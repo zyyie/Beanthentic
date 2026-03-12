@@ -22,9 +22,11 @@ class DashboardApp {
   setupEventListeners() {
     // Menu toggle
     const menuToggle = document.getElementById('menuToggle');
-    menuToggle.addEventListener('click', () => {
-      this.toggleSidePanel();
-    });
+    if (menuToggle) {
+      menuToggle.addEventListener('click', () => {
+        this.toggleSidePanel();
+      });
+    }
 
     // Navigation links
     const navLinks = document.querySelectorAll('.nav-link');
@@ -38,17 +40,21 @@ class DashboardApp {
 
     // Refresh button
     const refreshBtn = document.getElementById('refreshBtn');
-    refreshBtn.addEventListener('click', () => {
-      console.log('Refresh button clicked');
-      this.loadExcelData();
-    });
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        console.log('Refresh button clicked');
+        this.loadExcelData();
+      });
+    }
 
     // Export button
     const exportBtn = document.getElementById('exportBtn');
-    exportBtn.addEventListener('click', () => {
-      console.log('Export button clicked');
-      this.exportData();
-    });
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => {
+        console.log('Export button clicked');
+        this.exportData();
+      });
+    }
 
     // Export option buttons
     const exportOptionBtns = document.querySelectorAll('.export-option-btn');
@@ -93,6 +99,7 @@ class DashboardApp {
   toggleSidePanel() {
     const sidePanel = document.querySelector('.side-panel');
     const mainContent = document.querySelector('.main-content');
+    if (!sidePanel || !mainContent) return;
     
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
 
@@ -517,7 +524,12 @@ class DashboardApp {
     // Calculate statistics
     const totalFarmers = this.data.length;
     const totalTrees = this.data.reduce((sum, farmer) => sum + (farmer['TOTAL TREES'] || 0), 0);
-    const totalArea = this.data.reduce((sum, farmer) => sum + (farmer['Total Area Planted (HA.)'] || 0), 0);
+    const totalArea = this.data.reduce((sum, farmer) => {
+      const area = Number(
+        farmer['Total Area Planted (HA.)'] ?? farmer['TOTAL AREA PLANTED (HA.)'] ?? 0
+      );
+      return sum + (Number.isFinite(area) ? area : 0);
+    }, 0);
     const totalProduction = this.data.reduce((sum, farmer) => 
       sum + (farmer['LIBERICA PRODUCTION'] || 0) + (farmer['EXCELSA PRODUCTION'] || 0) + (farmer['ROBUSTA PRODUCTION'] || 0), 0
     );
@@ -532,6 +544,7 @@ class DashboardApp {
   }
 
   createCharts() {
+    if (!window.Chart) return;
     this.createTreeDistributionChart();
     this.createProductionChart();
   }

@@ -83,7 +83,8 @@ class App {
 
 // Initialize the app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-  new App();
+  if (window.__beanthenticAppInstance) return;
+  window.__beanthenticAppInstance = new App();
 });
 
 // Export for potential module usage

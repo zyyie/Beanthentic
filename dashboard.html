@@ -35,33 +35,33 @@
           <div class="nav-section">
             <h3>Overview</h3>
             <a href="#overview" class="nav-link active" data-module="overview">
-              <i class="nav-icon">📊</i>
+              <i class="nav-icon" aria-hidden="true">📊</i>
               <span>Dashboard Overview</span>
             </a>
           </div>
           <div class="nav-section">
             <h3>Data Management</h3>
             <a href="#farmers" class="nav-link" data-module="farmers">
-              <i class="nav-icon">👥</i>
+              <i class="nav-icon" aria-hidden="true">👥</i>
               <span>Farmer Records</span>
             </a>
             <a href="#analytics" class="nav-link" data-module="analytics">
-              <i class="nav-icon">📈</i>
+              <i class="nav-icon" aria-hidden="true">📈</i>
               <span>Analytics</span>
             </a>
             <a href="#reports" class="nav-link" data-module="reports">
-              <i class="nav-icon">📋</i>
+              <i class="nav-icon" aria-hidden="true">📋</i>
               <span>Reports</span>
             </a>
           </div>
           <div class="nav-section">
             <h3>Tools</h3>
             <a href="#export" class="nav-link" data-module="export">
-              <i class="nav-icon">📤</i>
+              <i class="nav-icon" aria-hidden="true">📤</i>
               <span>Export Data</span>
             </a>
             <a href="#settings" class="nav-link" data-module="settings">
-              <i class="nav-icon">⚙️</i>
+              <i class="nav-icon" aria-hidden="true">⚙️</i>
               <span>Settings</span>
             </a>
           </div>
@@ -84,11 +84,11 @@
           </div>
           <div class="header-right">
             <div class="header-actions">
-              <button class="action-btn" id="refreshBtn">
+              <button class="action-btn" id="refreshBtn" type="button">
                 <i class="action-icon">🔄</i>
                 <span>Refresh</span>
               </button>
-              <button class="action-btn" id="exportBtn">
+              <button class="action-btn" id="exportBtn" type="button">
                 <i class="action-icon">📤</i>
                 <span>Export</span>
               </button>
@@ -203,58 +203,57 @@
             <div class="table-container">
               <div class="table-wrapper">
                 <table id="farmerTable" class="data-table">
-            <thead>
-              <tr>
-                <th rowspan="3">No.</th>
-                <th rowspan="3">Name of Farmer</th>
-                <th rowspan="3">Address (Barangay)</th>
-                <th rowspan="3">FA Officer / Member</th>
-                <th rowspan="3">Birthday</th>
-                <th rowspan="3">Registered (Yes/No)</th>
-                <th rowspan="3">Status of Ownership</th>
-                <th rowspan="3">Total Area Planted (HA.)</th>
-                <th colspan="6">Existing Number of Trees</th>
-                <th colspan="3">Total Number of Trees</th>
-                <th colspan="3">Total Production (KILOS)</th>
-                <th rowspan="3">NCFRS</th>
-                <th rowspan="3">Remarks</th>
-              </tr>
-              <tr>
-                <th colspan="2">Liberica</th>
-                <th colspan="2">Excelsa</th>
-                <th colspan="2">Robusta</th>
-                <th rowspan="2">Bearing</th>
-                <th rowspan="2">Non-bearing</th>
-                <th rowspan="2">TOTAL</th>
-                <th rowspan="2">Liberica</th>
-                <th rowspan="2">Excelsa</th>
-                <th rowspan="2">Robusta</th>
-              </tr>
-              <tr>
-                <th>Bearing</th>
-                <th>Non-bearing</th>
-                <th>Bearing</th>
-                <th>Non-bearing</th>
-                <th>Bearing</th>
-                <th>Non-bearing</th>
-              </tr>
-            </thead>
-            <tbody id="tableBody">
-              <!-- Data will be populated here -->
-            </tbody>
-          </table>
-        </div>
-        
-        <div class="table-footer">
-          <div class="table-info">
-            <span id="recordInfo">Loading...</span>
-          </div>
-          <div class="pagination" id="pagination">
-            <!-- Pagination will be populated here -->
-          </div>
-        </div>
-      </div>
-    </div>
+                  <thead>
+                    <tr>
+                      <th rowspan="3">No.</th>
+                      <th rowspan="3">Name of Farmer</th>
+                      <th rowspan="3">Address (Barangay)</th>
+                      <th rowspan="3">FA Officer / Member</th>
+                      <th rowspan="3">Birthday</th>
+                      <th rowspan="3">Registered (Yes/No)</th>
+                      <th rowspan="3">Status of Ownership</th>
+                      <th rowspan="3">Total Area Planted (HA.)</th>
+                      <th colspan="6">Existing Number of Trees</th>
+                      <th colspan="3">Total Number of Trees</th>
+                      <th colspan="3">Total Production (KILOS)</th>
+                      <th rowspan="3">NCFRS</th>
+                      <th rowspan="3">Remarks</th>
+                    </tr>
+                    <tr>
+                      <th colspan="2">Liberica</th>
+                      <th colspan="2">Excelsa</th>
+                      <th colspan="2">Robusta</th>
+                      <th rowspan="2">Bearing</th>
+                      <th rowspan="2">Non-bearing</th>
+                      <th rowspan="2">TOTAL</th>
+                      <th rowspan="2">Liberica</th>
+                      <th rowspan="2">Excelsa</th>
+                      <th rowspan="2">Robusta</th>
+                    </tr>
+                    <tr>
+                      <th>Bearing</th>
+                      <th>Non-bearing</th>
+                      <th>Bearing</th>
+                      <th>Non-bearing</th>
+                      <th>Bearing</th>
+                      <th>Non-bearing</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tableBody">
+                    <!-- Data will be populated here -->
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="table-footer">
+                <div class="table-info">
+                  <span id="recordInfo">Loading...</span>
+                </div>
+                <div class="pagination" id="pagination">
+                  <!-- Pagination will be populated here -->
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Analytics Module -->

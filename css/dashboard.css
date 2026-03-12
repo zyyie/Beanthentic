@@ -17,10 +17,7 @@
   padding: 2rem 1.5rem;
 }
 
-.dashboard-header {
-  text-align: center;
-  margin-bottom: 2rem;
-}
+/* Note: the actual dashboard header is styled later as a sticky flex header. */
 
 .dashboard-title-section {
   margin-bottom: 1.5rem;
