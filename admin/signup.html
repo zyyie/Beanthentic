@@ -3,33 +3,46 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Beanthentic | Login</title>
+    <title>Beanthentic | Sign Up</title>
     <link rel="stylesheet" href="../css/base.css" />
     <link rel="stylesheet" href="../css/layout.css" />
     <link rel="stylesheet" href="../css/components.css" />
     <link rel="stylesheet" href="../css/responsive.css" />
-    <link rel="stylesheet" href="../css/login.css" />
+    <link rel="stylesheet" href="../css/signup.css" />
   </head>
 
   <body class="login-page">
     <main id="main" class="login-main">
       <div class="login-wrap">
-        <section class="card login-card-split" aria-label="Login form">
-          <div class="login-card-left" aria-hidden="true">
+        <section class="card signup-card-split" aria-label="Sign up form">
+          <div class="signup-card-left" aria-hidden="true">
             <img
               src="../assets/images/logo.png"
               alt="Beanthentic logo"
-              class="login-card-logo"
+              class="signup-card-logo"
             />
           </div>
 
-          <div class="login-card-right">
+          <div class="signup-card-right">
             <div class="card-header">
-              <h2 class="card-title">Welcome Admin!</h2>
-              <p class="card-desc">Enter your details to Log in.</p>
+              <h2 class="card-title">Create Admin Account</h2>
+              <p class="card-desc">Enter your details to sign up.</p>
             </div>
 
             <form class="form" action="#" method="post" novalidate>
+              <div class="field">
+                <label class="label" for="fullName">Full Name</label>
+                <input
+                  class="input"
+                  id="fullName"
+                  name="fullName"
+                  type="text"
+                  autocomplete="name"
+                  placeholder="Juan Dela Cruz"
+                  required
+                />
+              </div>
+
               <div class="field">
                 <label class="label" for="email">Email</label>
                 <input
@@ -44,35 +57,36 @@
               </div>
 
               <div class="field">
-                <div class="label-row">
-                  <label class="label" for="password">Password</label>
-                  <a class="link subtle" href="../forgot-password.html"
-                    >Forgot?</a
-                  >
-                </div>
+                <label class="label" for="password">Password</label>
                 <input
                   class="input"
                   id="password"
                   name="password"
                   type="password"
-                  autocomplete="current-password"
+                  autocomplete="new-password"
                   placeholder="••••••••"
                   required
                 />
               </div>
 
-              <div class="row">
-                <label class="checkbox">
-                  <input type="checkbox" name="remember" />
-                  <span>Remember me</span>
-                </label>
+              <div class="field">
+                <label class="label" for="confirmPassword">Confirm Password</label>
+                <input
+                  class="input"
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  autocomplete="new-password"
+                  placeholder="••••••••"
+                  required
+                />
               </div>
 
-              <button class="btn" type="submit">Log in</button>
+              <button class="btn" type="submit">Sign up</button>
 
               <p class="fineprint">
-                Don’t have an account?
-                <a class="link" href="./signup.html">Create one</a>
+                Already have an account?
+                <a class="link" href="./login.html">Log in</a>
               </p>
             </form>
           </div>

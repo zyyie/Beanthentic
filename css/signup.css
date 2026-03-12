@@ -1,4 +1,4 @@
-/* Login css styles */
+/* Signup css styles */
 
 .login-page {
   background: #0b3d2e;
@@ -33,12 +33,12 @@
 }
 
 /* Split card layout: left illustration/logo, right form */
-.login-card-split {
+.signup-card-split {
   display: flex;
   min-height: 380px;
 }
 
-.login-card-left {
+.signup-card-left {
   flex: 1;
   position: relative;
   background: #f5f7fb;
@@ -48,7 +48,7 @@
   padding: 2rem;
 }
 
-.login-card-left::before {
+.signup-card-left::before {
   content: "";
   position: absolute;
   width: 220px;
@@ -58,14 +58,14 @@
   opacity: 0.15;
 }
 
-.login-card-logo {
+.signup-card-logo {
   max-width: 200px;
   width: 100%;
   height: auto;
   filter: drop-shadow(0 18px 40px rgba(0, 0, 0, 0.4));
 }
 
-.login-card-right {
+.signup-card-right {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -196,7 +196,7 @@
   font-size: 0.9rem;
 }
 
-/* logo on login */
+/* logo on login/signup */
 .logo-img {
   height: 70px;
 }
@@ -206,19 +206,17 @@
     padding-inline: 1.1rem;
   }
 
-  .login-card-split {
+  .signup-card-split {
     flex-direction: column;
   }
 
-  .login-card-left::before {
+  .signup-card-left::before {
     width: 180px;
     height: 180px;
   }
-
   .card-header {
     padding: 1.25rem 1.15rem 0.2rem;
   }
-
   .form {
     padding: 0.9rem 1.15rem 1.25rem;
   }

@@ -1,24 +1,78 @@
 <!-- HOME / HERO SECTION -->
 <section id="home" class="hero">
   <div>
-    <div class="hero-tag">
-      <div class="hero-tag-dot"></div>
-      <span>Lorem Ipsum</span>
-    </div>
     <h1 class="hero-title">
-      Lorem ipsum <span>dolor sit amet</span> consectetur.
-    </h1>
+      Welcome to <span>Beanthentic</span> Coffee </h1>
     <p class="hero-subtitle">
-      Lorem ipsum dolor sit amet, consectetur adipisicing elit. Doloribus, accusantium. Vitae
-      explicabo repellat recusandae architecto, similique numquam perspiciatis.
+      Beanthentic Coffee is a platform that highlights the hard work of local farmers and the 
+      authenticity of their coffee beans. It showcases different coffee varieties such as Liberica, Robusta, and Excelsa, allowing consumers to 
+      learn about the origin, quality, and unique characteristics of each bean. Through Beanthentic, farmers can share their products while promoting transparency and appreciation for locally grown coffee.
     </p>
     <div class="hero-cta">
       <button class="btn-primary" onclick="document.getElementById('about').scrollIntoView({ behavior: 'smooth' })">
-        Lorem ipsum
+        About Us
       </button>
       <p class="hero-note">
-        Lorem ipsum dolor sit amet, <strong>consectetur adipiscing</strong>.
+        <strong>Explore the origins of authentic coffee beans and the farmers behind every harvest</strong>.
       </p>
+    </div>
+
+    <!-- Hero Slider (below title, before About Us) -->
+    <div class="hero-slider" aria-label="Featured images">
+      <div class="hero-slider-viewport">
+        <div class="hero-slider-track" role="list">
+          <div class="hero-slide" role="listitem" data-theme="one">
+            <img
+              class="hero-slide-img"
+              src="https://images.unsplash.com/photo-1517881426553-5d7d3abfbabf?auto=format&fit=crop&w=1600&q=80"
+              alt="Close-up coffee beans"
+              loading="lazy"
+              decoding="async"
+              referrerpolicy="no-referrer"
+            />
+            <div class="hero-slide-caption">
+              <strong>Liberica Beans</strong>
+              <span>Rich aroma, bold character</span>
+            </div>
+          </div>
+          <div class="hero-slide" role="listitem" data-theme="two">
+            <img
+              class="hero-slide-img"
+              src="https://images.unsplash.com/photo-1754648293032-090b43f4e45b?auto=format&fit=crop&w=1600&q=80"
+              alt="Hand holding ripe coffee cherries"
+              loading="lazy"
+              decoding="async"
+              referrerpolicy="no-referrer"
+            />
+            <div class="hero-slide-caption">
+              <strong>Harvest Season</strong>
+              <span>From cherries to beans</span>
+            </div>
+          </div>
+          <div class="hero-slide" role="listitem" data-theme="three">
+            <img
+              class="hero-slide-img"
+              src="https://images.unsplash.com/photo-1746623691136-afb227ca4229?auto=format&fit=crop&w=1600&q=80"
+              alt="Farmers harvesting coffee in a plantation"
+              loading="lazy"
+              decoding="async"
+              referrerpolicy="no-referrer"
+            />
+            <div class="hero-slide-caption">
+              <strong>Farmers</strong>
+              <span>Supporting sustainable coffee</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-slider-controls">
+        <div class="hero-slider-dots" role="tablist" aria-label="Choose slide">
+          <button class="hero-slider-dot" type="button" role="tab" aria-selected="true" data-slide="0"></button>
+          <button class="hero-slider-dot" type="button" role="tab" aria-selected="false" data-slide="1"></button>
+          <button class="hero-slider-dot" type="button" role="tab" aria-selected="false" data-slide="2"></button>
+        </div>
+      </div>
     </div>
   </div>
 </section>
