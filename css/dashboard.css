@@ -345,9 +345,15 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* Default: allow modules like Overview to scroll */
+  overflow: auto;
   position: relative;
   min-height: 0;
+}
+
+/* Farmer Records: keep scroll inside the table wrapper */
+.module-content.lock-scroll {
+  overflow: hidden;
 }
 
 /* Avoid global section padding from base.css inside the app layout */
@@ -852,6 +858,16 @@
   flex: 1;
   min-height: 0;
   border-radius: 8px;
+}
+
+/* Farmer Records: keep module fixed, table scrolls */
+#farmers-module {
+  min-height: 0;
+}
+
+#farmers-module .table-container {
+  flex: 1;
+  min-height: 0;
 }
 
 .data-table {

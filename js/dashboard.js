@@ -13,6 +13,11 @@ class DashboardApp {
     console.log('Dashboard initialized');
     this.setupEventListeners();
     this.charts = {};
+    // Default module is Overview, so ensure normal scrolling.
+    const moduleContent = document.querySelector('.module-content');
+    if (moduleContent) {
+      moduleContent.classList.remove('lock-scroll');
+    }
     // Auto-load farmer data when dashboard starts
     setTimeout(() => {
       this.loadExcelData();
@@ -173,6 +178,12 @@ class DashboardApp {
     const targetModule = document.getElementById(`${moduleName}-module`);
     if (targetModule) {
       targetModule.classList.remove('hidden');
+    }
+
+    // Scroll behavior: only lock page scroll for the Farmers module
+    const moduleContent = document.querySelector('.module-content');
+    if (moduleContent) {
+      moduleContent.classList.toggle('lock-scroll', moduleName === 'farmers');
     }
 
     // Close mobile menu
