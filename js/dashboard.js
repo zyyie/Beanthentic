@@ -153,15 +153,19 @@ class DashboardApp {
     if (!sidePanel || !mainContent) return;
     
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    const page = document.body;
 
     if (isMobile) {
       sidePanel.classList.toggle('mobile-open');
       mainContent.classList.toggle('expanded');
+      // On mobile, header should be full-width; keep "collapsed" state off.
+      page.classList.toggle('sidebar-collapsed', !sidePanel.classList.contains('mobile-open'));
       return;
     }
 
     sidePanel.classList.toggle('collapsed');
     mainContent.classList.toggle('expanded');
+    page.classList.toggle('sidebar-collapsed', sidePanel.classList.contains('collapsed'));
   }
 
   closeMobileSidePanel() {
@@ -171,6 +175,7 @@ class DashboardApp {
 
     sidePanel.classList.remove('mobile-open');
     mainContent.classList.remove('expanded');
+    document.body.classList.add('sidebar-collapsed');
   }
 
   syncSidePanelToViewport() {
@@ -183,6 +188,7 @@ class DashboardApp {
     if (isMobile) {
       // Desktop collapse state shouldn't leak into the mobile off-canvas.
       sidePanel.classList.remove('collapsed');
+      document.body.classList.remove('sidebar-collapsed');
       return;
     }
 
@@ -190,6 +196,9 @@ class DashboardApp {
     sidePanel.classList.remove('mobile-open');
     if (!sidePanel.classList.contains('collapsed')) {
       mainContent.classList.remove('expanded');
+      document.body.classList.remove('sidebar-collapsed');
+    } else {
+      document.body.classList.add('sidebar-collapsed');
     }
   }
 
