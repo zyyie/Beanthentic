@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Beanthentic Coffee - Dashboard</title>
+  
+  <!-- CSS Files -->
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  
+  <!-- Chart.js for data visualization -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- SheetJS for Excel file reading -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+</head>
+<body class="dashboard-page">
+  <!-- Header Component -->
+  <div id="header-component"></div>
+
+  <main class="dashboard-main">
+    <div class="dashboard-layout">
+      <!-- Side Panel -->
+      <aside class="side-panel">
+        <div class="side-panel-header">
+          <a class="side-brand" href="index.html" aria-label="Beanthentic home">
+            <img class="side-brand-img" src="assets/images/logo.png" alt="Beanthentic logo" />
+            <span class="side-brand-text">Beanthentic</span>
+          </a>
+        </div>
+        <nav class="side-nav">
+          <div class="nav-section">
+            <h3>Overview</h3>
+            <a href="#overview" class="nav-link active" data-module="overview">
+              <i class="nav-icon">📊</i>
+              <span>Dashboard Overview</span>
+            </a>
+          </div>
+          <div class="nav-section">
+            <h3>Data Management</h3>
+            <a href="#farmers" class="nav-link" data-module="farmers">
+              <i class="nav-icon">👥</i>
+              <span>Farmer Records</span>
+            </a>
+            <a href="#analytics" class="nav-link" data-module="analytics">
+              <i class="nav-icon">📈</i>
+              <span>Analytics</span>
+            </a>
+            <a href="#reports" class="nav-link" data-module="reports">
+              <i class="nav-icon">📋</i>
+              <span>Reports</span>
+            </a>
+          </div>
+          <div class="nav-section">
+            <h3>Tools</h3>
+            <a href="#export" class="nav-link" data-module="export">
+              <i class="nav-icon">📤</i>
+              <span>Export Data</span>
+            </a>
+            <a href="#settings" class="nav-link" data-module="settings">
+              <i class="nav-icon">⚙️</i>
+              <span>Settings</span>
+            </a>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content Area -->
+      <div class="main-content">
+        <!-- Header -->
+        <header class="dashboard-header">
+          <div class="header-left">
+            <button class="menu-toggle" id="menuToggle">
+              <i class="menu-icon">☰</i>
+            </button>
+            <div class="breadcrumb">
+              <span class="breadcrumb-item">Dashboard</span>
+              <span class="breadcrumb-separator">/</span>
+              <span class="breadcrumb-item active" id="currentModule">Overview</span>
+            </div>
+          </div>
+          <div class="header-right">
+            <div class="header-actions">
+              <button class="action-btn" id="refreshBtn">
+                <i class="action-icon">🔄</i>
+                <span>Refresh</span>
+              </button>
+              <button class="action-btn" id="exportBtn">
+                <i class="action-icon">📤</i>
+                <span>Export</span>
+              </button>
+            </div>
+            <div class="user-profile">
+              <div class="user-avatar">👤</div>
+              <div class="user-info">
+                <span class="user-name">Admin</span>
+                <span class="user-role">Administrator</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <!-- Module Content -->
+        <div class="module-content">
+          <!-- Overview Module -->
+          <div class="module" id="overview-module" data-module="overview">
+            <section class="dashboard-title-section">
+              <div class="dashboard-title-row">
+                <img class="dashboard-title-logo" src="assets/images/logo.png" alt="Beanthentic logo" />
+                <div>
+                  <h1 class="dashboard-title">Coffee Database Dashboard</h1>
+                  <p class="dashboard-subtitle">Farmer Records Management System</p>
+                </div>
+              </div>
+            </section>
+
+            <!-- Stats Cards Section -->
+            <section class="stats-section">
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <div class="stat-icon">👥</div>
+                  <div class="stat-content">
+                    <h3>Total Farmers</h3>
+                    <p class="stat-number" id="totalFarmers">0</p>
+                    <span class="stat-label">Registered farmers</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon">🌳</div>
+                  <div class="stat-content">
+                    <h3>Total Trees</h3>
+                    <p class="stat-number" id="totalTrees">0</p>
+                    <span class="stat-label">Coffee trees planted</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon">📊</div>
+                  <div class="stat-content">
+                    <h3>Total Area</h3>
+                    <p class="stat-number" id="totalArea">0</p>
+                    <span class="stat-label">Hectares planted</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon">☕</div>
+                  <div class="stat-content">
+                    <h3>Total Production</h3>
+                    <p class="stat-number" id="totalProduction">0</p>
+                    <span class="stat-label">Kilos produced</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Charts Section -->
+            <section class="charts-section">
+              <div class="charts-grid">
+                <div class="chart-card">
+                  <h3>Tree Distribution</h3>
+                  <div class="chart-container">
+                    <canvas id="treeChart"></canvas>
+                  </div>
+                </div>
+                <div class="chart-card">
+                  <h3>Production by Type</h3>
+                  <div class="chart-container">
+                    <canvas id="productionChart"></canvas>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- Farmers Module -->
+          <div class="module hidden" id="farmers-module" data-module="farmers">
+            <section class="module-header">
+              <h1>Farmer Records</h1>
+              <p>Manage and view all farmer information</p>
+            </section>
+
+            <section class="module-toolbar" aria-label="Farmer Records controls">
+              <div class="toolbar-left">
+                <label class="search-field" for="farmerSearch">
+                  <span class="field-label">Search</span>
+                  <input id="farmerSearch" type="search" placeholder="Search name, barangay, officer, NCFRS, remarks…" autocomplete="off" />
+                </label>
+              </div>
+              <div class="toolbar-right">
+                <label class="select-field" for="pageSizeSelect">
+                  <span class="field-label">Rows</span>
+                  <select id="pageSizeSelect">
+                    <option value="25">25</option>
+                    <option value="50" selected>50</option>
+                    <option value="100">100</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+            
+            <div class="table-container">
+              <div class="table-wrapper">
+                <table id="farmerTable" class="data-table">
+            <thead>
+              <tr>
+                <th rowspan="3">No.</th>
+                <th rowspan="3">Name of Farmer</th>
+                <th rowspan="3">Address (Barangay)</th>
+                <th rowspan="3">FA Officer / Member</th>
+                <th rowspan="3">Birthday</th>
+                <th rowspan="3">Registered (Yes/No)</th>
+                <th rowspan="3">Status of Ownership</th>
+                <th rowspan="3">Total Area Planted (HA.)</th>
+                <th colspan="6">Existing Number of Trees</th>
+                <th colspan="3">Total Number of Trees</th>
+                <th colspan="3">Total Production (KILOS)</th>
+                <th rowspan="3">NCFRS</th>
+                <th rowspan="3">Remarks</th>
+              </tr>
+              <tr>
+                <th colspan="2">Liberica</th>
+                <th colspan="2">Excelsa</th>
+                <th colspan="2">Robusta</th>
+                <th rowspan="2">Bearing</th>
+                <th rowspan="2">Non-bearing</th>
+                <th rowspan="2">TOTAL</th>
+                <th rowspan="2">Liberica</th>
+                <th rowspan="2">Excelsa</th>
+                <th rowspan="2">Robusta</th>
+              </tr>
+              <tr>
+                <th>Bearing</th>
+                <th>Non-bearing</th>
+                <th>Bearing</th>
+                <th>Non-bearing</th>
+                <th>Bearing</th>
+                <th>Non-bearing</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <!-- Data will be populated here -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="table-footer">
+          <div class="table-info">
+            <span id="recordInfo">Loading...</span>
+          </div>
+          <div class="pagination" id="pagination">
+            <!-- Pagination will be populated here -->
+          </div>
+        </div>
+      </div>
+    </div>
+          </div>
+
+          <!-- Analytics Module -->
+          <div class="module hidden" id="analytics-module" data-module="analytics">
+            <section class="module-header">
+              <h1>Analytics</h1>
+              <p>Deep insights into coffee farming data</p>
+            </section>
+            <div class="analytics-content">
+              <div class="placeholder-content">
+                <div class="placeholder-icon">📈</div>
+                <h3>Analytics Module</h3>
+                <p>Advanced analytics and reporting features coming soon</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reports Module -->
+          <div class="module hidden" id="reports-module" data-module="reports">
+            <section class="module-header">
+              <h1>Reports</h1>
+              <p>Generate and view detailed reports</p>
+            </section>
+            <div class="reports-content">
+              <div class="placeholder-content">
+                <div class="placeholder-icon">📋</div>
+                <h3>Reports Module</h3>
+                <p>Comprehensive reporting features coming soon</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Export Module -->
+          <div class="module hidden" id="export-module" data-module="export">
+            <section class="module-header">
+              <h1>Export Data</h1>
+              <p>Export your data in various formats</p>
+            </section>
+            <div class="export-content">
+              <div class="export-options">
+                <div class="export-card">
+                  <h3>📊 Excel Export</h3>
+                  <p>Export farmer data to Excel format</p>
+                  <button class="export-option-btn">Export to Excel</button>
+                </div>
+                <div class="export-card">
+                  <h3>📄 PDF Report</h3>
+                  <p>Generate PDF reports</p>
+                  <button class="export-option-btn">Generate PDF</button>
+                </div>
+                <div class="export-card">
+                  <h3>📈 CSV Export</h3>
+                  <p>Export data as CSV file</p>
+                  <button class="export-option-btn">Export to CSV</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Settings Module -->
+          <div class="module hidden" id="settings-module" data-module="settings">
+            <section class="module-header">
+              <h1>Settings</h1>
+              <p>Configure dashboard preferences</p>
+            </section>
+            <div class="settings-content">
+              <div class="placeholder-content">
+                <div class="placeholder-icon">⚙️</div>
+                <h3>Settings Module</h3>
+                <p>Dashboard configuration options coming soon</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer Component -->
+  <div id="footer-component"></div>
+
+  <!-- JavaScript Files -->
+  <script src="js/main.js"></script>
+  <script src="js/navigation.js"></script>
+  <script src="data/farmer-data.js"></script>
+  <script src="js/dashboard.js"></script>
+  
+  <!-- Component Loader -->
+  <script>
+    // Load HTML components
+    async function loadComponents() {
+      try {
+        const components = [
+          { id: 'header-component', file: 'components/header.html' },
+          { id: 'footer-component', file: 'components/footer.html' }
+        ];
+
+        for (const component of components) {
+          const response = await fetch(component.file);
+          const html = await response.text();
+          document.getElementById(component.id).innerHTML = html;
+        }
+
+        // Initialize dashboard after components are loaded
+        if (window.DashboardApp) {
+          new window.DashboardApp();
+        }
+      } catch (error) {
+        console.error('Error loading components:', error);
+      }
+    }
+
+    // Load components when DOM is ready
+    document.addEventListener('DOMContentLoaded', loadComponents);
+  </script>
+</body>
+</html>
