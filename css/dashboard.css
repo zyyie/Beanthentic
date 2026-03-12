@@ -3,12 +3,16 @@
 /* This page uses a full-bleed app layout; override the site's centered <main>. */
 .dashboard-page {
   background: #f6f7f9;
+  height: 100vh;
+  overflow: hidden; /* prevent page scroll; scroll happens inside panes */
 }
 
 .dashboard-page .dashboard-main {
   max-width: none;
   margin: 0;
   padding: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .dashboard-container {
@@ -59,8 +63,9 @@
 /* Dashboard Layout */
 .dashboard-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100%;
   background: #f6f7f9;
+  overflow: hidden;
 }
 
 /* Side Panel */
@@ -190,10 +195,13 @@
   position: relative;
   /* Keep the "page" fixed; scroll inside inner panes */
   height: 100vh;
+  width: calc(100% - 260px);
+  overflow: hidden;
 }
 
 .main-content.expanded {
   margin-left: 0;
+  width: 100%;
 }
 
 /* Dashboard Header */
@@ -345,7 +353,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  /* Default: allow modules like Overview to scroll */
+  /* Default: allow modules like Overview to scroll (inside app frame) */
   overflow: auto;
   position: relative;
   min-height: 0;
@@ -410,6 +418,61 @@
   display: flex;
   align-items: end;
   gap: 0.75rem;
+}
+
+.crud-actions {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+.crud-btn {
+  padding: 0.55rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(11, 61, 46, 0.22);
+  background: #0b3d2e;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease;
+  white-space: nowrap;
+}
+
+.crud-btn:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.crud-btn.secondary {
+  background: #fff;
+  color: #0b3d2e;
+}
+
+.cell-editable {
+  cursor: text;
+}
+
+.cell-editable:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(62, 166, 66, 0.55);
+  background: rgba(62, 166, 66, 0.08);
+}
+
+.row-action-btn {
+  padding: 0.35rem 0.6rem;
+  border-radius: 10px;
+  border: 1px solid rgba(220, 53, 69, 0.25);
+  background: rgba(220, 53, 69, 0.08);
+  color: #b02a37;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.row-action-btn:hover {
+  background: rgba(220, 53, 69, 0.14);
 }
 
 .search-field,
@@ -719,6 +782,7 @@
   
   .main-content {
     margin-left: 0;
+    width: 100%;
   }
   
   .dashboard-header {
@@ -850,6 +914,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  max-width: 100%;
 }
 
 .table-wrapper {
@@ -858,6 +923,38 @@
   flex: 1;
   min-height: 0;
   border-radius: 8px;
+  max-width: 100%;
+}
+
+/* Farmers: split table into two views */
+.table-view-toggle {
+  display: inline-flex;
+  gap: 0.35rem;
+  padding: 0.25rem;
+  border-radius: 12px;
+  background: rgba(11, 61, 46, 0.06);
+  border: 1px solid rgba(11, 61, 46, 0.14);
+}
+
+.view-toggle-btn {
+  border: 0;
+  background: transparent;
+  color: #0b3d2e;
+  padding: 0.45rem 0.75rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.view-toggle-btn.active {
+  background: #0b3d2e;
+  color: #fff;
+}
+
+.data-table.is-hidden {
+  display: none;
 }
 
 /* Farmer Records: keep module fixed, table scrolls */
@@ -874,9 +971,13 @@
   width: 100%;
   border-collapse: collapse;
   background: #fff9f2;
-  table-layout: auto;
+  table-layout: fixed;
   font-size: 0.75rem;
-  min-width: 1200px;
+  /* allow horizontal scroll without visual overlap */
+  min-width: max-content;
+  /* Approx header row heights for sticky offsets */
+  --thead-row-1: 38px;
+  --thead-row-2: 34px;
 }
 
 .data-table th {
@@ -888,12 +989,31 @@
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 0.01em;
-  /* Multi-row headers don't play well with sticky positioning */
-  position: static;
+  /* Sticky multi-row table header (works inside .table-wrapper scroll) */
+  position: sticky;
   border: 1px solid rgba(255, 255, 255, 0.3);
   vertical-align: middle;
-  white-space: normal;
+  white-space: nowrap;
   line-height: 1.2;
+  z-index: 3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 3-row THEAD: stack without overlap */
+.data-table thead tr:nth-child(1) th {
+  top: 0;
+  z-index: 6;
+}
+
+.data-table thead tr:nth-child(2) th {
+  top: var(--thead-row-1);
+  z-index: 5;
+}
+
+.data-table thead tr:nth-child(3) th {
+  top: calc(var(--thead-row-1) + var(--thead-row-2));
+  z-index: 4;
 }
 
 .data-table td {
@@ -904,6 +1024,21 @@
   text-align: center;
   vertical-align: middle;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Per-view minimum widths (prevents cramped headers) */
+#farmerTableBasic {
+  min-width: 980px;
+}
+
+#farmerTableTrees {
+  min-width: 1100px;
+}
+
+#farmerTableProduction {
+  min-width: 980px;
 }
 
 .data-table td:first-child,
