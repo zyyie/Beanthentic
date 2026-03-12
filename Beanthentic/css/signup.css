@@ -1,6 +1,7 @@
-/* Login page-only styles */
+/* Signup page-only styles */
 
-body.login-page {
+/* Teal background + centered card (keeps existing card size) */
+body.signup-page {
   background: radial-gradient(circle at 20% 10%, rgba(45, 212, 191, 0.22), transparent 50%),
     radial-gradient(circle at 80% 0%, rgba(16, 185, 129, 0.18), transparent 55%),
     linear-gradient(180deg, #064e4a 0%, #0b3d2e 100%);
@@ -9,7 +10,7 @@ body.login-page {
   flex-direction: column;
 }
 
-body.login-page .login-main {
+body.signup-page .login-main {
   flex: 1;
   display: flex;
   align-items: center;
@@ -17,12 +18,13 @@ body.login-page .login-main {
   padding-bottom: 1.25rem;
 }
 
-body.login-page .login-wrap {
+body.signup-page .login-wrap {
   width: 100%;
   align-items: center;
   min-height: 100%;
 }
 
+/* Card + form styling (same as login page) */
 .login-main {
   max-width: 1100px;
   margin: 0 auto;
@@ -100,29 +102,6 @@ body.login-page .login-wrap {
   box-shadow: 0 0 0 4px rgba(62, 166, 66, 0.18);
 }
 
-.row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-top: 0.15rem;
-}
-
-.checkbox {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-  color: #6a574c;
-  font-size: 0.92rem;
-  user-select: none;
-}
-
-.checkbox input {
-  width: 16px;
-  height: 16px;
-  accent-color: #3ea642;
-}
-
 .btn {
   margin-top: 0.35rem;
   width: 100%;
@@ -164,5 +143,17 @@ body.login-page .login-wrap {
   text-align: center;
   color: #7a6a5f;
   font-size: 0.9rem;
+}
+
+@media (max-width: 740px) {
+  .login-main {
+    padding-inline: 1.1rem;
+  }
+  .card-header {
+    padding: 1.25rem 1.15rem 0.2rem;
+  }
+  .form {
+    padding: 0.9rem 1.15rem 1.25rem;
+  }
 }
 
