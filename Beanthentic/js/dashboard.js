@@ -59,6 +59,28 @@ class DashboardApp {
         this.handleExport(exportType);
       });
     });
+
+    // Farmer table search
+    const farmerSearch = document.getElementById('farmerSearch');
+    if (farmerSearch) {
+      farmerSearch.addEventListener('input', (e) => {
+        const term = (e.target.value || '').toString().trim().toLowerCase();
+        this.filterData(term);
+      });
+    }
+
+    // Page size selector
+    const pageSizeSelect = document.getElementById('pageSizeSelect');
+    if (pageSizeSelect) {
+      pageSizeSelect.addEventListener('change', (e) => {
+        const nextSize = Number.parseInt(e.target.value, 10);
+        if (Number.isFinite(nextSize) && nextSize > 0) {
+          this.pageSize = nextSize;
+          this.currentPage = 1;
+          this.updateTable();
+        }
+      });
+    }
   }
 
   toggleSidePanel() {

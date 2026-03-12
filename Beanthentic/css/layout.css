@@ -29,15 +29,31 @@ header {
 }
 
 .logo-img {
-  height: 90px;
+  height: 44px;
   width: auto;
   display: block;
 }
+
 
 .nav-links {
   display: flex;
   gap: 1.5rem;
   font-size: 0.95rem;
+}
+
+/* Dashboard uses a fixed left sidebar: keep header aligned */
+.dashboard-page header .nav {
+  max-width: none;
+  margin: 0;
+  padding-left: calc(260px + 1.5rem);
+  padding-right: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .dashboard-page header .nav {
+    padding-left: 1.1rem;
+    padding-right: 1.1rem;
+  }
 }
 
 .nav-links a {

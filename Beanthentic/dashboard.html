@@ -17,19 +17,19 @@
   <!-- SheetJS for Excel file reading -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 </head>
-<body>
+<body class="dashboard-page">
   <!-- Header Component -->
   <div id="header-component"></div>
 
-  <main>
+  <main class="dashboard-main">
     <div class="dashboard-layout">
       <!-- Side Panel -->
       <aside class="side-panel">
         <div class="side-panel-header">
-          <div class="logo">
-            <h2>☕ Beanthentic</h2>
-            <span>Dashboard</span>
-          </div>
+          <a class="side-brand" href="index.html" aria-label="Beanthentic home">
+            <img class="side-brand-img" src="assets/images/logo.png" alt="Beanthentic logo" />
+            <span class="side-brand-text">Beanthentic</span>
+          </a>
         </div>
         <nav class="side-nav">
           <div class="nav-section">
@@ -108,8 +108,13 @@
           <!-- Overview Module -->
           <div class="module" id="overview-module" data-module="overview">
             <section class="dashboard-title-section">
-              <h1 class="dashboard-title">Coffee Database Dashboard</h1>
-              <p class="dashboard-subtitle">Farmer Records Management System</p>
+              <div class="dashboard-title-row">
+                <img class="dashboard-title-logo" src="assets/images/logo.png" alt="Beanthentic logo" />
+                <div>
+                  <h1 class="dashboard-title">Coffee Database Dashboard</h1>
+                  <p class="dashboard-subtitle">Farmer Records Management System</p>
+                </div>
+              </div>
             </section>
 
             <!-- Stats Cards Section -->
@@ -174,6 +179,25 @@
             <section class="module-header">
               <h1>Farmer Records</h1>
               <p>Manage and view all farmer information</p>
+            </section>
+
+            <section class="module-toolbar" aria-label="Farmer Records controls">
+              <div class="toolbar-left">
+                <label class="search-field" for="farmerSearch">
+                  <span class="field-label">Search</span>
+                  <input id="farmerSearch" type="search" placeholder="Search name, barangay, officer, NCFRS, remarks…" autocomplete="off" />
+                </label>
+              </div>
+              <div class="toolbar-right">
+                <label class="select-field" for="pageSizeSelect">
+                  <span class="field-label">Rows</span>
+                  <select id="pageSizeSelect">
+                    <option value="25">25</option>
+                    <option value="50" selected>50</option>
+                    <option value="100">100</option>
+                  </select>
+                </label>
+              </div>
             </section>
             
             <div class="table-container">

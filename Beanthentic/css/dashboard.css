@@ -1,5 +1,16 @@
 /* Dashboard specific styles */
 
+/* This page uses a full-bleed app layout; override the site's centered <main>. */
+.dashboard-page {
+  background: #f6f7f9;
+}
+
+.dashboard-page .dashboard-main {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
 .dashboard-container {
   max-width: 1400px;
   margin: 0 auto;
@@ -13,6 +24,20 @@
 
 .dashboard-title-section {
   margin-bottom: 1.5rem;
+}
+
+.dashboard-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.dashboard-title-logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.12));
 }
 
 .dashboard-title {
@@ -33,13 +58,13 @@
 .dashboard-layout {
   display: flex;
   min-height: 100vh;
-  background: #f8f9fa;
+  background: #f6f7f9;
 }
 
 /* Side Panel */
 .side-panel {
   width: 260px;
-  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+  background: linear-gradient(180deg, #0b3d2e 0%, #0f5132 55%, #0b3d2e 100%);
   color: white;
   position: fixed;
   left: 0;
@@ -78,18 +103,27 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.logo h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
+.side-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   color: #fff;
+  text-decoration: none;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.logo span {
-  display: block;
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.7);
-  margin-top: 0.25rem;
+.side-brand-img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.side-brand-text {
+  font-size: 1.05rem;
+  line-height: 1;
 }
 
 .side-nav {
@@ -126,13 +160,13 @@
 .nav-link:hover {
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
-  border-left-color: #3498db;
+  border-left-color: #3ea642;
 }
 
 .nav-link.active {
-  background: rgba(52, 152, 219, 0.2);
+  background: rgba(62, 166, 66, 0.18);
   color: #fff;
-  border-left-color: #3498db;
+  border-left-color: #3ea642;
 }
 
 .nav-icon {
@@ -146,7 +180,7 @@
 .main-content {
   flex: 1;
   margin-left: 260px;
-  background: #f8f9fa;
+  background: #f6f7f9;
   min-height: 100vh;
   transition: margin-left 0.3s ease;
   display: flex;
@@ -229,8 +263,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
+  background: #f6f7f9;
+  border: 1px solid rgba(11, 61, 46, 0.16);
   border-radius: 6px;
   font-size: 0.9rem;
   cursor: pointer;
@@ -238,8 +272,8 @@
 }
 
 .action-btn:hover {
-  background: #e9ecef;
-  border-color: #adb5bd;
+  background: rgba(11, 61, 46, 0.06);
+  border-color: rgba(11, 61, 46, 0.28);
 }
 
 .user-profile {
@@ -292,6 +326,11 @@
   position: relative;
 }
 
+/* Avoid global section padding from base.css inside the app layout */
+.module-content section {
+  padding: 0;
+}
+
 .module {
   display: block;
 }
@@ -315,6 +354,60 @@
   margin: 0;
   color: #6c757d;
   font-size: 1.1rem;
+}
+
+/* Farmers module toolbar */
+.module-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.search-field,
+.select-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.field-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #6c757d;
+}
+
+#farmerSearch {
+  width: min(520px, 76vw);
+  padding: 0.65rem 0.9rem;
+  border: 1px solid rgba(11, 61, 46, 0.18);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #25130c;
+  outline: none;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+#farmerSearch:focus {
+  border-color: rgba(62, 166, 66, 0.6);
+  box-shadow: 0 0 0 4px rgba(62, 166, 66, 0.16);
+}
+
+#pageSizeSelect {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid rgba(11, 61, 46, 0.18);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #25130c;
+  outline: none;
 }
 
 /* Dashboard Container */
@@ -717,6 +810,7 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(212, 177, 141, 0.3);
   overflow-x: auto;
+  width: 100%;
 }
 
 .table-wrapper {
@@ -742,12 +836,11 @@
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 0.01em;
-  position: sticky;
-  top: 0;
-  z-index: 5;
+  /* Multi-row headers don't play well with sticky positioning */
+  position: static;
   border: 1px solid rgba(255, 255, 255, 0.3);
   vertical-align: middle;
-  white-space: nowrap;
+  white-space: normal;
   line-height: 1.2;
 }
 
