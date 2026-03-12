@@ -3,12 +3,16 @@
 /* This page uses a full-bleed app layout; override the site's centered <main>. */
 .dashboard-page {
   background: #f6f7f9;
+  height: 100vh;
+  overflow: hidden; /* prevent page scroll; scroll happens inside panes */
 }
 
 .dashboard-page .dashboard-main {
   max-width: none;
   margin: 0;
   padding: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .dashboard-container {
@@ -59,15 +63,16 @@
 /* Dashboard Layout */
 .dashboard-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100%;
   background: #f6f7f9;
+  overflow: hidden;
 }
 
 /* Side Panel */
 .side-panel {
   width: 260px;
-  background: linear-gradient(180deg, #0b3d2e 0%, #0f5132 55%, #0b3d2e 100%);
-  color: white;
+  background: #ffffff;
+  color: #2c3e50;
   position: fixed;
   left: 0;
   top: 0;
@@ -101,15 +106,17 @@
 }
 
 .side-panel-header {
-  padding: 2rem 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 2rem 1.25rem 1.35rem;
+  border-bottom: 1px solid rgba(11, 61, 46, 0.12);
 }
 
 .side-brand {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.6rem;
-  color: #fff;
+  justify-content: center;
+  gap: 0.65rem;
+  color: #0b3d2e;
   text-decoration: none;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -117,15 +124,17 @@
 }
 
 .side-brand-img {
-  width: 42px;
-  height: 42px;
+  width: 110px;
+  height: 110px;
   object-fit: contain;
   flex: 0 0 auto;
+  filter: drop-shadow(0 10px 18px rgba(120, 78, 49, 0.18));
 }
 
 .side-brand-text {
-  font-size: 1.05rem;
-  line-height: 1;
+  font-size: 1.1rem;
+  line-height: 1.05;
+  text-align: center;
 }
 
 .side-nav {
@@ -141,7 +150,7 @@
   margin: 0 0 1rem 0;
   font-size: 0.8rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
+  color: #6c757d;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -150,25 +159,35 @@
   display: flex;
   align-items: center;
   padding: 0.875rem 1.5rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: #495057;
   text-decoration: none;
   font-size: 0.95rem;
   font-weight: 500;
   transition: all 0.3s ease;
-  border-left: 3px solid transparent;
   cursor: pointer;
+  border-radius: 10px;
+  margin: 0.2rem 0.75rem;
+  position: relative;
 }
 
 .nav-link:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  border-left-color: #3ea642;
+  background: linear-gradient(135deg, rgba(139, 74, 43, 0.92), rgba(62, 166, 66, 0.92));
+  color: #ffffff;
+  border-left-color: transparent;
+  box-shadow: 0 12px 26px rgba(120, 78, 49, 0.14);
 }
 
 .nav-link.active {
-  background: rgba(62, 166, 66, 0.18);
-  color: #fff;
-  border-left-color: #3ea642;
+  background: linear-gradient(135deg, rgba(139, 74, 43, 0.96), rgba(62, 166, 66, 0.96));
+  color: #ffffff;
+  border-left-color: transparent;
+  box-shadow: 0 14px 30px rgba(120, 78, 49, 0.18);
+}
+
+.nav-link:focus-visible {
+  outline: none;
+  box-shadow:
+    0 14px 30px rgba(120, 78, 49, 0.18);
 }
 
 .nav-icon {
@@ -190,10 +209,13 @@
   position: relative;
   /* Keep the "page" fixed; scroll inside inner panes */
   height: 100vh;
+  width: calc(100% - 260px);
+  overflow: hidden;
 }
 
 .main-content.expanded {
   margin-left: 0;
+  width: 100%;
 }
 
 /* Dashboard Header */
@@ -242,9 +264,24 @@
 }
 
 .menu-icon {
-  display: block;
-  line-height: 1;
-  font-size: clamp(1.15rem, 3.2vw, 1.55rem);
+  width: 22px;
+  height: 16px;
+  display: grid;
+  align-content: space-between;
+  justify-items: center;
+}
+
+.menu-bar {
+  width: 100%;
+  height: 2px;
+  border-radius: 999px;
+  background: #1b2b25;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: transform 0.22s ease, opacity 0.22s ease, background-color 0.22s ease;
+}
+
+.menu-toggle:hover .menu-bar {
+  background: #147539;
 }
 
 .breadcrumb {
@@ -318,7 +355,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
+  color: #ffffff;
+}
+
+.user-avatar i {
+  line-height: 1;
 }
 
 .user-info {
@@ -345,9 +387,15 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* Default: allow modules like Overview to scroll (inside app frame) */
+  overflow: auto;
   position: relative;
   min-height: 0;
+}
+
+/* Farmer Records: keep scroll inside the table wrapper */
+.module-content.lock-scroll {
+  overflow: hidden;
 }
 
 /* Avoid global section padding from base.css inside the app layout */
@@ -404,6 +452,61 @@
   display: flex;
   align-items: end;
   gap: 0.75rem;
+}
+
+.crud-actions {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+.crud-btn {
+  padding: 0.55rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(11, 61, 46, 0.22);
+  background: #0b3d2e;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease;
+  white-space: nowrap;
+}
+
+.crud-btn:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.crud-btn.secondary {
+  background: #fff;
+  color: #0b3d2e;
+}
+
+.cell-editable {
+  cursor: text;
+}
+
+.cell-editable:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(62, 166, 66, 0.55);
+  background: rgba(62, 166, 66, 0.08);
+}
+
+.row-action-btn {
+  padding: 0.35rem 0.6rem;
+  border-radius: 10px;
+  border: 1px solid rgba(220, 53, 69, 0.25);
+  background: rgba(220, 53, 69, 0.08);
+  color: #b02a37;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.row-action-btn:hover {
+  background: rgba(220, 53, 69, 0.14);
 }
 
 .search-field,
@@ -464,14 +567,14 @@
 }
 
 .stat-card {
-  background: white;
+  background: linear-gradient(135deg, #8b4a2b, #3ea642);
   border-radius: 12px;
   padding: 1.25rem;
-  color: #2c3e50;
+  color: #ffffff;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(212, 177, 141, 0.2);
+  box-shadow: 0 12px 26px rgba(15, 40, 24, 0.25);
+  border: 1px solid rgba(0, 0, 0, 0.04);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
@@ -487,7 +590,7 @@
   right: 0;
   width: 100px;
   height: 100px;
-  background: linear-gradient(135deg, rgba(139, 74, 43, 0.1), rgba(62, 166, 66, 0.1));
+  background: radial-gradient(circle at 0 0, rgba(255, 255, 255, 0.25), transparent 60%);
   border-radius: 50%;
   transform: translate(30px, -30px);
 }
@@ -498,23 +601,27 @@
   opacity: 0.8;
 }
 
+.stat-icon i {
+  line-height: 1;
+}
+
 .stat-content h3 {
   margin: 0 0 0.5rem 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #6c757d;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .stat-number {
   font-size: 2.5rem;
   font-weight: 700;
   margin: 0.5rem 0;
-  color: #2c3e50;
+  color: #ffffff;
 }
 
 .stat-label {
   font-size: 0.9rem;
-  color: #6c757d;
+  color: rgba(255, 255, 255, 0.86);
 }
 
 /* Charts Section */
@@ -530,18 +637,22 @@
 }
 
 .chart-card {
-  background: white;
-  border-radius: 16px;
-  padding: 1.5rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(212, 177, 141, 0.2);
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 1.75rem 1.6rem 1.6rem;
+  box-shadow:
+    0 18px 35px rgba(15, 40, 24, 0.12),
+    0 0 0 1px rgba(15, 40, 24, 0.02);
+  border: 1px solid rgba(223, 227, 231, 0.9);
+  overflow: hidden;
 }
 
 .chart-card h3 {
-  margin: 0 0 1rem 0;
-  color: #25130c;
-  font-size: 1.1rem;
-  font-weight: 600;
+  margin: 0 0 1.25rem 0;
+  color: #1f2933;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .chart-container {
@@ -632,9 +743,17 @@
 }
 
 .placeholder-icon {
-  font-size: 4rem;
+  font-size: 3rem;
   margin-bottom: 1rem;
   opacity: 0.5;
+}
+
+.placeholder-icon i {
+  line-height: 1;
+}
+
+.card-heading-icon {
+  margin-right: 0.5rem;
 }
 
 .placeholder-content h3 {
@@ -713,6 +832,7 @@
   
   .main-content {
     margin-left: 0;
+    width: 100%;
   }
   
   .dashboard-header {
@@ -844,6 +964,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  max-width: 100%;
 }
 
 .table-wrapper {
@@ -852,15 +973,61 @@
   flex: 1;
   min-height: 0;
   border-radius: 8px;
+  max-width: 100%;
+}
+
+/* Farmers: split table into two views */
+.table-view-toggle {
+  display: inline-flex;
+  gap: 0.35rem;
+  padding: 0.25rem;
+  border-radius: 12px;
+  background: rgba(11, 61, 46, 0.06);
+  border: 1px solid rgba(11, 61, 46, 0.14);
+}
+
+.view-toggle-btn {
+  border: 0;
+  background: transparent;
+  color: #0b3d2e;
+  padding: 0.45rem 0.75rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.view-toggle-btn.active {
+  background: #0b3d2e;
+  color: #fff;
+}
+
+.data-table.is-hidden {
+  display: none;
+}
+
+/* Farmer Records: keep module fixed, table scrolls */
+#farmers-module {
+  min-height: 0;
+}
+
+#farmers-module .table-container {
+  flex: 1;
+  min-height: 0;
 }
 
 .data-table {
   width: 100%;
   border-collapse: collapse;
   background: #fff9f2;
-  table-layout: auto;
+  table-layout: fixed;
   font-size: 0.75rem;
-  min-width: 1200px;
+  /* allow horizontal scroll without visual overlap */
+  min-width: max-content;
+  /* Approx header row heights for sticky offsets */
+  --thead-row-1: 38px;
+  --thead-row-2: 34px;
 }
 
 .data-table th {
@@ -872,12 +1039,31 @@
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 0.01em;
-  /* Multi-row headers don't play well with sticky positioning */
-  position: static;
+  /* Sticky multi-row table header (works inside .table-wrapper scroll) */
+  position: sticky;
   border: 1px solid rgba(255, 255, 255, 0.3);
   vertical-align: middle;
-  white-space: normal;
+  white-space: nowrap;
   line-height: 1.2;
+  z-index: 3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 3-row THEAD: stack without overlap */
+.data-table thead tr:nth-child(1) th {
+  top: 0;
+  z-index: 6;
+}
+
+.data-table thead tr:nth-child(2) th {
+  top: var(--thead-row-1);
+  z-index: 5;
+}
+
+.data-table thead tr:nth-child(3) th {
+  top: calc(var(--thead-row-1) + var(--thead-row-2));
+  z-index: 4;
 }
 
 .data-table td {
@@ -888,6 +1074,21 @@
   text-align: center;
   vertical-align: middle;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Per-view minimum widths (prevents cramped headers) */
+#farmerTableBasic {
+  min-width: 980px;
+}
+
+#farmerTableTrees {
+  min-width: 1100px;
+}
+
+#farmerTableProduction {
+  min-width: 980px;
 }
 
 .data-table td:first-child,

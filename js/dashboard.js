@@ -6,6 +6,7 @@ class DashboardApp {
     this.currentPage = 1;
     this.pageSize = 10;
     this.totalRecords = 0;
+    this.farmerTableView = 'basic';
     this.init();
   }
 
@@ -13,6 +14,11 @@ class DashboardApp {
     console.log('Dashboard initialized');
     this.setupEventListeners();
     this.charts = {};
+    // Default module is Overview, so ensure normal scrolling.
+    const moduleContent = document.querySelector('.module-content');
+    if (moduleContent) {
+      moduleContent.classList.remove('lock-scroll');
+    }
     // Auto-load farmer data when dashboard starts
     setTimeout(() => {
       this.loadExcelData();
@@ -88,6 +94,51 @@ class DashboardApp {
       });
     }
 
+    // Farmer table view toggle
+    const viewToggleBtns = document.querySelectorAll('[data-table-view]');
+    viewToggleBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.setFarmerTableView(btn.dataset.tableView || 'basic');
+      });
+    });
+
+    // Farmer CRUD actions
+    const addFarmerBtn = document.getElementById('addFarmerBtn');
+    if (addFarmerBtn) {
+      addFarmerBtn.addEventListener('click', () => this.addFarmer());
+    }
+
+    const saveFarmersBtn = document.getElementById('saveFarmersBtn');
+    if (saveFarmersBtn) {
+      saveFarmersBtn.addEventListener('click', () => this.saveFarmers());
+    }
+
+    // Inline edit + row delete (event delegation)
+    document.addEventListener('click', (e) => {
+      const delBtn = e.target.closest('[data-action="delete-farmer"]');
+      if (!delBtn) return;
+      const idx = Number.parseInt(delBtn.getAttribute('data-row-index') || '', 10);
+      if (!Number.isFinite(idx) || idx < 0) return;
+      this.deleteFarmer(idx);
+    });
+
+    document.addEventListener(
+      'blur',
+      (e) => {
+        const cell = e.target.closest('[data-field][data-row-index]');
+        if (!cell) return;
+        if (cell.getAttribute('contenteditable') !== 'true') return;
+
+        const idx = Number.parseInt(cell.getAttribute('data-row-index') || '', 10);
+        const field = cell.getAttribute('data-field') || '';
+        if (!Number.isFinite(idx) || idx < 0 || !field) return;
+
+        const rawValue = (cell.textContent || '').trim();
+        this.updateFarmerField(idx, field, rawValue);
+      },
+      true
+    );
+
     // Keep sidebar state consistent when resizing across breakpoints.
     window.addEventListener('resize', () => {
       this.syncSidePanelToViewport();
@@ -102,15 +153,19 @@ class DashboardApp {
     if (!sidePanel || !mainContent) return;
     
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    const page = document.body;
 
     if (isMobile) {
       sidePanel.classList.toggle('mobile-open');
       mainContent.classList.toggle('expanded');
+      // On mobile, header should be full-width; keep "collapsed" state off.
+      page.classList.toggle('sidebar-collapsed', !sidePanel.classList.contains('mobile-open'));
       return;
     }
 
     sidePanel.classList.toggle('collapsed');
     mainContent.classList.toggle('expanded');
+    page.classList.toggle('sidebar-collapsed', sidePanel.classList.contains('collapsed'));
   }
 
   closeMobileSidePanel() {
@@ -120,6 +175,7 @@ class DashboardApp {
 
     sidePanel.classList.remove('mobile-open');
     mainContent.classList.remove('expanded');
+    document.body.classList.add('sidebar-collapsed');
   }
 
   syncSidePanelToViewport() {
@@ -132,6 +188,7 @@ class DashboardApp {
     if (isMobile) {
       // Desktop collapse state shouldn't leak into the mobile off-canvas.
       sidePanel.classList.remove('collapsed');
+      document.body.classList.remove('sidebar-collapsed');
       return;
     }
 
@@ -139,6 +196,9 @@ class DashboardApp {
     sidePanel.classList.remove('mobile-open');
     if (!sidePanel.classList.contains('collapsed')) {
       mainContent.classList.remove('expanded');
+      document.body.classList.remove('sidebar-collapsed');
+    } else {
+      document.body.classList.add('sidebar-collapsed');
     }
   }
 
@@ -175,6 +235,12 @@ class DashboardApp {
       targetModule.classList.remove('hidden');
     }
 
+    // Scroll behavior: only lock page scroll for the Farmers module
+    const moduleContent = document.querySelector('.module-content');
+    if (moduleContent) {
+      moduleContent.classList.toggle('lock-scroll', moduleName === 'farmers');
+    }
+
     // Close mobile menu
     if (window.innerWidth <= 768) {
       this.closeMobileSidePanel();
@@ -195,9 +261,14 @@ class DashboardApp {
     try {
       console.log('Loading farmer data from data file...');
       
-      // Use the actual farmer data from the data file
-      if (window.farmerData && window.farmerData.length > 0) {
-        this.data = window.farmerData;
+      // Prefer admin-edited data (localStorage), then fall back to seeded data
+      const saved = this.loadSavedFarmers();
+      const source = (Array.isArray(saved) && saved.length)
+        ? saved
+        : (window.farmerData && window.farmerData.length > 0 ? window.farmerData : null);
+
+      if (source) {
+        this.data = source;
         this.filteredData = [...this.data];
         this.totalRecords = this.data.length;
         
@@ -311,7 +382,12 @@ class DashboardApp {
   }
 
   renderTableBody() {
-    const tableBody = document.getElementById('tableBody');
+    const tableBody =
+      this.farmerTableView === 'trees'
+        ? document.getElementById('tableBodyTrees')
+        : this.farmerTableView === 'production'
+          ? document.getElementById('tableBodyProduction')
+          : document.getElementById('tableBodyBasic');
     console.log('Rendering table, total data length:', this.filteredData.length);
     
     if (!tableBody) {
@@ -326,51 +402,98 @@ class DashboardApp {
     console.log('Page data:', pageData.length, 'records from', startIndex, 'to', endIndex);
 
     if (pageData.length === 0) {
-      tableBody.innerHTML = '<tr><td colspan="20" class="no-data">No data available. Click "Load Excel Data" to load farmer records.</td></tr>';
+      const colSpan =
+        this.farmerTableView === 'trees'
+          ? 12
+          : this.farmerTableView === 'production'
+            ? 9
+            : 11;
+      tableBody.innerHTML = `<tr><td colspan="${colSpan}" class="no-data">No data available.</td></tr>`;
       return;
     }
 
     const bodyHTML = pageData.map((row, index) => {
       const actualIndex = startIndex + index + 1;
+      const rowIndexInData = this.data.indexOf(row);
       console.log('Rendering farmer', actualIndex, ':', row['NAME OF FARMER'] || 'Unknown');
-      
-      const cells = [
-        this.createInputCell(actualIndex, 'number'),
-        this.createInputCell(this.getValue(row, ['NAME OF FARMER', 'Name of Farmer', 'name']), 'text'),
-        this.createInputCell(this.getValue(row, ['ADDRESS (BARANGAY)', 'Address (Barangay)', 'address']), 'text'),
-        this.createInputCell(this.getValue(row, ['FA OFFICER / MEMBER', 'FA Officer / member', 'officer']), 'text'),
-        this.createInputCell(this.getValue(row, ['BIRTHDAY', 'birthday']), 'text'),
-        this.createInputCell(this.getValue(row, ['RSBSA Registered (Yes/No)', 'REGISTERED (YES/NO)', 'Registered (Yes/No)', 'registered']), 'text'),
-        this.createInputCell(this.getValue(row, ['STATUS OF OWNERSHIP', 'STATUS OF OWNERSHIP', 'ownership']), 'text'),
-        this.createInputCell(this.getValue(row, ['Total Area Planted (HA.)', 'TOTAL AREA PLANTED (HA.)', 'area']), 'number'),
-        
-        // Tree counts with highlights
-        this.createInputCell(this.getValue(row, ['LIBERICA BEARING', 'Liberica_Bearing']), 'number', 'highlight-yellow'),
-        this.createInputCell(this.getValue(row, ['LIBERICA NON-BEARING', 'Liberica_Non-bearing']), 'number', 'highlight-yellow'),
-        this.createInputCell(this.getValue(row, ['EXCELSA BEARING', 'Excelsa_Bearing']), 'number', 'highlight-yellow'),
-        this.createInputCell(this.getValue(row, ['EXCELSA NON-BEARING', 'Excelsa_Non-bearing']), 'number', 'highlight-yellow'),
-        this.createInputCell(this.getValue(row, ['ROBUSTA BEARING', 'Robusta_Bearing']), 'number', 'highlight-yellow'),
-        this.createInputCell(this.getValue(row, ['ROBUSTA NON-BEARING', 'Robusta_Non-bearing']), 'number', 'highlight-yellow'),
-        
-        // Totals with highlights
-        this.createInputCell(this.getValue(row, ['TOTAL BEARING', 'Total_Bearing']), 'number', 'highlight-green'),
-        this.createInputCell(this.getValue(row, ['TOTAL NON-BEARING', 'Total_Non-bearing']), 'number', 'highlight-green'),
-        this.createInputCell(this.getValue(row, ['TOTAL TREES', 'TOTAL_TREES']), 'number', 'highlight-green'),
-        
-        // Production with highlights
-        this.createInputCell(this.getValue(row, ['LIBERICA PRODUCTION', 'Liberica_Production']), 'number', 'highlight-blue'),
-        this.createInputCell(this.getValue(row, ['EXCELSA PRODUCTION', 'Excelsa_Production']), 'number', 'highlight-blue'),
-        this.createInputCell(this.getValue(row, ['ROBUSTA PRODUCTION', 'Robusta_Production']), 'number', 'highlight-blue'),
-        
-        this.createInputCell(this.getValue(row, ['NCFRS', 'ncfrs']), 'text'),
-        this.createInputCell(this.getValue(row, ['REMARKS', 'remarks']), 'text')
-      ];
-      
-      return `<tr data-row-index="${actualIndex - 1}">${cells.join('')}</tr>`;
+
+      const cells =
+        this.farmerTableView === 'trees'
+          ? [
+              this.createInputCell(actualIndex, 'number'),
+              this.createInputCell(this.getValue(row, ['NAME OF FARMER', 'Name of Farmer', 'name']), 'text'),
+
+              this.createInputCell(this.getValue(row, ['LIBERICA BEARING', 'Liberica_Bearing']), 'number', 'highlight-yellow'),
+              this.createInputCell(this.getValue(row, ['LIBERICA NON-BEARING', 'Liberica_Non-bearing']), 'number', 'highlight-yellow'),
+              this.createInputCell(this.getValue(row, ['EXCELSA BEARING', 'Excelsa_Bearing']), 'number', 'highlight-yellow'),
+              this.createInputCell(this.getValue(row, ['EXCELSA NON-BEARING', 'Excelsa_Non-bearing']), 'number', 'highlight-yellow'),
+              this.createInputCell(this.getValue(row, ['ROBUSTA BEARING', 'Robusta_Bearing']), 'number', 'highlight-yellow'),
+              this.createInputCell(this.getValue(row, ['ROBUSTA NON-BEARING', 'Robusta_Non-bearing']), 'number', 'highlight-yellow'),
+
+              this.createInputCell(this.getValue(row, ['TOTAL BEARING', 'Total_Bearing']), 'number', 'highlight-green'),
+              this.createInputCell(this.getValue(row, ['TOTAL NON-BEARING', 'Total_Non-bearing']), 'number', 'highlight-green'),
+              this.createInputCell(this.getValue(row, ['TOTAL TREES', 'TOTAL_TREES']), 'number', 'highlight-green'),
+              this.createRowActionsCell(rowIndexInData)
+            ]
+          : this.farmerTableView === 'production'
+            ? [
+                this.createInputCell(actualIndex, 'number'),
+                this.createInputCell(this.getValue(row, ['NAME OF FARMER', 'Name of Farmer', 'name']), 'text'),
+                this.createInputCell(this.getValue(row, ['TOTAL TREES', 'TOTAL_TREES']), 'number', 'highlight-green'),
+                this.createInputCell(this.getValue(row, ['LIBERICA PRODUCTION', 'Liberica_Production']), 'number', 'highlight-blue'),
+                this.createInputCell(this.getValue(row, ['EXCELSA PRODUCTION', 'Excelsa_Production']), 'number', 'highlight-blue'),
+                this.createInputCell(this.getValue(row, ['ROBUSTA PRODUCTION', 'Robusta_Production']), 'number', 'highlight-blue'),
+                this.createInputCell(this.getTotalProduction(row), 'number', 'highlight-blue'),
+                this.createEditableCell(this.getValue(row, ['REMARKS', 'remarks']), rowIndexInData, 'REMARKS', 'text'),
+                this.createRowActionsCell(rowIndexInData)
+              ]
+          : [
+              this.createInputCell(actualIndex, 'number'),
+              this.createInputCell(this.getValue(row, ['NAME OF FARMER', 'Name of Farmer', 'name']), 'text'),
+              this.createInputCell(this.getValue(row, ['ADDRESS (BARANGAY)', 'Address (Barangay)', 'address']), 'text'),
+              this.createInputCell(this.getValue(row, ['FA OFFICER / MEMBER', 'FA Officer / member', 'officer']), 'text'),
+              this.createInputCell(this.getValue(row, ['BIRTHDAY', 'birthday']), 'text'),
+              this.createInputCell(this.getValue(row, ['RSBSA Registered (Yes/No)', 'REGISTERED (YES/NO)', 'Registered (Yes/No)', 'registered']), 'text'),
+              this.createInputCell(this.getValue(row, ['STATUS OF OWNERSHIP', 'ownership']), 'text'),
+              this.createInputCell(this.getValue(row, ['Total Area Planted (HA.)', 'TOTAL AREA PLANTED (HA.)', 'area']), 'number'),
+              this.createInputCell(this.getValue(row, ['NCFRS', 'ncfrs']), 'text'),
+              this.createEditableCell(this.getValue(row, ['REMARKS', 'remarks']), rowIndexInData, 'REMARKS', 'text'),
+              this.createRowActionsCell(rowIndexInData)
+            ];
+
+      return `<tr data-row-index="${rowIndexInData}">${cells.join('')}</tr>`;
     }).join('');
 
     tableBody.innerHTML = bodyHTML;
     console.log('Table rendered successfully with', pageData.length, 'farmer records');
+  }
+
+  setFarmerTableView(view) {
+    this.farmerTableView = view === 'trees' ? 'trees' : view === 'production' ? 'production' : 'basic';
+
+    const btns = document.querySelectorAll('[data-table-view]');
+    btns.forEach(btn => {
+      btn.classList.toggle('active', (btn.dataset.tableView || 'basic') === this.farmerTableView);
+    });
+
+    const basicTable = document.getElementById('farmerTableBasic');
+    const treesTable = document.getElementById('farmerTableTrees');
+    const productionTable = document.getElementById('farmerTableProduction');
+
+    if (basicTable && treesTable && productionTable) {
+      const showBasic = this.farmerTableView === 'basic';
+      const showTrees = this.farmerTableView === 'trees';
+      const showProduction = this.farmerTableView === 'production';
+
+      basicTable.classList.toggle('is-hidden', !showBasic);
+      treesTable.classList.toggle('is-hidden', !showTrees);
+      productionTable.classList.toggle('is-hidden', !showProduction);
+
+      treesTable.setAttribute('aria-hidden', showTrees ? 'false' : 'true');
+      productionTable.setAttribute('aria-hidden', showProduction ? 'false' : 'true');
+    }
+
+    this.renderTableBody();
   }
 
   createInputCell(value, type = 'text', highlightClass = '') {
@@ -378,6 +501,129 @@ class DashboardApp {
     const className = highlightClass ? ` class="${highlightClass}"` : '';
     
     return `<td${className}>${formattedValue}</td>`;
+  }
+
+  createEditableCell(value, rowIndex, field, type = 'text', highlightClass = '') {
+    const formattedValue = this.formatValue(value);
+    const className = [highlightClass, 'cell-editable'].filter(Boolean).join(' ');
+    const classAttr = className ? ` class="${className}"` : '';
+    const isReadOnly = field === '__no' || field === '__totalProduction';
+    const editable = isReadOnly ? 'false' : 'true';
+
+    return `<td${classAttr} data-row-index="${rowIndex}" data-field="${field}" contenteditable="${editable}">${formattedValue}</td>`;
+  }
+
+  createRowActionsCell(rowIndex) {
+    return `<td><button type="button" class="row-action-btn" data-action="delete-farmer" data-row-index="${rowIndex}">Delete</button></td>`;
+  }
+
+  getTotalProduction(row) {
+    const lib = Number(this.getValue(row, ['LIBERICA PRODUCTION', 'Liberica_Production']) || 0) || 0;
+    const exc = Number(this.getValue(row, ['EXCELSA PRODUCTION', 'Excelsa_Production']) || 0) || 0;
+    const rob = Number(this.getValue(row, ['ROBUSTA PRODUCTION', 'Robusta_Production']) || 0) || 0;
+    return lib + exc + rob;
+  }
+
+  updateFarmerField(rowIndex, field, rawValue) {
+    const row = this.data[rowIndex];
+    if (!row) return;
+    if (field === '__no' || field === '__totalProduction') return;
+
+    const numericFields = new Set([
+      'Total Area Planted (HA.)',
+      'TOTAL AREA PLANTED (HA.)',
+      'LIBERICA BEARING',
+      'LIBERICA NON-BEARING',
+      'EXCELSA BEARING',
+      'EXCELSA NON-BEARING',
+      'ROBUSTA BEARING',
+      'ROBUSTA NON-BEARING',
+      'TOTAL BEARING',
+      'TOTAL NON-BEARING',
+      'TOTAL TREES',
+      'LIBERICA PRODUCTION',
+      'EXCELSA PRODUCTION',
+      'ROBUSTA PRODUCTION'
+    ]);
+
+    if (numericFields.has(field)) {
+      const cleaned = rawValue.replace(/,/g, '');
+      const n = Number(cleaned);
+      row[field] = Number.isFinite(n) ? n : 0;
+    } else {
+      row[field] = rawValue;
+    }
+
+    // Refresh computed cells when needed
+    if (this.farmerTableView === 'production') {
+      this.renderTableBody();
+    }
+  }
+
+  addFarmer() {
+    const newRow = {
+      'NAME OF FARMER': '',
+      'ADDRESS (BARANGAY)': '',
+      'FA OFFICER / MEMBER': '',
+      'BIRTHDAY': '',
+      'RSBSA Registered (Yes/No)': '',
+      'STATUS OF OWNERSHIP': '',
+      'Total Area Planted (HA.)': 0,
+      'LIBERICA BEARING': 0,
+      'LIBERICA NON-BEARING': 0,
+      'EXCELSA BEARING': 0,
+      'EXCELSA NON-BEARING': 0,
+      'ROBUSTA BEARING': 0,
+      'ROBUSTA NON-BEARING': 0,
+      'TOTAL BEARING': 0,
+      'TOTAL NON-BEARING': 0,
+      'TOTAL TREES': 0,
+      'LIBERICA PRODUCTION': 0,
+      'EXCELSA PRODUCTION': 0,
+      'ROBUSTA PRODUCTION': 0,
+      'NCFRS': '',
+      'REMARKS': ''
+    };
+
+    this.data.push(newRow);
+    this.filteredData = [...this.data];
+    this.totalRecords = this.data.length;
+    this.currentPage = Math.max(1, Math.ceil(this.filteredData.length / this.pageSize));
+    this.updateTable();
+    this.updateStats();
+  }
+
+  deleteFarmer(rowIndex) {
+    if (!this.data[rowIndex]) return;
+    this.data.splice(rowIndex, 1);
+    this.filteredData = [...this.data];
+    this.totalRecords = this.data.length;
+
+    const totalPages = Math.max(1, Math.ceil(this.filteredData.length / this.pageSize));
+    this.currentPage = Math.min(this.currentPage, totalPages);
+    this.updateTable();
+    this.updateStats();
+  }
+
+  saveFarmers() {
+    try {
+      localStorage.setItem('beanthentic_farmers', JSON.stringify(this.data));
+      this.showNotification('Farmer records saved.', 'success');
+    } catch (e) {
+      console.error('Failed saving farmers:', e);
+      this.showNotification('Failed to save farmer records.', 'error');
+    }
+  }
+
+  loadSavedFarmers() {
+    try {
+      const raw = localStorage.getItem('beanthentic_farmers');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
   }
 
   getValue(row, possibleKeys) {
