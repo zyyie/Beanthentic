@@ -3,16 +3,13 @@
 /* This page uses a full-bleed app layout; override the site's centered <main>. */
 .dashboard-page {
   background: #f6f7f9;
-  height: 100vh;
-  overflow: hidden; /* prevent page scroll; scroll happens inside panes */
+  min-height: 100vh;
 }
 
 .dashboard-page .dashboard-main {
   max-width: none;
   margin: 0;
   padding: 0;
-  height: 100%;
-  overflow: hidden;
 }
 
 .dashboard-container {
@@ -63,9 +60,7 @@
 /* Dashboard Layout */
 .dashboard-layout {
   display: flex;
-  height: 100%;
   background: #f6f7f9;
-  overflow: hidden;
 }
 
 /* Side Panel */
@@ -207,10 +202,7 @@
   display: flex;
   flex-direction: column;
   position: relative;
-  /* Keep the "page" fixed; scroll inside inner panes */
-  height: 100vh;
-  width: calc(100% - 260px);
-  overflow: hidden;
+  /* Allow page to scroll naturally; inner sections can still manage their own scrolling. */
 }
 
 .main-content.expanded {

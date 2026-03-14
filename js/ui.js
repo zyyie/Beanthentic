@@ -7,6 +7,7 @@ class UIController {
   init() {
     this.setupAnimations();
     this.setupInteractions();
+    this.setupHeroSlider();
     this.loadYear();
   }
 
@@ -66,6 +67,57 @@ class UIController {
     });
   }
 
+  setupHeroSlider() {
+    const slider = document.querySelector('.hero-slider');
+    if (!slider) return;
+
+    const track = slider.querySelector('.hero-slider-track');
+    const slides = Array.from(slider.querySelectorAll('.hero-slide'));
+    const dots = Array.from(slider.querySelectorAll('.hero-slider-dot'));
+
+    if (!track || slides.length === 0) return;
+
+    let index = 0;
+    let timerId = null;
+
+    const setIndex = (nextIndex) => {
+      index = (nextIndex + slides.length) % slides.length;
+      track.style.transform = `translateX(-${index * 100}%)`;
+      dots.forEach((dot, i) => {
+        dot.setAttribute('aria-selected', i === index ? 'true' : 'false');
+      });
+    };
+
+    const start = () => {
+      stop();
+      timerId = window.setInterval(() => setIndex(index + 1), 4500);
+    };
+
+    const stop = () => {
+      if (timerId) window.clearInterval(timerId);
+      timerId = null;
+    };
+
+    dots.forEach((dot) => {
+      dot.addEventListener('click', () => {
+        const slide = Number.parseInt(dot.dataset.slide || '0', 10);
+        if (Number.isFinite(slide)) {
+          setIndex(slide);
+          start();
+        }
+      });
+    });
+
+    // Pause on hover/focus for accessibility.
+    slider.addEventListener('mouseenter', stop);
+    slider.addEventListener('mouseleave', start);
+    slider.addEventListener('focusin', stop);
+    slider.addEventListener('focusout', start);
+
+    setIndex(0);
+    start();
+  }
+
   loadYear() {
     // Set current year in footer
     const yearElement = document.getElementById('year');
@@ -95,7 +147,7 @@ class UIController {
   }
 }
 
-// Initialize UI controller when DOM is ready
+// Initialize UI controller when DOM is ready and expose globally
 document.addEventListener('DOMContentLoaded', () => {
-  new UIController();
+  window.uiController = new UIController();
 });
