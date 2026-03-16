@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Beanthentic Coffee</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <header>
+    <div class="nav">
+      <a href="#" class="logo" aria-label="Beanthentic home"><span>BEANTHENTIC</span></a>
+      <nav class="nav-links">
+        <a href="#">Home</a>
+        <a href="#about">About Us</a>
+        <a href="#">Dashboard</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section id="home" class="hero">
+      <div>
+        <h1 class="hero-title">Welcome to <span>Beanthentic</span> Coffee</h1>
+        <p class="hero-subtitle">
+          Beanthentic Coffee is a platform that highlights the hard work of local farmers and the
+          authenticity of their coffee beans. It showcases different coffee varieties such as Liberica, Robusta, and Excelsa, allowing consumers to
+          learn about the origin, quality, and unique characteristics of each bean.
+        </p>
+        <div class="hero-cta">
+          <button class="btn-primary" onclick="document.getElementById('about').scrollIntoView({ behavior: 'smooth' })">About Us</button>
+          <p class="hero-note"><strong>Explore the origins of authentic coffee beans and the farmers behind every harvest</strong>.</p>
+        </div>
+        <div class="hero-slider" aria-label="Featured images">
+          <div class="hero-slider-viewport">
+            <div class="hero-slider-track" role="list">
+              <div class="hero-slide" role="listitem" data-theme="one">
+                <img class="hero-slide-img" src="https://images.unsplash.com/photo-1517881426553-5d7d3abfbabf?auto=format&fit=crop&w=800&q=80" alt="Coffee beans" />
+                <div class="hero-slide-caption"><strong>Liberica Beans</strong><span>Rich aroma, bold character</span></div>
+              </div>
+              <div class="hero-slide" role="listitem" data-theme="two">
+                <img class="hero-slide-img" src="https://images.unsplash.com/photo-1754648293032-090b43f4e45b?auto=format&fit=crop&w=800&q=80" alt="Coffee cherries" />
+                <div class="hero-slide-caption"><strong>Harvest Season</strong><span>From cherries to beans</span></div>
+              </div>
+              <div class="hero-slide" role="listitem" data-theme="three">
+                <img class="hero-slide-img" src="https://images.unsplash.com/photo-1746623691136-afb227ca4229?auto=format&fit=crop&w=800&q=80" alt="Farmers" />
+                <div class="hero-slide-caption"><strong>Farmers</strong><span>Supporting sustainable coffee</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="hero-slider-controls">
+            <div class="hero-slider-dots" role="tablist">
+              <button class="hero-slider-dot" type="button" role="tab" aria-selected="true" data-slide="0"></button>
+              <button class="hero-slider-dot" type="button" role="tab" aria-selected="false" data-slide="1"></button>
+              <button class="hero-slider-dot" type="button" role="tab" aria-selected="false" data-slide="2"></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="about">
+      <div class="about-grid">
+        <article class="about-card">
+          <div class="about-pill"><span class="about-pill-dot"></span><span>About Us</span></div>
+          <h3>About Beanthentic</h3>
+          <p>Beanthentic is an innovative platform designed to support coffee farmers and promote authentic, high-quality coffee. The system helps verify the origin and authenticity of coffee products while ensuring transparency and traceability within the coffee industry.</p>
+          <p>Beanthentic integrates modern technology with agricultural practices to evaluate Geographic Indication (GI) eligibility and provide reliable data about coffee farms, production, and quality.</p>
+          <ul class="about-list">
+            <li><span>•</span><div>Coffee authenticity verification and traceability system.</div></li>
+            <li><span>•</span><div>Evaluation of Geographic Indication (GI) eligibility for coffee farmers.</div></li>
+            <li><span>•</span><div>Support for farmer data management and sustainable coffee production.</div></li>
+          </ul>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <span><span class="footer-dot"></span> Beanthentic &copy; <span id="year"></span> · Brewed with care.</span>
+      <span>Serving honest coffee, one cup at a time.</span>
+    </div>
+  </footer>
+
+  <script src="js/navigation.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>
