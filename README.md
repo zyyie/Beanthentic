@@ -1,30 +1,25 @@
-# Beanthentic Coffee Website
+# Beanthentic Coffee
 
-A clean, modern coffee website with organized, modular frontend structure.
+Website at web (Flask) at Android app para sa Beanthentic Coffee.
 
 ## Project Structure
 
 ```
 Beanthentic/
-├── index.html              # Main HTML file with component loading
-├── css/                    # Stylesheets organized by function
-│   ├── base.css           # Base styles, reset, typography
-│   ├── layout.css         # Header, footer, navigation layout
-│   ├── components.css     # Hero, about, and other component styles
-│   └── responsive.css     # Mobile and responsive styles
-├── js/                     # JavaScript files organized by functionality
-│   ├── main.js            # Main application entry point
-│   ├── navigation.js      # Navigation and smooth scrolling
-│   └── ui.js              # UI interactions and animations
-├── components/             # HTML component templates
-│   ├── header.html        # Header and navigation
-│   ├── hero.html          # Hero section
-│   ├── about.html         # About section
-│   └── footer.html        # Footer
-├── assets/                 # Static assets
-│   └── images/            # Image files
-│       └── logo.png       # Company logo
-└── README.md              # This file
+├── index.html              # Homepage (component loading)
+├── app.py                  # Flask app – serves index.html at /
+├── requirements.txt        # Python: flask
+├── css/                    # Styles: base, layout, components, responsive
+├── js/                     # Scripts: main, navigation, ui
+├── components/             # HTML: header, hero, about, footer
+├── android-app/            # Android APK (homepage only)
+│   ├── app/src/main/
+│   │   ├── assets/         # index.html, css/, js/
+│   │   ├── java/           # MainActivity.kt
+│   │   └── res/            # Manifest, themes, icons
+│   ├── build.gradle.kts
+│   └── README.md           # Paano i-build ang APK
+└── README.md
 ```
 
 ## Features
@@ -37,9 +32,14 @@ Beanthentic/
 
 ## Getting Started
 
-1. Open `index.html` in a web browser
-2. The components will be loaded automatically via JavaScript
-3. All styles and scripts are modular and can be easily extended
+**Web (Flask)**  
+`pip install -r requirements.txt` → `python app.py` → buksan `http://127.0.0.1:5000/`
+
+**Web (static)**  
+Buksan lang ang `index.html` sa browser; maglo-load ang components via JavaScript.
+
+**Android APK**  
+Tingnan ang `android-app/README.md` para sa build steps.
 
 ## File Organization
 
