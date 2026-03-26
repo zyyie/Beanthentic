@@ -1,0 +1,64 @@
+<div class="settings-card">
+  <h3>Activity Log</h3>
+  <p style="margin-top: -0.25rem; color: #6c757d; font-size: 0.95rem;">
+    Search and filter admin actions (login times, IP addresses, and specific data changes).
+  </p>
+
+  <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: end; margin-bottom: 0.6rem;">
+    <label style="display: grid; gap: 0.35rem;">
+      <span style="font-weight: 900; color: #6c757d; font-size: 0.9rem;">Action Filter</span>
+      <select
+        id="activityActionFilter"
+        style="padding: 0.55rem 0.7rem; border-radius: 10px; border: 1px solid #d1d5db; min-width: 240px; background: #ffffff;"
+      >
+        <option value="all" selected>All actions</option>
+        <option value="admin login">Admin Login</option>
+        <option value="security change">Security Change</option>
+        <option value="data update">Data Update</option>
+        <option value="admin logout">Admin Logout</option>
+      </select>
+    </label>
+
+    <div class="search-bar" style="margin-bottom: 0;">
+      <input type="text" id="activitySearch" placeholder="Search (date, action, details, IP)..." />
+    </div>
+  </div>
+
+  <table class="activity-table">
+    <thead>
+      <tr>
+        <th>Date &amp; Time</th>
+        <th>Action</th>
+        <th>Details</th>
+        <th>IP Address</th>
+      </tr>
+    </thead>
+    <tbody id="activityTableBody">
+      <tr>
+        <td>2026-03-25 10:22</td>
+        <td>Admin Login</td>
+        <td>Successful login</td>
+        <td>127.0.0.1</td>
+      </tr>
+      <tr>
+        <td>2026-03-25 12:04</td>
+        <td>Security Change</td>
+        <td>Enabled 2FA (UI sample)</td>
+        <td>127.0.0.1</td>
+      </tr>
+      <tr>
+        <td>2026-03-25 14:18</td>
+        <td>Data Update</td>
+        <td>Edited farmer record remarks</td>
+        <td>127.0.0.1</td>
+      </tr>
+      <tr>
+        <td>2026-03-26 09:05</td>
+        <td>Admin Logout</td>
+        <td>Session ended</td>
+        <td>127.0.0.1</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+

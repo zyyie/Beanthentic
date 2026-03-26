@@ -57,10 +57,34 @@
               <i class="nav-icon fa-solid fa-file-export" aria-hidden="true"></i>
               <span>Export Data</span>
             </a>
-            <a href="admin/settings.html" class="nav-link" data-module="settings">
+            <a href="#settings" class="nav-link" data-module="settings" id="sidebarSettingsLink">
               <i class="nav-icon fa-solid fa-gear" aria-hidden="true"></i>
               <span>Settings</span>
+              <i class="settings-arrow fa-solid fa-chevron-down" aria-hidden="true"></i>
             </a>
+
+            <div class="settings-submenu" id="sidebarSettingsSubmenu" aria-label="Settings fragments submenu">
+              <button type="button" class="settings-submenu-item" data-tab="security">
+                <i class="submenu-icon fa-solid fa-shield-halved" aria-hidden="true"></i>
+                Account Security
+              </button>
+              <button type="button" class="settings-submenu-item" data-tab="notifications">
+                <i class="submenu-icon fa-solid fa-bell" aria-hidden="true"></i>
+                Notifications Settings
+              </button>
+              <button type="button" class="settings-submenu-item" data-tab="activity">
+                <i class="submenu-icon fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+                Activity Log
+              </button>
+              <button type="button" class="settings-submenu-item" data-tab="faq">
+                <i class="submenu-icon fa-solid fa-circle-question" aria-hidden="true"></i>
+                FAQ
+              </button>
+              <button type="button" class="settings-submenu-item" data-tab="profile">
+                <i class="submenu-icon fa-solid fa-user-gear" aria-hidden="true"></i>
+                Profile Actions
+              </button>
+            </div>
           </div>
         </nav>
       </aside>
@@ -356,16 +380,17 @@
           <!-- Settings Module -->
           <div class="module hidden" id="settings-module" data-module="settings">
             <section class="module-header">
-              <h1>Settings</h1>
+              <h1 id="adminSettingsPageTitle">Settings</h1>
               <p>Configure dashboard preferences</p>
             </section>
             <div class="settings-content">
-              <div class="placeholder-content">
-                <div class="placeholder-icon">
-                  <i class="fa-solid fa-gear"></i>
+              <div class="table-section settings-admin-section">
+                <div class="section-header">
+                  <h2 id="adminSettingsFragmentTitle">Account Security</h2>
                 </div>
-                <h3>Settings Module</h3>
-                <p>Dashboard configuration options coming soon</p>
+                <div id="adminSettingsFragmentContainer" aria-live="polite">
+                  Loading...
+                </div>
               </div>
             </div>
           </div>

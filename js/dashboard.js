@@ -7,6 +7,7 @@ class DashboardApp {
     this.pageSize = 10;
     this.totalRecords = 0;
     this.farmerTableView = 'basic';
+    this.activeSettingsTab = 'security';
     this.init();
   }
 
@@ -43,6 +44,33 @@ class DashboardApp {
         this.switchModule(module);
       });
     });
+
+    // Sidebar settings dropdown (UI navigation to settings_dynamic.html fragments)
+    const settingsSidebarLink = document.getElementById('sidebarSettingsLink');
+    const sidebarSettingsSubmenu = document.getElementById('sidebarSettingsSubmenu');
+    if (settingsSidebarLink && sidebarSettingsSubmenu) {
+      settingsSidebarLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        const nextOpen = !sidebarSettingsSubmenu.classList.contains('open');
+        sidebarSettingsSubmenu.classList.toggle('open', nextOpen);
+        settingsSidebarLink.classList.toggle('open', nextOpen);
+      });
+
+      const submenuButtons = sidebarSettingsSubmenu.querySelectorAll('.settings-submenu-item[data-tab]');
+      submenuButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const tab = btn.getAttribute('data-tab') || 'security';
+
+          submenuButtons.forEach((b) => b.classList.remove('active'));
+          btn.classList.add('active');
+
+          this.activeSettingsTab = tab;
+
+          // Ensure the Settings module is visible and render the selected fragment inside it.
+          this.switchModule('settings');
+        });
+      });
+    }
 
     // Refresh button
     const refreshBtn = document.getElementById('refreshBtn');
@@ -241,9 +269,222 @@ class DashboardApp {
       moduleContent.classList.toggle('lock-scroll', moduleName === 'farmers');
     }
 
+    if (moduleName === 'settings') {
+      // Default/admin settings fragment on open.
+      this.loadAdminSettingsFragment(this.activeSettingsTab || 'security');
+    }
+
     // Close mobile menu
     if (window.innerWidth <= 768) {
       this.closeMobileSidePanel();
+    }
+  }
+
+  async loadAdminSettingsFragment(tab) {
+    const container = document.getElementById('adminSettingsFragmentContainer');
+    const titleEl = document.getElementById('adminSettingsFragmentTitle');
+    const pageTitleEl = document.getElementById('adminSettingsPageTitle');
+    if (!container) return;
+
+    const fragments = {
+      security: '/admin/settings/account_security.html',
+      notifications: '/admin/settings/notifications_settings.html',
+      activity: '/admin/settings/activity_log.html',
+      faq: '/admin/settings/faq.html',
+      profile: '/admin/settings/profile_actions.html',
+    };
+
+    const titleMap = {
+      security: 'Account Security',
+      notifications: 'Notifications Settings',
+      activity: 'Activity Log',
+      faq: 'FAQ',
+      profile: 'Profile Actions',
+    };
+
+    const resolvedTab = fragments[tab] ? tab : 'security';
+    const url = fragments[resolvedTab];
+
+    if (titleEl) titleEl.textContent = titleMap[resolvedTab] || 'Account Security';
+    if (pageTitleEl) pageTitleEl.textContent = titleMap[resolvedTab] || 'Settings';
+
+    container.innerHTML = 'Loading...';
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} while fetching ${url}`);
+      }
+      const html = await res.text();
+      container.innerHTML = `<div class="settings-fragment">${html}</div>`;
+      this.initAdminSettingsInteractions(container, resolvedTab);
+    } catch (err) {
+      console.error('Failed to load settings fragment:', err);
+      const msg = err && err.message ? err.message : String(err);
+      container.innerHTML = `<div class="alert alert-error">Failed to load settings content: ${msg}</div>`;
+    }
+  }
+
+  initAdminSettingsInteractions(containerEl) {
+    // FAQ accordion
+    const faqItems = containerEl.querySelectorAll('.faq-item');
+    faqItems.forEach((item) => {
+      const q = item.querySelector('.faq-question');
+      const a = item.querySelector('.faq-answer');
+      if (!q || !a) return;
+      q.addEventListener('click', () => {
+        item.classList.toggle('active');
+        a.classList.toggle('active');
+      });
+    });
+
+    // Activity log search
+    const search = containerEl.querySelector('#activitySearch');
+    const actionFilter = containerEl.querySelector('#activityActionFilter');
+    const tbody = containerEl.querySelector('#activityTableBody');
+    if (tbody) {
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+
+      const getRowActionText = (row) => {
+        const tds = row.querySelectorAll('td');
+        // Columns: [Date & Time, Action, Details, IP Address]
+        if (tds.length >= 2) return (tds[1].textContent || '').trim().toLowerCase();
+        return '';
+      };
+
+      const applyFilters = () => {
+        const term = (search && (search.value || '')).toString().toLowerCase().trim();
+        const selectedAction = (actionFilter && actionFilter.value) ? actionFilter.value : 'all';
+
+        rows.forEach((row) => {
+          const fullText = row.textContent.toLowerCase();
+          const rowAction = getRowActionText(row);
+
+          const actionOk = selectedAction === 'all' || rowAction === selectedAction;
+          const termOk = !term || fullText.includes(term);
+
+          row.style.display = actionOk && termOk ? '' : 'none';
+        });
+      };
+
+      if (search) {
+        search.addEventListener('input', () => {
+          applyFilters();
+        });
+      }
+      if (actionFilter) actionFilter.addEventListener('change', applyFilters);
+      applyFilters();
+    }
+
+    // Notifications save button
+    const saveNotificationsBtn = containerEl.querySelector('#saveNotificationsBtn');
+    if (saveNotificationsBtn) {
+      saveNotificationsBtn.addEventListener('click', () => {
+        this.showNotification('Notification settings saved (UI-only).', 'success');
+      });
+    }
+
+    // Profile form submit + logout
+    const profileForm = containerEl.querySelector('#profileForm');
+    if (profileForm) {
+      profileForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.showNotification('Profile updated (UI-only).', 'success');
+      });
+    }
+
+    const logoutBtn = containerEl.querySelector('#logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to log out?')) {
+          window.location.href = '/logout';
+        }
+      });
+    }
+
+    // Account security: password reset (UI-only)
+    const passwordForm = containerEl.querySelector('#passwordForm');
+    if (passwordForm) {
+      passwordForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.showNotification('Password reset submitted (UI-only).', 'success');
+      });
+    }
+
+    // Account security: simple 2FA UI toggle + sample codes (UI-only)
+    const enable2faBtn = containerEl.querySelector('#enable2faBtn');
+    const disable2faBtn = containerEl.querySelector('#disable2faBtn');
+    const viewBackupCodesBtn = containerEl.querySelector('#viewBackupCodesBtn');
+    const cancel2faSetupBtn = containerEl.querySelector('#cancel2faSetupBtn');
+    // IDs start with a digit, so we must use attribute selectors (CSS selector '#2faStatus' is invalid).
+    const twoFaStatus = containerEl.querySelector('[id="2faStatus"]');
+    const twoFaSetup = containerEl.querySelector('[id="2faSetup"]');
+    const manualKey = containerEl.querySelector('#manualKey');
+    const backupCodesList = containerEl.querySelector('#backupCodesList');
+    const enable2faToggle = containerEl.querySelector('#enable2faToggle');
+    const notEnabledState = containerEl.querySelector('[id="2faNotEnabledState"]');
+    const enabledState = containerEl.querySelector('[id="2faEnabledState"]');
+
+    const genCodes = () => [
+      'ABCD-1234-EFGH-5678',
+      'IJKL-9012-MNOP-3456',
+      'QRST-7890-UVWX-1234',
+      'YZAB-4567-CDEF-8901',
+    ];
+
+    const set2faEnabledState = (enabled) => {
+      if (twoFaStatus) twoFaStatus.style.display = 'block';
+      if (notEnabledState) notEnabledState.style.display = enabled ? 'none' : 'block';
+      if (enabledState) enabledState.style.display = enabled ? 'block' : 'none';
+    };
+
+    const open2faSetup = (showMsg = true) => {
+      if (twoFaStatus) twoFaStatus.style.display = 'none';
+      if (twoFaSetup) twoFaSetup.style.display = 'block';
+      if (manualKey) manualKey.textContent = 'Manual key: (sample) BEANTHENTIC-DEMO-SECRET';
+      if (backupCodesList) {
+        backupCodesList.innerHTML = genCodes().map((c) => `<code>${c}</code>`).join('');
+      }
+      if (showMsg) this.showNotification('2FA setup initiated (UI-only).', 'success');
+    };
+
+    if (enable2faToggle) {
+      // Initialize state on load.
+      set2faEnabledState(!!enable2faToggle.checked);
+
+      enable2faToggle.addEventListener('change', () => {
+        const enabled = !!enable2faToggle.checked;
+        set2faEnabledState(enabled);
+        if (enabled) open2faSetup(true);
+      });
+    } else if (notEnabledState && enabledState) {
+      // Fallback initialization: assume "not enabled" visible.
+      set2faEnabledState(false);
+    }
+
+    if (enable2faBtn) {
+      enable2faBtn.addEventListener('click', () => {
+        if (enable2faToggle) enable2faToggle.checked = true;
+        set2faEnabledState(true);
+        open2faSetup(true);
+      });
+    }
+    if (viewBackupCodesBtn) {
+      viewBackupCodesBtn.addEventListener('click', () => open2faSetup(false));
+    }
+    if (disable2faBtn) {
+      disable2faBtn.addEventListener('click', () => {
+        if (twoFaSetup) twoFaSetup.style.display = 'none';
+        if (twoFaStatus) twoFaStatus.style.display = 'block';
+        if (enable2faToggle) enable2faToggle.checked = false;
+        set2faEnabledState(false);
+        this.showNotification('2FA disabled (UI-only).', 'success');
+      });
+    }
+    if (cancel2faSetupBtn) {
+      cancel2faSetupBtn.addEventListener('click', () => {
+        if (twoFaSetup) twoFaSetup.style.display = 'none';
+        if (twoFaStatus) twoFaStatus.style.display = 'block';
+      });
     }
   }
 
