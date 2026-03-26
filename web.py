@@ -6,12 +6,112 @@ import time
 from datetime import datetime
 from pathlib import Path
 import io
+import ast
 
 from flask import Flask, redirect, render_template, request, session, url_for, jsonify, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
+from flask_admin import Admin
+from flask_admin.contrib.sqla import ModelView
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__, template_folder=".", static_folder=".", static_url_path="")
 app.secret_key = "beanthentic-dev-secret-change-this"
+
+# Initialize Flask-Admin interface
+admin = Admin(app, name='Beanthentic Admin')
+
+# SQLAlchemy configuration
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///beanthentic.db"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db = SQLAlchemy(app)
+
+# Farmer model
+class Farmer(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    no = db.Column(db.Integer, nullable=False)
+    name = db.Column(db.String(200), nullable=False)
+    address_barangay = db.Column(db.String(100), nullable=False)
+    fa_officer_member = db.Column(db.String(50), nullable=False)
+    birthday = db.Column(db.String(50))
+    rsbsa_registered = db.Column(db.String(10), nullable=False)
+    status_ownership = db.Column(db.String(10))
+    total_area_planted_ha = db.Column(db.Float, nullable=False)
+    liberica_bearing = db.Column(db.Integer, default=0)
+    liberica_non_bearing = db.Column(db.Integer, default=0)
+    excelsa_bearing = db.Column(db.Integer, default=0)
+    excelsa_non_bearing = db.Column(db.Integer, default=0)
+    robusta_bearing = db.Column(db.Integer, default=0)
+    robusta_non_bearing = db.Column(db.Integer, default=0)
+    total_bearing = db.Column(db.Integer, default=0)
+    total_non_bearing = db.Column(db.Integer, default=0)
+    total_trees = db.Column(db.Integer, default=0)
+    liberica_production = db.Column(db.Float, default=0)
+    excelsa_production = db.Column(db.Float, default=0)
+    robusta_production = db.Column(db.Float, default=0)
+    ncfrs = db.Column(db.String(50))
+    remarks = db.Column(db.Text)
+
+    def __repr__(self):
+        return f"Farmer('{self.name}', '{self.address_barangay}')"
+
+# Add Farmer model to Flask-Admin interface
+admin.add_view(ModelView(Farmer, db.session))
+
+# Function to populate database with existing farmer data
+def populate_farmer_data():
+    # Check if data already exists by trying to query
+    try:
+        Farmer.query.first()
+        return  # Data already exists, exit
+    except:
+        pass  # Table doesn't exist yet, continue with population
+    
+    # Import farmer data from the JS file
+    try:
+        farmer_data_file = Path(__file__).resolve().parent / "data" / "farmer-data.js"
+        if farmer_data_file.exists():
+            content = farmer_data_file.read_text(encoding='utf-8')
+            # Extract the JavaScript array
+            start = content.find('[')
+            end = content.rfind(']') + 1
+            if start != -1 and end != 0:
+                # Convert JS object notation to Python dict
+                js_data = content[start:end]
+                # Replace single quotes with double quotes for JSON parsing
+                js_data = js_data.replace("'", '"')
+                # Convert to Python list
+                farmer_list = ast.literal_eval(js_data)
+                
+                for farmer_data in farmer_list:
+                    farmer = Farmer(
+                        no=farmer_data.get('NO.', 0),
+                        name=farmer_data.get('NAME OF FARMER', ''),
+                        address_barangay=farmer_data.get('ADDRESS (BARANGAY)', ''),
+                        fa_officer_member=farmer_data.get('FA OFFICER / MEMBER', ''),
+                        birthday=farmer_data.get('BIRTHDAY', ''),
+                        rsbsa_registered=farmer_data.get('RSBSA Registered (Yes/No)', ''),
+                        status_ownership=farmer_data.get('STATUS OF OWNERSHIP', ''),
+                        total_area_planted_ha=farmer_data.get('Total Area Planted (HA.)', 0),
+                        liberica_bearing=farmer_data.get('LIBERICA BEARING', 0),
+                        liberica_non_bearing=farmer_data.get('LIBERICA NON-BEARING', 0),
+                        excelsa_bearing=farmer_data.get('EXCELSA BEARING', 0),
+                        excelsa_non_bearing=farmer_data.get('EXCELSA NON-BEARING', 0),
+                        robusta_bearing=farmer_data.get('ROBUSTA BEARING', 0),
+                        robusta_non_bearing=farmer_data.get('ROBUSTA NON-BEARING', 0),
+                        total_bearing=farmer_data.get('TOTAL BEARING', 0),
+                        total_non_bearing=farmer_data.get('TOTAL NON-BEARING', 0),
+                        total_trees=farmer_data.get('TOTAL TREES', 0),
+                        liberica_production=farmer_data.get('LIBERICA PRODUCTION', 0),
+                        excelsa_production=farmer_data.get('EXCELSA PRODUCTION', 0),
+                        robusta_production=farmer_data.get('ROBUSTA PRODUCTION', 0),
+                        ncfrs=farmer_data.get('NCFRS', ''),
+                        remarks=farmer_data.get('REMARKS', '')
+                    )
+                    db.session.add(farmer)
+                db.session.commit()
+                print(f"Successfully populated {len(farmer_list)} farmer records")
+    except Exception as e:
+        print(f"Error populating farmer data: {e}")
 
 USER_DB = Path(__file__).resolve().parent / "users.json"
 SETTINGS_DB = Path(__file__).resolve().parent / "settings.json"
@@ -294,18 +394,15 @@ def export_excel():
     if not session.get("user_email"):
         return redirect(url_for("login"))
     
-    # Create sample data for export
-    data = [
-        {"Name": "John Doe", "Email": "john@example.com", "Role": "Admin", "Status": "Active"},
-        {"Name": "Jane Smith", "Email": "jane@example.com", "Role": "User", "Status": "Active"},
-        {"Name": "Bob Johnson", "Email": "bob@example.com", "Role": "User", "Status": "Inactive"}
-    ]
+    # Get actual farmer data from database
+    farmers = Farmer.query.all()
     
     # Create CSV content
     output = io.StringIO()
-    output.write("Name,Email,Role,Status\n")
-    for row in data:
-        output.write(f"{row['Name']},{row['Email']},{row['Role']},{row['Status']}\n")
+    output.write("NO.,NAME OF FARMER,ADDRESS (BARANGAY),FA OFFICER / MEMBER,BIRTHDAY,RSBSA Registered (Yes/No),STATUS OF OWNERSHIP,Total Area Planted (HA.),LIBERICA BEARING,LIBERICA NON-BEARING,EXCELSA BEARING,EXCELSA NON-BEARING,ROBUSTA BEARING,ROBUSTA NON-BEARING,TOTAL BEARING,TOTAL NON-BEARING,TOTAL TREES,LIBERICA PRODUCTION,EXCELSA PRODUCTION,ROBUSTA PRODUCTION,NCFRS,REMARKS\n")
+    
+    for farmer in farmers:
+        output.write(f"{farmer.no},{farmer.name},{farmer.address_barangay},{farmer.fa_officer_member},{farmer.birthday},{farmer.rsbsa_registered},{farmer.status_ownership},{farmer.total_area_planted_ha},{farmer.liberica_bearing},{farmer.liberica_non_bearing},{farmer.excelsa_bearing},{farmer.excelsa_non_bearing},{farmer.robusta_bearing},{farmer.robusta_non_bearing},{farmer.total_bearing},{farmer.total_non_bearing},{farmer.total_trees},{farmer.liberica_production},{farmer.excelsa_production},{farmer.robusta_production},{farmer.ncfrs},{farmer.remarks}\n")
     
     # Create file in memory
     output.seek(0)
@@ -326,18 +423,37 @@ def export_pdf():
     if not session.get("user_email"):
         return redirect(url_for("login"))
     
-    # Create simple PDF content (as text for now)
+    # Get actual farmer data from database
+    farmers = Farmer.query.all()
+    total_farmers = len(farmers)
+    total_area = sum(f.total_area_planted_ha for f in farmers)
+    total_trees = sum(f.total_trees for f in farmers)
+    
+    # Create PDF content
     pdf_content = f"""
     Farmer Data Report
     Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
     
-    Sample Data:
-    - John Doe (john@example.com) - Admin - Active
-    - Jane Smith (jane@example.com) - User - Active  
-    - Bob Johnson (bob@example.com) - User - Inactive
+    SUMMARY:
+    - Total Farmers: {total_farmers}
+    - Total Area Planted: {total_area:.2f} HA
+    - Total Trees: {total_trees:,}
     
-    Total Records: 3
+    DETAILED RECORDS:
     """
+    
+    for farmer in farmers[:20]:  # Limit to first 20 for readability
+        pdf_content += f"""
+    {farmer.no}. {farmer.name}
+    Address: {farmer.address_barangay}
+    FA Officer: {farmer.fa_officer_member}
+    Area: {farmer.total_area_planted_ha} HA
+    Trees: {farmer.total_trees:,}
+    Production: Liberica={farmer.liberica_production}, Excelsa={farmer.excelsa_production}, Robusta={farmer.robusta_production}
+    """
+    
+    if total_farmers > 20:
+        pdf_content += f"\n... and {total_farmers - 20} more records"
     
     # Create file in memory
     mem = io.BytesIO()
@@ -357,18 +473,15 @@ def export_csv():
     if not session.get("user_email"):
         return redirect(url_for("login"))
     
-    # Create sample data for export
-    data = [
-        {"Name": "John Doe", "Email": "john@example.com", "Role": "Admin", "Status": "Active"},
-        {"Name": "Jane Smith", "Email": "jane@example.com", "Role": "User", "Status": "Active"},
-        {"Name": "Bob Johnson", "Email": "bob@example.com", "Role": "User", "Status": "Inactive"}
-    ]
+    # Get actual farmer data from database
+    farmers = Farmer.query.all()
     
     # Create CSV content
     output = io.StringIO()
-    output.write("Name,Email,Role,Status\n")
-    for row in data:
-        output.write(f"{row['Name']},{row['Email']},{row['Role']},{row['Status']}\n")
+    output.write("NO.,NAME OF FARMER,ADDRESS (BARANGAY),FA OFFICER / MEMBER,BIRTHDAY,RSBSA Registered (Yes/No),STATUS OF OWNERSHIP,Total Area Planted (HA.),LIBERICA BEARING,LIBERICA NON-BEARING,EXCELSA BEARING,EXCELSA NON-BEARING,ROBUSTA BEARING,ROBUSTA NON-BEARING,TOTAL BEARING,TOTAL NON-BEARING,TOTAL TREES,LIBERICA PRODUCTION,EXCELSA PRODUCTION,ROBUSTA PRODUCTION,NCFRS,REMARKS\n")
+    
+    for farmer in farmers:
+        output.write(f"{farmer.no},{farmer.name},{farmer.address_barangay},{farmer.fa_officer_member},{farmer.birthday},{farmer.rsbsa_registered},{farmer.status_ownership},{farmer.total_area_planted_ha},{farmer.liberica_bearing},{farmer.liberica_non_bearing},{farmer.excelsa_bearing},{farmer.excelsa_non_bearing},{farmer.robusta_bearing},{farmer.robusta_non_bearing},{farmer.total_bearing},{farmer.total_non_bearing},{farmer.total_trees},{farmer.liberica_production},{farmer.excelsa_production},{farmer.robusta_production},{farmer.ncfrs},{farmer.remarks}\n")
     
     # Create file in memory
     output.seek(0)
@@ -383,6 +496,11 @@ def export_csv():
         mimetype='text/csv'
     )
 
+
+# Create database tables and populate with data
+with app.app_context():
+    db.create_all()
+    populate_farmer_data()
 
 if __name__ == "__main__":
     app.run(debug=True, port=5001)

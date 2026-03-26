@@ -1080,7 +1080,7 @@
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  background: #fff9f2;
+  background: #ffffff;
   table-layout: fixed;
   font-size: 0.75rem;
   /* allow horizontal scroll without visual overlap */
@@ -1091,8 +1091,8 @@
 }
 
 .data-table th {
-  background: linear-gradient(135deg, #673f2c, #715039);
-  color: #fff;
+  background: #8B4A2B;
+  color: white;
   padding: 0.6rem 0.4rem;
   text-align: center;
   font-weight: 600;
@@ -1101,7 +1101,7 @@
   letter-spacing: 0.01em;
   /* Sticky multi-row table header (works inside .table-wrapper scroll) */
   position: sticky;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(212, 177, 141, 0.2);
   vertical-align: middle;
   white-space: nowrap;
   line-height: 1.2;
@@ -1129,6 +1129,7 @@
 .data-table td {
   padding: 0.5rem 0.4rem;
   border: 1px solid rgba(212, 177, 141, 0.2);
+  background: #ffffff;
   font-size: 0.7rem;
   color: #25130c;
   text-align: center;
