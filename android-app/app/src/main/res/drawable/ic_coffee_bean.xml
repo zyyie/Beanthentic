@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+
+    <!-- Coffee bean silhouette (brown) -->
+    <path
+        android:fillColor="#8B5A2B"
+        android:pathData="M32,6
+            C19,6 10,16 10,28
+            C10,45 25,49 28,51
+            C30,52 31,55 32,60
+            C33,55 34,52 36,51
+            C39,49 54,45 54,28
+            C54,16 45,6 32,6
+            Z" />
+
+    <!-- Soft highlight on top-left -->
+    <path
+        android:fillColor="#A87946"
+        android:pathData="M24,22
+            C25,14 31,12 37,14
+            C41,16 42,21 41,25
+            C38,22 35,21 32,21
+            C28,21 26,22 24,22
+            Z" />
+
+    <!-- Center crease -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#6B3F1E"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M22,26
+            C25,36 30,41 32,43
+            C34,41 39,36 42,26" />
+</vector>
+
