@@ -29,7 +29,10 @@
               <p class="card-desc">Enter your details to Log in.</p>
             </div>
 
-            <form class="form" action="#" method="post" novalidate>
+            <form class="form" action="/login" method="post" novalidate>
+              {% if error %}
+              <p class="fineprint" style="color: #c0392b">{{ error }}</p>
+              {% endif %}
               <div class="field">
                 <label class="label" for="email">Email</label>
                 <input
@@ -72,7 +75,7 @@
 
               <p class="fineprint">
                 Don’t have an account?
-                <a class="link" href="./signup.html">Create one</a>
+                <a class="link" href="/signup">Create one</a>
               </p>
             </form>
           </div>
