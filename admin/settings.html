@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings - Beanthentic Coffee</title>
+  
+  <!-- CSS Files -->
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/layout.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/responsive.css">
+  <!-- Icon library -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  
+  <style>
+    .settings-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    .settings-header {
+      margin-bottom: 30px;
+    }
+    
+    .settings-tabs {
+      display: flex;
+      border-bottom: 2px solid #e5e7eb;
+      margin-bottom: 30px;
+    }
+    
+    .settings-tab {
+      padding: 12px 24px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: #6b7280;
+      border-bottom: 2px solid transparent;
+      transition: all 0.3s ease;
+    }
+    
+    .settings-tab:hover {
+      color: #374151;
+      background-color: #f9fafb;
+    }
+    
+    .settings-tab.active {
+      color: #059669;
+      border-bottom-color: #059669;
+    }
+    
+    .settings-section {
+      display: none;
+      animation: fadeIn 0.3s ease-in;
+    }
+    
+    .settings-section.active {
+      display: block;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .settings-card {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .settings-card h3 {
+      margin: 0 0 20px 0;
+      color: #111827;
+      font-size: 18px;
+      font-weight: 600;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      color: #374151;
+    }
+    
+    .form-group input[type="password"],
+    .form-group input[type="text"],
+    .form-group input[type="email"] {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.3s ease;
+    }
+    
+    .form-group input:focus {
+      outline: none;
+      border-color: #059669;
+      box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+    }
+    
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-primary {
+      background-color: #059669;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background-color: #047857;
+    }
+    
+    .btn-secondary {
+      background-color: #6b7280;
+      color: white;
+    }
+    
+    .btn-secondary:hover {
+      background-color: #4b5563;
+    }
+    
+    .btn-danger {
+      background-color: #dc2626;
+      color: white;
+    }
+    
+    .btn-danger:hover {
+      background-color: #b91c1c;
+    }
+    
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 24px;
+    }
+    
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    
+    input:checked + .toggle-slider {
+      background-color: #059669;
+    }
+    
+    input:checked + .toggle-slider:before {
+      transform: translateX(26px);
+    }
+    
+    .notification-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .notification-item:last-child {
+      border-bottom: none;
+    }
+    
+    .notification-info h4 {
+      margin: 0 0 4px 0;
+      font-size: 14px;
+      font-weight: 500;
+      color: #111827;
+    }
+    
+    .notification-info p {
+      margin: 0;
+      font-size: 12px;
+      color: #6b7280;
+    }
+    
+    .activity-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    
+    .activity-table th,
+    .activity-table td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .activity-table th {
+      background-color: #f9fafb;
+      font-weight: 600;
+      color: #374151;
+    }
+    
+    .activity-table tr:hover {
+      background-color: #f9fafb;
+    }
+    
+    .search-bar {
+      margin-bottom: 20px;
+    }
+    
+    .search-bar input {
+      width: 100%;
+      max-width: 300px;
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+    }
+    
+    .faq-item {
+      margin-bottom: 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    .faq-question {
+      width: 100%;
+      padding: 16px;
+      background: #f9fafb;
+      border: none;
+      text-align: left;
+      cursor: pointer;
+      font-weight: 500;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .faq-question:hover {
+      background: #f3f4f6;
+    }
+    
+    .faq-answer {
+      padding: 0 16px;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease, padding 0.3s ease;
+    }
+    
+    .faq-answer.active {
+      padding: 16px;
+      max-height: 500px;
+    }
+    
+    .faq-icon {
+      transition: transform 0.3s ease;
+    }
+    
+    .faq-item.active .faq-icon {
+      transform: rotate(180deg);
+    }
+    
+    .alert {
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    
+    .alert-success {
+      background-color: #d1fae5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+    
+    .alert-error {
+      background-color: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+    
+    .alert-warning {
+      background-color: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
+    }
+    
+    .backup-codes {
+      background: #f9fafb;
+      padding: 16px;
+      border-radius: 6px;
+      margin: 16px 0;
+    }
+    
+    .backup-codes code {
+      display: block;
+      padding: 8px 12px;
+      margin: 4px 0;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+    
+    .qr-code {
+      text-align: center;
+      margin: 20px 0;
+    }
+    
+    .qr-code img {
+      max-width: 200px;
+      border: 1px solid #e5e7eb;
+      padding: 10px;
+      background: white;
+    }
+  </style>
+</head>
+<body class="dashboard-page">
+  <main class="dashboard-main">
+    <div class="dashboard-layout">
+      <!-- Side Panel -->
+      <aside class="side-panel">
+        <div class="side-panel-header">
+            <img class="side-brand-img" src="../assets/images/logo.png" alt="Beanthentic logo" />
+        </div>
+        <nav class="side-nav">
+          <div class="nav-section">
+            <h3>Overview</h3>
+            <a href="../dashboard.html" class="nav-link" data-module="overview">
+              <i class="nav-icon fa-solid fa-chart-pie" aria-hidden="true"></i>
+              <span>Dashboard Overview</span>
+            </a>
+          </div>
+          <div class="nav-section">
+            <h3>Data Management</h3>
+            <a href="../dashboard.html#farmers" class="nav-link" data-module="farmers">
+              <i class="nav-icon fa-solid fa-people-group" aria-hidden="true"></i>
+              <span>Farmer Records</span>
+            </a>
+            <a href="../dashboard.html#analytics" class="nav-link" data-module="analytics">
+              <i class="nav-icon fa-solid fa-chart-line" aria-hidden="true"></i>
+              <span>Analytics</span>
+            </a>
+            <a href="../dashboard.html#reports" class="nav-link" data-module="reports">
+              <i class="nav-icon fa-solid fa-file-lines" aria-hidden="true"></i>
+              <span>Reports</span>
+            </a>
+          </div>
+          <div class="nav-section">
+            <h3>Tools</h3>
+            <a href="../dashboard.html#export" class="nav-link" data-module="export">
+              <i class="nav-icon fa-solid fa-file-export" aria-hidden="true"></i>
+              <span>Export Data</span>
+            </a>
+            <a href="#" class="nav-link active" data-module="settings">
+              <i class="nav-icon fa-solid fa-gear" aria-hidden="true"></i>
+              <span>Settings</span>
+            </a>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content Area -->
+      <div class="main-content">
+        <!-- Header -->
+        <header class="dashboard-header">
+          <div class="header-left">
+            <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle sidebar">
+              <span class="menu-icon" aria-hidden="true">
+                <span class="menu-bar"></span>
+                <span class="menu-bar"></span>
+                <span class="menu-bar"></span>
+              </span>
+            </button>
+            <div class="breadcrumb">
+              <span class="breadcrumb-item">Dashboard</span>
+              <span class="breadcrumb-separator">/</span>
+              <span class="breadcrumb-item active">Settings</span>
+            </div>
+          </div>
+          <div class="header-right">
+            <div class="header-actions">
+              <button class="action-btn" id="refreshBtn" type="button">
+                <i class="action-icon fa-solid fa-rotate-right"></i>
+                <span>Refresh</span>
+              </button>
+            </div>
+            <div class="user-profile">
+              <div class="user-avatar">
+                <i class="fa-solid fa-user"></i>
+              </div>
+              <div class="user-info">
+                <span class="user-name">{{ session.get('user_name', 'Admin') }}</span>
+                <span class="user-role">Administrator</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <!-- Settings Content -->
+        <div class="settings-container">
+          <div class="settings-header">
+            <h1>Settings</h1>
+            <p>Manage your account settings and preferences</p>
+          </div>
+
+          <div id="alertContainer"></div>
+
+          <!-- Settings Tabs -->
+          <div class="settings-tabs">
+            <button class="settings-tab active" data-tab="security">Account Security</button>
+            <button class="settings-tab" data-tab="notifications">Notifications</button>
+            <button class="settings-tab" data-tab="activity">Activity Log</button>
+            <button class="settings-tab" data-tab="faq">FAQ</button>
+            <button class="settings-tab" data-tab="profile">Profile</button>
+          </div>
+
+          <!-- Account Security Section -->
+          <div class="settings-section active" id="security-section">
+            <div class="settings-card">
+              <h3>Password Reset</h3>
+              <form id="passwordForm">
+                <div class="form-group">
+                  <label for="currentPassword">Current Password</label>
+                  <input type="password" id="currentPassword" name="currentPassword" required>
+                </div>
+                <div class="form-group">
+                  <label for="newPassword">New Password</label>
+                  <input type="password" id="newPassword" name="newPassword" required minlength="8">
+                </div>
+                <div class="form-group">
+                  <label for="confirmPassword">Confirm New Password</label>
+                  <input type="password" id="confirmPassword" name="confirmPassword" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Update Password</button>
+              </form>
+            </div>
+
+            <div class="settings-card">
+              <h3>Two-Factor Authentication</h3>
+              <div id="2faStatus">
+                {% if settings.security.two_factor_enabled %}
+                  <div class="alert alert-success">
+                    <i class="fa-solid fa-shield-halved"></i> 2FA is currently enabled
+                  </div>
+                  <p>Your account is protected with two-factor authentication.</p>
+                  <button type="button" class="btn btn-danger" id="disable2faBtn">Disable 2FA</button>
+                  <button type="button" class="btn btn-secondary" id="viewBackupCodesBtn">View Backup Codes</button>
+                {% else %}
+                  <div class="alert alert-warning">
+                    <i class="fa-solid fa-triangle-exclamation"></i> 2FA is not enabled
+                  </div>
+                  <p>Enable two-factor authentication to add an extra layer of security to your account.</p>
+                  <button type="button" class="btn btn-primary" id="enable2faBtn">Enable 2FA</button>
+                {% endif %}
+              </div>
+              
+              <div id="2faSetup" style="display: none;">
+                <h4>Setup Two-Factor Authentication</h4>
+                <div class="qr-code">
+                  <p>Scan this QR code with your authenticator app:</p>
+                  <div id="qrCodePlaceholder">
+                    <i class="fa-solid fa-qrcode" style="font-size: 200px; color: #d1d5db;"></i>
+                  </div>
+                  <p id="manualKey"></p>
+                </div>
+                <div class="backup-codes">
+                  <h4>Backup Recovery Codes</h4>
+                  <p>Save these codes in a safe place. You can use them to access your account if you lose your authenticator device.</p>
+                  <div id="backupCodesList"></div>
+                </div>
+                <button type="button" class="btn btn-secondary" id="cancel2faSetupBtn">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notifications Section -->
+          <div class="settings-section" id="notifications-section">
+            <div class="settings-card">
+              <h3>Email Notifications</h3>
+              <div class="notification-item">
+                <div class="notification-info">
+                  <h4>System Events</h4>
+                  <p>Get notified about system updates and maintenance</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="email_system_events" 
+                         {% if settings.notifications.email_system_events %}checked{% endif %}>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="notification-item">
+                <div class="notification-info">
+                  <h4>User Registrations</h4>
+                  <p>Receive alerts when new users register</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="email_user_registrations"
+                         {% if settings.notifications.email_user_registrations %}checked{% endif %}>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="notification-item">
+                <div class="notification-info">
+                  <h4>Security Breaches</h4>
+                  <p>Immediate alerts for security incidents</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="email_security_breaches"
+                         {% if settings.notifications.email_security_breaches %}checked{% endif %}>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-card">
+              <h3>SMS Notifications</h3>
+              <div class="notification-item">
+                <div class="notification-info">
+                  <h4>System Events</h4>
+                  <p>Get notified about system updates and maintenance</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="sms_system_events"
+                         {% if settings.notifications.sms_system_events %}checked{% endif %}>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="notification-item">
+                <div class="notification-info">
+                  <h4>User Registrations</h4>
+                  <p>Receive alerts when new users register</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="sms_user_registrations"
+                         {% if settings.notifications.sms_user_registrations %}checked{% endif %}>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="notification-item">
+                <div class="notification-info">
+                  <h4>Security Breaches</h4>
+                  <p>Immediate alerts for security incidents</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="sms_security_breaches"
+                         {% if settings.notifications.sms_security_breaches %}checked{% endif %}>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-card">
+              <h3>In-App Notifications</h3>
+              <div class="notification-item">
+                <div class="notification-info">
+                  <h4>System Events</h4>
+                  <p>Get notified about system updates and maintenance</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="in_app_system_events"
+                         {% if settings.notifications.in_app_system_events %}checked{% endif %}>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="notification-item">
+                <div class="notification-info">
+                  <h4>User Registrations</h4>
+                  <p>Receive alerts when new users register</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="in_app_user_registrations"
+                         {% if settings.notifications.in_app_user_registrations %}checked{% endif %}>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="notification-item">
+                <div class="notification-info">
+                  <h4>Security Breaches</h4>
+                  <p>Immediate alerts for security incidents</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="in_app_security_breaches"
+                         {% if settings.notifications.in_app_security_breaches %}checked{% endif %}>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <button type="button" class="btn btn-primary" id="saveNotificationsBtn">Save Notification Settings</button>
+          </div>
+
+          <!-- Activity Log Section -->
+          <div class="settings-section" id="activity-section">
+            <div class="settings-card">
+              <h3>Activity History</h3>
+              <div class="search-bar">
+                <input type="text" id="activitySearch" placeholder="Search activities...">
+              </div>
+              <table class="activity-table">
+                <thead>
+                  <tr>
+                    <th>Date & Time</th>
+                    <th>Action</th>
+                    <th>Details</th>
+                    <th>IP Address</th>
+                  </tr>
+                </thead>
+                <tbody id="activityTableBody">
+                  {% for activity in activity_log|reverse %}
+                    <tr>
+                      <td>{{ activity.timestamp[:19].replace('T', ' ') }}</td>
+                      <td>{{ activity.action }}</td>
+                      <td>{{ activity.details }}</td>
+                      <td>{{ activity.ip_address }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- FAQ Section -->
+          <div class="settings-section" id="faq-section">
+            <div class="settings-card">
+              <h3>Frequently Asked Questions</h3>
+              
+              <div class="faq-item">
+                <button class="faq-question">
+                  <span>How do I reset my password?</span>
+                  <i class="fa-solid fa-chevron-down faq-icon"></i>
+                </button>
+                <div class="faq-answer">
+                  <p>To reset your password, go to the Account Security section and fill out the password reset form. You'll need to enter your current password and then provide a new password that meets our security requirements (minimum 8 characters).</p>
+                </div>
+              </div>
+
+              <div class="faq-item">
+                <button class="faq-question">
+                  <span>What is Two-Factor Authentication (2FA)?</span>
+                  <i class="fa-solid fa-chevron-down faq-icon"></i>
+                </button>
+                <div class="faq-answer">
+                  <p>Two-Factor Authentication adds an extra layer of security to your account. After enabling 2FA, you'll need to enter a code from your authenticator app (like Google Authenticator) in addition to your password when logging in.</p>
+                </div>
+              </div>
+
+              <div class="faq-item">
+                <button class="faq-question">
+                  <span>How do I set up 2FA?</span>
+                  <i class="fa-solid fa-chevron-down faq-icon"></i>
+                </button>
+                <div class="faq-answer">
+                  <p>1. Go to Account Security section<br>
+                     2. Click "Enable 2FA"<br>
+                     3. Scan the QR code with your authenticator app<br>
+                     4. Save the backup codes in a safe place<br>
+                     5. Enter the verification code to complete setup</p>
+                </div>
+              </div>
+
+              <div class="faq-item">
+                <button class="faq-question">
+                  <span>What are backup codes?</span>
+                  <i class="fa-solid fa-chevron-down faq-icon"></i>
+                </button>
+                <div class="faq-answer">
+                  <p>Backup codes are one-time use codes that you can use to access your account if you lose your authenticator device. Each code can only be used once. Keep them in a secure location.</p>
+                </div>
+              </div>
+
+              <div class="faq-item">
+                <button class="faq-question">
+                  <span>How can I view my activity log?</span>
+                  <i class="fa-solid fa-chevron-down faq-icon"></i>
+                </button>
+                <div class="faq-answer">
+                  <p>Your activity log is available in the Activity Log section. It shows all recent actions performed on your account, including login times, password changes, and security settings updates. You can search through the log using the search bar.</p>
+                </div>
+              </div>
+
+              <div class="faq-item">
+                <button class="faq-question">
+                  <span>How do I update my notification preferences?</span>
+                  <i class="fa-solid fa-chevron-down faq-icon"></i>
+                </button>
+                <div class="faq-answer">
+                  <p>Go to the Notifications section where you can toggle email, SMS, and in-app notifications for different types of events like system updates, user registrations, and security alerts. Click "Save Notification Settings" to apply your changes.</p>
+                </div>
+              </div>
+
+              <div class="faq-item">
+                <button class="faq-question">
+                  <span>Is my data secure?</span>
+                  <i class="fa-solid fa-chevron-down faq-icon"></i>
+                </button>
+                <div class="faq-answer">
+                  <p>Yes, we take security seriously. All passwords are encrypted, we support 2FA, and we maintain detailed activity logs. We recommend enabling 2FA and using a strong, unique password for maximum security.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Profile Section -->
+          <div class="settings-section" id="profile-section">
+            <div class="settings-card">
+              <h3>Profile Information</h3>
+              <form id="profileForm">
+                <div class="form-group">
+                  <label for="fullName">Full Name</label>
+                  <input type="text" id="fullName" name="fullName" value="{{ current_user.get('full_name', '') }}" required>
+                </div>
+                <div class="form-group">
+                  <label for="email">Email Address</label>
+                  <input type="email" id="email" name="email" value="{{ session.get('user_email', '') }}" readonly>
+                  <small>Email address cannot be changed</small>
+                </div>
+                <button type="submit" class="btn btn-primary">Update Profile</button>
+              </form>
+            </div>
+
+            <div class="settings-card">
+              <h3>Account Actions</h3>
+              <p>Manage your account session and access.</p>
+              <button type="button" class="btn btn-secondary" id="refreshSessionBtn">Refresh Session</button>
+              <button type="button" class="btn btn-danger" id="logoutBtn">Log Out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- JavaScript -->
+  <script>
+    // Store settings data globally
+    const settingsData = {{ settings | tojson }};
+    
+    // Tab switching
+    document.querySelectorAll('.settings-tab').forEach(tab => {
+      tab.addEventListener('click', function() {
+        const targetTab = this.dataset.tab;
+        
+        // Update active tab
+        document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        
+        // Update active section
+        document.querySelectorAll('.settings-section').forEach(section => {
+          section.classList.remove('active');
+        });
+        document.getElementById(targetTab + '-section').classList.add('active');
+      });
+    });
+
+    // Alert system
+    function showAlert(message, type = 'success') {
+      const alertContainer = document.getElementById('alertContainer');
+      const alert = document.createElement('div');
+      alert.className = `alert alert-${type}`;
+      alert.innerHTML = `
+        <i class="fa-solid fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'triangle-exclamation'}"></i>
+        ${message}
+      `;
+      alertContainer.appendChild(alert);
+      
+      setTimeout(() => {
+        alert.remove();
+      }, 5000);
+    }
+
+    // Password form submission
+    document.getElementById('passwordForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const formData = new FormData(this);
+      formData.append('action', 'change_password');
+      
+      try {
+        const response = await fetch('/settings/security', {
+          method: 'POST',
+          body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          showAlert(result.success, 'success');
+          this.reset();
+        } else {
+          showAlert(result.error, 'error');
+        }
+      } catch (error) {
+        showAlert('An error occurred. Please try again.', 'error');
+      }
+    });
+
+    // 2FA toggle
+    document.getElementById('enable2faBtn').addEventListener('click', async function() {
+      try {
+        const response = await fetch('/settings/security', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: 'action=toggle_2fa&enable_2fa=true'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          // Show setup UI
+          document.getElementById('2faStatus').style.display = 'none';
+          document.getElementById('2faSetup').style.display = 'block';
+          document.getElementById('manualKey').textContent = `Manual key: ${result.secret}`;
+          
+          // Display backup codes
+          const backupCodesList = document.getElementById('backupCodesList');
+          backupCodesList.innerHTML = result.backup_codes.map(code => `<code>${code}</code>`).join('');
+          
+          showAlert('2FA setup initiated. Save your backup codes!', 'success');
+        } else {
+          showAlert(result.error, 'error');
+        }
+      } catch (error) {
+        showAlert('An error occurred. Please try again.', 'error');
+      }
+    });
+
+    document.getElementById('disable2faBtn').addEventListener('click', async function() {
+      const password = prompt('Enter your password to disable 2FA:');
+      if (!password) return;
+      
+      try {
+        const response = await fetch('/settings/security', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: `action=toggle_2fa&enable_2fa=false&password=${password}`
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          showAlert(result.success, 'success');
+          location.reload();
+        } else {
+          showAlert(result.error, 'error');
+        }
+      } catch (error) {
+        showAlert('An error occurred. Please try again.', 'error');
+      }
+    });
+
+    document.getElementById('cancel2faSetupBtn').addEventListener('click', function() {
+      document.getElementById('2faSetup').style.display = 'none';
+      document.getElementById('2faStatus').style.display = 'block';
+    });
+
+    // View backup codes
+    document.getElementById('viewBackupCodesBtn').addEventListener('click', function() {
+      if (settingsData.security.backup_codes && settingsData.security.backup_codes.length > 0) {
+        const backupCodesList = document.getElementById('backupCodesList');
+        backupCodesList.innerHTML = settingsData.security.backup_codes.map(code => `<code>${code}</code>`).join('');
+        document.getElementById('2faStatus').style.display = 'none';
+        document.getElementById('2faSetup').style.display = 'block';
+        document.getElementById('manualKey').textContent = 'Current backup codes:';
+      } else {
+        showAlert('No backup codes available. Please enable 2FA first.', 'warning');
+      }
+    });
+
+    // Notification settings
+    document.getElementById('saveNotificationsBtn').addEventListener('click', async function() {
+      const formData = new FormData();
+      
+      // Collect all notification settings
+      document.querySelectorAll('#notifications-section input[type="checkbox"]').forEach(checkbox => {
+        formData.append(checkbox.id, checkbox.checked);
+      });
+      
+      try {
+        const response = await fetch('/settings/notifications', {
+          method: 'POST',
+          body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          showAlert(result.success, 'success');
+        } else {
+          showAlert(result.error, 'error');
+        }
+      } catch (error) {
+        showAlert('An error occurred. Please try again.', 'error');
+      }
+    });
+
+    // Profile form submission
+    document.getElementById('profileForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const formData = new FormData(this);
+      
+      try {
+        const response = await fetch('/settings/profile', {
+          method: 'POST',
+          body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          showAlert(result.success, 'success');
+          // Update displayed name
+          document.querySelector('.user-name').textContent = formData.get('fullName');
+        } else {
+          showAlert(result.error, 'error');
+        }
+      } catch (error) {
+        showAlert('An error occurred. Please try again.', 'error');
+      }
+    });
+
+    // FAQ accordion
+    document.querySelectorAll('.faq-question').forEach(button => {
+      button.addEventListener('click', function() {
+        const faqItem = this.parentElement;
+        const answer = this.nextElementSibling;
+        
+        faqItem.classList.toggle('active');
+        answer.classList.toggle('active');
+      });
+    });
+
+    // Activity log search
+    document.getElementById('activitySearch').addEventListener('input', function() {
+      const searchTerm = this.value.toLowerCase();
+      const rows = document.querySelectorAll('#activityTableBody tr');
+      
+      rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(searchTerm) ? '' : 'none';
+      });
+    });
+
+    // Logout functionality
+    document.getElementById('logoutBtn').addEventListener('click', function() {
+      if (confirm('Are you sure you want to log out?')) {
+        window.location.href = '/logout';
+      }
+    });
+
+    // Refresh session
+    document.getElementById('refreshSessionBtn').addEventListener('click', function() {
+      showAlert('Session refreshed successfully', 'success');
+    });
+
+    // Load components
+    async function loadComponents() {
+      try {
+        const components = [
+        ];
+
+        for (const component of components) {
+          const response = await fetch(component.file);
+          const html = await response.text();
+          document.getElementById(component.id).innerHTML = html;
+        }
+      } catch (error) {
+        console.error('Error loading components:', error);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadComponents);
+  </script>
+</body>
+</html>

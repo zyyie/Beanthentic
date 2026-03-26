@@ -20,9 +20,6 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 </head>
 <body class="dashboard-page">
-  <!-- Header Component -->
-  <div id="header-component"></div>
-
   <main class="dashboard-main">
     <div class="dashboard-layout">
       <!-- Side Panel -->
@@ -60,7 +57,7 @@
               <i class="nav-icon fa-solid fa-file-export" aria-hidden="true"></i>
               <span>Export Data</span>
             </a>
-            <a href="#settings" class="nav-link" data-module="settings">
+            <a href="admin/settings.html" class="nav-link" data-module="settings">
               <i class="nav-icon fa-solid fa-gear" aria-hidden="true"></i>
               <span>Settings</span>
             </a>
@@ -92,18 +89,11 @@
                 <i class="action-icon fa-solid fa-rotate-right"></i>
                 <span>Refresh</span>
               </button>
-              <button class="action-btn" id="exportBtn" type="button">
-                <i class="action-icon fa-solid fa-file-export"></i>
-                <span>Export</span>
-              </button>
             </div>
             <div class="user-profile">
-              <div class="user-avatar">
-                <i class="fa-solid fa-user"></i>
-              </div>
               <div class="user-info">
-                <span class="user-name">Admin</span>
-                <span class="user-role">Administrator</span>
+                <span class="user-name"></span>
+                <span class="user-role"></span>
               </div>
             </div>
           </div>
@@ -347,22 +337,22 @@
                 <div class="export-card">
                   <h3><i class="fa-solid fa-file-excel card-heading-icon"></i> Excel Export</h3>
                   <p>Export farmer data to Excel format</p>
-                  <button class="export-option-btn">Export to Excel</button>
+                  <button class="export-option-btn" onclick="window.location.href='/export/excel'">Export to Excel</button>
                 </div>
                 <div class="export-card">
                   <h3><i class="fa-solid fa-file-pdf card-heading-icon"></i> PDF Report</h3>
                   <p>Generate PDF reports</p>
-                  <button class="export-option-btn">Generate PDF</button>
+                  <button class="export-option-btn" onclick="window.location.href='/export/pdf'">Generate PDF</button>
                 </div>
                 <div class="export-card">
                   <h3><i class="fa-solid fa-file-csv card-heading-icon"></i> CSV Export</h3>
                   <p>Export data as CSV file</p>
-                  <button class="export-option-btn">Export to CSV</button>
+                  <button class="export-option-btn" onclick="window.location.href='/export/csv'">Export to CSV</button>
                 </div>
               </div>
             </div>
           </div>
-
+          
           <!-- Settings Module -->
           <div class="module hidden" id="settings-module" data-module="settings">
             <section class="module-header">
@@ -384,9 +374,6 @@
     </div>
   </main>
 
-  <!-- Footer Component -->
-  <div id="footer-component"></div>
-
   <!-- JavaScript Files -->
   <script src="js/main.js"></script>
   <script src="js/navigation.js"></script>
@@ -399,8 +386,6 @@
     async function loadComponents() {
       try {
         const components = [
-          { id: 'header-component', file: 'components/header.html' },
-          { id: 'footer-component', file: 'components/footer.html' }
         ];
 
         for (const component of components) {
