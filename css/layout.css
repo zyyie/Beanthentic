@@ -84,7 +84,7 @@ header {
   bottom: 0;
   width: 0;
   height: 2px;
-  background: linear-gradient(90deg, #8b4a2b, #3ea642);
+  background: linear-gradient(90deg, #8b4a2b, #a6723e);
   transition: width 0.2s ease-out;
 }
 

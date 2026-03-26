@@ -404,10 +404,10 @@ class DashboardApp {
     if (pageData.length === 0) {
       const colSpan =
         this.farmerTableView === 'trees'
-          ? 12
+          ? 13
           : this.farmerTableView === 'production'
-            ? 9
-            : 11;
+            ? 10
+            : 12;
       tableBody.innerHTML = `<tr><td colspan="${colSpan}" class="no-data">No data available.</td></tr>`;
       return;
     }
@@ -417,11 +417,15 @@ class DashboardApp {
       const rowIndexInData = this.data.indexOf(row);
       console.log('Rendering farmer', actualIndex, ':', row['NAME OF FARMER'] || 'Unknown');
 
+      const fullName = this.getValue(row, ['NAME OF FARMER', 'Name of Farmer', 'name']);
+      const nameParts = this.splitFarmerName(fullName);
+
       const cells =
         this.farmerTableView === 'trees'
           ? [
               this.createInputCell(actualIndex, 'number'),
-              this.createInputCell(this.getValue(row, ['NAME OF FARMER', 'Name of Farmer', 'name']), 'text'),
+              this.createInputCell(nameParts.first, 'text'),
+              this.createInputCell(nameParts.last, 'text'),
 
               this.createInputCell(this.getValue(row, ['LIBERICA BEARING', 'Liberica_Bearing']), 'number', 'highlight-yellow'),
               this.createInputCell(this.getValue(row, ['LIBERICA NON-BEARING', 'Liberica_Non-bearing']), 'number', 'highlight-yellow'),
@@ -438,7 +442,8 @@ class DashboardApp {
           : this.farmerTableView === 'production'
             ? [
                 this.createInputCell(actualIndex, 'number'),
-                this.createInputCell(this.getValue(row, ['NAME OF FARMER', 'Name of Farmer', 'name']), 'text'),
+                this.createInputCell(nameParts.first, 'text'),
+                this.createInputCell(nameParts.last, 'text'),
                 this.createInputCell(this.getValue(row, ['TOTAL TREES', 'TOTAL_TREES']), 'number', 'highlight-green'),
                 this.createInputCell(this.getValue(row, ['LIBERICA PRODUCTION', 'Liberica_Production']), 'number', 'highlight-blue'),
                 this.createInputCell(this.getValue(row, ['EXCELSA PRODUCTION', 'Excelsa_Production']), 'number', 'highlight-blue'),
@@ -449,7 +454,8 @@ class DashboardApp {
               ]
           : [
               this.createInputCell(actualIndex, 'number'),
-              this.createInputCell(this.getValue(row, ['NAME OF FARMER', 'Name of Farmer', 'name']), 'text'),
+              this.createInputCell(nameParts.first, 'text'),
+              this.createInputCell(nameParts.last, 'text'),
               this.createInputCell(this.getValue(row, ['ADDRESS (BARANGAY)', 'Address (Barangay)', 'address']), 'text'),
               this.createInputCell(this.getValue(row, ['FA OFFICER / MEMBER', 'FA Officer / member', 'officer']), 'text'),
               this.createInputCell(this.getValue(row, ['BIRTHDAY', 'birthday']), 'text'),
@@ -469,6 +475,15 @@ class DashboardApp {
   }
 
   setFarmerTableView(view) {
+    // Preserve scroll positions to avoid "jump to top" when sidebar is open.
+    const moduleContent = document.querySelector('.module-content');
+    const tableWrapper = document.querySelector('.table-wrapper');
+    const prevWindowScrollY = window.scrollY;
+    const prevWindowScrollX = window.scrollX;
+    const prevModuleScrollTop = moduleContent ? moduleContent.scrollTop : 0;
+    const prevTableScrollTop = tableWrapper ? tableWrapper.scrollTop : 0;
+    const prevTableScrollLeft = tableWrapper ? tableWrapper.scrollLeft : 0;
+
     this.farmerTableView = view === 'trees' ? 'trees' : view === 'production' ? 'production' : 'basic';
 
     const btns = document.querySelectorAll('[data-table-view]');
@@ -494,6 +509,21 @@ class DashboardApp {
     }
 
     this.renderTableBody();
+
+    // Restore scroll after DOM changes/rendering.
+    const restore = () => {
+      if (moduleContent) moduleContent.scrollTop = prevModuleScrollTop;
+      if (tableWrapper) {
+        tableWrapper.scrollTop = prevTableScrollTop;
+        tableWrapper.scrollLeft = prevTableScrollLeft;
+      }
+      window.scrollTo({ top: prevWindowScrollY, left: prevWindowScrollX, behavior: 'auto' });
+    };
+
+    // Do it multiple times to account for layout reflow and table row height changes.
+    requestAnimationFrame(restore);
+    setTimeout(restore, 50);
+    setTimeout(restore, 120);
   }
 
   createInputCell(value, type = 'text', highlightClass = '') {
@@ -633,6 +663,16 @@ class DashboardApp {
       }
     }
     return '';
+  }
+
+  splitFarmerName(fullName) {
+    const raw = (fullName ?? '').toString().trim().replace(/\s+/g, ' ');
+    if (!raw) return { first: '', last: '' };
+
+    const parts = raw.split(' ');
+    const first = parts.shift() || '';
+    const last = parts.join(' ');
+    return { first, last };
   }
 
   formatValue(value) {

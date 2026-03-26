@@ -15,7 +15,7 @@
   padding: 0.2rem 0.6rem 0.2rem 0.2rem;
   border-radius: 999px;
   background: rgba(192, 133, 82, 0.08);
-  color: #32501f;
+  color: #3d2813;
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -27,8 +27,8 @@
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  background: radial-gradient(circle at 30% 30%, #e7f5df, #3ea642);
-  border: 1px solid rgba(62, 166, 66, 0.45);
+  background: radial-gradient(circle at 30% 30%, #e7f5df, #5e2d0d);
+  border: 1px solid rgba(101, 48, 13, 0.45);
 }
 
 .hero-title {
@@ -39,7 +39,7 @@
 }
 
 .hero-title span {
-  color: #3ea642;
+  color: #4e3017;
 }
 
 .hero-subtitle {
@@ -94,8 +94,8 @@
 }
 
 .hero-slide[data-theme="one"] {
-  background: radial-gradient(circle at 20% 20%, rgba(62, 166, 66, 0.22), rgba(255, 255, 255, 0.2) 45%),
-    linear-gradient(135deg, rgba(11, 61, 46, 0.18), rgba(192, 133, 82, 0.14));
+  background: radial-gradient(circle at 20% 20%, rgba(166, 109, 62, 0.22), rgba(255, 255, 255, 0.2) 45%),
+    linear-gradient(135deg, rgba(61, 28, 11, 0.18), rgba(192, 133, 82, 0.14));
 }
 
 .hero-slide[data-theme="two"] {
@@ -149,14 +149,14 @@
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  border: 1px solid rgba(11, 61, 46, 0.28);
-  background: rgba(11, 61, 46, 0.18);
+  border: 1px solid rgba(51, 34, 11, 0.28);
+  background: rgba(61, 34, 11, 0.18);
   cursor: pointer;
 }
 
 .hero-slider-dot[aria-selected="true"] {
   width: 22px;
-  background: linear-gradient(135deg, rgba(11, 61, 46, 0.95), rgba(62, 166, 66, 0.95));
+  background: linear-gradient(135deg, rgba(48, 23, 7, 0.95), rgba(166, 105, 62, 0.95));
   border-color: transparent;
 }
 
