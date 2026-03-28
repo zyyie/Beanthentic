@@ -40,6 +40,70 @@ class App {
         // Add any scroll-based functionality here
       }, 100);
     });
+
+    // Setup notification button
+    this.setupNotificationButton();
+  }
+
+  setupNotificationButton() {
+    const notificationBtn = document.getElementById('notificationBtn');
+    if (notificationBtn) {
+      notificationBtn.addEventListener('click', () => {
+        this.handleNotificationClick();
+      });
+    }
+  }
+
+  handleNotificationClick() {
+    // Clear the notification badge when clicked
+    const badge = document.querySelector('.notification-badge');
+    if (badge) {
+      badge.style.display = 'none';
+    }
+    
+    // Show a simple notification (you can replace this with a more sophisticated notification system)
+    this.showNotificationMessage('Notifications cleared!');
+  }
+
+  showNotificationMessage(message) {
+    // Create a simple toast notification
+    const toast = document.createElement('div');
+    toast.className = 'notification-toast';
+    toast.textContent = message;
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #8b4a2b, #5a2e1c);
+      color: white;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(139, 74, 43, 0.3);
+      z-index: 10000;
+      font-weight: 600;
+      opacity: 0;
+      transform: translateY(-20px);
+      transition: all 0.3s ease;
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Animate in
+    setTimeout(() => {
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateY(0)';
+    }, 10);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(-20px)';
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 300);
+    }, 3000);
   }
 
   checkPageLoad() {
