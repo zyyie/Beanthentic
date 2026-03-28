@@ -57,10 +57,6 @@ class DashboardApp {
         const nextOpen = !sidebarSettingsSubmenu.classList.contains('open');
         sidebarSettingsSubmenu.classList.toggle('open', nextOpen);
         settingsSidebarLink.classList.toggle('open', nextOpen);
-
-        // When clicking Settings, show overview first (no fragment auto-display).
-        this.activeSettingsTab = null;
-        this.switchModule('settings');
       });
 
       const submenuButtons = sidebarSettingsSubmenu.querySelectorAll('.settings-submenu-item[data-tab]');
@@ -76,61 +72,6 @@ class DashboardApp {
           // Ensure the Settings module is visible and render the selected fragment inside it.
           this.switchModule('settings');
         });
-      });
-    }
-
-    // Settings overview cards (click to open fragment)
-    const settingsOverview = document.getElementById('settingsOverview');
-    if (settingsOverview) {
-      settingsOverview.addEventListener('click', (e) => {
-        const card = e.target.closest('[data-open-tab]');
-        if (!card) return;
-        const tab = card.getAttribute('data-open-tab') || 'security';
-
-        const sidebarSubmenu = document.getElementById('sidebarSettingsSubmenu');
-        if (sidebarSubmenu) {
-          const btn = sidebarSubmenu.querySelector(`.settings-submenu-item[data-tab="${tab}"]`);
-          if (btn) btn.click();
-        } else {
-          this.activeSettingsTab = tab;
-          this.switchModule('settings');
-        }
-      });
-    }
-
-    // Header notifications + profile menu
-    const notificationBtn = document.getElementById('notificationBtn');
-    if (notificationBtn) {
-      notificationBtn.addEventListener('click', () => {
-        this.showNotification('You have 3 new notifications.', 'success');
-      });
-    }
-
-    const profileMenuWrap = document.getElementById('profileMenuWrap');
-    const profileMenuBtn = document.getElementById('profileMenuBtn');
-    const profileAccountInfoBtn = document.getElementById('profileAccountInfoBtn');
-    if (profileMenuWrap && profileMenuBtn) {
-      profileMenuBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const nextOpen = !profileMenuWrap.classList.contains('open');
-        profileMenuWrap.classList.toggle('open', nextOpen);
-        profileMenuBtn.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
-      });
-
-      if (profileAccountInfoBtn) {
-        profileAccountInfoBtn.addEventListener('click', () => {
-          profileMenuWrap.classList.remove('open');
-          profileMenuBtn.setAttribute('aria-expanded', 'false');
-          this.activeSettingsTab = 'profile';
-          this.switchModule('settings');
-        });
-      }
-
-      document.addEventListener('click', (e) => {
-        if (!profileMenuWrap.contains(e.target)) {
-          profileMenuWrap.classList.remove('open');
-          profileMenuBtn.setAttribute('aria-expanded', 'false');
-        }
       });
     }
 
@@ -332,34 +273,14 @@ class DashboardApp {
     }
 
     if (moduleName === 'settings') {
-      this.showSettingsOverview();
-      if (this.activeSettingsTab) {
-        this.showSettingsFragment(this.activeSettingsTab);
-      }
+      // Default/admin settings fragment on open.
+      this.loadAdminSettingsFragment(this.activeSettingsTab || 'security');
     }
 
     // Close mobile menu
     if (window.innerWidth <= 768) {
       this.closeMobileSidePanel();
     }
-  }
-
-  showSettingsOverview() {
-    const overview = document.getElementById('settingsOverview');
-    const fragmentSection = document.getElementById('settingsFragmentSection');
-    if (overview) overview.classList.remove('hidden');
-    if (fragmentSection) fragmentSection.classList.add('hidden');
-
-    const pageTitleEl = document.getElementById('adminSettingsPageTitle');
-    if (pageTitleEl) pageTitleEl.textContent = 'Settings';
-  }
-
-  showSettingsFragment(tab) {
-    const overview = document.getElementById('settingsOverview');
-    const fragmentSection = document.getElementById('settingsFragmentSection');
-    if (overview) overview.classList.add('hidden');
-    if (fragmentSection) fragmentSection.classList.remove('hidden');
-    this.loadAdminSettingsFragment(tab);
   }
 
   async loadAdminSettingsFragment(tab) {
@@ -702,7 +623,6 @@ class DashboardApp {
     this.renderTableBody();
     this.renderPagination();
     this.updateRecordInfo();
-    this.updateOwnershipLegend();
   }
 
   renderTableBody() {
@@ -810,16 +730,6 @@ class DashboardApp {
               this.createInputCell(nameParts.first, 'text'),
               this.createInputCell(this.getValue(row, ['ADDRESS (BARANGAY)', 'Address (Barangay)', 'address']), 'text'),
               this.createInputCell(this.getValue(row, ['BIRTHDAY', 'birthday']), 'text'),
-<<<<<<< HEAD
-=======
-              this.createInputCell(this.getValue(row, ['RSBSA Registered (Yes/No)', 'REGISTERED (YES/NO)', 'Registered (Yes/No)', 'registered']), 'text'),
-              this.createInputCell(
-                this.formatOwnership(this.getValue(row, ['STATUS OF OWNERSHIP', 'ownership'])),
-                'text'
-              ),
-              this.createInputCell(this.getValue(row, ['Total Area Planted (HA.)', 'TOTAL AREA PLANTED (HA.)', 'area']), 'number'),
-              this.createInputCell(this.getValue(row, ['NCFRS', 'ncfrs']), 'text'),
->>>>>>> eba5aaccacb3fc59613c6e871858ec6cc123e2cf
               this.createEditableCell(this.getValue(row, ['REMARKS', 'remarks']), rowIndexInData, 'REMARKS', 'text'),
               this.createRowActionsCell(rowIndexInData)
             ];
@@ -874,7 +784,6 @@ class DashboardApp {
     }
 
     this.renderTableBody();
-    this.updateOwnershipLegend();
 
     // Restore scroll after DOM changes/rendering.
     const restore = () => {
@@ -1074,43 +983,6 @@ class DashboardApp {
       return value.toLocaleString();
     }
     return value.toString();
-  }
-
-  formatOwnership(rawValue) {
-    const v = (rawValue ?? '').toString().trim();
-    if (!v) return '';
-
-    const upper = v.toUpperCase();
-    const letter = upper[0] || '';
-
-    const map = {
-      A: 'Landowner',
-      B: 'COA Holder',
-      C: 'Leaseholder',
-      D: 'Seasonal Farm Worker',
-      E: 'Others'
-    };
-
-    if (map[letter]) {
-      // Show only the Excel-style code (A/B/C/D/E) in the table.
-      return letter;
-    }
-
-    // Fallback: display the raw value if it isn't the expected A-E codes.
-    return v;
-  }
-
-  updateOwnershipLegend() {
-    const el = document.getElementById('ownershipLegend');
-    if (!el) return;
-
-    const shouldShow = this.farmerTableView === 'basic';
-    el.classList.toggle('hidden', !shouldShow);
-    el.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
-
-    if (shouldShow) {
-      el.textContent = 'Legend: A - Landowner, B - COA Holder, C - Leaseholder, D - Seasonal Farm Worker, E - Others';
-    }
   }
 
   filterData(searchTerm) {

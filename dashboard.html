@@ -120,33 +120,10 @@
                 <span>Refresh</span>
               </button>
             </div>
-
-            <button class="action-btn notification-btn" id="notificationBtn" type="button" aria-label="Notifications">
-              <i class="action-icon fa-solid fa-bell"></i>
-              <span class="notif-badge" aria-hidden="true">3</span>
-            </button>
-
-            <div class="profile-menu-wrap" id="profileMenuWrap">
-              <button class="user-profile" id="profileMenuBtn" type="button" aria-haspopup="menu" aria-expanded="false">
-                <div class="user-avatar">
-                  <i class="fa-solid fa-user"></i>
-                </div>
-                <div class="user-info">
-                  <span class="user-name">{{ session.get('user_name', 'Admin') }}</span>
-                  <span class="user-role">Administrator</span>
-                </div>
-                <i class="fa-solid fa-chevron-down profile-caret" aria-hidden="true"></i>
-              </button>
-
-              <div class="profile-dropdown" id="profileDropdown" role="menu" aria-label="Profile menu">
-                <button class="profile-dropdown-item" id="profileAccountInfoBtn" type="button" role="menuitem">
-                  <i class="fa-solid fa-id-card"></i>
-                  <span>Account Information</span>
-                </button>
-                <a class="profile-dropdown-item danger" href="/logout" role="menuitem">
-                  <i class="fa-solid fa-right-from-bracket"></i>
-                  <span>Log out</span>
-                </a>
+            <div class="user-profile">
+              <div class="user-info">
+                <span class="user-name"></span>
+                <span class="user-role"></span>
               </div>
             </div>
           </div>
@@ -408,9 +385,6 @@
                 <div class="table-info">
                   <span id="recordInfo">Loading...</span>
                 </div>
-                <div class="ownership-legend hidden" id="ownershipLegend" aria-hidden="true">
-                  Legend: A - Landowner, B - COA Holder, C - Leaseholder, D - Seasonal Farm Worker, E - Others
-                </div>
                 <div class="pagination" id="pagination">
                   <!-- Pagination will be populated here -->
                 </div>
@@ -483,63 +457,10 @@
           <div class="module hidden" id="settings-module" data-module="settings">
             <section class="module-header">
               <h1 id="adminSettingsPageTitle">Settings</h1>
-              <p>Account Settings.</p>
+              <p>Configure dashboard preferences</p>
             </section>
             <div class="settings-content">
-              <section class="table-section settings-overview" id="settingsOverview">
-                <div class="section-header">
-                  <h2>Settings Categories</h2>
-                </div>
-
-                <div class="settings-cards">
-                  <article class="settings-card-tile" data-open-tab="security">
-                    <div class="tile-icon"><i class="fa-solid fa-shield-halved"></i></div>
-                    <div class="tile-body">
-                      <h3>Account Security</h3>
-                      <p>Password reset workflow + 2FA setup + backup recovery codes.</p>
-                    </div>
-                    <div class="tile-cta">Open</div>
-                  </article>
-
-                  <article class="settings-card-tile" data-open-tab="notifications">
-                    <div class="tile-icon"><i class="fa-solid fa-bell"></i></div>
-                    <div class="tile-body">
-                      <h3>Notifications Settings</h3>
-                      <p>Email, SMS, and in-app alerts for key system events.</p>
-                    </div>
-                    <div class="tile-cta">Open</div>
-                  </article>
-
-                  <article class="settings-card-tile" data-open-tab="activity">
-                    <div class="tile-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
-                    <div class="tile-body">
-                      <h3>Activity Log</h3>
-                      <p>Searchable, filterable history of admin actions (IP, changes).</p>
-                    </div>
-                    <div class="tile-cta">Open</div>
-                  </article>
-
-                  <article class="settings-card-tile" data-open-tab="faq">
-                    <div class="tile-icon"><i class="fa-solid fa-circle-question"></i></div>
-                    <div class="tile-body">
-                      <h3>FAQ</h3>
-                      <p>Accordion help for admin troubleshooting and management.</p>
-                    </div>
-                    <div class="tile-cta">Open</div>
-                  </article>
-
-                  <article class="settings-card-tile" data-open-tab="profile">
-                    <div class="tile-icon"><i class="fa-solid fa-user-gear"></i></div>
-                    <div class="tile-body">
-                      <h3>Profile Actions</h3>
-                      <p>Update profile info and use a prominent log-out button.</p>
-                    </div>
-                    <div class="tile-cta">Open</div>
-                  </article>
-                </div>
-              </section>
-
-              <div class="table-section settings-admin-section hidden" id="settingsFragmentSection">
+              <div class="table-section settings-admin-section">
                 <div class="section-header">
                   <h2 id="adminSettingsFragmentTitle">Account Security</h2>
                 </div>

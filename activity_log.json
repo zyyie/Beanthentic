@@ -84,19 +84,3 @@
     "ip_address": "127.0.0.1"
   }
 ]
-[
-  {
-    "timestamp": "2026-03-26T16:29:31.800147",
-    "user_email": "krisharubia05@gmail.com",
-    "action": "LOGOUT",
-    "details": "User logged out",
-    "ip_address": "127.0.0.1"
-  },
-  {
-    "timestamp": "2026-03-26T16:29:38.802498",
-    "user_email": "krisharubia05@gmail.com",
-    "action": "LOGIN",
-    "details": "User logged in successfully",
-    "ip_address": "127.0.0.1"
-  }
-]
