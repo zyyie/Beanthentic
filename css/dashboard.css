@@ -2,14 +2,33 @@
 
 /* This page uses a full-bleed app layout; override the site's centered <main>. */
 .dashboard-page {
-  background: #f6f7f9;
+  background: linear-gradient(135deg, #f8f6f3, #f0ebe4, #f5f2ed);
+  background-attachment: fixed;
   min-height: 100vh;
+  position: relative;
+}
+
+.dashboard-page::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 20%, rgba(139, 74, 43, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(59, 33, 7, 0.02) 0%, transparent 50%),
+    radial-gradient(circle at 40% 60%, rgba(212, 177, 141, 0.04) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .dashboard-page .dashboard-main {
   max-width: none;
   margin: 0;
   padding: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .dashboard-container {
@@ -265,6 +284,9 @@
   display: flex;
   flex-direction: column;
   position: relative;
+  /* Breathing room between sidebar edge and page content */
+  padding-left: 0.35rem;
+  box-sizing: border-box;
   /* Allow page to scroll naturally; inner sections can still manage their own scrolling. */
 }
 
@@ -365,7 +387,8 @@
   gap: 1.5rem;
 }
 
-.header-actions {
+/* Scoped so <th class="header-actions"> in data tables is not a flex box */
+.dashboard-header .header-actions {
   display: flex;
   gap: 0.5rem;
 }
@@ -436,8 +459,8 @@
 
 /* Module Content */
 .module-content {
-  /* Consistent “frame” under sticky header */
-  padding-inline: clamp(1rem, 2.4vw, 2rem);
+  /* Consistent “frame” under sticky header — extra inline padding when sidebar is open */
+  padding-inline: clamp(1.25rem, 3vw, 2.25rem);
   padding-block: clamp(1rem, 2vw, 1.5rem) clamp(1.25rem, 2.6vw, 2rem);
   flex: 1;
   display: flex;
@@ -495,78 +518,241 @@
 /* Farmers module toolbar */
 .module-toolbar {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 1.5rem;
   flex-wrap: wrap;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 2rem;
+  background: linear-gradient(135deg, #ffffff, #faf9f7);
+  border-radius: 20px;
+  box-shadow: 
+    0 12px 40px rgba(59, 33, 7, 0.06),
+    0 4px 12px rgba(59, 33, 7, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(212, 177, 141, 0.15);
+  position: relative;
+  overflow: hidden;
+  min-height: 80px;
 }
 
-.toolbar-left,
+.module-toolbar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(139, 74, 43, 0.3), 
+    transparent
+  );
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex: 1;
+  min-width: 300px;
+}
+
 .toolbar-right {
   display: flex;
-  align-items: end;
-  gap: 0.75rem;
+  align-items: center;
+  gap: 1.5rem;
+  flex: 2;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/* Farmer Records: search/actions row first, then tabs — even vertical rhythm */
+#farmers-module.module {
+  gap: 1.25rem;
+  min-height: 0;
+}
+
+#farmers-module .module-header {
+  margin-bottom: 0;
+}
+
+#farmers-module .module-toolbar.farmer-toolbar {
+  margin-bottom: 0;
+  padding: 1.25rem 1.5rem;
+  gap: 1.25rem;
+  min-height: 0;
+}
+
+#farmers-module .table-container {
+  margin-top: 0;
+  padding: 0.65rem 0.75rem;
+}
+
+.farmer-toolbar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1.25rem;
+}
+
+.farmer-toolbar-tabs {
+  width: 100%;
+}
+
+/* Tab strip: no outer “card” — only the buttons read as tabs */
+.farmer-toolbar-tabs .table-view-toggle {
+  width: 100%;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  min-height: 0;
+  overflow: visible;
+  gap: 0.35rem 0.5rem;
+}
+
+.farmer-toolbar-tabs .table-view-toggle::before {
+  display: none;
+  content: none;
+}
+
+.farmer-toolbar-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.25rem;
+  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+}
+
+/* One horizontal line: label + input stretches; actions share vertical center with input */
+.farmer-toolbar .farmer-search-field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.65rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.farmer-toolbar .farmer-search-field .field-label {
+  flex-shrink: 0;
+}
+
+.farmer-toolbar #farmerSearch {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.farmer-toolbar #farmerSearch:focus {
+  transform: none;
+}
+
+.farmer-toolbar #pageSizeSelect {
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.farmer-toolbar .farmer-rows-field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.farmer-toolbar .farmer-rows-field .field-label {
+  margin: 0;
+}
+
+.farmer-toolbar .toolbar-left {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.farmer-toolbar .farmer-toolbar-actions {
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 1rem 1.25rem;
 }
 
 .crud-actions {
   display: inline-flex;
-  gap: 0.5rem;
-  align-items: end;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .crud-btn {
-  padding: 0.55rem 0.9rem;
-  border-radius: 10px;
-  border: 1px solid rgba(139, 74, 43, 0.35);
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  border: 2px solid transparent;
   background: linear-gradient(135deg, #8b4a2b, #5a2e1c);
   color: #fff;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
-  transition: filter 0.15s ease, transform 0.15s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(139, 74, 43, 0.25);
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  letter-spacing: 0.025em;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .crud-btn:hover {
   filter: brightness(1.05);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(139, 74, 43, 0.35);
+}
+
+.crud-btn:active {
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 74, 43, 0.25);
 }
 
 .crud-btn.secondary {
-  background: #fff;
+  background: #ffffff;
   color: #8b4a2b;
-  border: 1px solid rgba(139, 74, 43, 0.45);
+  border: 2px solid #8b4a2b;
+  box-shadow: 0 4px 12px rgba(139, 74, 43, 0.15);
 }
 
 .crud-btn.secondary:hover {
-  background: rgba(139, 74, 43, 0.06);
+  background: rgba(139, 74, 43, 0.08);
+  border-color: #5a2e1c;
+  box-shadow: 0 8px 20px rgba(139, 74, 43, 0.25);
 }
 
 .cell-editable {
   cursor: text;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.cell-editable:hover {
+  background: rgba(139, 74, 43, 0.03);
+  box-shadow: inset 0 0 0 1px rgba(139, 74, 43, 0.1);
 }
 
 .cell-editable:focus {
   outline: none;
-  box-shadow: inset 0 0 0 2px rgba(62, 166, 66, 0.55);
-  background: rgba(62, 166, 66, 0.08);
-}
-
-.row-action-btn {
-  padding: 0.35rem 0.6rem;
-  border-radius: 10px;
-  border: 1px solid rgba(220, 53, 69, 0.25);
-  background: rgba(220, 53, 69, 0.08);
-  color: #b02a37;
-  font-size: 0.8rem;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.row-action-btn:hover {
-  background: rgba(220, 53, 69, 0.14);
+  box-shadow: inset 0 0 0 2px rgba(139, 74, 43, 0.4);
+  background: rgba(139, 74, 43, 0.06);
+  color: #3B2107;
+  font-weight: 600;
 }
 
 .search-field,
@@ -582,28 +768,54 @@
 }
 
 #farmerSearch {
-  width: min(520px, 76vw);
-  padding: 0.65rem 0.9rem;
-  border: 1px solid rgba(11, 61, 46, 0.18);
-  border-radius: 10px;
+  width: 100%;
+  max-width: min(640px, 100%);
+  padding: 0.75rem 1rem;
+  border: 2px solid rgba(139, 74, 43, 0.2);
+  border-radius: 12px;
   background: #ffffff;
   color: #25130c;
   outline: none;
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  box-shadow: 0 2px 8px rgba(59, 33, 7, 0.08);
 }
 
 #farmerSearch:focus {
-  border-color: rgba(166, 107, 62, 0.6);
-  box-shadow: 0 0 0 4px rgba(166, 110, 62, 0.16);
+  border-color: #8b4a2b;
+  box-shadow: 0 0 0 4px rgba(139, 74, 43, 0.15), 0 4px 12px rgba(59, 33, 7, 0.12);
+  transform: translateY(-1px);
+}
+
+#farmerSearch::placeholder {
+  color: #8b7355;
+  font-style: italic;
 }
 
 #pageSizeSelect {
-  padding: 0.6rem 0.75rem;
-  border: 1px solid rgba(11, 61, 46, 0.18);
-  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  border: 2px solid rgba(139, 74, 43, 0.2);
+  border-radius: 12px;
   background: #ffffff;
   color: #25130c;
   outline: none;
+  font-size: 0.9rem;
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(59, 33, 7, 0.08);
+  min-width: 80px;
+}
+
+#pageSizeSelect:focus {
+  border-color: #8b4a2b;
+  box-shadow: 0 0 0 4px rgba(139, 74, 43, 0.15), 0 4px 12px rgba(59, 33, 7, 0.12);
+  transform: translateY(-1px);
+}
+
+#pageSizeSelect:hover {
+  border-color: rgba(139, 74, 43, 0.4);
 }
 
 /* Dashboard Container */
@@ -1012,13 +1224,347 @@
 
 /* Table Container */
 .table-container {
-  background: rgba(255, 255, 255, 0.9);
+  background: linear-gradient(135deg, #ffffff, #faf9f7);
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin-bottom: 0;
+  box-shadow: 
+    0 8px 32px rgba(59, 33, 7, 0.08),
+    0 2px 8px rgba(59, 33, 7, 0.04);
+  border: 1px solid rgba(139, 74, 43, 0.15);
+  /* Footer stays visible; table scrolls within .table-wrapper */
+  overflow: hidden;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-width: 100%;
+  position: relative;
+}
+
+.table-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(139, 74, 43, 0.2), 
+    transparent
+  );
+  z-index: 1;
+}
+
+.table-wrapper {
+  /* Scroll table itself (both directions) */
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
   border-radius: 12px;
+  max-width: 100%;
+  /* Ensure horizontal scroll when needed */
+  overflow-x: auto;
+  overflow-y: auto;
+  background: #ffffff;
+  box-shadow: inset 0 1px 3px rgba(59, 33, 7, 0.04);
+}
+
+/* Farmers: split table into two views */
+.table-view-toggle {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: linear-gradient(135deg, #ffffff, #f8f6f3);
+  border-radius: 18px;
+  box-shadow: 
+    0 8px 32px rgba(59, 33, 7, 0.08),
+    0 2px 8px rgba(59, 33, 7, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(139, 74, 43, 0.15);
+  position: relative;
+  overflow: hidden;
+  min-height: 52px;
+}
+
+.table-view-toggle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(139, 74, 43, 0.2), 
+    transparent
+  );
+}
+
+.view-toggle-btn {
+  border: none;
+  background: transparent;
+  color: #6a574c;
+  padding: 0.875rem 1.5rem;
+  border-radius: 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  line-height: 1.1;
+}
+
+.view-toggle-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, 
+    rgba(139, 74, 43, 0.08), 
+    rgba(166, 107, 62, 0.04)
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.view-toggle-btn:hover {
+  color: #3B2107;
+  background: rgba(139, 74, 43, 0.06);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(139, 74, 43, 0.12);
+}
+
+.view-toggle-btn:hover::before {
+  opacity: 1;
+}
+
+.view-toggle-btn.active {
+  background: linear-gradient(135deg, #7b2d00, #5c1f00);
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 
+    0 8px 24px rgba(92, 31, 0, 0.35),
+    0 2px 8px rgba(92, 31, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.view-toggle-btn.active::before {
+  opacity: 0;
+}
+
+.view-toggle-btn.active:hover {
+  background: linear-gradient(135deg, #6b2600, #4a1800);
+  transform: translateY(-3px);
+  box-shadow: 
+    0 12px 32px rgba(92, 31, 0, 0.45),
+    0 4px 12px rgba(92, 31, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.data-table.is-hidden {
+  display: none;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  table-layout: fixed;
+  font-size: 13px;
+  min-width: max-content;
+  font-family: inherit;
+  line-height: 1.4;
+  color: #25130c;
+}
+
+/* Unified Header Styling */
+.data-table th {
+  background: linear-gradient(135deg, #8b4a2b, #5a2e1c);
+  color: #ffffff;
+  padding: 12px 14px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 0.5px solid rgba(212, 177, 141, 0.3);
+  vertical-align: middle;
+  white-space: nowrap;
+  line-height: 1.3;
+  position: sticky;
+  z-index: 3;
+  overflow: visible;
+  text-overflow: unset;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Sub-headers (second and third rows) */
+.data-table thead tr:nth-child(2) th,
+.data-table thead tr:nth-child(3) th {
+  background: linear-gradient(135deg, #a6623a, #7b3f00);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+/* Multi-row header positioning */
+.data-table thead tr:nth-child(1) th {
+  top: 0;
+  z-index: 6;
+}
+
+.data-table thead tr:nth-child(2) th {
+  top: 38px;
+  z-index: 5;
+}
+
+.data-table thead tr:nth-child(3) th {
+  top: 72px;
+  z-index: 4;
+}
+
+/* Farmer Records: compact density + sticky offsets for shorter header rows */
+#farmers-module .data-table {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+#farmers-module .data-table th {
+  padding: 6px 8px;
+  font-size: 10px;
+  letter-spacing: 0.045em;
+  line-height: 1.25;
+}
+
+#farmers-module .data-table td {
+  padding: 5px 8px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+#farmers-module .data-table td:nth-child(2),
+#farmers-module .data-table td:nth-child(3) {
+  padding-left: 8px;
+}
+
+#farmers-module .data-table thead tr:nth-child(2) th {
+  top: 28px;
+}
+
+#farmers-module .data-table thead tr:nth-child(3) th {
+  top: 56px;
+}
+
+#farmers-module .data-table tbody td:first-child {
+  overflow: visible;
+  text-overflow: clip;
+  font-variant-numeric: tabular-nums;
+}
+
+#farmers-module .row-action-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 5px;
+}
+
+#farmers-module .table-footer {
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  gap: 0.65rem;
+}
+
+#farmers-module .table-info {
+  font-size: 12px;
+}
+
+#farmers-module .rsbsa-badge {
+  font-size: 10px;
+  padding: 0.12rem 0.4rem;
+}
+
+/* Unified Table Body Styling */
+.data-table td {
+  padding: 12px 14px;
+  border: 0.5px solid rgba(139, 74, 43, 0.12);
+  background: #ffffff;
+  font-size: 13px;
+  color: #25130c;
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all 0.2s ease;
+}
+
+/* Text alignment for name columns */
+.data-table td:nth-child(2),
+.data-table td:nth-child(3) {
+  text-align: left;
+  padding-left: 12px;
+}
+
+/* Row hover state */
+.data-table tr:hover {
+  background: linear-gradient(135deg, rgba(139, 74, 43, 0.04), rgba(166, 107, 62, 0.02));
+  transform: scale(1.001);
+  box-shadow: 0 2px 8px rgba(59, 33, 7, 0.06);
+}
+
+.data-table tr {
+  transition: background-color 0.2s ease;
+}
+
+/* Yellow highlight for specific rows */
+.data-table tr:nth-child(4),
+.data-table tr:nth-child(34),
+.data-table tr:nth-child(35) {
+  background: #FEF9C3;
+}
+
+/* Unified Delete Button Styling */
+.row-action-btn {
+  background: #FEE2E2;
+  color: #991B1B;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.row-action-btn:hover {
+  background: #FECACA;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(153, 27, 27, 0.1);
+}
+
+/* Table Container */
+.table-container {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: var(--border-radius-lg, 12px);
   padding: 1rem;
   margin-bottom: 0;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(212, 177, 141, 0.3);
-  /* Footer stays visible; table scrolls within .table-wrapper */
+  border: 0.5px solid var(--color-border-tertiary, rgba(212, 177, 141, 0.3));
   overflow: hidden;
   width: 100%;
   display: flex;
@@ -1028,145 +1574,13 @@
 }
 
 .table-wrapper {
-  /* Scroll the table itself (both directions) */
   overflow: auto;
   flex: 1;
   min-height: 0;
   border-radius: 8px;
   max-width: 100%;
-}
-
-/* Farmers: split table into two views */
-.table-view-toggle {
-  display: inline-flex;
-  gap: 0.35rem;
-  padding: 0.25rem;
-  border-radius: 12px;
-  background: rgba(61, 28, 11, 0.06);
-  border: 1px solid rgba(61, 28, 11, 0.14);
-}
-
-.view-toggle-btn {
-  border: 0;
-  background: transparent;
-  color: #3d210b;
-  padding: 0.45rem 0.75rem;
-  border-radius: 10px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.view-toggle-btn.active {
-  background: #381b09;
-  color: #fff;
-}
-
-.data-table.is-hidden {
-  display: none;
-}
-
-/* Farmer Records: keep module fixed, table scrolls */
-#farmers-module {
-  min-height: 0;
-}
-
-#farmers-module .table-container {
-  flex: 1;
-  min-height: 0;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: #ffffff;
-  table-layout: fixed;
-  font-size: 0.75rem;
-  /* allow horizontal scroll without visual overlap */
-  min-width: max-content;
-  /* Approx header row heights for sticky offsets */
-  --thead-row-1: 38px;
-  --thead-row-2: 34px;
-}
-
-.data-table th {
-  background: #8B4A2B;
-  color: white;
-  padding: 0.6rem 0.4rem;
-  text-align: center;
-  font-weight: 600;
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.01em;
-  /* Sticky multi-row table header (works inside .table-wrapper scroll) */
-  position: sticky;
-  border: 1px solid rgba(212, 177, 141, 0.2);
-  vertical-align: middle;
-  white-space: nowrap;
-  line-height: 1.2;
-  z-index: 3;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* 3-row THEAD: stack without overlap */
-.data-table thead tr:nth-child(1) th {
-  top: 0;
-  z-index: 6;
-}
-
-.data-table thead tr:nth-child(2) th {
-  top: var(--thead-row-1);
-  z-index: 5;
-}
-
-.data-table thead tr:nth-child(3) th {
-  top: calc(var(--thead-row-1) + var(--thead-row-2));
-  z-index: 4;
-}
-
-.data-table td {
-  padding: 0.5rem 0.4rem;
-  border: 1px solid rgba(212, 177, 141, 0.2);
-  background: #ffffff;
-  font-size: 0.7rem;
-  color: #25130c;
-  text-align: center;
-  vertical-align: middle;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Per-view minimum widths (prevents cramped headers) */
-#farmerTableBasic {
-  min-width: 980px;
-}
-
-#farmerTableTrees {
-  min-width: 1100px;
-}
-
-#farmerTableProduction {
-  min-width: 980px;
-}
-
-.data-table td:first-child,
-.data-table td:nth-child(2),
-.data-table td:nth-child(3),
-.data-table td:nth-child(4),
-.data-table td:nth-child(5),
-.data-table td:nth-child(6),
-.data-table td:nth-child(7),
-.data-table td:nth-child(8),
-.data-table td:last-child {
-  text-align: left;
-  padding-left: 0.6rem;
-}
-
-.data-table tr:hover {
-  background: rgba(192, 133, 82, 0.08);
+  overflow-x: auto;
+  overflow-y: auto;
 }
 
 /* Table Footer */
@@ -1176,13 +1590,13 @@
   align-items: center;
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid rgba(212, 177, 141, 0.2);
+  border-top: 0.5px solid var(--color-border-tertiary, rgba(212, 177, 141, 0.2));
   flex-wrap: wrap;
   gap: 1rem;
 }
 
 .table-info {
-  font-size: 0.9rem;
+  font-size: 13px;
   color: #6a574c;
 }
 
@@ -1191,34 +1605,109 @@
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .page-btn {
-  padding: 0.4rem 0.8rem;
-  border: 1px solid rgba(212, 177, 141, 0.45);
-  border-radius: 8px;
-  background: #fff9f2;
-  color: #25130c;
+  padding: 0.5rem 0.875rem;
+  border: 2px solid rgba(139, 74, 43, 0.2);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #8b4a2b;
   font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
-  min-width: 36px;
+  transition: all 0.3s ease;
+  min-width: 40px;
+  min-height: 36px;
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  box-shadow: 0 2px 6px rgba(59, 33, 7, 0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .page-btn:hover:not(:disabled) {
-  background: rgba(192, 133, 82, 0.15);
+  background: linear-gradient(135deg, rgba(139, 74, 43, 0.08), rgba(166, 107, 62, 0.04));
   border-color: #8b4a2b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 74, 43, 0.15);
 }
 
 .page-btn.active {
   background: linear-gradient(135deg, #8b4a2b, #5a2e1c);
   color: #fff;
   border-color: transparent;
+  box-shadow: 0 4px 12px rgba(139, 74, 43, 0.25);
+  transform: translateY(-1px);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .page-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+
+/* Hide/Show Tables */
+.data-table.is-hidden {
+  display: none;
+}
+
+/* RSBSA Badge Styling */
+.rsbsa-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+  min-width: 50px;
+}
+
+.rsbsa-yes {
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.15), rgba(40, 167, 69, 0.08));
+  color: #1e7e34;
+  border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.rsbsa-no {
+  background: linear-gradient(135deg, rgba(220, 53, 69, 0.15), rgba(220, 53, 69, 0.08));
+  color: #b02a37;
+  border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
+/* Ownership Cell Styling */
+.ownership-cell {
+  text-align: center;
+  font-weight: 700;
+  color: #8b4a2b;
+  font-size: 14px;
+}
+
+/* Highlight Classes */
+.highlight-yellow {
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.12), rgba(255, 193, 7, 0.06)) !important;
+  border-color: rgba(255, 193, 7, 0.3) !important;
+  font-weight: 600 !important;
+}
+
+.highlight-green {
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.12), rgba(40, 167, 69, 0.06)) !important;
+  border-color: rgba(40, 167, 69, 0.3) !important;
+  font-weight: 600 !important;
+  color: #1e7e34 !important;
+}
+
+.highlight-blue {
+  background: linear-gradient(135deg, rgba(13, 110, 253, 0.12), rgba(13, 110, 253, 0.06)) !important;
+  border-color: rgba(13, 110, 253, 0.3) !important;
+  font-weight: 600 !important;
+  color: #0d6efd !important;
 }
 
 /* No data message */
@@ -1227,32 +1716,93 @@
   padding: 3rem 1rem;
   color: #6a574c;
   font-style: italic;
+  font-size: 13px;
 }
 
-/* Notification styles */
+/* Column Width Standards (first column = row numbers — wide enough to avoid "1…" ellipsis) */
+#farmers-module .data-table thead tr:first-child > th:first-child {
+  width: 52px;
+  min-width: 52px;
+  box-sizing: border-box;
+}
+
+.data-table th:nth-child(2) { width: 120px; } /* Last Name */
+.data-table th:nth-child(3) { width: 120px; } /* First Name */
+.data-table th:last-child { width: 90px; }  /* Actions */
+
+/* Table-specific minimum widths */
+#farmerTableBasic { min-width: 700px; }
+/* Tree / Production min-widths: see css/farmer-trees-production-tables.css */
+#farmerTableAffiliation { min-width: 700px; }
+#farmerTableFarm { min-width: 800px; }
+
+/* Affiliation specific column widths */
+#farmerTableAffiliation.data-table th:nth-child(4) { width: 140px; } /* FA Officer/Member */
+#farmerTableAffiliation.data-table th:nth-child(5) { width: 100px; } /* RSBSA Registered */
+#farmerTableAffiliation.data-table th:nth-child(6) { width: 100px; } /* NCFRS */
+
+/* Farm Info: sub-column widths (second header row — cells are nth-child 1–5 in that tr) */
+#farmerTableFarm.data-table thead tr:nth-child(2) th:nth-child(1) { width: 100px; min-width: 100px; }
+#farmerTableFarm.data-table thead tr:nth-child(2) th:nth-child(2) { width: 90px; min-width: 90px; }
+#farmerTableFarm.data-table thead tr:nth-child(2) th:nth-child(3) { width: 90px; min-width: 90px; }
+#farmerTableFarm.data-table thead tr:nth-child(2) th:nth-child(4) { width: 100px; min-width: 100px; }
+#farmerTableFarm.data-table thead tr:nth-child(2) th:nth-child(5) { width: 80px; min-width: 80px; }
+#farmerTableFarm.data-table thead tr:first-child > th:nth-child(5) { width: 120px; min-width: 120px; } /* Total Area */
+
+/* Farm Info: no white seam between “STATUS OF OWNERSHIP” and sub-headers */
+#farmerTableFarm.data-table thead tr:first-child > th[colspan="5"] {
+  vertical-align: bottom;
+  padding-bottom: 10.5px;
+  border-bottom: none;
+}
+
+#farmerTableFarm.data-table thead tr:nth-child(2) th {
+  vertical-align: top;
+  padding: 0 8px 6px;
+  border-top: none;
+  /* Stack under row 1 when sticky (compact header row ≈ 30px) */
+  top: 30px;
+}
+
+/* Notification System */
 .notification {
   position: fixed;
   top: 20px;
   right: 20px;
   padding: 1rem 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  z-index: 1000;
+  border-radius: 12px;
   font-weight: 600;
-  animation: slideIn 0.3s ease;
+  font-size: 0.9rem;
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  z-index: 10000;
+  animation: slideInRight 0.3s ease-out;
+  max-width: 400px;
+  word-wrap: break-word;
 }
 
 .notification-success {
-  background: #28a745;
-  color: white;
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.95), rgba(40, 167, 69, 0.85));
+  color: #ffffff;
+  border: 1px solid rgba(40, 167, 69, 0.3);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .notification-error {
-  background: #dc3545;
-  color: white;
+  background: linear-gradient(135deg, rgba(220, 53, 69, 0.95), rgba(220, 53, 69, 0.85));
+  color: #ffffff;
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-@keyframes slideIn {
+.notification-warning {
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.95), rgba(255, 193, 7, 0.85));
+  color: #3B2107;
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
+}
+
+@keyframes slideInRight {
   from {
     transform: translateX(100%);
     opacity: 0;
@@ -1263,10 +1813,46 @@
   }
 }
 
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 860px) {
   .dashboard-container {
     padding: 1rem;
+  }
+
+  .module-toolbar {
+    padding: 1.5rem;
+    min-height: auto;
+  }
+
+  .farmer-toolbar-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .farmer-toolbar .toolbar-left {
+    flex: none;
+    width: 100%;
+  }
+
+  .farmer-toolbar .farmer-toolbar-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .farmer-toolbar-tabs .table-view-toggle {
+    justify-content: center;
   }
 
   .controls-row {
@@ -1296,25 +1882,53 @@
     font-size: 2rem;
   }
 
-  .dashboard-controls,
+  .module-toolbar {
+    padding: 1rem;
+  }
+
+  .view-toggle-btn {
+    padding: 0.75rem 1rem;
+    font-size: 0.75rem;
+    min-height: 38px;
+  }
+
+  .crud-btn {
+    padding: 0.625rem 1rem;
+    font-size: 0.8rem;
+    min-height: 38px;
+  }
+
+  #farmerSearch {
+    width: 100%;
+    max-width: none;
+    padding: 0.625rem 0.875rem;
+  }
+
   .table-container {
     padding: 1rem;
   }
 
   .data-table th,
   .data-table td {
-    padding: 0.3rem 0.2rem;
-    font-size: 0.65rem;
+    padding: 0.5rem 0.4rem;
+    font-size: 0.75rem;
   }
 
   .table-input {
-    font-size: 0.6rem;
+    font-size: 0.7rem;
   }
 
   .page-btn {
-    padding: 0.3rem 0.6rem;
-    font-size: 0.8rem;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.75rem;
     min-width: 32px;
+    min-height: 32px;
+  }
+
+  .rsbsa-badge {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.5rem;
+    min-width: 40px;
   }
 }
 
@@ -1325,6 +1939,7 @@
 
 .settings-fragment {
   /* The outer page already provides most spacing; this just keeps loaded fragments tidy. */
+  padding: 0.5rem;
 }
 
 .settings-admin-section #adminSettingsFragmentContainer {

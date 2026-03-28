@@ -1,0 +1,86 @@
+[
+  {
+    "timestamp": "2026-03-26T21:48:01.186417",
+    "user_email": "erickamaynete@gmail.com",
+    "action": "LOGIN",
+    "details": "User logged in successfully",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-26T21:48:23.555187",
+    "user_email": "erickamaynete@gmail.com",
+    "action": "LOGIN",
+    "details": "User logged in successfully",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-26T22:33:45.397378",
+    "user_email": "erickamaynete@gmail.com",
+    "action": "LOGIN_FAILED",
+    "details": "Failed login attempt",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-26T22:33:50.213229",
+    "user_email": "erickamaynete@gmail.com",
+    "action": "LOGIN",
+    "details": "User logged in successfully",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-28T12:55:24.305588",
+    "user_email": "erickamaynete@gmail.com",
+    "action": "LOGIN",
+    "details": "User logged in successfully",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-28T13:43:14.396889",
+    "user_email": "erickamaynete@gmail.com",
+    "action": "LOGIN",
+    "details": "User logged in successfully",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-28T14:34:01.495639",
+    "user_email": "erickamaynete@gmail.com",
+    "action": "LOGIN_FAILED",
+    "details": "Failed login attempt",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-28T14:34:01.896428",
+    "user_email": "",
+    "action": "LOGIN_FAILED",
+    "details": "Failed login attempt",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-28T14:34:03.811482",
+    "user_email": "",
+    "action": "LOGIN_FAILED",
+    "details": "Failed login attempt",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-28T14:34:04.377718",
+    "user_email": "",
+    "action": "LOGIN_FAILED",
+    "details": "Failed login attempt",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-28T14:34:10.367692",
+    "user_email": "erickamaynete@gmail.com",
+    "action": "LOGIN",
+    "details": "User logged in successfully",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-28T14:40:03.697220",
+    "user_email": "erickamaynete@gmail.com",
+    "action": "LOGIN",
+    "details": "User logged in successfully",
+    "ip_address": "127.0.0.1"
+  }
+]

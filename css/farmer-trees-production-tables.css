@@ -1,0 +1,157 @@
+/**
+ * Tree Counts (#farmerTableTrees) & Production (#farmerTableProduction) only.
+ * Farmer Records — do not reuse selectors for Basic / Affiliation / Farm tables.
+ */
+
+/* Table width: fit columns; horizontal scroll in .table-wrapper (no huge gap before Actions) */
+#farmerTableTrees.data-table,
+#farmerTableProduction.data-table {
+  max-width: none;
+}
+
+#farmerTableTrees.data-table {
+  width: max-content;
+  min-width: 1240px;
+}
+
+/*
+ * Production: fill the scroll area so thead/tbody share one column grid (avoids
+ * max-content + colspan/col bugs and stray gaps). Global .data-table th:nth-child(2|3)
+ * and th:last-child still break row 3 unless we reset thead th widths here.
+ */
+#farmerTableProduction.data-table {
+  width: 100%;
+  min-width: 800px;
+  table-layout: fixed;
+  box-sizing: border-box;
+}
+
+/* Column widths via <colgroup> (authoritative for table-layout: fixed) */
+#farmerTableTrees.data-table col.ft-col-no {
+  width: 52px;
+}
+
+#farmerTableTrees.data-table col.ft-col-name {
+  width: 118px;
+}
+
+#farmerTableTrees.data-table col.ft-col-tree {
+  width: 104px;
+}
+
+#farmerTableTrees.data-table col.ft-col-total {
+  width: 112px;
+}
+
+#farmerTableTrees.data-table col.ft-col-action {
+  width: 88px;
+}
+
+#farmerTableProduction.data-table col.fp-col-no {
+  width: 52px;
+}
+
+#farmerTableProduction.data-table col.fp-col-name {
+  width: 118px;
+}
+
+#farmerTableProduction.data-table col.fp-col-kg {
+  width: 138px;
+}
+
+#farmerTableProduction.data-table col.fp-col-action {
+  width: 88px;
+}
+
+/*
+ * Global .data-table th:nth-child(2|3) and th:last-child set widths on the wrong
+ * cells in multi-row headers (e.g. Robusta matches :last-child in row 3).
+ * Col <col> defines the grid; never let generic th rules win on Production.
+ */
+#farmerTableTrees.data-table thead tr.header-row-2 th,
+#farmerTableTrees.data-table thead tr.header-row-3 th {
+  width: auto;
+  min-width: 0;
+}
+
+#farmerTableProduction.data-table thead th {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  box-sizing: border-box;
+}
+
+/* Group titles: show full text (no "EXISTING NUM…") */
+#farmerTableTrees.data-table thead tr.header-row-1 .header-group-existing,
+#farmerTableTrees.data-table thead tr.header-row-1 .header-group-total {
+  white-space: normal;
+  line-height: 1.22;
+  padding: 5px 8px;
+  hyphens: none;
+}
+
+#farmerTableTrees.data-table thead tr.header-row-2 th {
+  white-space: normal;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  padding: 5px 6px;
+}
+
+#farmerTableProduction.data-table thead tr.header-row-1 .header-group-production,
+#farmerTableProduction.data-table thead tr.header-row-2 .header-dried-cherries {
+  white-space: normal;
+  line-height: 1.22;
+  padding: 5px 8px;
+}
+
+#farmerTableProduction.data-table thead tr.header-row-3 th {
+  white-space: normal;
+  letter-spacing: 0.04em;
+  padding: 5px 8px;
+}
+
+/*
+ * Numeric cells: keep full values visible; strip yellow/green/blue panel styling
+ * (classes still come from JS — we only reset appearance for these two tables).
+ */
+#farmerTableTrees.data-table tbody td.highlight-yellow,
+#farmerTableTrees.data-table tbody td.highlight-green,
+#farmerTableProduction.data-table tbody td.highlight-blue {
+  overflow: visible;
+  text-overflow: clip;
+  font-variant-numeric: tabular-nums;
+  background: #ffffff !important;
+  color: #25130c !important;
+  border-color: rgba(139, 74, 43, 0.12) !important;
+  font-weight: 400 !important;
+}
+
+/* Undo global “sample row” yellow striping on these views only */
+#farmerTableTrees.data-table tbody tr:nth-child(4),
+#farmerTableTrees.data-table tbody tr:nth-child(34),
+#farmerTableTrees.data-table tbody tr:nth-child(35),
+#farmerTableProduction.data-table tbody tr:nth-child(4),
+#farmerTableProduction.data-table tbody tr:nth-child(34),
+#farmerTableProduction.data-table tbody tr:nth-child(35) {
+  background: transparent;
+}
+
+#farmerTableTrees.data-table tbody tr:nth-child(4) td,
+#farmerTableTrees.data-table tbody tr:nth-child(34) td,
+#farmerTableTrees.data-table tbody tr:nth-child(35) td,
+#farmerTableProduction.data-table tbody tr:nth-child(4) td,
+#farmerTableProduction.data-table tbody tr:nth-child(34) td,
+#farmerTableProduction.data-table tbody tr:nth-child(35) td {
+  background: #ffffff;
+}
+
+/* Slightly tighter rows for these two views only */
+#farmers-module #farmerTableTrees.data-table td,
+#farmers-module #farmerTableProduction.data-table td {
+  padding: 4px 7px;
+}
+
+#farmers-module #farmerTableTrees.data-table th,
+#farmers-module #farmerTableProduction.data-table th {
+  padding: 5px 7px;
+}

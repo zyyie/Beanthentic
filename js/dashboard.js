@@ -3,6 +3,9 @@ class DashboardApp {
   constructor() {
     this.data = [];
     this.filteredData = [];
+    // PDF/source dataset only includes 50 farmers.
+    // Cap any loaded/saved data to keep dashboard counts consistent.
+    this.maxFarmers = 50;
     this.currentPage = 1;
     this.pageSize = 10;
     this.totalRecords = 0;
@@ -509,7 +512,7 @@ class DashboardApp {
         : (window.farmerData && window.farmerData.length > 0 ? window.farmerData : null);
 
       if (source) {
-        this.data = source;
+        this.data = Array.isArray(source) ? source.slice(0, this.maxFarmers) : [];
         this.filteredData = [...this.data];
         this.totalRecords = this.data.length;
         
@@ -628,7 +631,11 @@ class DashboardApp {
         ? document.getElementById('tableBodyTrees')
         : this.farmerTableView === 'production'
           ? document.getElementById('tableBodyProduction')
-          : document.getElementById('tableBodyBasic');
+          : this.farmerTableView === 'affiliation'
+            ? document.getElementById('tableBodyAffiliation')
+            : this.farmerTableView === 'farm'
+              ? document.getElementById('tableBodyFarm')
+              : document.getElementById('tableBodyBasic');
     console.log('Rendering table, total data length:', this.filteredData.length);
     
     if (!tableBody) {
@@ -647,8 +654,12 @@ class DashboardApp {
         this.farmerTableView === 'trees'
           ? 13
           : this.farmerTableView === 'production'
-            ? 10
-            : 12;
+            ? 7
+            : this.farmerTableView === 'affiliation'
+              ? 7
+              : this.farmerTableView === 'farm'
+                ? 10
+                : 7;
       tableBody.innerHTML = `<tr><td colspan="${colSpan}" class="no-data">No data available.</td></tr>`;
       return;
     }
@@ -665,8 +676,8 @@ class DashboardApp {
         this.farmerTableView === 'trees'
           ? [
               this.createInputCell(actualIndex, 'number'),
-              this.createInputCell(nameParts.first, 'text'),
               this.createInputCell(nameParts.last, 'text'),
+              this.createInputCell(nameParts.first, 'text'),
 
               this.createInputCell(this.getValue(row, ['LIBERICA BEARING', 'Liberica_Bearing']), 'number', 'highlight-yellow'),
               this.createInputCell(this.getValue(row, ['LIBERICA NON-BEARING', 'Liberica_Non-bearing']), 'number', 'highlight-yellow'),
@@ -683,27 +694,42 @@ class DashboardApp {
           : this.farmerTableView === 'production'
             ? [
                 this.createInputCell(actualIndex, 'number'),
-                this.createInputCell(nameParts.first, 'text'),
                 this.createInputCell(nameParts.last, 'text'),
-                this.createInputCell(this.getValue(row, ['TOTAL TREES', 'TOTAL_TREES']), 'number', 'highlight-green'),
+                this.createInputCell(nameParts.first, 'text'),
                 this.createInputCell(this.getValue(row, ['LIBERICA PRODUCTION', 'Liberica_Production']), 'number', 'highlight-blue'),
                 this.createInputCell(this.getValue(row, ['EXCELSA PRODUCTION', 'Excelsa_Production']), 'number', 'highlight-blue'),
                 this.createInputCell(this.getValue(row, ['ROBUSTA PRODUCTION', 'Robusta_Production']), 'number', 'highlight-blue'),
-                this.createInputCell(this.getTotalProduction(row), 'number', 'highlight-blue'),
-                this.createEditableCell(this.getValue(row, ['REMARKS', 'remarks']), rowIndexInData, 'REMARKS', 'text'),
+                this.createRowActionsCell(rowIndexInData)
+              ]
+          : this.farmerTableView === 'affiliation'
+            ? [
+                this.createInputCell(actualIndex, 'number'),
+                this.createInputCell(nameParts.last, 'text'),
+                this.createInputCell(nameParts.first, 'text'),
+                this.createInputCell(this.getValue(row, ['FA OFFICER / MEMBER', 'FA Officer / member', 'officer']), 'text'),
+                this.createRSBSABadge(this.getValue(row, ['RSBSA Registered (Yes/No)', 'REGISTERED (YES/NO)', 'Registered (Yes/No)', 'registered'])),
+                this.createInputCell(this.getValue(row, ['NCFRS', 'ncfrs']), 'text'),
+                this.createRowActionsCell(rowIndexInData)
+              ]
+          : this.farmerTableView === 'farm'
+            ? [
+                this.createInputCell(actualIndex, 'number'),
+                this.createInputCell(nameParts.last, 'text'),
+                this.createInputCell(nameParts.first, 'text'),
+                this.createOwnershipCell(this.getValue(row, ['OWNER_OPERATOR', 'Owner-Operator', 'A'])),
+                this.createOwnershipCell(this.getValue(row, ['LESSOR', 'Lessor', 'B'])),
+                this.createOwnershipCell(this.getValue(row, ['LESSEE', 'Lessee', 'C'])),
+                this.createOwnershipCell(this.getValue(row, ['SHAREHOLDER', 'Shareholder', 'D'])),
+                this.createOwnershipCell(this.getValue(row, ['OTHERS', 'Others', 'E'])),
+                this.createInputCell(this.getValue(row, ['Total Area Planted (HA.)', 'TOTAL AREA PLANTED (HA.)', 'area']), 'number'),
                 this.createRowActionsCell(rowIndexInData)
               ]
           : [
               this.createInputCell(actualIndex, 'number'),
-              this.createInputCell(nameParts.first, 'text'),
               this.createInputCell(nameParts.last, 'text'),
+              this.createInputCell(nameParts.first, 'text'),
               this.createInputCell(this.getValue(row, ['ADDRESS (BARANGAY)', 'Address (Barangay)', 'address']), 'text'),
-              this.createInputCell(this.getValue(row, ['FA OFFICER / MEMBER', 'FA Officer / member', 'officer']), 'text'),
               this.createInputCell(this.getValue(row, ['BIRTHDAY', 'birthday']), 'text'),
-              this.createInputCell(this.getValue(row, ['RSBSA Registered (Yes/No)', 'REGISTERED (YES/NO)', 'Registered (Yes/No)', 'registered']), 'text'),
-              this.createInputCell(this.getValue(row, ['STATUS OF OWNERSHIP', 'ownership']), 'text'),
-              this.createInputCell(this.getValue(row, ['Total Area Planted (HA.)', 'TOTAL AREA PLANTED (HA.)', 'area']), 'number'),
-              this.createInputCell(this.getValue(row, ['NCFRS', 'ncfrs']), 'text'),
               this.createEditableCell(this.getValue(row, ['REMARKS', 'remarks']), rowIndexInData, 'REMARKS', 'text'),
               this.createRowActionsCell(rowIndexInData)
             ];
@@ -725,7 +751,7 @@ class DashboardApp {
     const prevTableScrollTop = tableWrapper ? tableWrapper.scrollTop : 0;
     const prevTableScrollLeft = tableWrapper ? tableWrapper.scrollLeft : 0;
 
-    this.farmerTableView = view === 'trees' ? 'trees' : view === 'production' ? 'production' : 'basic';
+    this.farmerTableView = view === 'trees' ? 'trees' : view === 'production' ? 'production' : view === 'affiliation' ? 'affiliation' : view === 'farm' ? 'farm' : 'basic';
 
     const btns = document.querySelectorAll('[data-table-view]');
     btns.forEach(btn => {
@@ -735,18 +761,26 @@ class DashboardApp {
     const basicTable = document.getElementById('farmerTableBasic');
     const treesTable = document.getElementById('farmerTableTrees');
     const productionTable = document.getElementById('farmerTableProduction');
+    const affiliationTable = document.getElementById('farmerTableAffiliation');
+    const farmTable = document.getElementById('farmerTableFarm');
 
-    if (basicTable && treesTable && productionTable) {
+    if (basicTable && treesTable && productionTable && affiliationTable && farmTable) {
       const showBasic = this.farmerTableView === 'basic';
       const showTrees = this.farmerTableView === 'trees';
       const showProduction = this.farmerTableView === 'production';
+      const showAffiliation = this.farmerTableView === 'affiliation';
+      const showFarm = this.farmerTableView === 'farm';
 
       basicTable.classList.toggle('is-hidden', !showBasic);
       treesTable.classList.toggle('is-hidden', !showTrees);
       productionTable.classList.toggle('is-hidden', !showProduction);
+      affiliationTable.classList.toggle('is-hidden', !showAffiliation);
+      farmTable.classList.toggle('is-hidden', !showFarm);
 
       treesTable.setAttribute('aria-hidden', showTrees ? 'false' : 'true');
       productionTable.setAttribute('aria-hidden', showProduction ? 'false' : 'true');
+      affiliationTable.setAttribute('aria-hidden', showAffiliation ? 'false' : 'true');
+      farmTable.setAttribute('aria-hidden', showFarm ? 'false' : 'true');
     }
 
     this.renderTableBody();
@@ -786,6 +820,29 @@ class DashboardApp {
 
   createRowActionsCell(rowIndex) {
     return `<td><button type="button" class="row-action-btn" data-action="delete-farmer" data-row-index="${rowIndex}">Delete</button></td>`;
+  }
+
+  createRSBSABadge(value) {
+    const normalizedValue = String(value).toLowerCase().trim();
+    const isYes = normalizedValue === 'yes' || normalizedValue === 'y';
+    
+    if (isYes) {
+      return `<td><span class="rsbsa-badge rsbsa-yes">YES</span></td>`;
+    } else if (normalizedValue === 'no' || normalizedValue === 'n') {
+      return `<td><span class="rsbsa-badge rsbsa-no">NO</span></td>`;
+    } else {
+      return `<td></td>`;
+    }
+  }
+
+  createOwnershipCell(value) {
+    const hasValue = value && String(value).trim() !== '';
+    
+    if (hasValue) {
+      return `<td class="ownership-cell">X</td>`;
+    } else {
+      return `<td class="ownership-cell"></td>`;
+    }
   }
 
   getTotalProduction(row) {
@@ -832,6 +889,10 @@ class DashboardApp {
   }
 
   addFarmer() {
+    if (this.data.length >= this.maxFarmers) {
+      this.showNotification(`Maximum of ${this.maxFarmers} farmers reached.`, 'error');
+      return;
+    }
     const newRow = {
       'NAME OF FARMER': '',
       'ADDRESS (BARANGAY)': '',
