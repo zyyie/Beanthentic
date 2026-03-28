@@ -1,2 +1,4 @@
 flask>=3.0,<4.0
+flask-admin
+flask-sqlalchemy
 
