@@ -31,8 +31,7 @@
       <!-- Side Panel -->
       <aside class="side-panel">
         <div class="side-panel-header">
-            <img class="side-brand-img" src="assets/images/logo.png" alt="Beanthentic logo" />
-          </a>
+          <img class="side-brand-img" src="assets/images/logo.png" alt="Beanthentic logo" />
         </div>
         <nav class="side-nav">
           <div class="nav-section">
@@ -40,6 +39,10 @@
             <a href="#overview" class="nav-link active" data-module="overview">
               <i class="nav-icon fa-solid fa-chart-pie" aria-hidden="true"></i>
               <span>Dashboard Overview</span>
+            </a>
+            <a href="#notifications" class="nav-link" data-module="notifications">
+              <i class="nav-icon fa-solid fa-bell" aria-hidden="true"></i>
+              <span>Notifications</span>
             </a>
           </div>
           <div class="nav-section">
@@ -115,19 +118,50 @@
           </div>
           <div class="header-right">
             <div class="header-actions">
-              <button class="action-btn" id="notificationBtn" type="button" aria-label="Notifications">
+              <button class="action-btn header-slate-btn header-slate-btn--icon" id="notificationBtn" type="button" aria-label="Notifications">
                 <i class="action-icon fa-solid fa-bell"></i>
                 <span class="notification-badge">3</span>
               </button>
-              <button class="action-btn" id="refreshBtn" type="button">
+              <button class="action-btn header-slate-btn header-slate-btn--text" id="refreshBtn" type="button">
                 <i class="action-icon fa-solid fa-rotate-right"></i>
                 <span>Refresh</span>
               </button>
             </div>
-            <div class="user-profile">
-              <div class="user-info">
-                <span class="user-name"></span>
-                <span class="user-role"></span>
+            <div class="user-profile-dropdown" id="userProfileDropdown">
+              <button
+                type="button"
+                class="user-profile-trigger"
+                id="userProfileTrigger"
+                aria-expanded="false"
+                aria-haspopup="true"
+                aria-controls="userProfileMenu"
+              >
+                <div class="user-avatar" aria-hidden="true">
+                  <i class="fa-solid fa-user"></i>
+                </div>
+                <div class="user-info">
+                  <span class="user-name">Krisha Rubia</span>
+                  <span class="user-role">Administrator</span>
+                </div>
+                <span class="user-profile-chevron" aria-hidden="true">
+                  <i class="fa-solid fa-chevron-down"></i>
+                </span>
+              </button>
+              <div
+                class="user-profile-menu"
+                id="userProfileMenu"
+                role="menu"
+                aria-labelledby="userProfileTrigger"
+                hidden
+              >
+                <button type="button" class="user-profile-menu-item user-profile-menu-item--account" role="menuitem" id="userProfileAccountBtn">
+                  <i class="fa-solid fa-id-card" aria-hidden="true"></i>
+                  <span>Account Information</span>
+                </button>
+                <button type="button" class="user-profile-menu-item user-profile-menu-item--logout" role="menuitem" id="userProfileLogoutBtn">
+                  <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+                  <span>Log out</span>
+                </button>
               </div>
             </div>
           </div>
@@ -209,6 +243,38 @@
                 </div>
               </div>
             </section>
+          </div>
+
+          <!-- Notifications Module (layout matches Settings / Account Security) -->
+          <div class="module hidden" id="notifications-module" data-module="notifications">
+            <section class="module-header">
+              <h1>Notifications</h1>
+              <p>Alerts, updates, and activity for your coffee farmer records</p>
+            </section>
+
+            <div class="settings-content">
+              <div class="table-section settings-admin-section">
+                <div class="settings-card notifications-page-card" aria-label="Notifications">
+                  <div class="notifications-toolbar-inner">
+                    <button
+                      type="button"
+                      class="btn btn-secondary notifications-toolbar-btn notifications-toolbar-btn--icon"
+                      id="notificationsPageBellBtn"
+                      aria-label="Notification options"
+                    >
+                      <i class="fa-solid fa-bell" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" class="btn btn-secondary notifications-toolbar-btn" id="notificationsPageRefreshBtn">
+                      <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+                      <span>Refresh</span>
+                    </button>
+                  </div>
+                  <ul class="notifications-list" id="notificationsList">
+                    <!-- Populated by dashboard.js -->
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Farmers Module -->

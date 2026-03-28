@@ -7,11 +7,17 @@
 #farmerTableTrees.data-table,
 #farmerTableProduction.data-table {
   max-width: none;
+  /* Flush columns — same as Farm/Basic tables (no gutter between cells) */
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
 }
 
+/* Same as Production: one column grid for thead/tbody (avoids misaligned borders) */
 #farmerTableTrees.data-table {
-  width: max-content;
+  width: 100%;
   min-width: 1240px;
+  table-layout: fixed;
+  box-sizing: border-box;
 }
 
 /*
@@ -66,13 +72,15 @@
 /*
  * Global .data-table th:nth-child(2|3) and th:last-child set widths on the wrong
  * cells in multi-row headers (e.g. Robusta matches :last-child in row 3).
- * Col <col> defines the grid; never let generic th rules win on Production.
+ * Col <col> defines the grid; reset widths on rows 2–3 only (row 1 uses dashboard
+ * + colgroup; #farmers-module … th:first-child keeps No. at 52px).
  */
 #farmerTableTrees.data-table thead tr.header-row-2 th,
 #farmerTableTrees.data-table thead tr.header-row-3 th {
   width: auto;
   min-width: 0;
 }
+
 
 #farmerTableProduction.data-table thead th {
   width: auto !important;
@@ -110,8 +118,7 @@
   padding: 5px 8px;
 }
 
-/*
- * Numeric cells: keep full values visible; strip yellow/green/blue panel styling
+ /* Numeric cells: keep full values visible; strip yellow/green/blue panel styling
  * (classes still come from JS — we only reset appearance for these two tables).
  */
 #farmerTableTrees.data-table tbody td.highlight-yellow,

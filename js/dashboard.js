@@ -11,6 +11,12 @@ class DashboardApp {
     this.totalRecords = 0;
     this.farmerTableView = 'basic';
     this.activeSettingsTab = 'security';
+    /** @type {{ icon: string; title: string; meta: string }[]} */
+    this.notificationsFeed = [
+      { icon: 'fa-user-plus', title: 'New farmer record synced', meta: 'Today · 9:41 AM' },
+      { icon: 'fa-file-export', title: 'Export completed — Farmer data (Excel)', meta: 'Yesterday · 4:12 PM' },
+      { icon: 'fa-triangle-exclamation', title: 'Reminder: Review pending remarks', meta: 'Mar 26 · 11:00 AM' }
+    ];
     this.init();
   }
 
@@ -27,6 +33,37 @@ class DashboardApp {
     setTimeout(() => {
       this.loadExcelData();
     }, 500);
+    this.renderNotificationsList();
+  }
+
+  renderNotificationsList() {
+    const list = document.getElementById('notificationsList');
+    if (!list) return;
+
+    const esc = (s) =>
+      String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    const rows = this.notificationsFeed || [];
+    if (!rows.length) {
+      list.innerHTML = '<li class="notifications-empty">No notifications yet.</li>';
+      return;
+    }
+
+    list.innerHTML = rows
+      .map(
+        (n) => `<li class="notification-item">
+      <div class="notification-item-icon" aria-hidden="true"><i class="fa-solid ${esc(n.icon)}"></i></div>
+      <div class="notification-item-body">
+        <p class="notification-item-title">${esc(n.title)}</p>
+        <p class="notification-item-meta">${esc(n.meta)}</p>
+      </div>
+    </li>`
+      )
+      .join('');
   }
 
   setupEventListeners() {
@@ -81,6 +118,86 @@ class DashboardApp {
       refreshBtn.addEventListener('click', () => {
         console.log('Refresh button clicked');
         this.loadExcelData();
+      });
+    }
+
+    // Header profile dropdown: Account Information → Settings / Profile; Log out
+    const userProfileDropdown = document.getElementById('userProfileDropdown');
+    const userProfileTrigger = document.getElementById('userProfileTrigger');
+    const userProfileMenu = document.getElementById('userProfileMenu');
+    const userProfileAccountBtn = document.getElementById('userProfileAccountBtn');
+    const userProfileLogoutBtn = document.getElementById('userProfileLogoutBtn');
+
+    const openProfileSettings = () => {
+      this.activeSettingsTab = 'profile';
+      const submenuButtons = document.querySelectorAll(
+        '#sidebarSettingsSubmenu .settings-submenu-item[data-tab]'
+      );
+      submenuButtons.forEach((b) => {
+        b.classList.toggle('active', b.getAttribute('data-tab') === 'profile');
+      });
+      this.switchModule('settings');
+    };
+
+    const closeUserProfileMenu = () => {
+      if (!userProfileDropdown || !userProfileTrigger || !userProfileMenu) return;
+      userProfileDropdown.classList.remove('is-open');
+      userProfileMenu.hidden = true;
+      userProfileTrigger.setAttribute('aria-expanded', 'false');
+    };
+
+    const openUserProfileMenu = () => {
+      if (!userProfileDropdown || !userProfileTrigger || !userProfileMenu) return;
+      userProfileDropdown.classList.add('is-open');
+      userProfileMenu.hidden = false;
+      userProfileTrigger.setAttribute('aria-expanded', 'true');
+    };
+
+    if (userProfileTrigger && userProfileMenu) {
+      userProfileTrigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (userProfileMenu.hidden) {
+          openUserProfileMenu();
+        } else {
+          closeUserProfileMenu();
+        }
+      });
+
+      document.addEventListener('click', () => closeUserProfileMenu());
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeUserProfileMenu();
+      });
+    }
+
+    if (userProfileAccountBtn) {
+      userProfileAccountBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeUserProfileMenu();
+        openProfileSettings();
+      });
+    }
+
+    if (userProfileLogoutBtn) {
+      userProfileLogoutBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeUserProfileMenu();
+        if (confirm('Are you sure you want to log out?')) {
+          window.location.href = '/logout';
+        }
+      });
+    }
+
+    const notificationsPageRefreshBtn = document.getElementById('notificationsPageRefreshBtn');
+    const notificationsPageBellBtn = document.getElementById('notificationsPageBellBtn');
+    if (notificationsPageRefreshBtn) {
+      notificationsPageRefreshBtn.addEventListener('click', () => {
+        this.renderNotificationsList();
+        this.showNotification('Notifications refreshed', 'success');
+      });
+    }
+    if (notificationsPageBellBtn) {
+      notificationsPageBellBtn.addEventListener('click', () => {
+        this.showNotification('You are on the Notifications page', 'success');
       });
     }
 
@@ -247,6 +364,7 @@ class DashboardApp {
     const currentModule = document.getElementById('currentModule');
     const moduleNames = {
       'overview': 'Overview',
+      'notifications': 'Notifications',
       'farmers': 'Farmer Records',
       'analytics': 'Analytics',
       'reports': 'Reports',
@@ -275,6 +393,12 @@ class DashboardApp {
     if (moduleName === 'settings') {
       // Default/admin settings fragment on open.
       this.loadAdminSettingsFragment(this.activeSettingsTab || 'security');
+    }
+
+    if (moduleName === 'notifications') {
+      const badge = document.querySelector('.dashboard-header .notification-badge');
+      if (badge) badge.style.display = 'none';
+      this.renderNotificationsList();
     }
 
     // Close mobile menu

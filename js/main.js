@@ -55,14 +55,15 @@ class App {
   }
 
   handleNotificationClick() {
-    // Clear the notification badge when clicked
     const badge = document.querySelector('.notification-badge');
     if (badge) {
       badge.style.display = 'none';
     }
-    
-    // Show a simple notification (you can replace this with a more sophisticated notification system)
-    this.showNotificationMessage('Notifications cleared!');
+    if (window.dashboardApp && typeof window.dashboardApp.switchModule === 'function') {
+      window.dashboardApp.switchModule('notifications');
+      return;
+    }
+    this.showNotificationMessage('Notifications');
   }
 
   showNotificationMessage(message) {
