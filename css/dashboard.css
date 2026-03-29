@@ -8,6 +8,12 @@
   position: relative;
 }
 
+/* Wide tables must not grow the page horizontally (keeps sticky header + burger in view) */
+body.dashboard-page {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 .dashboard-page::before {
   content: '';
   position: fixed;
@@ -80,6 +86,10 @@
 .dashboard-layout {
   display: flex;
   background: #f6f7f9;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 /* Side Panel */
@@ -277,9 +287,12 @@
 /* Main Content */
 .main-content {
   flex: 1;
+  min-width: 0;
   margin-left: 260px;
   background: #f6f7f9;
   min-height: 100vh;
+  max-width: 100%;
+  overflow-x: hidden;
   transition: margin-left 0.3s ease;
   display: flex;
   flex-direction: column;
@@ -293,6 +306,8 @@
 .main-content.expanded {
   margin-left: 0;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* Dashboard Header */
@@ -305,9 +320,14 @@
   align-items: center;
   position: sticky;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 100;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   flex-shrink: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .header-left {
@@ -430,6 +450,12 @@
   box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.35);
 }
 
+.dashboard-header #refreshBtn:disabled {
+  opacity: 0.68;
+  cursor: wait;
+  pointer-events: none;
+}
+
 .header-slate-btn--icon {
   padding: 0.5rem;
   min-width: 40px;
@@ -449,6 +475,7 @@
 }
 
 #notificationBtn {
+  position: relative;
   padding: 0.5rem;
 }
 
@@ -468,12 +495,16 @@
   border-radius: 50%;
   min-width: 18px;
   height: 18px;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   line-height: 1;
   box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
   border: 2px solid white;
+}
+
+.notification-badge.is-visible {
+  display: flex;
 }
 
 /* Header profile + dropdown (matches design: avatar, name, role, chevron, popover menu) */
@@ -647,10 +678,13 @@
   padding-inline: clamp(1.25rem, 3vw, 2.25rem);
   padding-block: clamp(1rem, 2vw, 1.5rem) clamp(1.25rem, 2.6vw, 2rem);
   flex: 1;
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
-  /* Default: allow modules like Overview to scroll (inside app frame) */
-  overflow: auto;
+  /* Vertical scroll only here; horizontal stays inside .table-wrapper */
+  overflow-x: hidden;
+  overflow-y: auto;
   position: relative;
   min-height: 0;
 }
@@ -667,7 +701,8 @@
 
 .module {
   width: 100%;
-  max-width: none;
+  max-width: 100%;
+  min-width: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -751,6 +786,16 @@
   border: 1px solid rgba(212, 177, 141, 0.25);
   border-radius: 12px;
   box-shadow: 0 4px 14px rgba(40, 25, 15, 0.06);
+  cursor: pointer;
+}
+
+#notifications-module .notifications-list .notification-item:focus {
+  outline: none;
+}
+
+#notifications-module .notifications-list .notification-item:focus-visible {
+  outline: 2px solid rgba(139, 74, 43, 0.55);
+  outline-offset: 2px;
 }
 
 #notifications-module .notifications-list .notification-item-icon {
@@ -792,6 +837,44 @@
 
 #notifications-module .notifications-list .notification-item-body p {
   text-align: left;
+}
+
+#notifications-module .notifications-list .notification-item--read {
+  opacity: 0.78;
+  background: rgba(248, 247, 245, 0.96);
+}
+
+#notifications-module .notifications-list .notification-item--read .notification-item-title {
+  font-weight: 650;
+  color: #52606d;
+}
+
+#notifications-module .notifications-list .notification-item-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+#notifications-module .notification-mark-read-btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#notifications-module .notification-read-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #52796f;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+#notifications-module #notificationsMarkAllReadBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 #notifications-module .notifications-empty {
@@ -861,6 +944,8 @@
 #farmers-module.module {
   gap: 1.25rem;
   min-height: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 #farmers-module .module-header {
@@ -1395,6 +1480,9 @@
   .main-content {
     margin-left: 0;
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
   }
   
   .dashboard-header {
@@ -2062,6 +2150,294 @@
   top: 30px;
 }
 
+/* Delete / confirm dialog (farmer table & future use) */
+.confirm-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.confirm-dialog[hidden] {
+  display: none;
+}
+
+body.confirm-dialog-active {
+  overflow: hidden;
+}
+
+.confirm-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(3px);
+}
+
+.confirm-dialog__card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: min(96vw, 720px);
+  padding: 1.75rem 2.25rem 1.5rem;
+  background: linear-gradient(180deg, #ffffff 0%, #faf9f7 100%);
+  border: 1px solid rgba(122, 74, 52, 0.38);
+  border-radius: 16px;
+  box-shadow:
+    0 24px 48px rgba(40, 25, 15, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+  text-align: center;
+}
+
+.confirm-dialog__icon-wrap {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(139, 74, 43, 0.12), rgba(62, 140, 127, 0.12));
+  border: 1px solid rgba(139, 74, 43, 0.2);
+  color: #8b4a2b;
+  font-size: 1.35rem;
+}
+
+.confirm-dialog__icon-wrap--logout {
+  background: linear-gradient(145deg, rgba(45, 106, 92, 0.12), rgba(139, 74, 43, 0.1));
+  border-color: rgba(45, 106, 92, 0.28);
+  color: #56372d;
+}
+
+.confirm-dialog__title {
+  margin: 0 0 0.65rem;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #662e0c;
+  line-height: 1.25;
+}
+
+.confirm-dialog__message {
+  margin: 0 auto 1.1rem;
+  max-width: 52ch;
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: #642210;
+  text-align: center;
+}
+
+.confirm-dialog__ack {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.65rem;
+  margin: 0 auto 1.5rem;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #334155;
+  cursor: pointer;
+  padding: 0.85rem 1.25rem;
+  border-radius: 12px;
+  background: rgba(139, 74, 43, 0.06);
+  border: 1px solid rgba(139, 74, 43, 0.18);
+}
+
+.confirm-dialog__ack input[type='checkbox'] {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+  accent-color: #6a3f2d;
+  cursor: pointer;
+}
+
+.confirm-dialog__ack span {
+  cursor: pointer;
+  user-select: none;
+  text-align: center;
+  max-width: 32rem;
+  margin: 0 auto;
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: center;
+}
+
+.confirm-dialog__btn {
+  flex: 1 1 auto;
+  min-width: 120px;
+  padding: 0.65rem 1.15rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  font-family: inherit;
+  border-radius: 12px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.confirm-dialog__btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(137, 65, 14, 0.45);
+}
+
+.confirm-dialog__btn:active {
+  transform: scale(0.98);
+}
+
+.confirm-dialog__btn--secondary {
+  background: #faf6f3;
+  border: 2px solid rgba(139, 74, 43, 0.52);
+  color: #2a1a0f;
+}
+
+.confirm-dialog__btn--secondary:hover {
+  background: #f3ece6;
+  border-color: rgba(107, 58, 35, 0.72);
+}
+
+.confirm-dialog__btn--primary {
+  background: linear-gradient(135deg, #6a3d2d, #4d2f1e);
+  border-color: #321501;
+  color: #ffffff;
+}
+
+.confirm-dialog__btn--primary:hover {
+  background: linear-gradient(135deg, #6a3d2d, #4d2f1e);
+}
+
+.confirm-dialog__btn--primary:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  transform: none;
+  background: linear-gradient(135deg, #64748b, #475569);
+  border-color: #475569;
+}
+
+.confirm-dialog__btn--primary:disabled:hover {
+  background: linear-gradient(135deg, #64748b, #475569);
+}
+
+@media (max-width: 480px) {
+  .confirm-dialog__card {
+    padding: 1.5rem 1.25rem 1.25rem;
+  }
+
+  .confirm-dialog__actions {
+    flex-direction: column-reverse;
+  }
+
+  .confirm-dialog__btn {
+    width: 100%;
+  }
+}
+
+/* Notification detail modal (full text for in-app alerts) */
+.notification-detail-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 10055;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.notification-detail-dialog[hidden] {
+  display: none;
+}
+
+.notification-detail-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.notification-detail-dialog__card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: min(92vw, 520px);
+  padding: 1.5rem 1.75rem 1.35rem;
+  background: linear-gradient(180deg, #ffffff 0%, #faf9f7 100%);
+  border: 1px solid rgba(122, 74, 52, 0.35);
+  border-radius: 16px;
+  box-shadow: 0 22px 48px rgba(40, 25, 15, 0.16);
+  text-align: left;
+}
+
+.notification-detail-dialog__header {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1.05rem;
+}
+
+.notification-detail-dialog__icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #faf9f7;
+  border: 1px solid rgba(139, 74, 43, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8b4a2b;
+  flex-shrink: 0;
+  font-size: 1.05rem;
+}
+
+.notification-detail-dialog__head-text {
+  min-width: 0;
+}
+
+.notification-detail-dialog__title {
+  margin: 0 0 0.25rem;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.22rem;
+  font-weight: 700;
+  color: #662e0c;
+  line-height: 1.25;
+}
+
+.notification-detail-dialog__meta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+.notification-detail-dialog__body {
+  font-size: 0.94rem;
+  line-height: 1.55;
+  color: #334155;
+  margin: 0 0 1.2rem;
+}
+
+.notification-detail-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.notification-detail-dialog__footer .confirm-dialog__btn--primary {
+  min-width: 100px;
+}
+
 /* Notification System */
 .notification {
   position: fixed;
@@ -2098,6 +2474,42 @@
   color: #3B2107;
   border: 1px solid rgba(255, 193, 7, 0.3);
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
+}
+
+/* System primary (matches header / nav accents, e.g. #1e3a5f) */
+.notification-primary {
+  background: linear-gradient(135deg, rgba(95, 67, 30, 0.98), rgba(82, 52, 26, 0.92));
+  color: #ffffff;
+  border: 1px solid rgba(95, 55, 30, 0.35);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* Export module — matches “Export to Excel” / primary brown actions */
+.notification-brown {
+  background: linear-gradient(135deg, rgba(139, 74, 43, 0.98), rgba(90, 46, 28, 0.92));
+  color: #ffffff;
+  border: 1px solid rgba(139, 74, 43, 0.35);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.notification.notification--center {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  animation: slideInTop 0.35s ease-out;
+  max-width: min(520px, calc(100vw - 2rem));
+  text-align: center;
+}
+
+@keyframes slideInTop {
+  from {
+    transform: translate(-50%, -120%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
 }
 
 @keyframes slideInRight {

@@ -73,10 +73,12 @@
 
               <button class="btn" type="submit">Log in</button>
 
+              {% if signup_available %}
               <p class="fineprint">
                 Don’t have an account?
                 <a class="link" href="/signup">Create one</a>
               </p>
+              {% endif %}
             </form>
           </div>
         </section>

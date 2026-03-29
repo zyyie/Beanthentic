@@ -1,7 +1,7 @@
 /* Login css styles */
 
 .login-page {
-  background: #0b3d2e;
+  background: #3d230b;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -126,8 +126,8 @@
 }
 
 .input:focus {
-  border-color: rgba(62, 166, 66, 0.55);
-  box-shadow: 0 0 0 4px rgba(62, 166, 66, 0.18);
+  border-color: rgba(166, 98, 62, 0.55);
+  box-shadow: 0 0 0 4px rgba(166, 100, 62, 0.18);
 }
 
 .row {
@@ -150,7 +150,7 @@
 .checkbox input {
   width: 16px;
   height: 16px;
-  accent-color: #3ea642;
+  accent-color: #a6663e;
 }
 
 .btn {
@@ -162,7 +162,7 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  background: linear-gradient(135deg, #6e422e, #3ea642);
+  background: linear-gradient(135deg, #6e422e, #a6703e);
   color: #fff;
   cursor: pointer;
   box-shadow: 0 10px 22px rgba(95, 45, 15, 0.25);
@@ -180,7 +180,7 @@
 }
 
 .link {
-  color: #2f7a3f;
+  color: #7a472f;
   font-weight: 600;
 }
 

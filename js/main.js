@@ -55,10 +55,6 @@ class App {
   }
 
   handleNotificationClick() {
-    const badge = document.querySelector('.notification-badge');
-    if (badge) {
-      badge.style.display = 'none';
-    }
     if (window.dashboardApp && typeof window.dashboardApp.switchModule === 'function') {
       window.dashboardApp.switchModule('notifications');
       return;

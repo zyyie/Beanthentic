@@ -131,6 +131,11 @@ def save_users(users: dict) -> None:
     USER_DB.write_text(json.dumps(users, indent=2), encoding="utf-8")
 
 
+def has_admin_account() -> bool:
+    """True if at least one admin user exists (admin signup is one-time)."""
+    return bool(load_users())
+
+
 def load_settings() -> dict:
     if not SETTINGS_DB.exists():
         return {
@@ -192,13 +197,17 @@ def log_activity(user_email: str, action: str, details: str = "", ip_address: st
 def home():
     if session.get("user_email"):
         return redirect(url_for("dashboard"))
+    if has_admin_account():
+        return redirect(url_for("login"))
     return redirect(url_for("signup"))
 
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
+    if has_admin_account():
+        return redirect(url_for("login"))
+
     error = ""
-    success = ""
 
     if request.method == "POST":
         full_name = request.form.get("fullName", "").strip()
@@ -220,13 +229,16 @@ def signup():
                     "password_hash": generate_password_hash(password),
                 }
                 save_users(users)
-                success = "Signup successful. You can now log in."
+                return redirect(url_for("login"))
 
-    return render_template("admin/signup.html", error=error, success=success)
+    return render_template("admin/signup.html", error=error)
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if not has_admin_account():
+        return redirect(url_for("signup"))
+
     error = ""
 
     if request.method == "POST":
@@ -244,7 +256,8 @@ def login():
             log_activity(email, "LOGIN", "User logged in successfully", request.remote_addr)
             return redirect(url_for("dashboard"))
 
-    return render_template("admin/login.html", error=error)
+    signup_available = not has_admin_account()
+    return render_template("admin/login.html", error=error, signup_available=signup_available)
 
 
 @app.route("/dashboard")

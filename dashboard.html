@@ -118,13 +118,13 @@
           </div>
           <div class="header-right">
             <div class="header-actions">
-              <button class="action-btn header-slate-btn header-slate-btn--icon" id="notificationBtn" type="button" aria-label="Notifications">
-                <i class="action-icon fa-solid fa-bell"></i>
-                <span class="notification-badge">3</span>
-              </button>
               <button class="action-btn header-slate-btn header-slate-btn--text" id="refreshBtn" type="button">
                 <i class="action-icon fa-solid fa-rotate-right"></i>
                 <span>Refresh</span>
+              </button>
+              <button class="action-btn header-slate-btn header-slate-btn--icon" id="notificationBtn" type="button" aria-label="Notifications">
+                <i class="action-icon fa-solid fa-bell"></i>
+                <span class="notification-badge" id="headerNotificationBadge" aria-hidden="true">0</span>
               </button>
             </div>
             <div class="user-profile-dropdown" id="userProfileDropdown">
@@ -256,13 +256,9 @@
               <div class="table-section settings-admin-section">
                 <div class="settings-card notifications-page-card" aria-label="Notifications">
                   <div class="notifications-toolbar-inner">
-                    <button
-                      type="button"
-                      class="btn btn-secondary notifications-toolbar-btn notifications-toolbar-btn--icon"
-                      id="notificationsPageBellBtn"
-                      aria-label="Notification options"
-                    >
-                      <i class="fa-solid fa-bell" aria-hidden="true"></i>
+                    <button type="button" class="btn btn-secondary notifications-toolbar-btn" id="notificationsMarkAllReadBtn">
+                      <i class="fa-solid fa-check-double" aria-hidden="true"></i>
+                      <span>Mark all as read</span>
                     </button>
                     <button type="button" class="btn btn-secondary notifications-toolbar-btn" id="notificationsPageRefreshBtn">
                       <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
@@ -544,6 +540,102 @@
       </div>
     </div>
   </main>
+
+  <!-- Remove farmer row: in-app confirm (replaces browser dialog) -->
+  <div
+    id="deleteFarmerConfirmModal"
+    class="confirm-dialog"
+    hidden
+    aria-hidden="true"
+  >
+    <div class="confirm-dialog__backdrop" tabindex="-1"></div>
+    <div
+      class="confirm-dialog__card"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="deleteConfirmTitle"
+      aria-describedby="deleteConfirmMessage deleteConfirmAckText"
+    >
+      <div class="confirm-dialog__icon-wrap" aria-hidden="true">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <h2 id="deleteConfirmTitle" class="confirm-dialog__title">Delete farmer record?</h2>
+      <p id="deleteConfirmMessage" class="confirm-dialog__message"></p>
+      <label class="confirm-dialog__ack" id="deleteConfirmAckLabel">
+        <input type="checkbox" id="deleteConfirmAcknowledge" />
+        <span id="deleteConfirmAckText"></span>
+      </label>
+      <div class="confirm-dialog__actions">
+        <button type="button" class="confirm-dialog__btn confirm-dialog__btn--secondary" id="deleteConfirmCancel">
+          Cancel
+        </button>
+        <button type="button" class="confirm-dialog__btn confirm-dialog__btn--primary" id="deleteConfirmOk" disabled>
+          Remove
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log out confirmation (replaces browser confirm) -->
+  <div id="logoutConfirmModal" class="confirm-dialog" hidden aria-hidden="true">
+    <div class="confirm-dialog__backdrop" tabindex="-1"></div>
+    <div
+      class="confirm-dialog__card"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="logoutConfirmTitle"
+      aria-describedby="logoutConfirmMessage"
+    >
+      <div class="confirm-dialog__icon-wrap confirm-dialog__icon-wrap--logout" aria-hidden="true">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </div>
+      <h2 id="logoutConfirmTitle" class="confirm-dialog__title">Log out of Beanthentic?</h2>
+      <p id="logoutConfirmMessage" class="confirm-dialog__message">
+        You’ll need to sign in again to open the dashboard and farmer records.
+      </p>
+      <div class="confirm-dialog__actions">
+        <button type="button" class="confirm-dialog__btn confirm-dialog__btn--secondary" id="logoutConfirmCancel">
+          Cancel
+        </button>
+        <button type="button" class="confirm-dialog__btn confirm-dialog__btn--primary" id="logoutConfirmOk">
+          Log out
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification detail (read full alert content) -->
+  <div
+    id="notificationDetailModal"
+    class="notification-detail-dialog"
+    hidden
+    aria-hidden="true"
+  >
+    <div class="notification-detail-dialog__backdrop" tabindex="-1"></div>
+    <div
+      class="notification-detail-dialog__card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="notificationDetailTitle"
+      aria-describedby="notificationDetailBody"
+    >
+      <div class="notification-detail-dialog__header">
+        <div id="notificationDetailIconWrap" class="notification-detail-dialog__icon-wrap" aria-hidden="true">
+          <i id="notificationDetailIcon" class="fa-solid fa-bell"></i>
+        </div>
+        <div class="notification-detail-dialog__head-text">
+          <h2 id="notificationDetailTitle" class="notification-detail-dialog__title"></h2>
+          <p id="notificationDetailMeta" class="notification-detail-dialog__meta"></p>
+        </div>
+      </div>
+      <div id="notificationDetailBody" class="notification-detail-dialog__body"></div>
+      <div class="notification-detail-dialog__footer">
+        <button type="button" class="confirm-dialog__btn confirm-dialog__btn--primary" id="notificationDetailClose">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- JavaScript Files -->
   <script src="js/main.js"></script>

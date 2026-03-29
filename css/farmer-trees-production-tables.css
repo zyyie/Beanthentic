@@ -162,3 +162,23 @@
 #farmers-module #farmerTableProduction.data-table th {
   padding: 5px 7px;
 }
+
+/*
+ * Multi-row headers: global .data-table th uses a light tan border that reads as white
+ * gutters between brown blocks. Use a dark brown stroke so cells read as flush.
+ */
+#farmerTableTrees.data-table thead th,
+#farmerTableProduction.data-table thead th {
+  /* Replace global light tan 0.5px rule — it reads as white gutters on brown */
+  border: 1px solid rgba(42, 22, 12, 0.88) !important;
+  box-shadow: none;
+  background-clip: padding-box;
+}
+
+/* Sub-row header colors stay from dashboard.css gradients; row 2–3 use darker blend */
+#farmerTableTrees.data-table thead tr.header-row-2 th,
+#farmerTableTrees.data-table thead tr.header-row-3 th,
+#farmerTableProduction.data-table thead tr.header-row-2 th,
+#farmerTableProduction.data-table thead tr.header-row-3 th {
+  border-color: rgba(36, 19, 10, 0.9) !important;
+}

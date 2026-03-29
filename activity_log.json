@@ -82,5 +82,54 @@
     "action": "LOGIN",
     "details": "User logged in successfully",
     "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-28T18:01:53.612679",
+    "user_email": "krisharubia05@gmail.com",
+    "action": "LOGOUT",
+    "details": "User logged out",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-28T18:02:02.076812",
+    "user_email": "krisharubia05@gmail.com",
+    "action": "LOGIN",
+    "details": "User logged in successfully",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-29T12:25:30.721971",
+    "user_email": "krisharubia05@gmail.com",
+    "action": "LOGIN",
+    "details": "User logged in successfully",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-29T18:26:21.385440",
+    "user_email": "krisharubia05@gmail.com",
+    "action": "LOGIN",
+    "details": "User logged in successfully",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-29T19:43:18.730666",
+    "user_email": "krisharubia05@gmail.com",
+    "action": "LOGOUT",
+    "details": "User logged out",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-29T19:43:29.109117",
+    "user_email": "krisharubia05@gmail.com",
+    "action": "LOGIN",
+    "details": "User logged in successfully",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-29T20:48:33.066165",
+    "user_email": "krisharubia05@gmail.com",
+    "action": "LOGOUT",
+    "details": "User logged out",
+    "ip_address": "127.0.0.1"
   }
 ]

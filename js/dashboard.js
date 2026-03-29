@@ -1,4 +1,6 @@
 // Dashboard functionality for coffee database
+const NOTIFICATIONS_READ_STORAGE_KEY = 'beanthentic_dashboard_notification_read';
+
 class DashboardApp {
   constructor() {
     this.data = [];
@@ -11,13 +13,329 @@ class DashboardApp {
     this.totalRecords = 0;
     this.farmerTableView = 'basic';
     this.activeSettingsTab = 'security';
-    /** @type {{ icon: string; title: string; meta: string }[]} */
-    this.notificationsFeed = [
-      { icon: 'fa-user-plus', title: 'New farmer record synced', meta: 'Today · 9:41 AM' },
-      { icon: 'fa-file-export', title: 'Export completed — Farmer data (Excel)', meta: 'Yesterday · 4:12 PM' },
-      { icon: 'fa-triangle-exclamation', title: 'Reminder: Review pending remarks', meta: 'Mar 26 · 11:00 AM' }
-    ];
+    /** @type {{ id: string; icon: string; title: string; meta: string; detail: string; read: boolean }[]} */
+    this.notificationsFeed = this.hydrateNotificationsFeed();
+    /** @type {number | null} */
+    this.pendingDeleteRowIndex = null;
     this.init();
+  }
+
+  getDefaultNotifications() {
+    return [
+      {
+        id: 'feed-sync-1',
+        icon: 'fa-user-plus',
+        title: 'New farmer record synced',
+        meta: 'Today · 9:41 AM',
+        detail:
+          'A new farmer record was merged into your dashboard from the latest data sync. You can open Farmer Records to check the new row, verify names and barangay, and fix any typos. If counts look wrong, use the header Refresh button to reload from your saved or imported file.',
+      },
+      {
+        id: 'feed-export-1',
+        icon: 'fa-file-export',
+        title: 'Export completed — Farmer data (Excel)',
+        meta: 'Yesterday · 4:12 PM',
+        detail:
+          'Your export to Excel finished successfully. The file includes the farmer table as shown in the Export module (columns depend on the view you used). Download again anytime from Export Data if you need another copy. Large exports may take a few seconds—wait for the success message before closing the tab.',
+      },
+      {
+        id: 'feed-reminder-1',
+        icon: 'fa-triangle-exclamation',
+        title: 'Reminder: Review pending remarks',
+        meta: 'Mar 26 · 11:00 AM',
+        detail:
+          'Some rows still have empty or generic remarks in the REMARKS column. Review Farmer Records (Basic Info tab), filter or search if needed, and add clear notes for follow-up—for example planting status, visits, or data issues. Saving the table stores updates in your browser for next session.',
+      },
+    ];
+  }
+
+  hydrateNotificationsFeed() {
+    const defaults = this.getDefaultNotifications();
+    /** @type {Record<string, boolean>} */
+    let readById = {};
+    try {
+      const raw = localStorage.getItem(NOTIFICATIONS_READ_STORAGE_KEY);
+      if (raw) readById = JSON.parse(raw) || {};
+    } catch {
+      readById = {};
+    }
+    return defaults.map((n) => ({
+      ...n,
+      detail: n.detail || '',
+      read: !!readById[n.id],
+    }));
+  }
+
+  persistNotificationReadState() {
+    const readById = {};
+    this.notificationsFeed.forEach((n) => {
+      readById[n.id] = !!n.read;
+    });
+    try {
+      localStorage.setItem(NOTIFICATIONS_READ_STORAGE_KEY, JSON.stringify(readById));
+    } catch (e) {
+      console.warn('Could not save notification read state', e);
+    }
+  }
+
+  markNotificationRead(id) {
+    const n = this.notificationsFeed.find((x) => x.id === id);
+    if (!n || n.read) return;
+    n.read = true;
+    this.persistNotificationReadState();
+    this.renderNotificationsList();
+  }
+
+  markAllNotificationsRead() {
+    let changed = false;
+    this.notificationsFeed.forEach((n) => {
+      if (!n.read) {
+        n.read = true;
+        changed = true;
+      }
+    });
+    if (!changed) return;
+    this.persistNotificationReadState();
+    this.renderNotificationsList();
+  }
+
+  /**
+   * Header Refresh: reload farmer records (saved → seed), reset search & pager,
+   * sync overview charts/stats and notification list.
+   */
+  async refreshDashboard() {
+    const btn = document.getElementById('refreshBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.setAttribute('aria-busy', 'true');
+    }
+    try {
+      const search = document.getElementById('farmerSearch');
+      if (search) search.value = '';
+
+      this.currentPage = 1;
+      await this.loadExcelData();
+      this.filterData('');
+
+      this.notificationsFeed = this.hydrateNotificationsFeed();
+      this.renderNotificationsList();
+
+      this.showNotification('Dashboard refreshed.', 'success');
+    } catch (e) {
+      console.error('Refresh failed:', e);
+      this.showNotification('Refresh failed. Please try again.', 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+      }
+    }
+  }
+
+  openNotificationDetail(id) {
+    const n = this.notificationsFeed.find((x) => x.id === id);
+    if (!n) return;
+
+    if (!n.read) {
+      n.read = true;
+      this.persistNotificationReadState();
+      this.renderNotificationsList();
+    }
+
+    const root = document.getElementById('notificationDetailModal');
+    const titleEl = document.getElementById('notificationDetailTitle');
+    const metaEl = document.getElementById('notificationDetailMeta');
+    const bodyEl = document.getElementById('notificationDetailBody');
+    const iconEl = document.getElementById('notificationDetailIcon');
+    if (!root || !titleEl || !metaEl || !bodyEl || !iconEl) return;
+
+    titleEl.textContent = n.title;
+    metaEl.textContent = n.meta;
+    bodyEl.textContent = n.detail || 'No additional details for this notification.';
+
+    iconEl.className = `fa-solid ${n.icon || 'fa-bell'}`;
+
+    root.removeAttribute('hidden');
+    root.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('confirm-dialog-active');
+
+    const closeBtn = document.getElementById('notificationDetailClose');
+    if (closeBtn) closeBtn.focus();
+  }
+
+  closeNotificationDetail() {
+    const root = document.getElementById('notificationDetailModal');
+    if (root) {
+      root.setAttribute('hidden', '');
+      root.setAttribute('aria-hidden', 'true');
+    }
+    if (document.getElementById('deleteFarmerConfirmModal')?.hasAttribute('hidden')) {
+      document.body.classList.remove('confirm-dialog-active');
+    }
+  }
+
+  initNotificationDetailModal() {
+    const root = document.getElementById('notificationDetailModal');
+    const closeBtn = document.getElementById('notificationDetailClose');
+    if (!root || !closeBtn) return;
+
+    const backdrop = root.querySelector('.notification-detail-dialog__backdrop');
+    closeBtn.addEventListener('click', () => this.closeNotificationDetail());
+    if (backdrop) backdrop.addEventListener('click', () => this.closeNotificationDetail());
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const logoutEl = document.getElementById('logoutConfirmModal');
+      if (logoutEl && !logoutEl.hasAttribute('hidden')) return;
+      if (root.hasAttribute('hidden')) return;
+      e.preventDefault();
+      this.closeNotificationDetail();
+    });
+  }
+
+  openLogoutConfirmModal() {
+    const root = document.getElementById('logoutConfirmModal');
+    if (!root) return;
+    root.removeAttribute('hidden');
+    root.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('confirm-dialog-active');
+    document.getElementById('logoutConfirmCancel')?.focus();
+  }
+
+  closeLogoutConfirmModal() {
+    const root = document.getElementById('logoutConfirmModal');
+    if (root) {
+      root.setAttribute('hidden', '');
+      root.setAttribute('aria-hidden', 'true');
+    }
+    const del = document.getElementById('deleteFarmerConfirmModal');
+    const nd = document.getElementById('notificationDetailModal');
+    if (del?.hasAttribute('hidden') && nd?.hasAttribute('hidden')) {
+      document.body.classList.remove('confirm-dialog-active');
+    }
+  }
+
+  initLogoutConfirmModal() {
+    const root = document.getElementById('logoutConfirmModal');
+    const cancelBtn = document.getElementById('logoutConfirmCancel');
+    const okBtn = document.getElementById('logoutConfirmOk');
+    if (!root || !cancelBtn || !okBtn) return;
+
+    const backdrop = root.querySelector('.confirm-dialog__backdrop');
+    cancelBtn.addEventListener('click', () => this.closeLogoutConfirmModal());
+    okBtn.addEventListener('click', () => {
+      window.location.href = '/logout';
+    });
+    if (backdrop) backdrop.addEventListener('click', () => this.closeLogoutConfirmModal());
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (root.hasAttribute('hidden')) return;
+      e.preventDefault();
+      this.closeLogoutConfirmModal();
+    });
+  }
+
+  getFarmerDisplayNameForDelete(row) {
+    if (!row || typeof row !== 'object') return 'this record';
+    const full = (this.getValue(row, ['NAME OF FARMER', 'Name of Farmer', 'name']) || '').toString().trim();
+    if (full) return full;
+    const last = (this.getValue(row, ['LAST NAME', 'Last Name', 'lastName']) || '').toString().trim();
+    const first = (this.getValue(row, ['FIRST NAME', 'First Name', 'firstName']) || '').toString().trim();
+    const middle = (this.getValue(row, ['MIDDLE NAME', 'Middle Name', 'middleName']) || '').toString().trim();
+    const parts = [first, middle, last].filter(Boolean);
+    if (parts.length) return parts.join(' ');
+    return 'this record';
+  }
+
+  syncDeleteConfirmRemoveButton() {
+    const ack = document.getElementById('deleteConfirmAcknowledge');
+    const okBtn = document.getElementById('deleteConfirmOk');
+    if (!okBtn) return;
+    okBtn.disabled = !(ack && ack.checked);
+  }
+
+  openDeleteFarmerConfirm(rowIndex) {
+    const row = this.data[rowIndex];
+    const displayName = row ? this.getFarmerDisplayNameForDelete(row) : 'this record';
+
+    const msgEl = document.getElementById('deleteConfirmMessage');
+    if (msgEl) {
+      msgEl.textContent = `You are about to remove ${displayName} from your farmer records, which will delete their row from the table on this screen, so please double-check that this is the correct farmer before confirming.`;
+    }
+
+    const ackText = document.getElementById('deleteConfirmAckText');
+    if (ackText) {
+      ackText.textContent = `I confirm permanent removal of ${displayName}. This cannot be undone.`;
+    }
+
+    const ack = document.getElementById('deleteConfirmAcknowledge');
+    if (ack) ack.checked = false;
+    this.syncDeleteConfirmRemoveButton();
+
+    this.pendingDeleteRowIndex = rowIndex;
+    const root = document.getElementById('deleteFarmerConfirmModal');
+    if (!root) return;
+    root.removeAttribute('hidden');
+    root.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('confirm-dialog-active');
+    const cancelBtn = document.getElementById('deleteConfirmCancel');
+    if (cancelBtn) cancelBtn.focus();
+  }
+
+  closeDeleteFarmerConfirm() {
+    const root = document.getElementById('deleteFarmerConfirmModal');
+    if (root) {
+      root.setAttribute('hidden', '');
+      root.setAttribute('aria-hidden', 'true');
+    }
+    const ack = document.getElementById('deleteConfirmAcknowledge');
+    if (ack) ack.checked = false;
+    this.syncDeleteConfirmRemoveButton();
+    document.body.classList.remove('confirm-dialog-active');
+    this.pendingDeleteRowIndex = null;
+  }
+
+  confirmPendingDeleteFarmer() {
+    const ack = document.getElementById('deleteConfirmAcknowledge');
+    if (!ack || !ack.checked) return;
+
+    const idx = this.pendingDeleteRowIndex;
+    this.closeDeleteFarmerConfirm();
+    if (idx === null || !Number.isFinite(idx) || idx < 0) return;
+    if (!this.data[idx]) {
+      this.showNotification('Could not find that row to delete.', 'error');
+      return;
+    }
+    this.deleteFarmer(idx);
+  }
+
+  initDeleteFarmerConfirmModal() {
+    const root = document.getElementById('deleteFarmerConfirmModal');
+    const cancelBtn = document.getElementById('deleteConfirmCancel');
+    const okBtn = document.getElementById('deleteConfirmOk');
+    const ack = document.getElementById('deleteConfirmAcknowledge');
+    if (!root || !cancelBtn || !okBtn) return;
+
+    if (ack) {
+      ack.addEventListener('change', () => this.syncDeleteConfirmRemoveButton());
+    }
+
+    const backdrop = root.querySelector('.confirm-dialog__backdrop');
+    cancelBtn.addEventListener('click', () => this.closeDeleteFarmerConfirm());
+    okBtn.addEventListener('click', () => this.confirmPendingDeleteFarmer());
+    if (backdrop) backdrop.addEventListener('click', () => this.closeDeleteFarmerConfirm());
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const logoutEl = document.getElementById('logoutConfirmModal');
+      if (logoutEl && !logoutEl.hasAttribute('hidden')) return;
+      const nd = document.getElementById('notificationDetailModal');
+      if (nd && !nd.hasAttribute('hidden')) return;
+      if (root.hasAttribute('hidden')) return;
+      e.preventDefault();
+      this.closeDeleteFarmerConfirm();
+    });
   }
 
   init() {
@@ -36,9 +354,32 @@ class DashboardApp {
     this.renderNotificationsList();
   }
 
+  updateNotificationsToolbarState() {
+    const markAllBtn = document.getElementById('notificationsMarkAllReadBtn');
+    if (!markAllBtn) return;
+    const anyUnread = (this.notificationsFeed || []).some((n) => !n.read);
+    markAllBtn.disabled = !anyUnread;
+  }
+
+  updateHeaderNotificationBadge() {
+    const badge = document.getElementById('headerNotificationBadge');
+    if (!badge) return;
+    const unread = (this.notificationsFeed || []).filter((n) => !n.read).length;
+    if (unread <= 0) {
+      badge.classList.remove('is-visible');
+      badge.textContent = '0';
+      return;
+    }
+    badge.textContent = unread > 99 ? '99+' : String(unread);
+    badge.classList.add('is-visible');
+  }
+
   renderNotificationsList() {
     const list = document.getElementById('notificationsList');
-    if (!list) return;
+    if (!list) {
+      this.updateHeaderNotificationBadge();
+      return;
+    }
 
     const esc = (s) =>
       String(s)
@@ -50,20 +391,32 @@ class DashboardApp {
     const rows = this.notificationsFeed || [];
     if (!rows.length) {
       list.innerHTML = '<li class="notifications-empty">No notifications yet.</li>';
+      this.updateNotificationsToolbarState();
+      this.updateHeaderNotificationBadge();
       return;
     }
 
     list.innerHTML = rows
-      .map(
-        (n) => `<li class="notification-item">
+      .map((n) => {
+        const readClass = n.read ? ' notification-item--read' : '';
+        const actionMarkup = n.read
+          ? '<span class="notification-read-badge" aria-hidden="true">Read</span>'
+          : `<button type="button" class="btn btn-secondary notification-mark-read-btn" data-action="mark-notification-read" data-notification-id="${esc(
+              n.id
+            )}">Mark read</button>`;
+        return `<li class="notification-item${readClass}" data-notification-id="${esc(n.id)}" tabindex="0" aria-label="Open details: ${esc(n.title)}">
       <div class="notification-item-icon" aria-hidden="true"><i class="fa-solid ${esc(n.icon)}"></i></div>
       <div class="notification-item-body">
         <p class="notification-item-title">${esc(n.title)}</p>
         <p class="notification-item-meta">${esc(n.meta)}</p>
       </div>
-    </li>`
-      )
+      <div class="notification-item-actions">${actionMarkup}</div>
+    </li>`;
+      })
       .join('');
+
+    this.updateNotificationsToolbarState();
+    this.updateHeaderNotificationBadge();
   }
 
   setupEventListeners() {
@@ -112,12 +465,11 @@ class DashboardApp {
       });
     }
 
-    // Refresh button
+    // Refresh button (reload data, charts, table, notifications list)
     const refreshBtn = document.getElementById('refreshBtn');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', () => {
-        console.log('Refresh button clicked');
-        this.loadExcelData();
+        this.refreshDashboard();
       });
     }
 
@@ -181,25 +533,51 @@ class DashboardApp {
       userProfileLogoutBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         closeUserProfileMenu();
-        if (confirm('Are you sure you want to log out?')) {
-          window.location.href = '/logout';
-        }
+        this.openLogoutConfirmModal();
       });
     }
 
     const notificationsPageRefreshBtn = document.getElementById('notificationsPageRefreshBtn');
-    const notificationsPageBellBtn = document.getElementById('notificationsPageBellBtn');
+    const notificationsMarkAllReadBtn = document.getElementById('notificationsMarkAllReadBtn');
     if (notificationsPageRefreshBtn) {
       notificationsPageRefreshBtn.addEventListener('click', () => {
+        this.notificationsFeed = this.hydrateNotificationsFeed();
         this.renderNotificationsList();
-        this.showNotification('Notifications refreshed', 'success');
       });
     }
-    if (notificationsPageBellBtn) {
-      notificationsPageBellBtn.addEventListener('click', () => {
-        this.showNotification('You are on the Notifications page', 'success');
+    if (notificationsMarkAllReadBtn) {
+      notificationsMarkAllReadBtn.addEventListener('click', () => this.markAllNotificationsRead());
+    }
+
+    const notificationsListEl = document.getElementById('notificationsList');
+    if (notificationsListEl) {
+      notificationsListEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action="mark-notification-read"]');
+        if (btn) {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = btn.getAttribute('data-notification-id');
+          if (id) this.markNotificationRead(id);
+          return;
+        }
+        const item = e.target.closest('.notification-item');
+        if (!item) return;
+        const id = item.getAttribute('data-notification-id');
+        if (id) this.openNotificationDetail(id);
+      });
+      notificationsListEl.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const btn = e.target.closest('[data-action="mark-notification-read"]');
+        if (btn) return;
+        const item = e.target.closest('.notification-item');
+        if (!item) return;
+        e.preventDefault();
+        const id = item.getAttribute('data-notification-id');
+        if (id) this.openNotificationDetail(id);
       });
     }
+
+    this.initNotificationDetailModal();
 
     // Export button
     const exportBtn = document.getElementById('exportBtn');
@@ -267,8 +645,15 @@ class DashboardApp {
       if (!delBtn) return;
       const idx = Number.parseInt(delBtn.getAttribute('data-row-index') || '', 10);
       if (!Number.isFinite(idx) || idx < 0) return;
-      this.deleteFarmer(idx);
+      if (!this.data[idx]) {
+        this.showNotification('Could not find that row to delete.', 'error');
+        return;
+      }
+      this.openDeleteFarmerConfirm(idx);
     });
+
+    this.initDeleteFarmerConfirmModal();
+    this.initLogoutConfirmModal();
 
     document.addEventListener(
       'blur',
@@ -396,8 +781,6 @@ class DashboardApp {
     }
 
     if (moduleName === 'notifications') {
-      const badge = document.querySelector('.dashboard-header .notification-badge');
-      if (badge) badge.style.display = 'none';
       this.renderNotificationsList();
     }
 
@@ -522,9 +905,7 @@ class DashboardApp {
     const logoutBtn = containerEl.querySelector('#logoutBtn');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => {
-        if (confirm('Are you sure you want to log out?')) {
-          window.location.href = '/logout';
-        }
+        this.openLogoutConfirmModal();
       });
     }
 
@@ -617,11 +998,12 @@ class DashboardApp {
 
   handleExport(type) {
     console.log(`Exporting as ${type}...`);
-    this.showNotification(`Exporting data as ${type.toUpperCase()}...`, 'success');
-    
+    const exportToast = { placement: 'center' };
+    this.showNotification(`Exporting data as ${type.toUpperCase()}...`, 'brown', exportToast);
+
     // Simulate export process
     setTimeout(() => {
-      this.showNotification(`Data exported successfully as ${type.toUpperCase()}!`, 'success');
+      this.showNotification(`Data exported successfully as ${type.toUpperCase()}!`, 'brown', exportToast);
     }, 2000);
   }
 
@@ -1014,7 +1396,11 @@ class DashboardApp {
 
   addFarmer() {
     if (this.data.length >= this.maxFarmers) {
-      this.showNotification(`Maximum of ${this.maxFarmers} farmers reached.`, 'error');
+      this.showNotification(
+        `Maximum of ${this.maxFarmers} farmers reached. Remove a row or export data before adding another.`,
+        'primary',
+        { placement: 'center' }
+      );
       return;
     }
     const newRow = {
@@ -1164,7 +1550,7 @@ class DashboardApp {
 
   exportData() {
     console.log('Exporting data...');
-    this.showNotification('Data exported successfully!', 'success');
+    this.showNotification('Data exported successfully!', 'brown', { placement: 'center' });
   }
 
   renderPagination() {
@@ -1366,11 +1752,15 @@ class DashboardApp {
     });
   }
 
-  showNotification(message, type = 'success') {
+  showNotification(message, type = 'success', options = {}) {
+    const { placement = 'right' } = options;
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
+    if (placement === 'center') {
+      notification.classList.add('notification--center');
+    }
     notification.textContent = message;
-    
+
     document.body.appendChild(notification);
     
     setTimeout(() => {
