@@ -283,6 +283,13 @@
                     <span class="field-label">Search</span>
                     <input id="farmerSearch" type="search" placeholder="Search name, barangay, officer, NCFRS, remarks…" autocomplete="off" />
                   </label>
+                  <div class="table-view-toggle" role="group" aria-label="Farmer table view">
+                    <button type="button" class="view-toggle-btn active" data-table-view="basic" aria-pressed="true">Basic Info</button>
+                    <button type="button" class="view-toggle-btn" data-table-view="affiliation" aria-pressed="false">Affiliation</button>
+                    <button type="button" class="view-toggle-btn" data-table-view="farm" aria-pressed="false">Farm Info</button>
+                    <button type="button" class="view-toggle-btn" data-table-view="trees" aria-pressed="false">Tree Counts</button>
+                    <button type="button" class="view-toggle-btn" data-table-view="production" aria-pressed="false">Production</button>
+                  </div>
                 </div>
                 <div class="toolbar-right farmer-toolbar-actions" role="group" aria-label="Farmer records actions">
                   <div class="crud-actions">

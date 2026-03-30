@@ -15,7 +15,7 @@
 /* Same as Production: one column grid for thead/tbody (avoids misaligned borders) */
 #farmerTableTrees.data-table {
   width: 100%;
-  min-width: 1240px;
+  min-width: 1200px;
   table-layout: fixed;
   box-sizing: border-box;
 }
@@ -42,11 +42,11 @@
 }
 
 #farmerTableTrees.data-table col.ft-col-tree {
-  width: 104px;
+  width: 100px;
 }
 
 #farmerTableTrees.data-table col.ft-col-total {
-  width: 112px;
+  width: 100px;
 }
 
 #farmerTableTrees.data-table col.ft-col-action {
@@ -81,6 +81,12 @@
   min-width: 0;
 }
 
+/* Override global first-child width for trees table to use colgroup definition */
+#farmerTableTrees.data-table thead tr.header-row-1 th:first-child {
+  width: 52px !important;
+  min-width: 52px !important;
+}
+
 
 #farmerTableProduction.data-table thead th {
   width: auto !important;
@@ -93,16 +99,16 @@
 #farmerTableTrees.data-table thead tr.header-row-1 .header-group-existing,
 #farmerTableTrees.data-table thead tr.header-row-1 .header-group-total {
   white-space: normal;
-  line-height: 1.22;
-  padding: 5px 8px;
+  line-height: 1.1;
+  padding: 3px 8px;
   hyphens: none;
 }
 
 #farmerTableTrees.data-table thead tr.header-row-2 th {
   white-space: normal;
-  line-height: 1.2;
+  line-height: 1.1;
   letter-spacing: 0.03em;
-  padding: 5px 6px;
+  padding: 3px 6px;
 }
 
 #farmerTableProduction.data-table thead tr.header-row-1 .header-group-production,
@@ -160,7 +166,7 @@
 
 #farmers-module #farmerTableTrees.data-table th,
 #farmers-module #farmerTableProduction.data-table th {
-  padding: 5px 7px;
+  padding: 9px 10px;
 }
 
 /*

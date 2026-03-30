@@ -728,13 +728,16 @@ class DashboardApp {
       });
     }
 
-    // Farmer table view toggle
-    const viewToggleBtns = document.querySelectorAll('[data-table-view]');
-    viewToggleBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.setFarmerTableView(btn.dataset.tableView || 'basic');
+    // Farmer table view toggle (delegate: avoids missed hits on pseudo-element overlays / inner nodes)
+    const farmersModule = document.getElementById('farmers-module');
+    if (farmersModule) {
+      farmersModule.addEventListener('click', (e) => {
+        const btn = e.target.closest('.view-toggle-btn[data-table-view]');
+        if (!btn || !farmersModule.contains(btn)) return;
+        const view = btn.getAttribute('data-table-view') || 'basic';
+        this.setFarmerTableView(view);
       });
-    });
+    }
 
     // Farmer CRUD actions
     const addFarmerBtn = document.getElementById('addFarmerBtn');
@@ -1902,19 +1905,39 @@ class DashboardApp {
 
   setFarmerTableView(view) {
     // Preserve scroll positions to avoid "jump to top" when sidebar is open.
+    const farmersRoot = document.getElementById('farmers-module');
     const moduleContent = document.querySelector('.module-content');
-    const tableWrapper = document.querySelector('.table-wrapper');
+    const tableWrapper = farmersRoot
+      ? farmersRoot.querySelector('.table-wrapper')
+      : document.querySelector('.table-wrapper');
     const prevWindowScrollY = window.scrollY;
     const prevWindowScrollX = window.scrollX;
     const prevModuleScrollTop = moduleContent ? moduleContent.scrollTop : 0;
     const prevTableScrollTop = tableWrapper ? tableWrapper.scrollTop : 0;
     const prevTableScrollLeft = tableWrapper ? tableWrapper.scrollLeft : 0;
 
-    this.farmerTableView = view === 'trees' ? 'trees' : view === 'production' ? 'production' : view === 'affiliation' ? 'affiliation' : view === 'farm' ? 'farm' : 'basic';
+    const key = String(view || '')
+      .trim()
+      .toLowerCase();
+    this.farmerTableView =
+      key === 'trees'
+        ? 'trees'
+        : key === 'production'
+          ? 'production'
+          : key === 'affiliation'
+            ? 'affiliation'
+            : key === 'farm'
+              ? 'farm'
+              : 'basic';
 
-    const btns = document.querySelectorAll('[data-table-view]');
-    btns.forEach(btn => {
-      btn.classList.toggle('active', (btn.dataset.tableView || 'basic') === this.farmerTableView);
+    const btns = farmersRoot
+      ? farmersRoot.querySelectorAll('.view-toggle-btn[data-table-view]')
+      : document.querySelectorAll('.view-toggle-btn[data-table-view]');
+    btns.forEach((btn) => {
+      const btnKey = btn.getAttribute('data-table-view') || 'basic';
+      const active = btnKey === this.farmerTableView;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
 
     const basicTable = document.getElementById('farmerTableBasic');
@@ -1936,6 +1959,7 @@ class DashboardApp {
       affiliationTable.classList.toggle('is-hidden', !showAffiliation);
       farmTable.classList.toggle('is-hidden', !showFarm);
 
+      basicTable.setAttribute('aria-hidden', showBasic ? 'false' : 'true');
       treesTable.setAttribute('aria-hidden', showTrees ? 'false' : 'true');
       productionTable.setAttribute('aria-hidden', showProduction ? 'false' : 'true');
       affiliationTable.setAttribute('aria-hidden', showAffiliation ? 'false' : 'true');
