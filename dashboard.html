@@ -278,14 +278,14 @@
 
             <section class="module-toolbar farmer-toolbar" aria-label="Farmer Records controls">
               <div class="farmer-toolbar-controls">
-                <div class="toolbar-left">
+                <div class="toolbar-left farmer-toolbar-search-wrap">
                   <label class="search-field farmer-search-field" for="farmerSearch">
                     <span class="field-label">Search</span>
                     <input id="farmerSearch" type="search" placeholder="Search name, barangay, officer, NCFRS, remarks…" autocomplete="off" />
                   </label>
                 </div>
-                <div class="toolbar-right farmer-toolbar-actions">
-                  <div class="crud-actions" role="group" aria-label="Farmer records actions">
+                <div class="toolbar-right farmer-toolbar-actions" role="group" aria-label="Farmer records actions">
+                  <div class="crud-actions">
                     <button type="button" class="crud-btn" id="addFarmerBtn">Add Farmer</button>
                     <button type="button" class="crud-btn secondary" id="saveFarmersBtn">Save</button>
                   </div>
@@ -300,13 +300,30 @@
                   </label>
                 </div>
               </div>
+
               <div class="farmer-toolbar-tabs">
-                <div class="table-view-toggle" role="group" aria-label="Farmer table view">
+                <div class="table-view-toggle farmer-table-view-toggle" role="group" aria-label="Farmer table view">
                   <button type="button" class="view-toggle-btn active" data-table-view="basic">Basic Info</button>
                   <button type="button" class="view-toggle-btn" data-table-view="affiliation">Affiliation</button>
                   <button type="button" class="view-toggle-btn" data-table-view="farm">Farm Info</button>
                   <button type="button" class="view-toggle-btn" data-table-view="trees">Tree Counts</button>
                   <button type="button" class="view-toggle-btn" data-table-view="production">Production</button>
+                </div>
+              </div>
+
+              <div
+                class="farmer-limit-banner"
+                id="farmerLimitBanner"
+                hidden
+                role="status"
+                aria-live="polite"
+              >
+                <div class="farmer-limit-banner__inner">
+                  <span class="farmer-limit-banner__icon" aria-hidden="true">i</span>
+                  <p class="farmer-limit-banner__text" id="farmerLimitBannerText"></p>
+                  <button type="button" class="farmer-limit-banner__dismiss" id="farmerLimitBannerDismiss">
+                    Dismiss
+                  </button>
                 </div>
               </div>
             </section>

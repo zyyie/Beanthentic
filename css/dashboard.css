@@ -1016,28 +1016,46 @@ body.dashboard-page {
   flex-wrap: wrap;
 }
 
-/* Farmer Records: search/actions row first, then tabs — even vertical rhythm */
-#farmers-module.module {
-  gap: 1.25rem;
+/* Farmer Records: search row → view tabs (Basic Info, etc.) → limit banner — vertical rhythm */
+#farmers-module.module:not(.hidden) {
+  flex: 1;
   min-height: 0;
   min-width: 0;
   max-width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#farmers-module.module {
+  gap: 1.25rem;
 }
 
 #farmers-module .module-header {
   margin-bottom: 0;
+  flex-shrink: 0;
 }
 
 #farmers-module .module-toolbar.farmer-toolbar {
   margin-bottom: 0;
   padding: 1.25rem 1.5rem;
   gap: 1.25rem;
-  min-height: 0;
+  /* Must not shrink: min-height:0 + flex was collapsing tabs when Rows <select> focused/reflowed */
+  flex-shrink: 0;
+  min-height: min-content;
+  /* Parent .module-toolbar uses overflow:hidden; clip was hiding Add/Save/Rows on narrow widths */
+  overflow: visible;
+}
+
+#farmers-module .farmer-toolbar-tabs {
+  flex-shrink: 0;
 }
 
 #farmers-module .table-container {
   margin-top: 0;
   padding: 0.65rem 0.75rem;
+  flex: 1;
+  min-height: 0;
 }
 
 .farmer-toolbar {
@@ -1072,14 +1090,152 @@ body.dashboard-page {
   content: none;
 }
 
+/* One row: search (flex) + Add/Save/Rows — matches reference layout */
 .farmer-toolbar-controls {
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
   gap: 1rem 1.25rem;
   flex-wrap: wrap;
   width: 100%;
   min-width: 0;
+}
+
+.farmer-toolbar .toolbar-left.farmer-toolbar-search-wrap {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.farmer-toolbar .farmer-toolbar-actions {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem 1.25rem;
+  min-width: 0;
+}
+
+/* Full-width notice when at max farmers */
+.farmer-limit-banner {
+  width: 100%;
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, #faf6f0, #f5efe6);
+  border: 1px solid rgba(90, 46, 28, 0.35);
+  border-radius: 10px;
+}
+
+.farmer-limit-banner__inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem 1rem;
+  flex-wrap: wrap;
+}
+
+.farmer-limit-banner__icon {
+  flex-shrink: 0;
+  width: 1.35rem;
+  height: 1.35rem;
+  margin-top: 0.1rem;
+  border-radius: 50%;
+  border: 1.5px solid #5a2e1c;
+  color: #5a2e1c;
+  font-size: 0.75rem;
+  font-weight: 800;
+  font-style: italic;
+  font-family: Georgia, 'Times New Roman', serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.farmer-limit-banner__text {
+  flex: 1 1 200px;
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #4a3227;
+}
+
+.farmer-limit-banner__dismiss {
+  flex-shrink: 0;
+  margin-left: auto;
+  align-self: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #5a2e1c;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.farmer-limit-banner__dismiss:hover {
+  color: #3b1f12;
+}
+
+/* Reference-style tabs: plain text + pill active */
+#farmers-module .farmer-toolbar-tabs .farmer-table-view-toggle {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0.35rem 0;
+  margin: 0;
+  min-height: 0;
+  gap: 0.2rem 0.35rem;
+  overflow: visible;
+}
+
+#farmers-module .farmer-toolbar-tabs .farmer-table-view-toggle::before {
+  display: none;
+}
+
+#farmers-module .farmer-toolbar-tabs .view-toggle-btn {
+  border: none;
+  background: transparent;
+  color: #5a2e1c;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  min-height: 36px;
+  box-shadow: none;
+  transform: none;
+  text-shadow: none;
+}
+
+#farmers-module .farmer-toolbar-tabs .view-toggle-btn::before {
+  display: none;
+}
+
+#farmers-module .farmer-toolbar-tabs .view-toggle-btn:hover {
+  color: #3b1f12;
+  background: rgba(139, 74, 43, 0.08);
+  box-shadow: none;
+  transform: none;
+}
+
+#farmers-module .farmer-toolbar-tabs .view-toggle-btn.active {
+  background: linear-gradient(135deg, #6e3d24, #4a2615);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(74, 38, 21, 0.25);
+  transform: none;
+  text-shadow: none;
+  border: none;
+}
+
+#farmers-module .farmer-toolbar-tabs .view-toggle-btn.active:hover {
+  background: linear-gradient(135deg, #5c331f, #3d1f12);
+  transform: none;
 }
 
 /* One horizontal line: label + input stretches; actions share vertical center with input */
@@ -1126,16 +1282,6 @@ body.dashboard-page {
   margin: 0;
 }
 
-.farmer-toolbar .toolbar-left {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.farmer-toolbar .farmer-toolbar-actions {
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 1rem 1.25rem;
-}
 
 .crud-actions {
   display: inline-flex;
@@ -1262,7 +1408,7 @@ body.dashboard-page {
 #pageSizeSelect:focus {
   border-color: #8b4a2b;
   box-shadow: 0 0 0 4px rgba(139, 74, 43, 0.15), 0 4px 12px rgba(59, 33, 7, 0.12);
-  transform: translateY(-1px);
+  /* No translateY — avoids flex reflow clipping Basic Info / tabs next to Rows */
 }
 
 #pageSizeSelect:hover {
@@ -2033,6 +2179,18 @@ body.dashboard-page {
   border-radius: 5px;
 }
 
+/* ACTIONS column: global td overflow:hidden was clipping Delete buttons */
+#farmers-module .data-table td:last-child {
+  overflow: visible;
+  text-overflow: clip;
+  min-width: 5.75rem;
+}
+
+#farmers-module .data-table thead th:last-child {
+  overflow: visible;
+  min-width: 5.75rem;
+}
+
 #farmers-module .table-footer {
   margin-top: 0.65rem;
   padding-top: 0.65rem;
@@ -2734,15 +2892,23 @@ body.confirm-dialog-active {
     align-items: stretch;
   }
 
-  .farmer-toolbar .toolbar-left {
+  .farmer-toolbar .toolbar-left.farmer-toolbar-search-wrap {
     flex: none;
     width: 100%;
   }
 
   .farmer-toolbar .farmer-toolbar-actions {
-    flex-wrap: wrap;
-    justify-content: flex-start;
     width: 100%;
+    justify-content: space-between;
+  }
+
+  .farmer-limit-banner__inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .farmer-limit-banner__dismiss {
+    margin-left: 0;
   }
 
   .farmer-toolbar-tabs .table-view-toggle {

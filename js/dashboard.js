@@ -747,6 +747,19 @@ class DashboardApp {
       saveFarmersBtn.addEventListener('click', () => this.saveFarmers());
     }
 
+    const farmerLimitDismiss = document.getElementById('farmerLimitBannerDismiss');
+    if (farmerLimitDismiss) {
+      farmerLimitDismiss.addEventListener('click', () => {
+        try {
+          sessionStorage.setItem('beanthentic_farmer_limit_banner_dismissed', '1');
+        } catch (_) {
+          /* ignore */
+        }
+        const b = document.getElementById('farmerLimitBanner');
+        if (b) b.hidden = true;
+      });
+    }
+
     // Inline edit + row delete (event delegation)
     document.addEventListener('click', (e) => {
       const delBtn = e.target.closest('[data-action="delete-farmer"]');
@@ -1741,6 +1754,34 @@ class DashboardApp {
     this.renderTableBody();
     this.renderPagination();
     this.updateRecordInfo();
+    this.updateFarmerLimitBanner();
+  }
+
+  /** Show full-width notice when farmer count reaches max (reference: dismissible banner). */
+  updateFarmerLimitBanner() {
+    const banner = document.getElementById('farmerLimitBanner');
+    const textEl = document.getElementById('farmerLimitBannerText');
+    if (!banner || !textEl) return;
+
+    if (this.data.length < this.maxFarmers) {
+      try {
+        sessionStorage.removeItem('beanthentic_farmer_limit_banner_dismissed');
+      } catch (_) {
+        /* ignore */
+      }
+    }
+
+    textEl.textContent = `You've reached the maximum of ${this.maxFarmers} farmers for this dashboard. Remove a row or export data before adding another.`;
+
+    const atMax = this.data.length >= this.maxFarmers;
+    let dismissed = false;
+    try {
+      dismissed = sessionStorage.getItem('beanthentic_farmer_limit_banner_dismissed') === '1';
+    } catch (_) {
+      /* ignore */
+    }
+
+    banner.hidden = !atMax || dismissed;
   }
 
   renderTableBody() {
