@@ -133,7 +133,7 @@ def save_users(users: dict) -> None:
 
 
 def has_admin_account() -> bool:
-    """True if at least one admin user exists (admin signup is one-time)."""
+    """True if at least one admin user exists."""
     return bool(load_users())
 
 
@@ -222,9 +222,6 @@ def home():
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
-    if has_admin_account():
-        return redirect(url_for("login"))
-
     error = ""
 
     if request.method == "POST":
@@ -274,8 +271,7 @@ def login():
             log_activity(email, "LOGIN", "User logged in successfully", request.remote_addr)
             return redirect(url_for("dashboard"))
 
-    signup_available = not has_admin_account()
-    return render_template("admin/login.html", error=error, signup_available=signup_available)
+    return render_template("admin/login.html", error=error)
 
 
 @app.route("/dashboard")

@@ -883,7 +883,6 @@ class DashboardApp {
       'notifications': 'Notifications',
       'farmers': 'Farmer Records',
       'analytics': 'Analytics',
-      'reports': 'Reports',
       'export': 'Export Data',
       'settings': 'Settings'
     };
@@ -916,6 +915,9 @@ class DashboardApp {
 
     if (moduleName === 'notifications') {
       this.renderNotificationsList();
+    }
+    if (moduleName === 'analytics') {
+      this.renderAnalyticsModule();
     }
 
     // Close mobile menu
@@ -1732,6 +1734,7 @@ class DashboardApp {
     
     this.updateTable();
     this.updateStats();
+    this.createCharts();
   }
 
   updateTable() {
@@ -2248,6 +2251,7 @@ class DashboardApp {
     document.getElementById('totalProduction').textContent = totalProduction.toLocaleString();
 
     console.log('Stats updated:', { totalFarmers, totalTrees, totalArea, totalProduction });
+    this.renderAnalyticsModule();
   }
 
   createCharts() {
@@ -2358,6 +2362,356 @@ class DashboardApp {
           }
         }
       }
+    });
+  }
+
+  num(row, keys) {
+    const raw = this.getValue(row, keys);
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  yesNo(row, keys) {
+    const raw = (this.getValue(row, keys) || '').toString().trim().toLowerCase();
+    if (['yes', 'y', 'true', '1'].includes(raw)) return true;
+    if (['no', 'n', 'false', '0'].includes(raw)) return false;
+    return null;
+  }
+
+  computeGiAnalytics() {
+    const byBarangay = new Map();
+    const failCounts = new Map([
+      ['Tree Count (< 500 trees)', 0],
+      ['RSBSA Registration', 0],
+      ['Traditional Method (from remarks)', 0],
+      ['Soil Type info in remarks', 0],
+      ['NCFRS / Traceability ID', 0],
+    ]);
+
+    const varietyTotals = {
+      Liberica: 0,
+      Robusta: 0,
+      Excelsa: 0,
+    };
+
+    let eligible = 0;
+    let notEligible = 0;
+    let qrGenerated = 0;
+    let verified = 0;
+    let pending = 0;
+    let topBarangayName = '-';
+    let topBarangayCount = 0;
+
+    const rows = Array.isArray(this.data) ? this.data : [];
+    const eligibilityByIndex = [];
+    rows.forEach((farmer, idx) => {
+      const barangay = (this.getValue(farmer, ['ADDRESS (BARANGAY)', 'Address (Barangay)', 'address']) || 'Unknown')
+        .toString()
+        .trim();
+      const rsbsa = this.yesNo(farmer, [
+        'RSBSA Registered (Yes/No)',
+        'REGISTERED (YES/NO)',
+        'Registered (Yes/No)',
+        'registered',
+      ]);
+      const totalTrees =
+        this.num(farmer, ['TOTAL TREES', 'TOTAL_TREES']) ||
+        (this.num(farmer, ['TOTAL BEARING', 'Total_Bearing']) +
+          this.num(farmer, ['TOTAL NON-BEARING', 'Total_Non-bearing']));
+      const remarks = (this.getValue(farmer, ['REMARKS', 'remarks']) || '').toString().toLowerCase();
+      const ncfrs = (this.getValue(farmer, ['NCFRS', 'ncfrs']) || '').toString().trim();
+
+      const libTrees =
+        this.num(farmer, ['LIBERICA BEARING', 'Liberica_Bearing']) +
+        this.num(farmer, ['LIBERICA NON-BEARING', 'Liberica_Non-bearing']);
+      const robTrees =
+        this.num(farmer, ['ROBUSTA BEARING', 'Robusta_Bearing']) +
+        this.num(farmer, ['ROBUSTA NON-BEARING', 'Robusta_Non-bearing']);
+      const excTrees =
+        this.num(farmer, ['EXCELSA BEARING', 'Excelsa_Bearing']) +
+        this.num(farmer, ['EXCELSA NON-BEARING', 'Excelsa_Non-bearing']);
+
+      varietyTotals.Liberica += libTrees;
+      varietyTotals.Robusta += robTrees;
+      varietyTotals.Excelsa += excTrees;
+
+      const hasTraditionalHint =
+        /traditional|organic|heritage|manual|handpicked|intercrop/.test(remarks);
+      const hasSoilHint = /soil|loam|clay|volcanic|pH/.test(remarks);
+
+      const checks = {
+        treeCount: totalTrees >= 500,
+        rsbsa: rsbsa === true,
+        traditional: hasTraditionalHint,
+        soil: hasSoilHint,
+        ncfrs: !!ncfrs,
+      };
+
+      const isEligible = Object.values(checks).every(Boolean);
+      eligibilityByIndex.push(isEligible);
+      if (isEligible) {
+        eligible += 1;
+      } else {
+        notEligible += 1;
+        if (!checks.treeCount) failCounts.set('Tree Count (< 500 trees)', failCounts.get('Tree Count (< 500 trees)') + 1);
+        if (!checks.rsbsa) failCounts.set('RSBSA Registration', failCounts.get('RSBSA Registration') + 1);
+        if (!checks.traditional) failCounts.set('Traditional Method (from remarks)', failCounts.get('Traditional Method (from remarks)') + 1);
+        if (!checks.soil) failCounts.set('Soil Type info in remarks', failCounts.get('Soil Type info in remarks') + 1);
+        if (!checks.ncfrs) failCounts.set('NCFRS / Traceability ID', failCounts.get('NCFRS / Traceability ID') + 1);
+      }
+
+      if (ncfrs) qrGenerated += 1;
+      if (ncfrs && rsbsa === true) verified += 1;
+      else pending += 1;
+      byBarangay.set(barangay, (byBarangay.get(barangay) || 0) + 1);
+    });
+
+    for (const [name, count] of byBarangay.entries()) {
+      if (count > topBarangayCount) {
+        topBarangayCount = count;
+        topBarangayName = name;
+      }
+    }
+
+    const trendWindow = 6;
+    const bucketSize = Math.max(1, Math.ceil(rows.length / trendWindow));
+    const trendLabels = [];
+    const trendValues = [];
+    const now = new Date();
+    let cumulativeReady = 0;
+    for (let i = 0; i < rows.length; i++) {
+      if (eligibilityByIndex[i]) cumulativeReady += 1;
+      const bucketEnd = i === rows.length - 1 || (i + 1) % bucketSize === 0;
+      if (bucketEnd) {
+        const step = trendValues.length;
+        const d = new Date(now.getFullYear(), now.getMonth() - (trendWindow - 1 - step), 1);
+        trendLabels.push(
+          d.toLocaleString(undefined, { month: 'short', year: '2-digit' })
+        );
+        trendValues.push(cumulativeReady);
+      }
+    }
+
+    return {
+      total: rows.length,
+      eligible,
+      notEligible,
+      qrGenerated,
+      verified,
+      pending,
+      byBarangay,
+      topBarangayName,
+      topBarangayCount,
+      trendLabels,
+      trendValues,
+      failCounts,
+      varietyTotals,
+    };
+  }
+
+  setText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
+
+  renderAnalyticsModule() {
+    const analyticsRoot = document.getElementById('analytics-module');
+    if (!analyticsRoot || analyticsRoot.classList.contains('hidden')) return;
+    if (!window.Chart) return;
+
+    const metrics = this.computeGiAnalytics();
+    const total = Math.max(metrics.total, 1);
+    const eligibleRate = (metrics.eligible / total) * 100;
+
+    this.setText('giEligibleCount', metrics.eligible.toLocaleString());
+    this.setText('giEligibleRate', `${eligibleRate.toFixed(1)}% of farmers`);
+    this.setText('cityGiReadinessRate', `${eligibleRate.toFixed(1)}%`);
+    this.setText('qrGeneratedCount', metrics.qrGenerated.toLocaleString());
+    this.setText('verifiedProfilesCount', metrics.verified.toLocaleString());
+    this.setText('pendingProfilesCount', `${metrics.pending.toLocaleString()} pending`);
+
+    this.renderTopBarangaysChart(metrics);
+    this.renderCoffeeVarietyChart(metrics);
+    this.renderGiGrowthTrendChart(metrics);
+    this.renderVerificationStatusChart(metrics);
+  }
+
+  renderTopBarangaysChart(metrics) {
+    const canvas = document.getElementById('topBarangaysChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (this.charts.topBarangaysChart) this.charts.topBarangaysChart.destroy();
+    const sorted = [...metrics.byBarangay.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+    this.charts.topBarangaysChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: sorted.map(([k]) => k),
+        datasets: [
+          {
+            label: 'Coffee farms',
+            data: sorted.map(([, v]) => v),
+            backgroundColor: 'rgba(139, 74, 43, 0.82)',
+            borderColor: 'rgba(139, 74, 43, 1)',
+            borderWidth: 1.5,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+  }
+
+  renderCoffeeDensityHeatmap(metrics) {
+    const root = document.getElementById('coffeeDensityHeatmap');
+    if (!root) return;
+    const sorted = [...metrics.byBarangay.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+    const max = Math.max(1, ...sorted.map(([, v]) => v));
+    root.innerHTML = sorted
+      .map(([name, count]) => {
+        const intensity = count / max;
+        const alpha = 0.12 + intensity * 0.58;
+        return `<div class="analytics-heat-row">
+          <div class="analytics-heat-label">${name}</div>
+          <div class="analytics-heat-bar-wrap">
+            <div class="analytics-heat-bar" style="width:${Math.max(6, Math.round(intensity * 100))}%;background:rgba(139,74,43,${alpha.toFixed(2)});"></div>
+          </div>
+          <div class="analytics-heat-count">${count}</div>
+        </div>`;
+      })
+      .join('');
+  }
+
+  renderGiReadinessGaugeChart(metrics) {
+    const canvas = document.getElementById('giReadinessGaugeChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (this.charts.giReadinessGaugeChart) this.charts.giReadinessGaugeChart.destroy();
+    const total = Math.max(1, metrics.total);
+    const rate = (metrics.eligible / total) * 100;
+    this.charts.giReadinessGaugeChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['GI Ready', 'Remaining'],
+        datasets: [
+          {
+            data: [rate, 100 - rate],
+            backgroundColor: ['rgba(62, 166, 66, 0.88)', 'rgba(230, 233, 237, 1)'],
+            borderWidth: 2,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '72%',
+        rotation: -90,
+        circumference: 180,
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: (ctxItem) => `${ctxItem.label}: ${ctxItem.parsed.toFixed(1)}%`,
+            },
+          },
+        },
+      },
+    });
+  }
+
+  renderGiGrowthTrendChart(metrics) {
+    const canvas = document.getElementById('giGrowthTrendChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (this.charts.giGrowthTrendChart) this.charts.giGrowthTrendChart.destroy();
+    this.charts.giGrowthTrendChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: metrics.trendLabels,
+        datasets: [
+          {
+            label: 'GI-Ready farmers',
+            data: metrics.trendValues,
+            borderColor: 'rgba(139, 74, 43, 1)',
+            backgroundColor: 'rgba(139, 74, 43, 0.16)',
+            fill: true,
+            tension: 0.25,
+            pointRadius: 3,
+            pointHoverRadius: 4,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: true, position: 'bottom' } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+  }
+
+  renderCoffeeVarietyChart(metrics) {
+    const canvas = document.getElementById('coffeeVarietyChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (this.charts.coffeeVarietyChart) this.charts.coffeeVarietyChart.destroy();
+    this.charts.coffeeVarietyChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Liberica', 'Robusta', 'Excelsa'],
+        datasets: [
+          {
+            data: [
+              metrics.varietyTotals.Liberica,
+              metrics.varietyTotals.Robusta,
+              metrics.varietyTotals.Excelsa,
+            ],
+            backgroundColor: [
+              'rgba(139, 74, 43, 0.84)',
+              'rgba(62, 166, 66, 0.82)',
+              'rgba(255, 193, 7, 0.84)',
+            ],
+            borderWidth: 2,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '60%',
+        plugins: { legend: { position: 'bottom' } },
+      },
+    });
+  }
+
+  renderVerificationStatusChart(metrics) {
+    const canvas = document.getElementById('verificationStatusChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (this.charts.verificationStatusChart) this.charts.verificationStatusChart.destroy();
+    this.charts.verificationStatusChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Verified', 'Pending'],
+        datasets: [
+          {
+            label: 'Profiles',
+            data: [metrics.verified, metrics.pending],
+            backgroundColor: ['rgba(62, 166, 66, 0.82)', 'rgba(255, 193, 7, 0.86)'],
+            borderColor: ['rgba(62, 166, 66, 1)', 'rgba(255, 193, 7, 1)'],
+            borderWidth: 1.5,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
     });
   }
 

@@ -29,7 +29,7 @@
               <p class="card-desc">Enter your details to Log in.</p>
             </div>
 
-            <form class="form" action="/login" method="post" novalidate>
+            <form class="form" id="login-form" action="{{ url_for('login') }}" method="post" novalidate>
               {% if error %}
               <p class="fineprint" style="color: #c0392b">{{ error }}</p>
               {% endif %}
@@ -73,19 +73,29 @@
 
               <button class="btn" type="submit">Log in</button>
 
-              {% if signup_available %}
-              <p class="fineprint">
-                Don’t have an account?
-                <a class="link" href="/signup">Create one</a>
-              </p>
-              {% endif %}
+              <div class="login-form-footer">
+                <p class="fineprint">
+                  Don’t have an account?
+                  <a class="link" href="{{ url_for('signup') }}">Sign up</a>
+                </p>
+              </div>
             </form>
           </div>
         </section>
       </div>
     </main>
     <script>
-      document.getElementById("year").textContent = new Date().getFullYear();
+      (function () {
+        var link = document.getElementById("loginSignInHelper");
+        if (!link) return;
+        link.addEventListener("click", function (e) {
+          e.preventDefault();
+          var input = document.getElementById("email");
+          if (!input) return;
+          input.scrollIntoView({ behavior: "smooth", block: "center" });
+          input.focus({ preventScroll: true });
+        });
+      })();
     </script>
   </body>
 </html>

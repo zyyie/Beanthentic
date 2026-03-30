@@ -798,7 +798,7 @@ body.dashboard-page {
 }
 
 /* Scroll the list inside the card; keep page title + toolbar in view */
-#notifications-module.module {
+#notifications-module.module:not(.hidden) {
   flex: 1;
   min-height: 0;
   display: flex;
@@ -1381,6 +1381,96 @@ body.dashboard-page {
 .chart-container {
   height: 300px;
   position: relative;
+}
+
+/* Analytics Module */
+.analytics-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.analytics-kpi-card {
+  background: linear-gradient(140deg, #ffffff, #f8f4ef);
+  border: 1px solid rgba(212, 177, 141, 0.35);
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+  box-shadow: 0 8px 18px rgba(40, 25, 15, 0.08);
+}
+
+.analytics-kpi-card h3 {
+  margin: 0 0 0.45rem 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.analytics-kpi-value {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #3b2107;
+  line-height: 1.2;
+}
+
+.analytics-kpi-sub {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: #7a6a5c;
+}
+
+.analytics-charts-section .chart-card {
+  min-height: 360px;
+}
+
+.analytics-grid-2 {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.analytics-heatmap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-height: 300px;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.analytics-heat-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(130px, 2fr) 42px;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.analytics-heat-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #4b5563;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.analytics-heat-bar-wrap {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: #eceff3;
+  overflow: hidden;
+}
+
+.analytics-heat-bar {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.analytics-heat-count {
+  text-align: right;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #6b7280;
 }
 
 /* Table Section */

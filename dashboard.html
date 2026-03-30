@@ -55,10 +55,6 @@
               <i class="nav-icon fa-solid fa-chart-line" aria-hidden="true"></i>
               <span>Analytics</span>
             </a>
-            <a href="#reports" class="nav-link" data-module="reports">
-              <i class="nav-icon fa-solid fa-file-lines" aria-hidden="true"></i>
-              <span>Reports</span>
-            </a>
           </div>
           <div class="nav-section">
             <h3>Tools</h3>
@@ -464,32 +460,58 @@
               <h1>Analytics</h1>
               <p>Deep insights into coffee farming data</p>
             </section>
-            <div class="analytics-content">
-              <div class="placeholder-content">
-                <div class="placeholder-icon">
-                  <i class="fa-solid fa-chart-line"></i>
-                </div>
-                <h3>Analytics Module</h3>
-                <p>Advanced analytics and reporting features coming soon</p>
-              </div>
-            </div>
-          </div>
 
-          <!-- Reports Module -->
-          <div class="module hidden" id="reports-module" data-module="reports">
-            <section class="module-header">
-              <h1>Reports</h1>
-              <p>Generate and view detailed reports</p>
+            <section class="analytics-summary-grid" aria-label="Analytics summary">
+              <article class="analytics-kpi-card">
+                <h3>Lipa GI Readiness</h3>
+                <p class="analytics-kpi-value" id="cityGiReadinessRate">0.0%</p>
+                <p class="analytics-kpi-sub">City-wide eligible rate</p>
+              </article>
+              <article class="analytics-kpi-card">
+                <h3>GI-Ready Farmers</h3>
+                <p class="analytics-kpi-value" id="giEligibleCount">0</p>
+                <p class="analytics-kpi-sub" id="giEligibleRate">0.0% of farmers</p>
+              </article>
+              <article class="analytics-kpi-card">
+                <h3>Generated QR</h3>
+                <p class="analytics-kpi-value" id="qrGeneratedCount">0</p>
+                <p class="analytics-kpi-sub">Farmers with traceability ID</p>
+              </article>
+              <article class="analytics-kpi-card">
+                <h3>Verified Profiles</h3>
+                <p class="analytics-kpi-value" id="verifiedProfilesCount">0</p>
+                <p class="analytics-kpi-sub" id="pendingProfilesCount">0 pending</p>
+              </article>
             </section>
-            <div class="reports-content">
-              <div class="placeholder-content">
-                <div class="placeholder-icon">
-                  <i class="fa-solid fa-file-lines"></i>
+
+            <section class="charts-section analytics-charts-section">
+              <div class="charts-grid analytics-grid-2">
+                <div class="chart-card">
+                  <h3>Top 5 Barangays with Most Coffee Farms</h3>
+                  <div class="chart-container">
+                    <canvas id="topBarangaysChart"></canvas>
+                  </div>
                 </div>
-                <h3>Reports Module</h3>
-                <p>Comprehensive reporting features coming soon</p>
+                <div class="chart-card">
+                  <h3>Coffee Variety Distribution</h3>
+                  <div class="chart-container">
+                    <canvas id="coffeeVarietyChart"></canvas>
+                  </div>
+                </div>
+                <div class="chart-card">
+                  <h3>GI-Ready Farmer Growth Trend</h3>
+                  <div class="chart-container">
+                    <canvas id="giGrowthTrendChart"></canvas>
+                  </div>
+                </div>
+                <div class="chart-card">
+                  <h3>QR Verification Status</h3>
+                  <div class="chart-container">
+                    <canvas id="verificationStatusChart"></canvas>
+                  </div>
+                </div>
               </div>
-            </div>
+            </section>
           </div>
 
           <!-- Export Module -->

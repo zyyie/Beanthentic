@@ -29,7 +29,7 @@
               <p class="card-desc">Enter your details to sign up.</p>
             </div>
 
-            <form class="form" action="/signup" method="post" novalidate>
+            <form class="form" action="{{ url_for('signup') }}" method="post" novalidate>
               {% if error %}
               <p class="fineprint" style="color: #c0392b">{{ error }}</p>
               {% endif %}
@@ -89,7 +89,7 @@
 
               <p class="fineprint">
                 Already have an account?
-                <a class="link" href="/login">Log in</a>
+                <a class="link" href="{{ url_for('login') }}">Log in</a>
               </p>
             </form>
           </div>

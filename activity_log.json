@@ -208,5 +208,26 @@
     "action": "NOTIFICATIONS_UPDATED",
     "details": "Notification preferences updated",
     "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-30T12:00:20.976809",
+    "user_email": "krisharubia05@gmail.com",
+    "action": "LOGOUT",
+    "details": "User logged out",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-30T12:12:09.688174",
+    "user_email": "krisharubia05@gmail.com",
+    "action": "LOGIN",
+    "details": "User logged in successfully",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-30T12:12:26.172301",
+    "user_email": "krisharubia05@gmail.com",
+    "action": "LOGOUT",
+    "details": "User logged out",
+    "ip_address": "127.0.0.1"
   }
 ]
