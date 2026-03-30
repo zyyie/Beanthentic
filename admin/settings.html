@@ -105,8 +105,29 @@
     
     .form-group input:focus {
       outline: none;
-      border-color: #059669;
-      box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+      border-color: #8b4a2b;
+      box-shadow: 0 0 0 3px rgba(139, 74, 43, 0.15);
+    }
+
+    .form-field-error {
+      margin: 6px 0 0;
+      font-size: 13px;
+      font-weight: 600;
+      color: #991b1b;
+    }
+
+    .form-field-error[hidden] {
+      display: none;
+    }
+
+    .form-group input.is-invalid {
+      border-color: #dc2626;
+      box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+    }
+
+    .form-group input.is-valid {
+      border-color: #8b4a2b;
+      box-shadow: 0 0 0 3px rgba(139, 74, 43, 0.15);
     }
     
     .btn {
@@ -302,9 +323,9 @@
     }
     
     .alert-success {
-      background-color: #d1fae5;
-      color: #065f46;
-      border: 1px solid #a7f3d0;
+      background-color: rgba(139, 74, 43, 0.12);
+      color: #5a2e1c;
+      border: 1px solid rgba(139, 74, 43, 0.3);
     }
     
     .alert-error {
@@ -457,14 +478,17 @@
                 <div class="form-group">
                   <label for="currentPassword">Current Password</label>
                   <input type="password" id="currentPassword" name="currentPassword" required>
+                  <p class="form-field-error" id="currentPasswordError" role="alert" hidden></p>
                 </div>
                 <div class="form-group">
                   <label for="newPassword">New Password</label>
                   <input type="password" id="newPassword" name="newPassword" required minlength="8">
+                  <p class="form-field-error" id="newPasswordError" role="alert" hidden></p>
                 </div>
                 <div class="form-group">
                   <label for="confirmPassword">Confirm New Password</label>
                   <input type="password" id="confirmPassword" name="confirmPassword" required>
+                  <p class="form-field-error" id="confirmPasswordError" role="alert" hidden></p>
                 </div>
                 <button type="submit" class="btn btn-primary">Update Password</button>
               </form>
@@ -803,31 +827,172 @@
       }, 5000);
     }
 
-    // Password form submission
-    document.getElementById('passwordForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      const formData = new FormData(this);
-      formData.append('action', 'change_password');
-      
-      try {
-        const response = await fetch('/settings/security', {
-          method: 'POST',
-          body: formData
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-          showAlert(result.success, 'success');
-          this.reset();
+    // Password form — verify current password + inline validation
+    (function () {
+      const passwordForm = document.getElementById('passwordForm');
+      if (!passwordForm) return;
+      const cur = passwordForm.querySelector('#currentPassword');
+      const np = passwordForm.querySelector('#newPassword');
+      const cp = passwordForm.querySelector('#confirmPassword');
+      const curErr = passwordForm.querySelector('#currentPasswordError');
+      const npErr = passwordForm.querySelector('#newPasswordError');
+      const cpErr = passwordForm.querySelector('#confirmPasswordError');
+      let verifyTimer = null;
+      let verifySeq = 0;
+
+      function setFieldError(input, errEl, message) {
+        if (!input) return;
+        if (message) {
+          input.classList.add('is-invalid');
+          input.classList.remove('is-valid');
+          if (errEl) {
+            errEl.textContent = message;
+            errEl.hidden = false;
+          }
         } else {
-          showAlert(result.error, 'error');
+          input.classList.remove('is-invalid');
+          if (errEl) {
+            errEl.textContent = '';
+            errEl.hidden = true;
+          }
         }
-      } catch (error) {
-        showAlert('An error occurred. Please try again.', 'error');
       }
-    });
+      function setFieldOk(input, errEl) {
+        if (!input) return;
+        input.classList.remove('is-invalid');
+        input.classList.add('is-valid');
+        if (errEl) {
+          errEl.textContent = '';
+          errEl.hidden = true;
+        }
+      }
+      function clearCurrentFieldFeedback() {
+        if (cur) cur.classList.remove('is-invalid', 'is-valid');
+        if (curErr) {
+          curErr.textContent = '';
+          curErr.hidden = true;
+        }
+      }
+      async function verifyCurrentPassword() {
+        var pwd = (cur && cur.value) || '';
+        if (!pwd.trim()) {
+          clearCurrentFieldFeedback();
+          return false;
+        }
+        var seq = ++verifySeq;
+        var body = new URLSearchParams();
+        body.set('action', 'verify_current_password');
+        body.set('current_password', pwd);
+        try {
+          var res = await fetch('/settings/security', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString(),
+          });
+          var result = await res.json();
+          if (seq !== verifySeq) return null;
+          if (result.valid) {
+            setFieldOk(cur, curErr);
+            return true;
+          }
+          setFieldError(cur, curErr, result.error || "That doesn't match your current password.");
+          return false;
+        } catch (err) {
+          if (seq !== verifySeq) return null;
+          setFieldError(cur, curErr, 'Could not verify. Check your connection.');
+          return false;
+        }
+      }
+      function scheduleVerifyCurrent() {
+        clearTimeout(verifyTimer);
+        verifyTimer = setTimeout(function () {
+          verifyCurrentPassword();
+        }, 450);
+      }
+      function validateNewPasswords() {
+        var a = (np && np.value) || '';
+        var b = (cp && cp.value) || '';
+        if (np && npErr) {
+          if (a && a.length < 8) {
+            setFieldError(np, npErr, 'Use at least 8 characters.');
+          } else {
+            setFieldError(np, npErr, '');
+          }
+        }
+        if (cp && cpErr) {
+          if (b && a !== b) {
+            setFieldError(cp, cpErr, 'Does not match the new password above.');
+          } else {
+            setFieldError(cp, cpErr, '');
+          }
+        }
+      }
+
+      if (cur) {
+        cur.addEventListener('input', function () {
+          clearCurrentFieldFeedback();
+          if ((cur.value || '').trim()) scheduleVerifyCurrent();
+        });
+        cur.addEventListener('blur', function () {
+          clearTimeout(verifyTimer);
+          verifyCurrentPassword();
+        });
+      }
+      if (np) np.addEventListener('input', validateNewPasswords);
+      if (cp) cp.addEventListener('input', validateNewPasswords);
+
+      passwordForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        validateNewPasswords();
+        if (!(cur && cur.value.trim())) {
+          setFieldError(cur, curErr, 'Enter your current password.');
+          showAlert('Enter your current password.', 'error');
+          return;
+        }
+        clearTimeout(verifyTimer);
+        var currentOk = await verifyCurrentPassword();
+        if (currentOk === null) currentOk = await verifyCurrentPassword();
+        if (currentOk !== true) {
+          showAlert('Fix your current password before updating.', 'error');
+          return;
+        }
+        var npV = (np && np.value) || '';
+        var cpV = (cp && cp.value) || '';
+        if (npV.length < 8) {
+          setFieldError(np, npErr, 'Use at least 8 characters.');
+          showAlert('New password must be at least 8 characters.', 'error');
+          return;
+        }
+        if (npV !== cpV) {
+          setFieldError(cp, cpErr, 'Does not match the new password above.');
+          showAlert('New passwords do not match.', 'error');
+          return;
+        }
+        var formData = new FormData(passwordForm);
+        formData.append('action', 'change_password');
+        try {
+          var response = await fetch('/settings/security', {
+            method: 'POST',
+            body: formData,
+          });
+          var result = await response.json();
+          if (result.success) {
+            showAlert(result.success, 'success');
+            passwordForm.reset();
+            clearCurrentFieldFeedback();
+            setFieldError(np, npErr, '');
+            setFieldError(cp, cpErr, '');
+          } else {
+            showAlert(result.error, 'error');
+            if (result.error && result.error.toLowerCase().indexOf('current') !== -1) {
+              setFieldError(cur, curErr, result.error);
+            }
+          }
+        } catch (err) {
+          showAlert('An error occurred. Please try again.', 'error');
+        }
+      });
+    })();
 
     // 2FA toggle
     document.getElementById('enable2faBtn').addEventListener('click', async function() {

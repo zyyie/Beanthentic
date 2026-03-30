@@ -6,15 +6,18 @@
   <form id="passwordForm">
     <div class="form-group">
       <label for="currentPassword">Current Password</label>
-      <input type="password" id="currentPassword" name="currentPassword" required />
+      <input type="password" id="currentPassword" name="current_password" required autocomplete="current-password" />
+      <p class="form-field-error" id="currentPasswordError" role="alert" hidden></p>
     </div>
     <div class="form-group">
       <label for="newPassword">New Password</label>
-      <input type="password" id="newPassword" name="newPassword" required minlength="8" />
+      <input type="password" id="newPassword" name="new_password" required minlength="8" autocomplete="new-password" />
+      <p class="form-field-error" id="newPasswordError" role="alert" hidden></p>
     </div>
     <div class="form-group">
       <label for="confirmPassword">Confirm New Password</label>
-      <input type="password" id="confirmPassword" name="confirmPassword" required />
+      <input type="password" id="confirmPassword" name="confirm_password" required autocomplete="new-password" />
+      <p class="form-field-error" id="confirmPasswordError" role="alert" hidden></p>
     </div>
     <button type="submit" class="btn btn-primary">Update Password</button>
   </form>
@@ -75,6 +78,37 @@
 
     <div style="margin-top: 0.9rem; display: flex; gap: 0.6rem; flex-wrap: wrap;">
       <button type="button" class="btn btn-secondary" id="cancel2faSetupBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="disable2faConfirmModal" class="confirm-dialog" hidden aria-hidden="true">
+  <div class="confirm-dialog__backdrop" tabindex="-1" id="disable2faConfirmBackdrop"></div>
+  <div
+    class="confirm-dialog__card"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="disable2faConfirmTitle"
+    aria-describedby="disable2faConfirmMessage"
+  >
+    <div class="confirm-dialog__icon-wrap" aria-hidden="true">
+      <i class="fa-solid fa-shield-halved"></i>
+    </div>
+    <h2 id="disable2faConfirmTitle" class="confirm-dialog__title">Disable two-factor authentication?</h2>
+    <p id="disable2faConfirmMessage" class="confirm-dialog__message">
+      Enter your account password to confirm. You can turn 2FA on again later from this page.
+    </p>
+    <div class="form-group" style="margin-top: 0.75rem;">
+      <label for="disable2faPasswordInput">Password</label>
+      <input type="password" id="disable2faPasswordInput" autocomplete="current-password" />
+    </div>
+    <div class="confirm-dialog__actions">
+      <button type="button" class="confirm-dialog__btn confirm-dialog__btn--secondary" id="disable2faConfirmCancel">
+        Cancel
+      </button>
+      <button type="button" class="confirm-dialog__btn confirm-dialog__btn--primary" id="disable2faConfirmOk">
+        Disable 2FA
+      </button>
     </div>
   </div>
 </div>

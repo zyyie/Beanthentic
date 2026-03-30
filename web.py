@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import secrets
 import time
@@ -159,7 +160,24 @@ def load_settings() -> dict:
     try:
         return json.loads(SETTINGS_DB.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        return {}
+        return {
+            "notifications": {
+                "email_system_events": True,
+                "email_user_registrations": True,
+                "email_security_breaches": True,
+                "sms_system_events": False,
+                "sms_user_registrations": False,
+                "sms_security_breaches": True,
+                "in_app_system_events": True,
+                "in_app_user_registrations": True,
+                "in_app_security_breaches": True,
+            },
+            "security": {
+                "two_factor_enabled": False,
+                "two_factor_secret": None,
+                "backup_codes": [],
+            },
+        }
 
 
 def save_settings(settings: dict) -> None:
@@ -264,7 +282,15 @@ def login():
 def dashboard():
     if not session.get("user_email"):
         return redirect(url_for("login"))
-    return render_template("dashboard.html")
+    email = session.get("user_email", "")
+    users = load_users()
+    user = users.get(email, {})
+    full_name = user.get("full_name") or session.get("user_name") or email
+    return render_template(
+        "dashboard.html",
+        user_email=email,
+        user_full_name=full_name,
+    )
 
 
 @app.route("/logout")
@@ -292,6 +318,48 @@ def settings():
                          current_user=current_user)
 
 
+@app.route("/settings/state", methods=["GET"])
+def settings_state():
+    if not session.get("user_email"):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    settings = load_settings()
+    user_email = session.get("user_email", "")
+    users = load_users()
+    user = users.get(user_email, {})
+    notifications = settings.get("notifications", {})
+    sec = settings.get("security", {})
+    tf_enabled = bool(sec.get("two_factor_enabled"))
+
+    return jsonify(
+        {
+            "notifications": notifications,
+            "security": {
+                "two_factor_enabled": tf_enabled,
+                "totp_secret": (sec.get("two_factor_secret") if tf_enabled else None),
+                "backup_codes": (sec.get("backup_codes") if tf_enabled else None),
+            },
+            "user": {
+                "email": user_email,
+                "full_name": user.get("full_name") or session.get("user_name", ""),
+            },
+        }
+    )
+
+
+@app.route("/api/activity-feed", methods=["GET"])
+def api_activity_feed():
+    """Recent account activity for the dashboard Notifications module (refresh)."""
+    if not session.get("user_email"):
+        return jsonify({"error": "Unauthorized"}), 401
+    log = load_activity_log()
+    if not isinstance(log, list):
+        log = []
+    # Newest entries are appended last in the file — take tail and reverse
+    recent = log[-50:][::-1]
+    return jsonify({"items": recent})
+
+
 @app.route("/settings/security", methods=["POST"])
 def settings_security():
     if not session.get("user_email"):
@@ -302,10 +370,18 @@ def settings_security():
     users = load_users()
     current_user = users.get(user_email, {})
     
+    if action == "verify_current_password":
+        attempt = request.form.get("current_password") or request.form.get("currentPassword") or ""
+        if not attempt.strip():
+            return jsonify({"valid": False, "error": "Enter your current password."})
+        if check_password_hash(current_user.get("password_hash", ""), attempt):
+            return jsonify({"valid": True})
+        return jsonify({"valid": False, "error": "That doesn't match your current password."})
+
     if action == "change_password":
-        current_password = request.form.get("current_password")
-        new_password = request.form.get("new_password")
-        confirm_password = request.form.get("confirm_password")
+        current_password = request.form.get("current_password") or request.form.get("currentPassword")
+        new_password = request.form.get("new_password") or request.form.get("newPassword")
+        confirm_password = request.form.get("confirm_password") or request.form.get("confirmPassword")
         
         if not check_password_hash(current_user.get("password_hash", ""), current_password):
             log_activity(user_email, "PASSWORD_CHANGE_FAILED", "Incorrect current password", request.remote_addr)
@@ -327,30 +403,57 @@ def settings_security():
         enable_2fa = request.form.get("enable_2fa") == "true"
         
         if enable_2fa:
-            # Generate 2FA secret
-            secret = secrets.token_hex(16)
+            sec = settings.setdefault(
+                "security",
+                {
+                    "two_factor_enabled": False,
+                    "two_factor_secret": None,
+                    "backup_codes": [],
+                },
+            )
+            if sec.get("two_factor_enabled") and sec.get("two_factor_secret"):
+                return jsonify(
+                    {
+                        "success": "2FA is already enabled",
+                        "secret": sec["two_factor_secret"],
+                        "backup_codes": sec.get("backup_codes", []),
+                    }
+                )
+
+            # Base32 secret for Google Authenticator / RFC 6238 TOTP apps
+            secret = base64.b32encode(secrets.token_bytes(20)).decode("ascii").rstrip("=")
             backup_codes = [secrets.token_hex(4).upper() for _ in range(10)]
-            
-            settings["security"]["two_factor_enabled"] = True
-            settings["security"]["two_factor_secret"] = secret
-            settings["security"]["backup_codes"] = backup_codes
-            
+
+            sec["two_factor_enabled"] = True
+            sec["two_factor_secret"] = secret
+            sec["backup_codes"] = backup_codes
+
             save_settings(settings)
             log_activity(user_email, "2FA_ENABLED", "Two-factor authentication enabled", request.remote_addr)
-            return jsonify({
-                "success": "2FA enabled successfully",
-                "secret": secret,
-                "backup_codes": backup_codes
-            })
+            return jsonify(
+                {
+                    "success": "2FA enabled successfully",
+                    "secret": secret,
+                    "backup_codes": backup_codes,
+                }
+            )
         else:
             # Require password confirmation to disable 2FA
             password = request.form.get("password")
             if not check_password_hash(current_user.get("password_hash", ""), password):
                 return jsonify({"error": "Password is incorrect"})
-            
-            settings["security"]["two_factor_enabled"] = False
-            settings["security"]["two_factor_secret"] = None
-            settings["security"]["backup_codes"] = []
+
+            sec = settings.setdefault(
+                "security",
+                {
+                    "two_factor_enabled": False,
+                    "two_factor_secret": None,
+                    "backup_codes": [],
+                },
+            )
+            sec["two_factor_enabled"] = False
+            sec["two_factor_secret"] = None
+            sec["backup_codes"] = []
             
             save_settings(settings)
             log_activity(user_email, "2FA_DISABLED", "Two-factor authentication disabled", request.remote_addr)

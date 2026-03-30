@@ -35,6 +35,20 @@ body.dashboard-page {
   padding: 0;
   position: relative;
   z-index: 1;
+  /* Fill the viewport so inner .module-content can scroll (Notifications, Overview, etc.) */
+  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@supports (height: 100dvh) {
+  .dashboard-page .dashboard-main {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
 }
 
 .dashboard-container {
@@ -85,11 +99,14 @@ body.dashboard-page {
 /* Dashboard Layout */
 .dashboard-layout {
   display: flex;
+  flex: 1;
+  min-height: 0;
   background: #f6f7f9;
   min-width: 0;
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
+  overflow-y: hidden;
 }
 
 /* Side Panel */
@@ -151,8 +168,8 @@ body.dashboard-page {
 }
 
 .side-brand-img {
-  width: 110px;
-  height: 110px;
+  width: 125px;
+  height: 125px;
   object-fit: contain;
   flex: 0 0 auto;
   filter: drop-shadow(0 10px 18px rgba(120, 78, 49, 0.18));
@@ -288,11 +305,12 @@ body.dashboard-page {
 .main-content {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   margin-left: 260px;
   background: #f6f7f9;
-  min-height: 100vh;
   max-width: 100%;
   overflow-x: hidden;
+  overflow-y: hidden;
   transition: margin-left 0.3s ease;
   display: flex;
   flex-direction: column;
@@ -300,7 +318,6 @@ body.dashboard-page {
   /* Breathing room between sidebar edge and page content */
   padding-left: 0.35rem;
   box-sizing: border-box;
-  /* Allow page to scroll naturally; inner sections can still manage their own scrolling. */
 }
 
 .main-content.expanded {
@@ -620,7 +637,7 @@ body.dashboard-page {
   width: 40px;
   height: 40px;
   flex-shrink: 0;
-  background: linear-gradient(145deg, #3ea642 0%, #6b9f3a 38%, #8b4a2b 100%);
+  background: linear-gradient(145deg, #a6693e 0%, #9f643a 38%, #8b4a2b 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -743,6 +760,7 @@ body.dashboard-page {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
+  flex-shrink: 0;
   margin-bottom: 1rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid rgba(212, 177, 141, 0.22);
@@ -757,6 +775,19 @@ body.dashboard-page {
   font-size: 0.9rem;
 }
 
+#notifications-module .notifications-toolbar-btn[aria-busy='true'] .fa-rotate-right {
+  animation: notificationsRefreshSpin 0.6s linear infinite;
+}
+
+@keyframes notificationsRefreshSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 #notifications-module .notifications-toolbar-btn--icon {
   padding: 0.45rem 0.65rem;
   min-width: 40px;
@@ -766,6 +797,45 @@ body.dashboard-page {
   margin-bottom: 0;
 }
 
+/* Scroll the list inside the card; keep page title + toolbar in view */
+#notifications-module.module {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#notifications-module .module-header {
+  flex-shrink: 0;
+}
+
+#notifications-module .settings-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+#notifications-module .settings-admin-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+#notifications-module .notifications-page-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 #notifications-module .notifications-list {
   list-style: none;
   margin: 0;
@@ -773,6 +843,12 @@ body.dashboard-page {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
 }
 
 #notifications-module .notifications-list .notification-item {
@@ -2438,11 +2514,13 @@ body.confirm-dialog-active {
   min-width: 100px;
 }
 
-/* Notification System */
+/* Notification System — top center by default */
 .notification {
   position: fixed;
   top: 20px;
-  right: 20px;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
   padding: 1rem 1.5rem;
   border-radius: 12px;
   font-weight: 600;
@@ -2450,16 +2528,28 @@ body.confirm-dialog-active {
   font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
   z-index: 10000;
-  animation: slideInRight 0.3s ease-out;
-  max-width: 400px;
+  animation: slideInTop 0.35s ease-out;
+  max-width: min(520px, calc(100vw - 2rem));
+  text-align: center;
   word-wrap: break-word;
 }
 
-.notification-success {
-  background: linear-gradient(135deg, rgba(40, 167, 69, 0.95), rgba(40, 167, 69, 0.85));
+.notification.notification--right {
+  left: auto;
+  right: 20px;
+  transform: none;
+  text-align: left;
+  animation: slideInRight 0.3s ease-out;
+  max-width: 400px;
+}
+
+/* Success + brown export — same coffee theme (no green success bar) */
+.notification-success,
+.notification-brown {
+  background: linear-gradient(135deg, rgba(141, 96, 57, 0.98), rgba(145, 78, 45, 0.92));
   color: #ffffff;
-  border: 1px solid rgba(40, 167, 69, 0.3);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(139, 74, 43, 0.35);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
 .notification-error {
@@ -2484,14 +2574,18 @@ body.confirm-dialog-active {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
-/* Export module — matches “Export to Excel” / primary brown actions */
-.notification-brown {
+/*
+ * Info toast only — must be .notification.notification-info so we don’t style
+ * .notification-info rows in Settings / Notifications preferences (label blocks).
+ */
+.notification.notification-info {
   background: linear-gradient(135deg, rgba(139, 74, 43, 0.98), rgba(90, 46, 28, 0.92));
   color: #ffffff;
   border: 1px solid rgba(139, 74, 43, 0.35);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
+/* Legacy hook: same as default centered toast */
 .notification.notification--center {
   left: 50%;
   right: auto;
@@ -2688,15 +2782,45 @@ body.confirm-dialog-active {
   width: 100%;
   padding: 0.65rem 0.8rem;
   border-radius: 10px;
-  border: 1px solid rgba(11, 61, 46, 0.18);
+  border: 1px solid rgba(139, 74, 43, 0.38);
   outline: none;
-  background: #ffffff;
+  background: #fffdfa;
   color: #25130c;
+  box-shadow:
+    inset 0 1px 2px rgba(90, 46, 28, 0.07),
+    0 1px 2px rgba(90, 46, 28, 0.05);
 }
 
 .settings-admin-section .form-group input:focus {
-  border-color: rgba(62, 166, 66, 0.7);
-  box-shadow: 0 0 0 4px rgba(62, 166, 66, 0.12);
+  border-color: rgba(139, 74, 43, 0.72);
+  box-shadow:
+    inset 0 1px 2px rgba(90, 46, 28, 0.06),
+    0 0 0 4px rgba(139, 74, 43, 0.16);
+}
+
+.settings-admin-section .form-field-error {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #b02a37;
+}
+
+.settings-admin-section .form-field-error[hidden] {
+  display: none;
+}
+
+.settings-admin-section .form-group input.is-invalid {
+  border-color: rgba(176, 42, 55, 0.55);
+  box-shadow:
+    inset 0 1px 2px rgba(90, 46, 28, 0.05),
+    0 0 0 4px rgba(220, 53, 69, 0.14);
+}
+
+.settings-admin-section .form-group input.is-valid {
+  border-color: rgba(139, 74, 43, 0.5);
+  box-shadow:
+    inset 0 1px 2px rgba(90, 46, 28, 0.06),
+    0 0 0 4px rgba(139, 74, 43, 0.12);
 }
 
 .settings-admin-section .btn {
@@ -2740,9 +2864,9 @@ body.confirm-dialog-active {
 }
 
 .settings-admin-section .alert-success {
-  background: rgba(40, 167, 69, 0.10);
-  border-color: rgba(40, 167, 69, 0.25);
-  color: #1e7e34;
+  background: rgba(139, 74, 43, 0.12);
+  border-color: rgba(139, 74, 43, 0.28);
+  color: #5a2e1c;
 }
 
 .settings-admin-section .alert-error {
@@ -2828,7 +2952,11 @@ body.confirm-dialog-active {
   max-width: 360px;
   padding: 0.6rem 0.7rem;
   border-radius: 10px;
-  border: 1px solid rgba(209, 213, 219, 1);
+  border: 1px solid rgba(139, 74, 43, 0.35);
+  background: #fffdfa;
+  box-shadow:
+    inset 0 1px 2px rgba(90, 46, 28, 0.07),
+    0 1px 2px rgba(90, 46, 28, 0.05);
 }
 
 .settings-admin-section .activity-table {
@@ -2879,5 +3007,93 @@ body.confirm-dialog-active {
 .settings-admin-section .faq-item.active .faq-answer {
   padding: 1rem;
   max-height: 900px;
+}
+
+/* Settings hub: card grid (landing) */
+.settings-detail-toolbar {
+  margin-bottom: 0.75rem;
+}
+
+.settings-detail-toolbar .btn {
+  gap: 0.5rem;
+}
+
+.settings-landing {
+  padding: 0.25rem 0.5rem 0.75rem;
+}
+
+.settings-landing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.settings-landing-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  width: 100%;
+  text-align: left;
+  padding: 1.15rem 1.1rem;
+  margin: 0;
+  border: 1px solid rgba(212, 177, 141, 0.35);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 8px 20px rgba(40, 25, 15, 0.06);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.settings-landing-card:hover {
+  border-color: rgba(139, 74, 43, 0.45);
+  box-shadow: 0 10px 26px rgba(40, 25, 15, 0.1);
+  transform: translateY(-2px);
+}
+
+.settings-landing-card:focus-visible {
+  outline: 2px solid rgba(139, 74, 43, 0.65);
+  outline-offset: 2px;
+}
+
+.settings-landing-card__icon {
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(139, 74, 43, 0.12), rgba(90, 46, 28, 0.08));
+  color: #5a2e1c;
+  font-size: 1.2rem;
+}
+
+.settings-landing-card__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.settings-landing-card__title {
+  font-weight: 800;
+  font-size: 1.02rem;
+  color: #1f2933;
+}
+
+.settings-landing-card__desc {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #6c757d;
+}
+
+.settings-landing-card__chev {
+  flex-shrink: 0;
+  align-self: center;
+  color: rgba(139, 74, 43, 0.55);
+  font-size: 0.85rem;
 }
 

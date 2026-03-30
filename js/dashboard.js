@@ -13,6 +13,8 @@ class DashboardApp {
     this.totalRecords = 0;
     this.farmerTableView = 'basic';
     this.activeSettingsTab = 'security';
+    /** 'landing' = card hub; 'detail' = loaded fragment */
+    this.settingsViewMode = 'landing';
     /** @type {{ id: string; icon: string; title: string; meta: string; detail: string; read: boolean }[]} */
     this.notificationsFeed = this.hydrateNotificationsFeed();
     /** @type {number | null} */
@@ -49,8 +51,7 @@ class DashboardApp {
     ];
   }
 
-  hydrateNotificationsFeed() {
-    const defaults = this.getDefaultNotifications();
+  applyReadStateToItems(items) {
     /** @type {Record<string, boolean>} */
     let readById = {};
     try {
@@ -59,11 +60,102 @@ class DashboardApp {
     } catch {
       readById = {};
     }
-    return defaults.map((n) => ({
+    return items.map((n) => ({
       ...n,
-      detail: n.detail || '',
+      detail: n.detail != null ? n.detail : '',
       read: !!readById[n.id],
     }));
+  }
+
+  hydrateNotificationsFeed() {
+    return this.applyReadStateToItems(this.getDefaultNotifications());
+  }
+
+  iconForActivityAction(action) {
+    const a = (action || '').toUpperCase();
+    const map = {
+      LOGIN: 'fa-right-to-bracket',
+      LOGOUT: 'fa-right-from-bracket',
+      LOGIN_FAILED: 'fa-circle-xmark',
+      PASSWORD_CHANGED: 'fa-key',
+      PASSWORD_CHANGE_FAILED: 'fa-triangle-exclamation',
+      '2FA_ENABLED': 'fa-shield-halved',
+      '2FA_DISABLED': 'fa-shield-halved',
+      NOTIFICATIONS_UPDATED: 'fa-bell',
+      PROFILE_UPDATED: 'fa-user-pen',
+    };
+    return map[a] || 'fa-clock-rotate-left';
+  }
+
+  titleForActivity(action) {
+    const a = (action || '').toUpperCase();
+    const map = {
+      LOGIN: 'Signed in',
+      LOGOUT: 'Signed out',
+      LOGIN_FAILED: 'Failed sign-in attempt',
+      PASSWORD_CHANGED: 'Password changed',
+      PASSWORD_CHANGE_FAILED: 'Password change failed',
+      '2FA_ENABLED': 'Two-factor authentication enabled',
+      '2FA_DISABLED': 'Two-factor authentication disabled',
+      NOTIFICATIONS_UPDATED: 'Notification settings updated',
+      PROFILE_UPDATED: 'Profile updated',
+    };
+    if (map[a]) return map[a];
+    return (action || 'Activity').replace(/_/g, ' ');
+  }
+
+  formatActivityMeta(timestamp) {
+    if (!timestamp) return '';
+    try {
+      const d = new Date(timestamp);
+      if (Number.isNaN(d.getTime())) return String(timestamp);
+      return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    } catch {
+      return String(timestamp);
+    }
+  }
+
+  mapActivityLogToFeedItem(row, index) {
+    const id = `activity-${index}-${row.timestamp}`;
+    const action = row.action || '';
+    const icon = this.iconForActivityAction(action);
+    const title = this.titleForActivity(action);
+    const meta = this.formatActivityMeta(row.timestamp);
+    const parts = [row.details, row.ip_address ? `IP: ${row.ip_address}` : ''].filter(Boolean);
+    const detail = parts.join(' · ');
+    return { id, icon, title, meta, detail, read: false };
+  }
+
+  async refreshNotificationsModule() {
+    const btn = document.getElementById('notificationsPageRefreshBtn');
+    const markAllBtn = document.getElementById('notificationsMarkAllReadBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.setAttribute('aria-busy', 'true');
+    }
+    if (markAllBtn) markAllBtn.disabled = true;
+    try {
+      const res = await fetch('/api/activity-feed');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const rows = Array.isArray(data.items) ? data.items : [];
+      const activityItems = rows.map((row, i) => this.mapActivityLogToFeedItem(row, i));
+      const defaults = this.getDefaultNotifications();
+      this.notificationsFeed = this.applyReadStateToItems([...activityItems, ...defaults]);
+      this.renderNotificationsList();
+      this.showNotification('Notifications refreshed.', 'success');
+    } catch (e) {
+      console.warn('Notifications refresh failed:', e);
+      this.notificationsFeed = this.hydrateNotificationsFeed();
+      this.renderNotificationsList();
+      this.showNotification('Could not load latest activity. Showing saved list.', 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+      }
+      if (markAllBtn) markAllBtn.disabled = false;
+    }
   }
 
   persistNotificationReadState() {
@@ -169,7 +261,10 @@ class DashboardApp {
       root.setAttribute('hidden', '');
       root.setAttribute('aria-hidden', 'true');
     }
-    if (document.getElementById('deleteFarmerConfirmModal')?.hasAttribute('hidden')) {
+    const del = document.getElementById('deleteFarmerConfirmModal');
+    const logoutEl = document.getElementById('logoutConfirmModal');
+    const d2 = document.getElementById('disable2faConfirmModal');
+    if (del?.hasAttribute('hidden') && logoutEl?.hasAttribute('hidden') && d2?.hasAttribute('hidden')) {
       document.body.classList.remove('confirm-dialog-active');
     }
   }
@@ -210,7 +305,8 @@ class DashboardApp {
     }
     const del = document.getElementById('deleteFarmerConfirmModal');
     const nd = document.getElementById('notificationDetailModal');
-    if (del?.hasAttribute('hidden') && nd?.hasAttribute('hidden')) {
+    const d2 = document.getElementById('disable2faConfirmModal');
+    if (del?.hasAttribute('hidden') && nd?.hasAttribute('hidden') && d2?.hasAttribute('hidden')) {
       document.body.classList.remove('confirm-dialog-active');
     }
   }
@@ -292,8 +388,13 @@ class DashboardApp {
     const ack = document.getElementById('deleteConfirmAcknowledge');
     if (ack) ack.checked = false;
     this.syncDeleteConfirmRemoveButton();
-    document.body.classList.remove('confirm-dialog-active');
     this.pendingDeleteRowIndex = null;
+    const logoutEl = document.getElementById('logoutConfirmModal');
+    const nd = document.getElementById('notificationDetailModal');
+    const d2 = document.getElementById('disable2faConfirmModal');
+    if (logoutEl?.hasAttribute('hidden') && nd?.hasAttribute('hidden') && d2?.hasAttribute('hidden')) {
+      document.body.classList.remove('confirm-dialog-active');
+    }
   }
 
   confirmPendingDeleteFarmer() {
@@ -332,6 +433,8 @@ class DashboardApp {
       if (logoutEl && !logoutEl.hasAttribute('hidden')) return;
       const nd = document.getElementById('notificationDetailModal');
       if (nd && !nd.hasAttribute('hidden')) return;
+      const d2 = document.getElementById('disable2faConfirmModal');
+      if (d2 && !d2.hasAttribute('hidden')) return;
       if (root.hasAttribute('hidden')) return;
       e.preventDefault();
       this.closeDeleteFarmerConfirm();
@@ -434,6 +537,10 @@ class DashboardApp {
       link.addEventListener('click', (e) => {
         e.preventDefault();
         const module = link.dataset.module;
+        if (module === 'settings') {
+          this.settingsViewMode = 'landing';
+          this.syncSettingsSubmenuActive(null);
+        }
         this.switchModule(module);
       });
     });
@@ -458,6 +565,7 @@ class DashboardApp {
           btn.classList.add('active');
 
           this.activeSettingsTab = tab;
+          this.settingsViewMode = 'detail';
 
           // Ensure the Settings module is visible and render the selected fragment inside it.
           this.switchModule('settings');
@@ -482,6 +590,7 @@ class DashboardApp {
 
     const openProfileSettings = () => {
       this.activeSettingsTab = 'profile';
+      this.settingsViewMode = 'detail';
       const submenuButtons = document.querySelectorAll(
         '#sidebarSettingsSubmenu .settings-submenu-item[data-tab]'
       );
@@ -541,8 +650,7 @@ class DashboardApp {
     const notificationsMarkAllReadBtn = document.getElementById('notificationsMarkAllReadBtn');
     if (notificationsPageRefreshBtn) {
       notificationsPageRefreshBtn.addEventListener('click', () => {
-        this.notificationsFeed = this.hydrateNotificationsFeed();
-        this.renderNotificationsList();
+        this.refreshNotificationsModule();
       });
     }
     if (notificationsMarkAllReadBtn) {
@@ -654,6 +762,29 @@ class DashboardApp {
 
     this.initDeleteFarmerConfirmModal();
     this.initLogoutConfirmModal();
+
+    const settingsBackBtn = document.getElementById('settingsBackToOverviewBtn');
+    if (settingsBackBtn) {
+      settingsBackBtn.addEventListener('click', () => {
+        this.settingsViewMode = 'landing';
+        this.syncSettingsSubmenuActive(null);
+        this.loadSettingsLanding();
+      });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const m = document.getElementById('disable2faConfirmModal');
+      if (!m || m.hasAttribute('hidden')) return;
+      const logoutEl = document.getElementById('logoutConfirmModal');
+      if (logoutEl && !logoutEl.hasAttribute('hidden')) return;
+      const nd = document.getElementById('notificationDetailModal');
+      if (nd && !nd.hasAttribute('hidden')) return;
+      const del = document.getElementById('deleteFarmerConfirmModal');
+      if (del && !del.hasAttribute('hidden')) return;
+      e.preventDefault();
+      this.closeDisable2faConfirmModal();
+    });
 
     document.addEventListener(
       'blur',
@@ -776,8 +907,11 @@ class DashboardApp {
     }
 
     if (moduleName === 'settings') {
-      // Default/admin settings fragment on open.
-      this.loadAdminSettingsFragment(this.activeSettingsTab || 'security');
+      if (this.settingsViewMode === 'landing') {
+        this.loadSettingsLanding();
+      } else {
+        this.loadAdminSettingsFragment(this.activeSettingsTab || 'security');
+      }
     }
 
     if (moduleName === 'notifications') {
@@ -790,11 +924,174 @@ class DashboardApp {
     }
   }
 
+  async fetchSettingsState() {
+    const res = await fetch('/settings/state');
+    if (res.status === 401) {
+      this.showNotification('Please sign in again to change settings.', 'error');
+      return null;
+    }
+    if (!res.ok) {
+      this.showNotification('Could not load settings from server.', 'error');
+      return null;
+    }
+    return res.json();
+  }
+
+  buildTotpUri(email, secret) {
+    const enc = encodeURIComponent;
+    const id = email || 'admin';
+    return `otpauth://totp/Beanthentic:${enc(id)}?secret=${enc(secret)}&issuer=${enc('Beanthentic')}`;
+  }
+
+  fill2faSetupPanel(containerEl, email, secret, backupCodes) {
+    const twoFaStatus = containerEl.querySelector('[id="2faStatus"]');
+    const twoFaSetup = containerEl.querySelector('[id="2faSetup"]');
+    const manualKey = containerEl.querySelector('#manualKey');
+    const backupCodesList = containerEl.querySelector('#backupCodesList');
+    const qrHolder = containerEl.querySelector('#qrCodePlaceholder');
+    if (twoFaStatus) twoFaStatus.style.display = 'none';
+    if (twoFaSetup) twoFaSetup.style.display = 'block';
+    if (manualKey) manualKey.textContent = `Manual key (if you cannot scan): ${secret}`;
+    if (backupCodesList && Array.isArray(backupCodes)) {
+      backupCodesList.innerHTML = backupCodes.map((c) => `<code>${c}</code>`).join('');
+    }
+    if (qrHolder && secret) {
+      const uri = this.buildTotpUri(email, secret);
+      const src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(uri)}`;
+      qrHolder.innerHTML = `<img src="${src}" alt="Scan to add to authenticator app" width="200" height="200" loading="lazy" />`;
+    }
+  }
+
+  reset2faQrPlaceholder(containerEl) {
+    const qrHolder = containerEl.querySelector('#qrCodePlaceholder');
+    if (qrHolder) {
+      qrHolder.innerHTML =
+        '<i class="fa-solid fa-qrcode" style="font-size: 140px; color: #d1d5db;"></i>';
+    }
+  }
+
+  openDisable2faConfirmModal() {
+    const root = document.getElementById('disable2faConfirmModal');
+    if (!root) return;
+    root.removeAttribute('hidden');
+    root.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('confirm-dialog-active');
+    document.getElementById('disable2faPasswordInput')?.focus();
+  }
+
+  closeDisable2faConfirmModal() {
+    const root = document.getElementById('disable2faConfirmModal');
+    if (root) {
+      root.setAttribute('hidden', '');
+      root.setAttribute('aria-hidden', 'true');
+    }
+    const input = document.getElementById('disable2faPasswordInput');
+    if (input) input.value = '';
+    const logoutEl = document.getElementById('logoutConfirmModal');
+    const del = document.getElementById('deleteFarmerConfirmModal');
+    const nd = document.getElementById('notificationDetailModal');
+    const d2 = document.getElementById('disable2faConfirmModal');
+    if (
+      logoutEl?.hasAttribute('hidden') &&
+      del?.hasAttribute('hidden') &&
+      nd?.hasAttribute('hidden') &&
+      d2?.hasAttribute('hidden')
+    ) {
+      document.body.classList.remove('confirm-dialog-active');
+    }
+  }
+
+  syncSettingsSubmenuActive(tab) {
+    const submenuButtons = document.querySelectorAll('#sidebarSettingsSubmenu .settings-submenu-item[data-tab]');
+    submenuButtons.forEach((b) => {
+      if (tab == null) {
+        b.classList.remove('active');
+      } else {
+        b.classList.toggle('active', b.getAttribute('data-tab') === tab);
+      }
+    });
+  }
+
+  loadSettingsLanding() {
+    const container = document.getElementById('adminSettingsFragmentContainer');
+    const titleEl = document.getElementById('adminSettingsFragmentTitle');
+    const pageTitleEl = document.getElementById('adminSettingsPageTitle');
+    const toolbar = document.getElementById('settingsDetailToolbar');
+    if (!container) return;
+
+    if (toolbar) toolbar.hidden = true;
+    if (pageTitleEl) pageTitleEl.textContent = 'Settings';
+    if (titleEl) titleEl.textContent = 'Choose a category';
+
+    const cards = [
+      {
+        tab: 'security',
+        title: 'Account Security',
+        desc: 'Change your password and manage two-factor authentication.',
+        icon: 'fa-shield-halved',
+      },
+      {
+        tab: 'notifications',
+        title: 'Notifications Settings',
+        desc: 'Control email, SMS, and in-app alerts.',
+        icon: 'fa-bell',
+      },
+      {
+        tab: 'activity',
+        title: 'Activity Log',
+        desc: 'Review recent account actions and filters.',
+        icon: 'fa-clock-rotate-left',
+      },
+      {
+        tab: 'faq',
+        title: 'FAQ',
+        desc: 'Quick answers about passwords, 2FA, and backups.',
+        icon: 'fa-circle-question',
+      },
+      {
+        tab: 'profile',
+        title: 'Profile Actions',
+        desc: 'Update your name, refresh session, or sign out.',
+        icon: 'fa-user-gear',
+      },
+    ];
+
+    const rows = cards
+      .map(
+        (c) => `
+      <button type="button" class="settings-landing-card" data-tab="${c.tab}">
+        <span class="settings-landing-card__icon" aria-hidden="true"><i class="fa-solid ${c.icon}"></i></span>
+        <span class="settings-landing-card__body">
+          <span class="settings-landing-card__title">${c.title}</span>
+          <span class="settings-landing-card__desc">${c.desc}</span>
+        </span>
+        <span class="settings-landing-card__chev" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>
+      </button>`
+      )
+      .join('');
+
+    container.innerHTML = `<div class="settings-landing"><div class="settings-landing-grid">${rows}</div></div>`;
+
+    container.querySelectorAll('.settings-landing-card[data-tab]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const tab = btn.getAttribute('data-tab') || 'security';
+        this.activeSettingsTab = tab;
+        this.settingsViewMode = 'detail';
+        this.syncSettingsSubmenuActive(tab);
+        this.loadAdminSettingsFragment(tab);
+      });
+    });
+  }
+
   async loadAdminSettingsFragment(tab) {
     const container = document.getElementById('adminSettingsFragmentContainer');
     const titleEl = document.getElementById('adminSettingsFragmentTitle');
     const pageTitleEl = document.getElementById('adminSettingsPageTitle');
+    const toolbar = document.getElementById('settingsDetailToolbar');
     if (!container) return;
+
+    if (toolbar) toolbar.hidden = false;
+    this.settingsViewMode = 'detail';
 
     const fragments = {
       security: '/admin/settings/account_security.html',
@@ -826,7 +1123,7 @@ class DashboardApp {
       }
       const html = await res.text();
       container.innerHTML = `<div class="settings-fragment">${html}</div>`;
-      this.initAdminSettingsInteractions(container, resolvedTab);
+      await this.initAdminSettingsInteractions(container);
     } catch (err) {
       console.error('Failed to load settings fragment:', err);
       const msg = err && err.message ? err.message : String(err);
@@ -834,7 +1131,7 @@ class DashboardApp {
     }
   }
 
-  initAdminSettingsInteractions(containerEl) {
+  async initAdminSettingsInteractions(containerEl) {
     // FAQ accordion
     const faqItems = containerEl.querySelectorAll('.faq-item');
     faqItems.forEach((item) => {
@@ -856,49 +1153,116 @@ class DashboardApp {
 
       const getRowActionText = (row) => {
         const tds = row.querySelectorAll('td');
-        // Columns: [Date & Time, Action, Details, IP Address]
         if (tds.length >= 2) return (tds[1].textContent || '').trim().toLowerCase();
         return '';
       };
 
       const applyFilters = () => {
         const term = (search && (search.value || '')).toString().toLowerCase().trim();
-        const selectedAction = (actionFilter && actionFilter.value) ? actionFilter.value : 'all';
+        const selectedAction = actionFilter && actionFilter.value ? actionFilter.value : 'all';
 
         rows.forEach((row) => {
           const fullText = row.textContent.toLowerCase();
           const rowAction = getRowActionText(row);
-
           const actionOk = selectedAction === 'all' || rowAction === selectedAction;
           const termOk = !term || fullText.includes(term);
-
           row.style.display = actionOk && termOk ? '' : 'none';
         });
       };
 
-      if (search) {
-        search.addEventListener('input', () => {
-          applyFilters();
-        });
-      }
+      if (search) search.addEventListener('input', applyFilters);
       if (actionFilter) actionFilter.addEventListener('change', applyFilters);
       applyFilters();
     }
 
-    // Notifications save button
+    const needsServerState =
+      !!containerEl.querySelector('#passwordForm') ||
+      !!containerEl.querySelector('#saveNotificationsBtn') ||
+      !!containerEl.querySelector('#profileForm');
+
+    let state = null;
+    if (needsServerState) {
+      state = await this.fetchSettingsState();
+    }
+
+    const NOTIFICATION_KEYS = [
+      'email_system_events',
+      'email_user_registrations',
+      'email_security_breaches',
+      'sms_system_events',
+      'sms_user_registrations',
+      'sms_security_breaches',
+      'in_app_system_events',
+      'in_app_user_registrations',
+      'in_app_security_breaches',
+    ];
+
     const saveNotificationsBtn = containerEl.querySelector('#saveNotificationsBtn');
     if (saveNotificationsBtn) {
-      saveNotificationsBtn.addEventListener('click', () => {
-        this.showNotification('Notification settings saved (UI-only).', 'success');
+      if (state && state.notifications) {
+        NOTIFICATION_KEYS.forEach((k) => {
+          const el = containerEl.querySelector(`#${k}`);
+          if (el) el.checked = !!state.notifications[k];
+        });
+      }
+      saveNotificationsBtn.addEventListener('click', async () => {
+        const fd = new FormData();
+        NOTIFICATION_KEYS.forEach((k) => {
+          const el = containerEl.querySelector(`#${k}`);
+          fd.append(k, el && el.checked ? 'true' : 'false');
+        });
+        try {
+          const res = await fetch('/settings/notifications', { method: 'POST', body: fd });
+          const result = await res.json();
+          if (result.error) {
+            this.showNotification(result.error, 'error');
+            return;
+          }
+          this.showNotification(result.success || 'Notification settings saved.', 'success');
+        } catch {
+          this.showNotification('Could not save notifications.', 'error');
+        }
       });
     }
 
-    // Profile form submit + logout
     const profileForm = containerEl.querySelector('#profileForm');
     if (profileForm) {
-      profileForm.addEventListener('submit', (e) => {
+      const u = (state && state.user) || window.__BEANTHENTIC_USER__ || {};
+      const fn = containerEl.querySelector('#fullName');
+      const em = containerEl.querySelector('#email');
+      if (fn) fn.value = u.full_name || '';
+      if (em) em.value = u.email || '';
+
+      profileForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        this.showNotification('Profile updated (UI-only).', 'success');
+        const fullName = (containerEl.querySelector('#fullName')?.value || '').trim();
+        if (!fullName) {
+          this.showNotification('Full name is required.', 'error');
+          return;
+        }
+        const fd = new FormData();
+        fd.append('full_name', fullName);
+        try {
+          const res = await fetch('/settings/profile', { method: 'POST', body: fd });
+          const result = await res.json();
+          if (result.error) {
+            this.showNotification(result.error, 'error');
+            return;
+          }
+          const nameEl = document.querySelector('.user-name');
+          if (nameEl) nameEl.textContent = fullName;
+          if (window.__BEANTHENTIC_USER__) window.__BEANTHENTIC_USER__.full_name = fullName;
+          this.showNotification(result.success || 'Profile updated.', 'success');
+        } catch {
+          this.showNotification('Could not update profile.', 'error');
+        }
+      });
+    }
+
+    const refreshSessionBtn = containerEl.querySelector('#refreshSessionBtn');
+    if (refreshSessionBtn) {
+      refreshSessionBtn.addEventListener('click', () => {
+        window.location.reload();
       });
     }
 
@@ -909,35 +1273,191 @@ class DashboardApp {
       });
     }
 
-    // Account security: password reset (UI-only)
     const passwordForm = containerEl.querySelector('#passwordForm');
     if (passwordForm) {
-      passwordForm.addEventListener('submit', (e) => {
+      const cur = passwordForm.querySelector('#currentPassword');
+      const np = passwordForm.querySelector('#newPassword');
+      const cp = passwordForm.querySelector('#confirmPassword');
+      const curErr = passwordForm.querySelector('#currentPasswordError');
+      const npErr = passwordForm.querySelector('#newPasswordError');
+      const cpErr = passwordForm.querySelector('#confirmPasswordError');
+
+      let verifyTimer = null;
+      /** @type {number} */
+      let verifySeq = 0;
+
+      const setFieldError = (input, errEl, message) => {
+        if (!input) return;
+        if (message) {
+          input.classList.add('is-invalid');
+          input.classList.remove('is-valid');
+          if (errEl) {
+            errEl.textContent = message;
+            errEl.hidden = false;
+          }
+        } else {
+          input.classList.remove('is-invalid');
+          if (errEl) {
+            errEl.textContent = '';
+            errEl.hidden = true;
+          }
+        }
+      };
+
+      const setFieldOk = (input, errEl) => {
+        if (!input) return;
+        input.classList.remove('is-invalid');
+        input.classList.add('is-valid');
+        if (errEl) {
+          errEl.textContent = '';
+          errEl.hidden = true;
+        }
+      };
+
+      const clearCurrentFieldFeedback = () => {
+        if (cur) cur.classList.remove('is-invalid', 'is-valid');
+        if (curErr) {
+          curErr.textContent = '';
+          curErr.hidden = true;
+        }
+      };
+
+      const verifyCurrentPassword = async () => {
+        const pwd = (cur && cur.value) || '';
+        if (!pwd.trim()) {
+          clearCurrentFieldFeedback();
+          return false;
+        }
+        const seq = ++verifySeq;
+        const body = new URLSearchParams();
+        body.set('action', 'verify_current_password');
+        body.set('current_password', pwd);
+        try {
+          const res = await fetch('/settings/security', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString(),
+          });
+          const result = await res.json();
+          if (seq !== verifySeq) return null;
+          if (result.valid) {
+            setFieldOk(cur, curErr);
+            return true;
+          }
+          setFieldError(cur, curErr, result.error || "That doesn't match your current password.");
+          return false;
+        } catch {
+          if (seq !== verifySeq) return null;
+          setFieldError(cur, curErr, 'Could not verify. Check your connection.');
+          return false;
+        }
+      };
+
+      const scheduleVerifyCurrent = () => {
+        clearTimeout(verifyTimer);
+        verifyTimer = setTimeout(() => {
+          verifyCurrentPassword();
+        }, 450);
+      };
+
+      const validateNewPasswords = () => {
+        const a = (np && np.value) || '';
+        const b = (cp && cp.value) || '';
+        if (np && npErr) {
+          if (a && a.length < 8) {
+            setFieldError(np, npErr, 'Use at least 8 characters.');
+          } else {
+            setFieldError(np, npErr, '');
+          }
+        }
+        if (cp && cpErr) {
+          if (b && a !== b) {
+            setFieldError(cp, cpErr, 'Does not match the new password above.');
+          } else {
+            setFieldError(cp, cpErr, '');
+          }
+        }
+      };
+
+      if (cur) {
+        cur.addEventListener('input', () => {
+          clearCurrentFieldFeedback();
+          const pwd = (cur.value || '').trim();
+          if (pwd) scheduleVerifyCurrent();
+        });
+        cur.addEventListener('blur', () => {
+          clearTimeout(verifyTimer);
+          verifyCurrentPassword();
+        });
+      }
+      if (np) np.addEventListener('input', validateNewPasswords);
+      if (cp) cp.addEventListener('input', validateNewPasswords);
+
+      passwordForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        this.showNotification('Password reset submitted (UI-only).', 'success');
+        validateNewPasswords();
+
+        if (!(cur && cur.value.trim())) {
+          setFieldError(cur, curErr, 'Enter your current password.');
+          this.showNotification('Enter your current password.', 'error');
+          return;
+        }
+
+        clearTimeout(verifyTimer);
+        let currentOk = await verifyCurrentPassword();
+        if (currentOk === null) {
+          currentOk = await verifyCurrentPassword();
+        }
+        if (currentOk !== true) {
+          this.showNotification('Fix your current password before updating.', 'error');
+          return;
+        }
+
+        const npV = (np && np.value) || '';
+        const cpV = (cp && cp.value) || '';
+        if (npV.length < 8) {
+          setFieldError(np, npErr, 'Use at least 8 characters.');
+          this.showNotification('New password must be at least 8 characters.', 'error');
+          return;
+        }
+        if (npV !== cpV) {
+          setFieldError(cp, cpErr, 'Does not match the new password above.');
+          this.showNotification('New passwords do not match.', 'error');
+          return;
+        }
+
+        const fd = new FormData(passwordForm);
+        fd.set('action', 'change_password');
+        try {
+          const res = await fetch('/settings/security', { method: 'POST', body: fd });
+          const result = await res.json();
+          if (result.error) {
+            this.showNotification(result.error, 'error');
+            if (result.error.toLowerCase().includes('current')) {
+              setFieldError(cur, curErr, result.error);
+            }
+            return;
+          }
+          this.showNotification(result.success || 'Password updated.', 'success');
+          passwordForm.reset();
+          clearCurrentFieldFeedback();
+          setFieldError(np, npErr, '');
+          setFieldError(cp, cpErr, '');
+        } catch {
+          this.showNotification('Could not update password.', 'error');
+        }
       });
     }
 
-    // Account security: simple 2FA UI toggle + sample codes (UI-only)
     const enable2faBtn = containerEl.querySelector('#enable2faBtn');
     const disable2faBtn = containerEl.querySelector('#disable2faBtn');
     const viewBackupCodesBtn = containerEl.querySelector('#viewBackupCodesBtn');
     const cancel2faSetupBtn = containerEl.querySelector('#cancel2faSetupBtn');
-    // IDs start with a digit, so we must use attribute selectors (CSS selector '#2faStatus' is invalid).
     const twoFaStatus = containerEl.querySelector('[id="2faStatus"]');
     const twoFaSetup = containerEl.querySelector('[id="2faSetup"]');
-    const manualKey = containerEl.querySelector('#manualKey');
-    const backupCodesList = containerEl.querySelector('#backupCodesList');
     const enable2faToggle = containerEl.querySelector('#enable2faToggle');
     const notEnabledState = containerEl.querySelector('[id="2faNotEnabledState"]');
     const enabledState = containerEl.querySelector('[id="2faEnabledState"]');
-
-    const genCodes = () => [
-      'ABCD-1234-EFGH-5678',
-      'IJKL-9012-MNOP-3456',
-      'QRST-7890-UVWX-1234',
-      'YZAB-4567-CDEF-8901',
-    ];
 
     const set2faEnabledState = (enabled) => {
       if (twoFaStatus) twoFaStatus.style.display = 'block';
@@ -945,53 +1465,142 @@ class DashboardApp {
       if (enabledState) enabledState.style.display = enabled ? 'block' : 'none';
     };
 
-    const open2faSetup = (showMsg = true) => {
-      if (twoFaStatus) twoFaStatus.style.display = 'none';
-      if (twoFaSetup) twoFaSetup.style.display = 'block';
-      if (manualKey) manualKey.textContent = 'Manual key: (sample) BEANTHENTIC-DEMO-SECRET';
-      if (backupCodesList) {
-        backupCodesList.innerHTML = genCodes().map((c) => `<code>${c}</code>`).join('');
+    let twoFaActive = !!(state && state.security && state.security.two_factor_enabled);
+
+    const userEmail =
+      (state && state.user && state.user.email) ||
+      (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.email) ||
+      '';
+
+    const startEnable2fa = async (showSuccessMsg = true) => {
+      try {
+        const body = new URLSearchParams();
+        body.set('action', 'toggle_2fa');
+        body.set('enable_2fa', 'true');
+        const res = await fetch('/settings/security', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString(),
+        });
+        const result = await res.json();
+        if (result.error) {
+          this.showNotification(result.error, 'error');
+          return;
+        }
+        twoFaActive = true;
+        if (enable2faToggle) enable2faToggle.checked = true;
+        set2faEnabledState(true);
+        this.fill2faSetupPanel(containerEl, userEmail, result.secret, result.backup_codes);
+        if (showSuccessMsg) this.showNotification(result.success || '2FA enabled.', 'success');
+      } catch {
+        this.showNotification('Could not enable 2FA.', 'error');
       }
-      if (showMsg) this.showNotification('2FA setup initiated (UI-only).', 'success');
     };
 
-    if (enable2faToggle) {
-      // Initialize state on load.
-      set2faEnabledState(!!enable2faToggle.checked);
+    if (passwordForm || enable2faBtn || enable2faToggle) {
+      if (twoFaSetup) twoFaSetup.style.display = 'none';
+      if (twoFaStatus) twoFaStatus.style.display = 'block';
+      set2faEnabledState(twoFaActive);
+      if (enable2faToggle) enable2faToggle.checked = twoFaActive;
+      this.reset2faQrPlaceholder(containerEl);
+    }
 
+    if (enable2faToggle) {
       enable2faToggle.addEventListener('change', () => {
-        const enabled = !!enable2faToggle.checked;
-        set2faEnabledState(enabled);
-        if (enabled) open2faSetup(true);
+        const on = enable2faToggle.checked;
+        if (on) {
+          startEnable2fa(true);
+        } else if (twoFaActive) {
+          enable2faToggle.checked = true;
+          this.openDisable2faConfirmModal();
+        } else {
+          set2faEnabledState(false);
+        }
       });
     } else if (notEnabledState && enabledState) {
-      // Fallback initialization: assume "not enabled" visible.
-      set2faEnabledState(false);
+      set2faEnabledState(twoFaActive);
     }
 
     if (enable2faBtn) {
       enable2faBtn.addEventListener('click', () => {
         if (enable2faToggle) enable2faToggle.checked = true;
-        set2faEnabledState(true);
-        open2faSetup(true);
+        startEnable2fa(true);
       });
     }
+
     if (viewBackupCodesBtn) {
-      viewBackupCodesBtn.addEventListener('click', () => open2faSetup(false));
+      viewBackupCodesBtn.addEventListener('click', async () => {
+        const fresh = await this.fetchSettingsState();
+        if (!fresh || !fresh.security || !fresh.security.totp_secret) {
+          this.showNotification('Backup codes are not available. Enable 2FA first.', 'error');
+          return;
+        }
+        this.fill2faSetupPanel(
+          containerEl,
+          fresh.user && fresh.user.email,
+          fresh.security.totp_secret,
+          fresh.security.backup_codes || []
+        );
+        this.showNotification('Store these codes in a safe place.', 'success');
+      });
     }
+
     if (disable2faBtn) {
       disable2faBtn.addEventListener('click', () => {
-        if (twoFaSetup) twoFaSetup.style.display = 'none';
-        if (twoFaStatus) twoFaStatus.style.display = 'block';
-        if (enable2faToggle) enable2faToggle.checked = false;
-        set2faEnabledState(false);
-        this.showNotification('2FA disabled (UI-only).', 'success');
+        this.openDisable2faConfirmModal();
       });
     }
+
+    const submitDisable2fa = async () => {
+      const pwEl = document.getElementById('disable2faPasswordInput');
+      const password = (pwEl && pwEl.value) || '';
+      if (!password) {
+        this.showNotification('Enter your password to disable 2FA.', 'error');
+        return;
+      }
+      const body = new URLSearchParams();
+      body.set('action', 'toggle_2fa');
+      body.set('enable_2fa', 'false');
+      body.set('password', password);
+      try {
+        const res = await fetch('/settings/security', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString(),
+        });
+        const result = await res.json();
+        if (result.error) {
+          this.showNotification(result.error, 'error');
+          return;
+        }
+        this.closeDisable2faConfirmModal();
+        twoFaActive = false;
+        if (enable2faToggle) enable2faToggle.checked = false;
+        set2faEnabledState(false);
+        if (twoFaSetup) {
+          twoFaSetup.style.display = 'none';
+          this.reset2faQrPlaceholder(containerEl);
+        }
+        if (twoFaStatus) twoFaStatus.style.display = 'block';
+        this.showNotification(result.success || '2FA disabled.', 'success');
+      } catch {
+        this.showNotification('Could not disable 2FA.', 'error');
+      }
+    };
+
+    const disableOk = document.getElementById('disable2faConfirmOk');
+    const disableCancel = document.getElementById('disable2faConfirmCancel');
+    const disableBackdrop = document.getElementById('disable2faConfirmBackdrop');
+    if (disableOk) disableOk.addEventListener('click', () => submitDisable2fa());
+    if (disableCancel) disableCancel.addEventListener('click', () => this.closeDisable2faConfirmModal());
+    if (disableBackdrop) disableBackdrop.addEventListener('click', () => this.closeDisable2faConfirmModal());
+
     if (cancel2faSetupBtn) {
       cancel2faSetupBtn.addEventListener('click', () => {
         if (twoFaSetup) twoFaSetup.style.display = 'none';
         if (twoFaStatus) twoFaStatus.style.display = 'block';
+        set2faEnabledState(twoFaActive);
+        this.reset2faQrPlaceholder(containerEl);
       });
     }
   }
@@ -1753,11 +2362,11 @@ class DashboardApp {
   }
 
   showNotification(message, type = 'success', options = {}) {
-    const { placement = 'right' } = options;
+    const { placement = 'center' } = options;
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
-    if (placement === 'center') {
-      notification.classList.add('notification--center');
+    if (placement === 'right') {
+      notification.classList.add('notification--right');
     }
     notification.textContent = message;
 

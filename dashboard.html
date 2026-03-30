@@ -140,7 +140,7 @@
                   <i class="fa-solid fa-user"></i>
                 </div>
                 <div class="user-info">
-                  <span class="user-name">Krisha Rubia</span>
+                  <span class="user-name">{{ user_full_name }}</span>
                   <span class="user-role">Administrator</span>
                 </div>
                 <span class="user-profile-chevron" aria-hidden="true">
@@ -527,8 +527,14 @@
             </section>
             <div class="settings-content">
               <div class="table-section settings-admin-section">
+                <div class="settings-detail-toolbar" id="settingsDetailToolbar" hidden>
+                  <button type="button" class="btn btn-secondary" id="settingsBackToOverviewBtn">
+                    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                    <span>All settings</span>
+                  </button>
+                </div>
                 <div class="section-header">
-                  <h2 id="adminSettingsFragmentTitle">Account Security</h2>
+                  <h2 id="adminSettingsFragmentTitle">Settings</h2>
                 </div>
                 <div id="adminSettingsFragmentContainer" aria-live="polite">
                   Loading...
@@ -637,6 +643,9 @@
     </div>
   </div>
 
+  <script>
+    window.__BEANTHENTIC_USER__ = {{ {'email': user_email, 'full_name': user_full_name} | tojson }};
+  </script>
   <!-- JavaScript Files -->
   <script src="js/main.js"></script>
   <script src="js/navigation.js"></script>

@@ -70,7 +70,9 @@ class App {
     toast.style.cssText = `
       position: fixed;
       top: 20px;
-      right: 20px;
+      left: 50%;
+      right: auto;
+      transform: translate(-50%, -20px);
       background: linear-gradient(135deg, #8b4a2b, #5a2e1c);
       color: white;
       padding: 1rem 1.5rem;
@@ -78,9 +80,10 @@ class App {
       box-shadow: 0 4px 12px rgba(139, 74, 43, 0.3);
       z-index: 10000;
       font-weight: 600;
+      max-width: min(520px, calc(100vw - 2rem));
+      text-align: center;
       opacity: 0;
-      transform: translateY(-20px);
-      transition: all 0.3s ease;
+      transition: opacity 0.3s ease, transform 0.3s ease;
     `;
     
     document.body.appendChild(toast);
@@ -88,13 +91,13 @@ class App {
     // Animate in
     setTimeout(() => {
       toast.style.opacity = '1';
-      toast.style.transform = 'translateY(0)';
+      toast.style.transform = 'translate(-50%, 0)';
     }, 10);
     
     // Remove after 3 seconds
     setTimeout(() => {
       toast.style.opacity = '0';
-      toast.style.transform = 'translateY(-20px)';
+      toast.style.transform = 'translate(-50%, -20px)';
       setTimeout(() => {
         if (toast.parentNode) {
           toast.parentNode.removeChild(toast);
