@@ -278,5 +278,19 @@
     "action": "LOGIN",
     "details": "User logged in successfully",
     "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-30T14:23:07.532452",
+    "user_email": "krisharubia05@gmail.com",
+    "action": "LOGOUT",
+    "details": "User logged out",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-30T14:23:17.487908",
+    "user_email": "krisharubia05@gmail.com",
+    "action": "LOGIN",
+    "details": "User logged in successfully",
+    "ip_address": "127.0.0.1"
   }
 ]

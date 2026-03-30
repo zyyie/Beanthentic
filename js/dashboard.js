@@ -1831,13 +1831,18 @@ class DashboardApp {
       const rowIndexInData = this.data.indexOf(row);
       console.log('Rendering farmer', actualIndex, ':', row['NAME OF FARMER'] || 'Unknown');
 
+      // Always display the farmer's original NO., not the filtered/paginated row index.
+      // Falls back to actualIndex if the field is missing/invalid.
+      const rowNo = Number.parseInt(this.getValue(row, ['NO.', 'NO', 'no.']), 10);
+      const displayNo = Number.isFinite(rowNo) ? rowNo : actualIndex;
+
       const fullName = this.getValue(row, ['NAME OF FARMER', 'Name of Farmer', 'name']);
       const nameParts = this.splitFarmerName(fullName);
 
       const cells =
         this.farmerTableView === 'trees'
           ? [
-              this.createInputCell(actualIndex, 'number'),
+              this.createInputCell(displayNo, 'number'),
               this.createInputCell(nameParts.last, 'text'),
               this.createInputCell(nameParts.first, 'text'),
 
@@ -1855,7 +1860,7 @@ class DashboardApp {
             ]
           : this.farmerTableView === 'production'
             ? [
-                this.createInputCell(actualIndex, 'number'),
+                this.createInputCell(displayNo, 'number'),
                 this.createInputCell(nameParts.last, 'text'),
                 this.createInputCell(nameParts.first, 'text'),
                 this.createInputCell(this.getValue(row, ['LIBERICA PRODUCTION', 'Liberica_Production']), 'number', 'highlight-blue'),
@@ -1865,7 +1870,7 @@ class DashboardApp {
               ]
           : this.farmerTableView === 'affiliation'
             ? [
-                this.createInputCell(actualIndex, 'number'),
+                this.createInputCell(displayNo, 'number'),
                 this.createInputCell(nameParts.last, 'text'),
                 this.createInputCell(nameParts.first, 'text'),
                 this.createInputCell(this.getValue(row, ['FA OFFICER / MEMBER', 'FA Officer / member', 'officer']), 'text'),
@@ -1875,7 +1880,7 @@ class DashboardApp {
               ]
           : this.farmerTableView === 'farm'
             ? [
-                this.createInputCell(actualIndex, 'number'),
+                this.createInputCell(displayNo, 'number'),
                 this.createInputCell(nameParts.last, 'text'),
                 this.createInputCell(nameParts.first, 'text'),
                 this.createOwnershipCell(this.getValue(row, ['OWNER_OPERATOR', 'Owner-Operator', 'A'])),
@@ -1887,7 +1892,7 @@ class DashboardApp {
                 this.createRowActionsCell(rowIndexInData)
               ]
           : [
-              this.createInputCell(actualIndex, 'number'),
+              this.createInputCell(displayNo, 'number'),
               this.createInputCell(nameParts.last, 'text'),
               this.createInputCell(nameParts.first, 'text'),
               this.createInputCell(this.getValue(row, ['ADDRESS (BARANGAY)', 'Address (Barangay)', 'address']), 'text'),
@@ -2173,14 +2178,47 @@ class DashboardApp {
   }
 
   filterData(searchTerm) {
-    if (!searchTerm) {
+    const term = (searchTerm ?? '').toString().trim().toLowerCase();
+
+    if (!term) {
       this.filteredData = [...this.data];
     } else {
-      this.filteredData = this.data.filter(row => {
-        return Object.values(row).some(value => 
-          value && value.toString().toLowerCase().includes(searchTerm)
-        );
-      });
+      const numericCandidate = term.replace(/^(no\.?|#)\s*/i, '');
+      const isWholeNumber = /^\d+$/.test(numericCandidate);
+      const isLettersOnly = /^[a-z]+$/i.test(term);
+
+      if (isWholeNumber) {
+        // Exact match for the "NO." column only (prevents matching dates/other fields).
+        const n = Number.parseInt(numericCandidate, 10);
+        this.filteredData = this.data.filter(row => Number(row['NO.']) === n);
+      } else if (isLettersOnly) {
+        // If the term matches farmer "LAST NAME" prefixes, show only those results.
+        // Otherwise, fall back to a general "includes" search across all fields.
+        const matchesByLastNamePrefix = this.data.filter(row => {
+          const { last } = this.splitFarmerName(row['NAME OF FARMER'] ?? '');
+          return last.toLowerCase().startsWith(term);
+        });
+
+        if (matchesByLastNamePrefix.length > 0) {
+          this.filteredData = matchesByLastNamePrefix;
+        } else {
+          this.filteredData = this.data.filter(row =>
+            Object.values(row).some(value => (
+              value && value.toString().toLowerCase().includes(term)
+            ))
+          );
+        }
+      } else {
+        // Fallback: name prefix match first, then a general "includes" search across all fields.
+        this.filteredData = this.data.filter(row => {
+          const { first, last } = this.splitFarmerName(row['NAME OF FARMER'] ?? '');
+          if (first.toLowerCase().startsWith(term) || last.toLowerCase().startsWith(term)) return true;
+
+          return Object.values(row).some(value => (
+            value && value.toString().toLowerCase().includes(term)
+          ));
+        });
+      }
     }
     
     this.currentPage = 1;
