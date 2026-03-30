@@ -243,5 +243,40 @@
     "action": "LOGIN",
     "details": "User logged in successfully",
     "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-30T13:09:45.107408",
+    "user_email": "erickamaynete@gmail.com",
+    "action": "LOGOUT",
+    "details": "User logged out",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-30T13:09:53.220573",
+    "user_email": "erickamaynete@gmail.com",
+    "action": "LOGIN",
+    "details": "User logged in successfully",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-30T13:13:35.650291",
+    "user_email": "erickamaynete@gmail.com",
+    "action": "2FA_ENABLED",
+    "details": "Two-factor authentication enabled",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-30T13:13:47.372958",
+    "user_email": "erickamaynete@gmail.com",
+    "action": "2FA_DISABLED",
+    "details": "Two-factor authentication disabled",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "timestamp": "2026-03-30T13:49:30.682441",
+    "user_email": "erickamaynete@gmail.com",
+    "action": "LOGIN",
+    "details": "User logged in successfully",
+    "ip_address": "127.0.0.1"
   }
 ]
