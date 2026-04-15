@@ -1,5 +1,4 @@
-// Farmer data from Excel file
-const farmerData = [
+[
   {
     "NO.": 1,
     "NAME OF FARMER": "Romeo Montoya",
@@ -7788,11 +7787,4 @@ const farmerData = [
     "NCFRS": "",
     "REMARKS": ""
   }
-];
-
-// Export the data for use in the dashboard
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = farmerData;
-} else {
-  window.farmerData = farmerData;
-}
+]

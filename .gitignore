@@ -22,3 +22,6 @@ android-app/.idea/shelf/
 *.swp
 *.swo
 *~
+
+# Runtime data (avoid git pull conflicts)
+activity_log.json

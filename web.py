@@ -11,15 +11,31 @@ import ast
 
 from flask import Flask, redirect, render_template, request, session, url_for, jsonify, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
-from flask_admin import Admin
+from flask_admin import Admin, AdminIndexView
 from flask_admin.contrib.sqla import ModelView
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__, template_folder=".", static_folder=".", static_url_path="")
 app.secret_key = "beanthentic-dev-secret-change-this"
 
-# Initialize Flask-Admin interface
-admin = Admin(app, name='Beanthentic Admin')
+class ProtectedAdminIndexView(AdminIndexView):
+    def is_accessible(self):
+        return bool(session.get("user_email"))
+
+    def inaccessible_callback(self, name, **kwargs):
+        return redirect(url_for("login"))
+
+
+class ProtectedModelView(ModelView):
+    def is_accessible(self):
+        return bool(session.get("user_email"))
+
+    def inaccessible_callback(self, name, **kwargs):
+        return redirect(url_for("login"))
+
+
+# Initialize Flask-Admin interface (protected by session login)
+admin = Admin(app, name="Beanthentic Admin", index_view=ProtectedAdminIndexView())
 
 # SQLAlchemy configuration
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///beanthentic.db"
@@ -56,67 +72,262 @@ class Farmer(db.Model):
         return f"Farmer('{self.name}', '{self.address_barangay}')"
 
 # Add Farmer model to Flask-Admin interface
-admin.add_view(ModelView(Farmer, db.session))
+admin.add_view(ProtectedModelView(Farmer, db.session))
+
+
+class AdminUser(db.Model):
+    __tablename__ = "admin_user"
+
+    email = db.Column(db.String(255), primary_key=True)
+    full_name = db.Column(db.String(255), nullable=False)
+    password_hash = db.Column(db.String(512), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"AdminUser('{self.email}')"
+
+
+class ActivityLogEntry(db.Model):
+    __tablename__ = "activity_log_entry"
+
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, nullable=False, index=True)
+    user_email = db.Column(db.String(255), nullable=False, index=True)
+    action = db.Column(db.String(80), nullable=False, index=True)
+    details = db.Column(db.Text, default="")
+    ip_address = db.Column(db.String(64), default="")
+
+    def __repr__(self):
+        return f"ActivityLogEntry('{self.action}', '{self.user_email}')"
+
+
+# Add JSON-backed models to Flask-Admin interface
+admin.add_view(ProtectedModelView(AdminUser, db.session))
+admin.add_view(ProtectedModelView(ActivityLogEntry, db.session))
 
 # Function to populate database with existing farmer data
 def populate_farmer_data():
     # Check if data already exists by trying to query
     try:
-        Farmer.query.first()
-        return  # Data already exists, exit
+        if Farmer.query.first() is not None:
+            return  # Data already exists, exit
     except:
         pass  # Table doesn't exist yet, continue with population
     
-    # Import farmer data from the JS file
+    # Prefer JSON source; generate it from JS once if needed.
     try:
-        farmer_data_file = Path(__file__).resolve().parent / "data" / "farmer-data.js"
-        if farmer_data_file.exists():
-            content = farmer_data_file.read_text(encoding='utf-8')
-            # Extract the JavaScript array
-            start = content.find('[')
-            end = content.rfind(']') + 1
+        base = Path(__file__).resolve().parent
+        json_path = base / "data" / "farmer-data.json"
+        js_path = base / "data" / "farmer-data.js"
+
+        if not json_path.exists() and js_path.exists():
+            # One-time conversion so the source is easier to maintain.
+            content = js_path.read_text(encoding="utf-8")
+            start = content.find("[")
+            end = content.rfind("]") + 1
             if start != -1 and end != 0:
-                # Convert JS object notation to Python dict
-                js_data = content[start:end]
-                # Replace single quotes with double quotes for JSON parsing
-                js_data = js_data.replace("'", '"')
-                # Convert to Python list
-                farmer_list = ast.literal_eval(js_data)
-                
-                for farmer_data in farmer_list:
-                    farmer = Farmer(
-                        no=farmer_data.get('NO.', 0),
-                        name=farmer_data.get('NAME OF FARMER', ''),
-                        address_barangay=farmer_data.get('ADDRESS (BARANGAY)', ''),
-                        fa_officer_member=farmer_data.get('FA OFFICER / MEMBER', ''),
-                        birthday=farmer_data.get('BIRTHDAY', ''),
-                        rsbsa_registered=farmer_data.get('RSBSA Registered (Yes/No)', ''),
-                        status_ownership=farmer_data.get('STATUS OF OWNERSHIP', ''),
-                        total_area_planted_ha=farmer_data.get('Total Area Planted (HA.)', 0),
-                        liberica_bearing=farmer_data.get('LIBERICA BEARING', 0),
-                        liberica_non_bearing=farmer_data.get('LIBERICA NON-BEARING', 0),
-                        excelsa_bearing=farmer_data.get('EXCELSA BEARING', 0),
-                        excelsa_non_bearing=farmer_data.get('EXCELSA NON-BEARING', 0),
-                        robusta_bearing=farmer_data.get('ROBUSTA BEARING', 0),
-                        robusta_non_bearing=farmer_data.get('ROBUSTA NON-BEARING', 0),
-                        total_bearing=farmer_data.get('TOTAL BEARING', 0),
-                        total_non_bearing=farmer_data.get('TOTAL NON-BEARING', 0),
-                        total_trees=farmer_data.get('TOTAL TREES', 0),
-                        liberica_production=farmer_data.get('LIBERICA PRODUCTION', 0),
-                        excelsa_production=farmer_data.get('EXCELSA PRODUCTION', 0),
-                        robusta_production=farmer_data.get('ROBUSTA PRODUCTION', 0),
-                        ncfrs=farmer_data.get('NCFRS', ''),
-                        remarks=farmer_data.get('REMARKS', '')
-                    )
-                    db.session.add(farmer)
-                db.session.commit()
-                print(f"Successfully populated {len(farmer_list)} farmer records")
+                js_array = content[start:end]
+                farmer_list = ast.literal_eval(js_array)
+                json_path.write_text(json.dumps(farmer_list, indent=2), encoding="utf-8")
+
+        farmer_list = None
+        if json_path.exists():
+            farmer_list = json.loads(json_path.read_text(encoding="utf-8"))
+        elif js_path.exists():
+            # Fallback (should be rare): load directly from JS.
+            content = js_path.read_text(encoding="utf-8")
+            start = content.find("[")
+            end = content.rfind("]") + 1
+            if start != -1 and end != 0:
+                farmer_list = ast.literal_eval(content[start:end])
+
+        if isinstance(farmer_list, list) and farmer_list:
+            for farmer_data in farmer_list:
+                if not isinstance(farmer_data, dict):
+                    continue
+                farmer = Farmer(
+                    no=farmer_data.get("NO.", 0),
+                    name=farmer_data.get("NAME OF FARMER", ""),
+                    address_barangay=farmer_data.get("ADDRESS (BARANGAY)", ""),
+                    fa_officer_member=farmer_data.get("FA OFFICER / MEMBER", ""),
+                    birthday=farmer_data.get("BIRTHDAY", ""),
+                    rsbsa_registered=farmer_data.get("RSBSA Registered (Yes/No)", ""),
+                    status_ownership=farmer_data.get("STATUS OF OWNERSHIP", ""),
+                    total_area_planted_ha=farmer_data.get("Total Area Planted (HA.)", 0),
+                    liberica_bearing=farmer_data.get("LIBERICA BEARING", 0),
+                    liberica_non_bearing=farmer_data.get("LIBERICA NON-BEARING", 0),
+                    excelsa_bearing=farmer_data.get("EXCELSA BEARING", 0),
+                    excelsa_non_bearing=farmer_data.get("EXCELSA NON-BEARING", 0),
+                    robusta_bearing=farmer_data.get("ROBUSTA BEARING", 0),
+                    robusta_non_bearing=farmer_data.get("ROBUSTA NON-BEARING", 0),
+                    total_bearing=farmer_data.get("TOTAL BEARING", 0),
+                    total_non_bearing=farmer_data.get("TOTAL NON-BEARING", 0),
+                    total_trees=farmer_data.get("TOTAL TREES", 0),
+                    liberica_production=farmer_data.get("LIBERICA PRODUCTION", 0),
+                    excelsa_production=farmer_data.get("EXCELSA PRODUCTION", 0),
+                    robusta_production=farmer_data.get("ROBUSTA PRODUCTION", 0),
+                    ncfrs=farmer_data.get("NCFRS", ""),
+                    remarks=farmer_data.get("REMARKS", ""),
+                )
+                db.session.add(farmer)
+            db.session.commit()
+            print(f"Successfully populated {len(farmer_list)} farmer records")
     except Exception as e:
         print(f"Error populating farmer data: {e}")
 
 USER_DB = Path(__file__).resolve().parent / "users.json"
 SETTINGS_DB = Path(__file__).resolve().parent / "settings.json"
 ACTIVITY_LOG_DB = Path(__file__).resolve().parent / "activity_log.json"
+
+FARMER_JSON_DB = Path(__file__).resolve().parent / "data" / "farmer-data.json"
+
+
+def sync_farmers_json_to_db() -> None:
+    """Upsert farmer-data.json into sqlite so Flask-Admin shows all farmer records."""
+    if not FARMER_JSON_DB.exists():
+        return
+    try:
+        raw = json.loads(FARMER_JSON_DB.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return
+    if not isinstance(raw, list) or not raw:
+        return
+
+    # Deduplicate existing DB rows by farmer no (keep one row per no).
+    try:
+        duplicates = (
+            db.session.query(Farmer.no)
+            .group_by(Farmer.no)
+            .having(db.func.count(Farmer.id) > 1)
+            .all()
+        )
+        dup_nos = [n for (n,) in duplicates if n is not None]
+        for no in dup_nos:
+            rows = Farmer.query.filter_by(no=no).order_by(Farmer.id.asc()).all()
+            # Keep the first row, remove the rest.
+            for extra in rows[1:]:
+                db.session.delete(extra)
+        if dup_nos:
+            db.session.commit()
+    except Exception:
+        # Best effort; don't block sync if aggregation isn't available.
+        pass
+
+    for farmer_data in raw:
+        if not isinstance(farmer_data, dict):
+            continue
+        try:
+            no = int(farmer_data.get("NO.", 0) or 0)
+        except Exception:
+            no = 0
+        if no <= 0:
+            continue
+
+        existing = Farmer.query.filter_by(no=no).first()
+        if existing is None:
+            existing = Farmer(no=no, name="", address_barangay="", fa_officer_member="", rsbsa_registered="yes", total_area_planted_ha=0.0)
+            db.session.add(existing)
+
+        existing.no = no
+        existing.name = farmer_data.get("NAME OF FARMER", "") or ""
+        existing.address_barangay = farmer_data.get("ADDRESS (BARANGAY)", "") or ""
+        existing.fa_officer_member = farmer_data.get("FA OFFICER / MEMBER", "") or ""
+        existing.birthday = farmer_data.get("BIRTHDAY", "") or ""
+        existing.rsbsa_registered = farmer_data.get("RSBSA Registered (Yes/No)", "") or ""
+        existing.status_ownership = farmer_data.get("STATUS OF OWNERSHIP", "") or ""
+        existing.total_area_planted_ha = float(farmer_data.get("Total Area Planted (HA.)", 0) or 0)
+        existing.liberica_bearing = int(farmer_data.get("LIBERICA BEARING", 0) or 0)
+        existing.liberica_non_bearing = int(farmer_data.get("LIBERICA NON-BEARING", 0) or 0)
+        existing.excelsa_bearing = int(farmer_data.get("EXCELSA BEARING", 0) or 0)
+        existing.excelsa_non_bearing = int(farmer_data.get("EXCELSA NON-BEARING", 0) or 0)
+        existing.robusta_bearing = int(farmer_data.get("ROBUSTA BEARING", 0) or 0)
+        existing.robusta_non_bearing = int(farmer_data.get("ROBUSTA NON-BEARING", 0) or 0)
+        existing.total_bearing = int(farmer_data.get("TOTAL BEARING", 0) or 0)
+        existing.total_non_bearing = int(farmer_data.get("TOTAL NON-BEARING", 0) or 0)
+        existing.total_trees = int(farmer_data.get("TOTAL TREES", 0) or 0)
+        existing.liberica_production = float(farmer_data.get("LIBERICA PRODUCTION", 0) or 0)
+        existing.excelsa_production = float(farmer_data.get("EXCELSA PRODUCTION", 0) or 0)
+        existing.robusta_production = float(farmer_data.get("ROBUSTA PRODUCTION", 0) or 0)
+        existing.ncfrs = farmer_data.get("NCFRS", "") or ""
+        existing.remarks = farmer_data.get("REMARKS", "") or ""
+
+    db.session.commit()
+
+def _parse_iso_dt(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def sync_users_json_to_db() -> None:
+    """Upsert users.json into sqlite so Flask-Admin can display them."""
+    users = load_users()
+    if not isinstance(users, dict) or not users:
+        return
+
+    for email, info in users.items():
+        if not email or not isinstance(info, dict):
+            continue
+        full_name = (info.get("full_name") or "").strip() or email
+        pw_hash = (info.get("password_hash") or "").strip()
+        if not pw_hash:
+            continue
+
+        existing = db.session.get(AdminUser, email)
+        if existing:
+            existing.full_name = full_name
+            existing.password_hash = pw_hash
+        else:
+            db.session.add(AdminUser(email=email, full_name=full_name, password_hash=pw_hash))
+    db.session.commit()
+
+
+def sync_activity_log_json_to_db() -> None:
+    """Import activity_log.json into sqlite (append-only, de-duplicated)."""
+    log = load_activity_log()
+    if not isinstance(log, list) or not log:
+        return
+
+    # De-dupe using (timestamp, user_email, action, details, ip) fingerprint
+    existing = ActivityLogEntry.query.with_entities(
+        ActivityLogEntry.timestamp,
+        ActivityLogEntry.user_email,
+        ActivityLogEntry.action,
+        ActivityLogEntry.details,
+        ActivityLogEntry.ip_address,
+    ).all()
+    seen = set(existing)
+
+    for entry in log:
+        if not isinstance(entry, dict):
+            continue
+        ts = _parse_iso_dt((entry.get("timestamp") or "").strip())
+        if not ts:
+            continue
+        user_email = (entry.get("user_email") or "").strip()
+        action = (entry.get("action") or "").strip()
+        details = (entry.get("details") or "").strip()
+        ip = (entry.get("ip_address") or "").strip()
+        if not action:
+            continue
+
+        key = (ts, user_email, action, details, ip)
+        if key in seen:
+            continue
+        seen.add(key)
+        db.session.add(
+            ActivityLogEntry(
+                timestamp=ts,
+                user_email=user_email,
+                action=action,
+                details=details,
+                ip_address=ip,
+            )
+        )
+    db.session.commit()
 
 
 def load_users() -> dict:
@@ -130,6 +341,12 @@ def load_users() -> dict:
 
 def save_users(users: dict) -> None:
     USER_DB.write_text(json.dumps(users, indent=2), encoding="utf-8")
+    # Keep sqlite in sync for Flask-Admin visibility.
+    try:
+        sync_users_json_to_db()
+    except Exception:
+        # Don't break app flow if DB sync fails.
+        pass
 
 
 def has_admin_account() -> bool:
@@ -199,8 +416,9 @@ def save_activity_log(log: list) -> None:
 
 def log_activity(user_email: str, action: str, details: str = "", ip_address: str = "") -> None:
     log = load_activity_log()
+    ts = datetime.now()
     log.append({
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": ts.isoformat(),
         "user_email": user_email,
         "action": action,
         "details": details,
@@ -209,6 +427,20 @@ def log_activity(user_email: str, action: str, details: str = "", ip_address: st
     # Keep only last 1000 entries
     log = log[-1000:]
     save_activity_log(log)
+    # Also write to sqlite for Flask-Admin visibility.
+    try:
+        db.session.add(
+            ActivityLogEntry(
+                timestamp=ts,
+                user_email=user_email or "",
+                action=action or "",
+                details=details or "",
+                ip_address=ip_address or "",
+            )
+        )
+        db.session.commit()
+    except Exception:
+        pass
 
 
 @app.route("/")
@@ -613,6 +845,9 @@ def export_csv():
 with app.app_context():
     db.create_all()
     populate_farmer_data()
+    sync_farmers_json_to_db()
+    sync_users_json_to_db()
+    sync_activity_log_json_to_db()
 
 if __name__ == "__main__":
     app.run(debug=True, port=5001)
