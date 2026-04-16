@@ -10,5 +10,9 @@
   "erickamaynete@gmail.com": {
     "full_name": "Ericka",
     "password_hash": "scrypt:32768:8:1$9RnntGlWGwHcKIVa$0874fe3095b0b49b6f3e93046e3a5b4d260e106b3983ccdb5e05b7460f1b596807155bd285e8b21d3e86d1d8d34e065b2089c3d9b13d7d38e8a252728b962590"
+  },
+  "nycoalecbalaogan@gmail.com": {
+    "full_name": "Nyco Alec Balaogan",
+    "password_hash": "scrypt:32768:8:1$793z15cZd2CAnYez$88830e1ad596be55219cf2cbce9fe99baaeacd1ceca3a1f2083c4087b5cdcecad698fc9faf125a4759beb0240cbd92a568bfe9b89b5da39eefc8def2b6d52bd3"
   }
 }

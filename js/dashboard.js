@@ -5,9 +5,9 @@ class DashboardApp {
   constructor() {
     this.data = [];
     this.filteredData = [];
-    // PDF/source dataset only includes 50 farmers.
-    // Cap any loaded/saved data to keep dashboard counts consistent.
-    this.maxFarmers = 50;
+    // Database is now the source of truth; keep a very high cap
+    // so admin-added rows are visible in the dashboard.
+    this.maxFarmers = Number.MAX_SAFE_INTEGER;
     this.currentPage = 1;
     this.pageSize = 10;
     this.totalRecords = 0;
@@ -1637,20 +1637,15 @@ class DashboardApp {
   async loadExcelData() {
     try {
       console.log('Loading farmer data from database API...');
-      
-      // Prefer admin-edited data (localStorage), then fetch from API
-      const saved = this.loadSavedFarmers();
-      if (Array.isArray(saved) && saved.length) {
-        this.data = saved.slice(0, this.maxFarmers);
-      } else {
-        // Fetch from database API
-        const response = await fetch('/api/farmer-data');
-        if (!response.ok) {
-          throw new Error('Failed to fetch farmer data from database');
-        }
-        const apiData = await response.json();
-        this.data = Array.isArray(apiData) ? apiData.slice(0, this.maxFarmers) : [];
+
+      // Always fetch from DB-backed API so Flask-Admin changes
+      // are immediately reflected on the website.
+      const response = await fetch('/api/farmer-data');
+      if (!response.ok) {
+        throw new Error('Failed to fetch farmer data from database');
       }
+      const apiData = await response.json();
+      this.data = Array.isArray(apiData) ? apiData.slice(0, this.maxFarmers) : [];
       
       this.filteredData = [...this.data];
       this.totalRecords = this.data.length;
@@ -1666,8 +1661,26 @@ class DashboardApp {
       
     } catch (error) {
       console.error('Error loading farmer data:', error);
-      this.showNotification('Failed to load farmer data. Loading sample data...', 'error');
-      this.loadSampleData();
+      // Fallback to last browser backup only when API is unavailable.
+      const saved = this.loadSavedFarmers();
+      if (Array.isArray(saved) && saved.length) {
+        this.data = saved.slice(0, this.maxFarmers);
+        this.filteredData = [...this.data];
+        this.totalRecords = this.data.length;
+        this.updateStats();
+        this.createCharts();
+        this.updateTable();
+        this.showNotification('Database unreachable. Loaded browser backup data.', 'error');
+        return;
+      }
+
+      this.showNotification('Failed to load farmer data.', 'error');
+      this.data = [];
+      this.filteredData = [];
+      this.totalRecords = 0;
+      this.updateStats();
+      this.createCharts();
+      this.updateTable();
     }
   }
 
@@ -2134,7 +2147,7 @@ class DashboardApp {
   saveFarmers() {
     try {
       localStorage.setItem('beanthentic_farmers', JSON.stringify(this.data));
-      this.showNotification('Farmer records saved.', 'success');
+      this.showNotification('Farmer records saved to this browser backup only.', 'success');
     } catch (e) {
       console.error('Failed saving farmers:', e);
       this.showNotification('Failed to save farmer records.', 'error');
