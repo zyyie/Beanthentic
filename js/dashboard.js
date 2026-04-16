@@ -899,6 +899,7 @@ class DashboardApp {
       'notifications': 'Notifications',
       'farmers': 'Farmer Records',
       'analytics': 'Analytics',
+      'ipophl': 'IPOPHL',
       'export': 'Export Data',
       'settings': 'Settings'
     };
@@ -934,6 +935,9 @@ class DashboardApp {
     }
     if (moduleName === 'analytics') {
       this.renderAnalyticsModule();
+    }
+    if (moduleName === 'ipophl') {
+      this.renderIpophlModule();
     }
 
     // Close mobile menu
@@ -2652,6 +2656,494 @@ class DashboardApp {
     this.renderCoffeeVarietyChart(metrics);
     this.renderGiGrowthTrendChart(metrics);
     this.renderVerificationStatusChart(metrics);
+  }
+
+  renderIpophlModule() {
+    const ipophlRoot = document.getElementById('ipophl-module');
+    if (!ipophlRoot || ipophlRoot.classList.contains('hidden')) return;
+    
+    // Initialize IPOPHL module functionality
+    this.initializePhaseNavigation();
+    this.initializePhaseButtons();
+    this.initializeFileUpload();
+    this.initializeLinkInputs();
+    this.initializeProgressSteps();
+  }
+
+  initializePhaseNavigation() {
+    // Initialize current phase
+    if (!this.currentPhase) this.currentPhase = 1;
+    
+    // Show initial phase
+    this.showPhase(this.currentPhase);
+  }
+
+  initializeProgressSteps() {
+    const progressSteps = document.querySelectorAll('.progress-step');
+    
+    progressSteps.forEach(step => {
+      step.addEventListener('click', (e) => {
+        const phaseNum = parseInt(e.currentTarget.dataset.phase);
+        this.navigateToPhase(phaseNum);
+      });
+    });
+  }
+
+  initializePhaseButtons() {
+    // Phase navigation buttons
+    const nextPhaseBtns = document.querySelectorAll('.next-phase');
+    const prevPhaseBtns = document.querySelectorAll('.prev-phase');
+    const completeBtn = document.querySelector('.complete-btn');
+    
+    nextPhaseBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const nextPhase = parseInt(e.target.dataset.next);
+        this.navigateToPhase(nextPhase);
+      });
+    });
+    
+    prevPhaseBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const prevPhase = parseInt(e.target.dataset.prev);
+        this.navigateToPhase(prevPhase);
+      });
+    });
+    
+    if (completeBtn) {
+      completeBtn.addEventListener('click', () => {
+        this.completeRegistration();
+      });
+    }
+  }
+
+  navigateToPhase(phaseNum) {
+    // Validate phase transition
+    if (phaseNum < 1 || phaseNum > 5) return;
+    
+    // Allow free navigation between phases without validation
+    this.currentPhase = phaseNum;
+    this.showPhase(phaseNum);
+    this.updateProgress(phaseNum);
+  }
+
+  showPhase(phaseNum) {
+    // Hide all phases
+    const allPhases = document.querySelectorAll('.phase-section');
+    allPhases.forEach(phase => {
+      phase.classList.remove('active');
+    });
+    
+    // Show selected phase
+    const targetPhase = document.getElementById(`phase-${phaseNum}`);
+    if (targetPhase) {
+      targetPhase.classList.add('active');
+    }
+  }
+
+  updateProgress(phaseNum) {
+    const progressSteps = document.querySelectorAll('.progress-step');
+    
+    progressSteps.forEach((step, index) => {
+      const stepNum = index + 1;
+      step.classList.remove('active', 'completed');
+      
+      if (stepNum === phaseNum) {
+        step.classList.add('active');
+      } else if (stepNum < phaseNum) {
+        step.classList.add('completed');
+      }
+    });
+  }
+
+  validatePhaseCompletion(phaseNum) {
+    // Check if all required tasks in the phase have attachments
+    const phaseSection = document.getElementById(`phase-${phaseNum}`);
+    if (!phaseSection) return false;
+    
+    const uploadZones = phaseSection.querySelectorAll('.file-upload-zone');
+    let hasAttachments = false;
+    
+    uploadZones.forEach(zone => {
+      const service = zone.dataset.service;
+      if (this.ipophlFiles && this.ipophlFiles[service] && this.ipophlFiles[service].length > 0) {
+        hasAttachments = true;
+      }
+    });
+    
+    return hasAttachments;
+  }
+
+  completeRegistration() {
+    if (!this.validatePhaseCompletion(5)) {
+      this.showIpophlNotification('Please complete all required tasks in Phase 5 before completing registration.');
+      return;
+    }
+    
+    // Collect all phase data
+    const allAttachments = this.collectAllPhaseData();
+    
+    this.showIpophlNotification('GI Registration process completed! All phases and documentation have been submitted.');
+    
+    console.log('Completed GI Registration:', {
+      phases: allAttachments,
+      completedAt: new Date().toISOString()
+    });
+  }
+
+  collectAllPhaseData() {
+    const phases = {};
+    
+    for (let i = 1; i <= 5; i++) {
+      phases[`phase${i}`] = {
+        files: [],
+        links: []
+      };
+      
+      // Collect files for this phase
+      const phaseSection = document.getElementById(`phase-${i}`);
+      if (phaseSection) {
+        const uploadZones = phaseSection.querySelectorAll('.file-upload-zone');
+        uploadZones.forEach(zone => {
+          const service = zone.dataset.service;
+          if (this.ipophlFiles && this.ipophlFiles[service]) {
+            phases[`phase${i}`].files.push(...this.ipophlFiles[service]);
+          }
+          if (this.ipophlLinks && this.ipophlLinks[service]) {
+            phases[`phase${i}`].links.push(...this.ipophlLinks[service]);
+          }
+        });
+      }
+    }
+    
+    return phases;
+  }
+
+  initializeFileUpload() {
+    const uploadZones = document.querySelectorAll('.file-upload-zone');
+    
+    uploadZones.forEach(zone => {
+      const fileInput = zone.querySelector('.file-input');
+      const service = zone.dataset.service;
+      
+      // Click to upload
+      zone.addEventListener('click', (e) => {
+        if (e.target !== fileInput) {
+          fileInput.click();
+        }
+      });
+      
+      // File selection
+      fileInput.addEventListener('change', (e) => {
+        this.handleFileUpload(e.target.files, service);
+      });
+      
+      // Drag and drop
+      zone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        zone.classList.add('drag-over');
+      });
+      
+      zone.addEventListener('dragleave', () => {
+        zone.classList.remove('drag-over');
+      });
+      
+      zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        this.handleFileUpload(e.dataTransfer.files, service);
+      });
+    });
+  }
+
+  initializeLinkInputs() {
+    const addLinkBtns = document.querySelectorAll('.add-link-btn');
+    
+    addLinkBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const service = e.target.dataset.service;
+        const input = e.target.previousElementSibling;
+        const url = input.value.trim();
+        
+        if (url && this.isValidUrl(url)) {
+          this.addLink(service, url);
+          input.value = '';
+        } else {
+          this.showIpophlNotification('Please enter a valid URL.');
+        }
+      });
+    });
+    
+    // Enter key support for link inputs
+    const linkInputs = document.querySelectorAll('.link-input');
+    linkInputs.forEach(input => {
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          const btn = input.nextElementSibling;
+          btn.click();
+        }
+      });
+    });
+  }
+
+  handleFileUpload(files, service) {
+    const filesContainer = document.getElementById(`${service}-files`);
+    
+    Array.from(files).forEach(file => {
+      if (this.isValidFileType(file)) {
+        this.addFileToList(service, file);
+      } else {
+        this.showIpophlNotification(`Invalid file type: ${file.name}`);
+      }
+    });
+  }
+
+  addFileToList(service, file) {
+    const filesContainer = document.getElementById(`${service}-files`);
+    const fileId = `${service}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    const fileItem = document.createElement('div');
+    fileItem.className = 'file-item';
+    fileItem.dataset.fileId = fileId;
+    
+    const fileIcon = this.getFileIcon(file.name);
+    const fileSize = this.formatFileSize(file.size);
+    
+    fileItem.innerHTML = `
+      <div class="file-info">
+        <i class="file-icon ${fileIcon}"></i>
+        <span class="file-name">${file.name}</span>
+        <span class="file-size">${fileSize}</span>
+      </div>
+      <div class="file-actions">
+        <button class="file-action-btn preview" title="Preview">
+          <i class="fa-solid fa-eye"></i>
+        </button>
+        <button class="file-action-btn delete" title="Delete">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+    `;
+    
+    filesContainer.appendChild(fileItem);
+    
+    // Store file data
+    if (!this.ipophlFiles) this.ipophlFiles = {};
+    if (!this.ipophlFiles[service]) this.ipophlFiles[service] = [];
+    
+    this.ipophlFiles[service].push({
+      id: fileId,
+      file: file,
+      name: file.name,
+      size: file.size,
+      type: file.type
+    });
+    
+    // Add event listeners
+    fileItem.querySelector('.preview').addEventListener('click', () => {
+      this.previewFile(file);
+    });
+    
+    fileItem.querySelector('.delete').addEventListener('click', () => {
+      this.removeFile(service, fileId);
+    });
+  }
+
+  addLink(service, url) {
+    const filesContainer = document.getElementById(`${service}-files`);
+    const linkId = `${service}-link-${Date.now()}`;
+    
+    const linkItem = document.createElement('div');
+    linkItem.className = 'link-item';
+    linkItem.dataset.linkId = linkId;
+    
+    linkItem.innerHTML = `
+      <a href="${url}" target="_blank" class="link-url">${url}</a>
+      <button class="file-action-btn delete" title="Remove">
+        <i class="fa-solid fa-times"></i>
+      </button>
+    `;
+    
+    filesContainer.appendChild(linkItem);
+    
+    // Store link data
+    if (!this.ipophlLinks) this.ipophlLinks = {};
+    if (!this.ipophlLinks[service]) this.ipophlLinks[service] = [];
+    
+    this.ipophlLinks[service].push({
+      id: linkId,
+      url: url
+    });
+    
+    // Add event listener
+    linkItem.querySelector('.delete').addEventListener('click', () => {
+      this.removeLink(service, linkId);
+    });
+  }
+
+  removeFile(service, fileId) {
+    const fileItem = document.querySelector(`[data-file-id="${fileId}"]`);
+    if (fileItem) {
+      fileItem.remove();
+    }
+    
+    if (this.ipophlFiles && this.ipophlFiles[service]) {
+      this.ipophlFiles[service] = this.ipophlFiles[service].filter(f => f.id !== fileId);
+    }
+  }
+
+  removeLink(service, linkId) {
+    const linkItem = document.querySelector(`[data-link-id="${linkId}"]`);
+    if (linkItem) {
+      linkItem.remove();
+    }
+    
+    if (this.ipophlLinks && this.ipophlLinks[service]) {
+      this.ipophlLinks[service] = this.ipophlLinks[service].filter(l => l.id !== linkId);
+    }
+  }
+
+  previewFile(file) {
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        this.showImagePreview(e.target.result, file.name);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      this.showIpophlNotification(`Preview not available for ${file.type} files`);
+    }
+  }
+
+  showImagePreview(src, filename) {
+    const modal = document.createElement('div');
+    modal.className = 'image-preview-modal';
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      cursor: pointer;
+    `;
+    
+    const img = document.createElement('img');
+    img.src = src;
+    img.style.cssText = `
+      max-width: 90%;
+      max-height: 90%;
+      object-fit: contain;
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    `;
+    
+    modal.appendChild(img);
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', () => {
+      document.body.removeChild(modal);
+    });
+  }
+
+  getServiceFromCard(card) {
+    const title = card.querySelector('h3').textContent.toLowerCase();
+    if (title.includes('trademark')) return 'trademark';
+    if (title.includes('gi') || title.includes('certification')) return 'gi';
+    if (title.includes('patent')) return 'patent';
+    if (title.includes('search')) return 'search';
+    return 'unknown';
+  }
+
+  getAttachmentsForService(service) {
+    return {
+      files: this.ipophlFiles && this.ipophlFiles[service] ? this.ipophlFiles[service] : [],
+      links: this.ipophlLinks && this.ipophlLinks[service] ? this.ipophlLinks[service] : []
+    };
+  }
+
+  submitIpophlApplication(service, attachments) {
+    const message = `Submitting ${service} application with ${attachments.files.length} file(s) and ${attachments.links.length} link(s).`;
+    this.showIpophlNotification(message);
+    
+    // Here you would normally send the data to a server
+    console.log('IPOPHL Application:', {
+      service: service,
+      attachments: attachments,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  // Utility functions
+  isValidFileType(file) {
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 
+                       'application/pdf', 'application/msword', 
+                       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                       'application/dwg', 'image/vnd.dwg'];
+    return validTypes.includes(file.type) || file.name.match(/\.(jpg|jpeg|png|gif|webp|pdf|doc|docx|dwg)$/i);
+  }
+
+  isValidUrl(string) {
+    try {
+      new URL(string);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const iconMap = {
+      'pdf': 'fa-solid fa-file-pdf',
+      'doc': 'fa-solid fa-file-word',
+      'docx': 'fa-solid fa-file-word',
+      'jpg': 'fa-solid fa-file-image',
+      'jpeg': 'fa-solid fa-file-image',
+      'png': 'fa-solid fa-file-image',
+      'gif': 'fa-solid fa-file-image',
+      'webp': 'fa-solid fa-file-image',
+      'dwg': 'fa-solid fa-file-code'
+    };
+    return iconMap[ext] || 'fa-solid fa-file';
+  }
+
+  formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  showIpophlNotification(message) {
+    // Create a simple notification for IPOPHL actions
+    const notification = document.createElement('div');
+    notification.className = 'ipophl-notification';
+    notification.textContent = message;
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #8B4A2B;
+      color: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 1000;
+      max-width: 300px;
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    }, 3000);
   }
 
   renderTopBarangaysChart(metrics) {

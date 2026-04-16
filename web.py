@@ -70,10 +70,7 @@ class FarmerModelView(ProtectedModelView):
     edit_template = 'admin/edit_farmer.html'
     create_template = 'admin/create_farmer.html'
     
-    def get_query(self):
-        # Split the name field into last_name and first_name for display
-        return super(FarmerModelView, self).get_query()
-    
+        
     def on_model_change(self, form, model, is_created):
         # Combine last_name and first_name into the name field
         if hasattr(form, 'last_name') and hasattr(form, 'first_name'):

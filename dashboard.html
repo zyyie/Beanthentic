@@ -55,6 +55,10 @@
               <i class="nav-icon fa-solid fa-chart-line" aria-hidden="true"></i>
               <span>Analytics</span>
             </a>
+            <a href="#ipophl" class="nav-link" data-module="ipophl">
+              <i class="nav-icon fa-solid fa-certificate" aria-hidden="true"></i>
+              <span>IPOPHL</span>
+            </a>
           </div>
           <div class="nav-section">
             <h3>Tools</h3>
@@ -522,6 +526,308 @@
                   <div class="chart-container">
                     <canvas id="verificationStatusChart"></canvas>
                   </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- IPOPHL Module -->
+          <div class="module hidden" id="ipophl-module" data-module="ipophl">
+            <section class="module-header">
+              <h1>IPOPHL GI Registration</h1>
+              <p>Geographical Indication Registration Process for Lipa City Products</p>
+            </section>
+
+            <section class="ipophl-content">
+              <div class="phase-progress">
+                <div class="progress-step active" data-phase="1">
+                  <div class="step-number">1</div>
+                  <div class="step-title">Pre-Application</div>
+                </div>
+                <div class="progress-step" data-phase="2">
+                  <div class="step-number">2</div>
+                  <div class="step-title">Documents</div>
+                </div>
+                <div class="progress-step" data-phase="3">
+                  <div class="step-number">3</div>
+                  <div class="step-title">Filing</div>
+                </div>
+                <div class="progress-step" data-phase="4">
+                  <div class="step-number">4</div>
+                  <div class="step-title">Examination</div>
+                </div>
+                <div class="progress-step" data-phase="5">
+                  <div class="step-number">5</div>
+                  <div class="step-title">Registration</div>
+                </div>
+              </div>
+
+              <!-- Phase 1: Pre-Application Groundwork -->
+              <div class="phase-section active" id="phase-1">
+                <div class="phase-header">
+                  <h2><i class="fa-solid fa-map-marked-alt"></i> Phase 1: Pre-Application Groundwork</h2>
+                  <p>Establish the foundation for your GI application</p>
+                </div>
+                
+                <div class="phase-tasks">
+                  <div class="task-card">
+                    <h3><i class="fa-solid fa-coffee"></i> 1. Identify Qualifying Product</h3>
+                    <p>Confirm product has quality/reputation attributable to Lipa City's geographic origin (e.g., Lipa Barako coffee, local delicacies, handicrafts)</p>
+                    
+                    <div class="attachment-area">
+                      <h4>Product Documentation</h4>
+                      <div class="file-upload-zone" data-service="phase1-product">
+                        <i class="fa-solid fa-cloud-upload-alt"></i>
+                        <p>Upload product details, photos, specifications</p>
+                        <input type="file" class="file-input" multiple accept="image/*,.pdf,.doc,.docx">
+                      </div>
+                      <div class="attached-files" id="phase1-product-files"></div>
+                    </div>
+                  </div>
+
+                  <div class="task-card">
+                    <h3><i class="fa-solid fa-users"></i> 2. Establish Applicant Entity</h3>
+                    <p>Organize qualified applicant: producers' organization, LGU, or indigenous community group</p>
+                    
+                    <div class="attachment-area">
+                      <h4>Entity Documentation</h4>
+                      <div class="file-upload-zone" data-service="phase1-entity">
+                        <i class="fa-solid fa-cloud-upload-alt"></i>
+                        <p>Upload organization documents, certificates, bylaws</p>
+                        <input type="file" class="file-input" multiple accept="image/*,.pdf,.doc,.docx">
+                      </div>
+                      <div class="attached-files" id="phase1-entity-files"></div>
+                    </div>
+                  </div>
+
+                  <div class="task-card">
+                    <h3><i class="fa-solid fa-handshake"></i> 3. Stakeholder Consultations</h3>
+                    <p>Gather producers, LGU reps, industry groups; build consensus and governance</p>
+                    
+                    <div class="attachment-area">
+                      <h4>Consultation Records</h4>
+                      <div class="file-upload-zone" data-service="phase1-stakeholders">
+                        <i class="fa-solid fa-cloud-upload-alt"></i>
+                        <p>Upload meeting minutes, attendance sheets, consensus documents</p>
+                        <input type="file" class="file-input" multiple accept="image/*,.pdf,.doc,.docx">
+                      </div>
+                      <div class="attached-files" id="phase1-stakeholders-files"></div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="phase-actions">
+                  <button class="phase-btn next-phase" data-next="2">Proceed to Phase 2</button>
+                </div>
+              </div>
+
+              <!-- Phase 2: Preparing Application Documents -->
+              <div class="phase-section" id="phase-2">
+                <div class="phase-header">
+                  <h2><i class="fa-solid fa-file-alt"></i> Phase 2: Preparing Application Documents</h2>
+                  <p>Compile all required documentation for filing</p>
+                </div>
+                
+                <div class="phase-tasks">
+                  <div class="task-card">
+                    <h3><i class="fa-solid fa-book"></i> 4. Manual of Specifications (MOP)</h3>
+                    <p>Draft product defining characteristics, rules, and standards for GI seal usage</p>
+                    
+                    <div class="attachment-area">
+                      <h4>MOP Documentation</h4>
+                      <div class="file-upload-zone" data-service="phase2-mop">
+                        <i class="fa-solid fa-cloud-upload-alt"></i>
+                        <p>Upload draft Manual of Specifications</p>
+                        <input type="file" class="file-input" multiple accept=".pdf,.doc,.docx">
+                      </div>
+                      <div class="attached-files" id="phase2-mop-files"></div>
+                    </div>
+                  </div>
+
+                  <div class="task-card">
+                    <h3><i class="fa-solid fa-certificate"></i> 5. Government Certification</h3>
+                    <p>Obtain certification validating causal link between product quality and geographic origin</p>
+                    
+                    <div class="attachment-area">
+                      <h4>Certification Documents</h4>
+                      <div class="file-upload-zone" data-service="phase2-cert">
+                        <i class="fa-solid fa-cloud-upload-alt"></i>
+                        <p>Upload government certifications, technical information</p>
+                        <input type="file" class="file-input" multiple accept="image/*,.pdf,.doc,.docx">
+                      </div>
+                      <div class="attached-files" id="phase2-cert-files"></div>
+                    </div>
+                  </div>
+
+                  <div class="task-card">
+                    <h3><i class="fa-solid fa-clipboard-list"></i> 6. Application Details</h3>
+                    <p>Prepare applicant details, GI name, geographical area description, supporting documentation</p>
+                    
+                    <div class="attachment-area">
+                      <h4>Application Package</h4>
+                      <div class="file-upload-zone" data-service="phase2-details">
+                        <i class="fa-solid fa-cloud-upload-alt"></i>
+                        <p>Upload completed application forms, maps, technical docs</p>
+                        <input type="file" class="file-input" multiple accept="image/*,.pdf,.doc,.docx">
+                      </div>
+                      <div class="attached-files" id="phase2-details-files"></div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="phase-actions">
+                  <button class="phase-btn prev-phase" data-prev="1">Back to Phase 1</button>
+                  <button class="phase-btn next-phase" data-next="3">Proceed to Phase 3</button>
+                </div>
+              </div>
+
+              <!-- Phase 3: Filing with IPOPHL -->
+              <div class="phase-section" id="phase-3">
+                <div class="phase-header">
+                  <h2><i class="fa-solid fa-paper-plane"></i> Phase 3: Filing with IPOPHL</h2>
+                  <p>Submit your application to the Intellectual Property Office</p>
+                </div>
+                
+                <div class="phase-tasks">
+                  <div class="task-card">
+                    <h3><i class="fa-solid fa-file-import"></i> 7. File Application</h3>
+                    <p>Submit complete application to IPOPHL Bureau of Trademarks</p>
+                    
+                    <div class="attachment-area">
+                      <h4>Filing Documents</h4>
+                      <div class="file-upload-zone" data-service="phase3-filing">
+                        <i class="fa-solid fa-cloud-upload-alt"></i>
+                        <p>Upload final application package, cover letter, attachments</p>
+                        <input type="file" class="file-input" multiple accept="image/*,.pdf,.doc,.docx">
+                      </div>
+                      <div class="attached-files" id="phase3-filing-files"></div>
+                    </div>
+                  </div>
+
+                  <div class="task-card">
+                    <h3><i class="fa-solid fa-money-check-alt"></i> 8. Pay Filing Fees</h3>
+                    <p>Complete payment of required IPOPHL filing fees</p>
+                    
+                    <div class="attachment-area">
+                      <h4>Payment Documentation</h4>
+                      <div class="file-upload-zone" data-service="phase3-payment">
+                        <i class="fa-solid fa-cloud-upload-alt"></i>
+                        <p>Upload payment receipts, fee schedules, proof of payment</p>
+                        <input type="file" class="file-input" multiple accept="image/*,.pdf">
+                      </div>
+                      <div class="attached-files" id="phase3-payment-files"></div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="phase-actions">
+                  <button class="phase-btn prev-phase" data-prev="2">Back to Phase 2</button>
+                  <button class="phase-btn next-phase" data-next="4">Proceed to Phase 4</button>
+                </div>
+              </div>
+
+              <!-- Phase 4: Examination and Publication -->
+              <div class="phase-section" id="phase-4">
+                <div class="phase-header">
+                  <h2><i class="fa-solid fa-search-plus"></i> Phase 4: Examination and Publication</h2>
+                  <p>Application review and public notice period</p>
+                </div>
+                
+                <div class="phase-tasks">
+                  <div class="task-card">
+                    <h3><i class="fa-solid fa-clipboard-check"></i> 9. Formality & Substantive Examination</h3>
+                    <p>Application undergoes examination for registrability following IP Code provisions</p>
+                    
+                    <div class="attachment-area">
+                      <h4>Examination Documents</h4>
+                      <div class="file-upload-zone" data-service="phase4-exam">
+                        <i class="fa-solid fa-cloud-upload-alt"></i>
+                        <p>Upload examination reports, responses, clarifications</p>
+                        <input type="file" class="file-input" multiple accept="image/*,.pdf,.doc,.docx">
+                      </div>
+                      <div class="attached-files" id="phase4-exam-files"></div>
+                    </div>
+                  </div>
+
+                  <div class="task-card">
+                    <h3><i class="fa-solid fa-reply"></i> 10. Respond to Deficiency Notices</h3>
+                    <p>Address any deficiencies within specified timeframe (typically 2 months)</p>
+                    
+                    <div class="attachment-area">
+                      <h4>Response Documents</h4>
+                      <div class="file-upload-zone" data-service="phase4-response">
+                        <i class="fa-solid fa-cloud-upload-alt"></i>
+                        <p>Upload deficiency notices, response letters, extensions</p>
+                        <input type="file" class="file-input" multiple accept="image/*,.pdf,.doc,.docx">
+                      </div>
+                      <div class="attached-files" id="phase4-response-files"></div>
+                    </div>
+                  </div>
+
+                  <div class="task-card">
+                    <h3><i class="fa-solid fa-newspaper"></i> 11. Publication for Opposition</h3>
+                    <p>Application published for third-party observations/objections (1 month period)</p>
+                    
+                    <div class="attachment-area">
+                      <h4>Publication Documents</h4>
+                      <div class="file-upload-zone" data-service="phase4-pub">
+                        <i class="fa-solid fa-cloud-upload-alt"></i>
+                        <p>Upload publication notices, opposition filings, responses</p>
+                        <input type="file" class="file-input" multiple accept="image/*,.pdf,.doc,.docx">
+                      </div>
+                      <div class="attached-files" id="phase4-pub-files"></div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="phase-actions">
+                  <button class="phase-btn prev-phase" data-prev="3">Back to Phase 3</button>
+                  <button class="phase-btn next-phase" data-next="5">Proceed to Phase 5</button>
+                </div>
+              </div>
+
+              <!-- Phase 5: Registration and Ongoing Compliance -->
+              <div class="phase-section" id="phase-5">
+                <div class="phase-header">
+                  <h2><i class="fa-solid fa-award"></i> Phase 5: Registration and Ongoing Compliance</h2>
+                  <p>Final registration and maintenance requirements</p>
+                </div>
+                
+                <div class="phase-tasks">
+                  <div class="task-card">
+                    <h3><i class="fa-solid fa-trophy"></i> 12. GI Registration Certificate</h3>
+                    <p>Receive official GI registration certificate from IPOPHL</p>
+                    
+                    <div class="attachment-area">
+                      <h4>Registration Documents</h4>
+                      <div class="file-upload-zone" data-service="phase5-cert">
+                        <i class="fa-solid fa-cloud-upload-alt"></i>
+                        <p>Upload registration certificate, official notices</p>
+                        <input type="file" class="file-input" multiple accept="image/*,.pdf">
+                      </div>
+                      <div class="attached-files" id="phase5-cert-files"></div>
+                    </div>
+                  </div>
+
+                  <div class="task-card">
+                    <h3><i class="fa-solid fa-shield-alt"></i> 13. Maintain Standards & Quality Control</h3>
+                    <p>Ongoing compliance: maintain product standards, quality control, prevent unauthorized use</p>
+                    
+                    <div class="attachment-area">
+                      <h4>Compliance Documentation</h4>
+                      <div class="file-upload-zone" data-service="phase5-compliance">
+                        <i class="fa-solid fa-cloud-upload-alt"></i>
+                        <p>Upload quality control reports, compliance audits, monitoring records</p>
+                        <input type="file" class="file-input" multiple accept="image/*,.pdf,.doc,.docx">
+                      </div>
+                      <div class="attached-files" id="phase5-compliance-files"></div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="phase-actions">
+                  <button class="phase-btn prev-phase" data-prev="4">Back to Phase 4</button>
+                  <button class="phase-btn complete-btn">Complete Registration</button>
                 </div>
               </div>
             </section>
