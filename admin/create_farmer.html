@@ -1,0 +1,167 @@
+{% extends 'admin/create.html' %}
+
+{% block body %}
+<div class="row">
+    <div class="col-md-12">
+        <ul class="nav nav-tabs">
+            <li class="active"><a href="#basic-info" data-toggle="tab">BASIC INFO</a></li>
+            <li><a href="#affiliation" data-toggle="tab">AFFILIATION</a></li>
+            <li><a href="#farm-info" data-toggle="tab">FARM INFO</a></li>
+            <li><a href="#tree-counts" data-toggle="tab">TREE COUNTS</a></li>
+            <li><a href="#production" data-toggle="tab">PRODUCTION</a></li>
+        </ul>
+        
+        <div class="tab-content">
+            <!-- BASIC INFO Tab -->
+            <div class="tab-pane active" id="basic-info">
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ form.no.label(class='control-label') }}
+                        {{ form.no(class='form-control') }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.name.label(class='control-label') }}
+                        {{ form.name(class='form-control') }}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ form.address_barangay.label(class='control-label') }}
+                        {{ form.address_barangay(class='form-control') }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.birthday.label(class='control-label') }}
+                        {{ form.birthday(class='form-control') }}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        {{ form.remarks.label(class='control-label') }}
+                        {{ form.remarks(class='form-control', rows=3) }}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- AFFILIATION Tab -->
+            <div class="tab-pane" id="affiliation">
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ form.fa_officer_member.label(class='control-label') }}
+                        {{ form.fa_officer_member(class='form-control') }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.rsbsa_registered.label(class='control-label') }}
+                        {{ form.rsbsa_registered(class='form-control') }}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ form.status_ownership.label(class='control-label') }}
+                        {{ form.status_ownership(class='form-control') }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.ncfrs.label(class='control-label') }}
+                        {{ form.ncfrs(class='form-control') }}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- FARM INFO Tab -->
+            <div class="tab-pane" id="farm-info">
+                <div class="row">
+                    <div class="col-md-12">
+                        {{ form.total_area_planted_ha.label(class='control-label') }}
+                        {{ form.total_area_planted_ha(class='form-control') }}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- TREE COUNTS Tab -->
+            <div class="tab-pane" id="tree-counts">
+                <h4>Liberica Trees</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ form.liberica_bearing.label(class='control-label') }}
+                        {{ form.liberica_bearing(class='form-control') }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.liberica_non_bearing.label(class='control-label') }}
+                        {{ form.liberica_non_bearing(class='form-control') }}
+                    </div>
+                </div>
+                
+                <h4>Excelsa Trees</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ form.excelsa_bearing.label(class='control-label') }}
+                        {{ form.excelsa_bearing(class='form-control') }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.excelsa_non_bearing.label(class='control-label') }}
+                        {{ form.excelsa_non_bearing(class='form-control') }}
+                    </div>
+                </div>
+                
+                <h4>Robusta Trees</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ form.robusta_bearing.label(class='control-label') }}
+                        {{ form.robusta_bearing(class='form-control') }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.robusta_non_bearing.label(class='control-label') }}
+                        {{ form.robusta_non_bearing(class='form-control') }}
+                    </div>
+                </div>
+                
+                <h4>Totals</h4>
+                <div class="row">
+                    <div class="col-md-4">
+                        {{ form.total_bearing.label(class='control-label') }}
+                        {{ form.total_bearing(class='form-control') }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.total_non_bearing.label(class='control-label') }}
+                        {{ form.total_non_bearing(class='form-control') }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.total_trees.label(class='control-label') }}
+                        {{ form.total_trees(class='form-control') }}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- PRODUCTION Tab -->
+            <div class="tab-pane" id="production">
+                <div class="row">
+                    <div class="col-md-4">
+                        {{ form.liberica_production.label(class='control-label') }}
+                        {{ form.liberica_production(class='form-control') }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.excelsa_production.label(class='control-label') }}
+                        {{ form.excelsa_production(class='form-control') }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.robusta_production.label(class='control-label') }}
+                        {{ form.robusta_production(class='form-control') }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block tail_js %}
+{{ super() }}
+<script>
+$(document).ready(function() {
+    // Initialize tabs
+    $('.nav-tabs a').click(function (e) {
+        e.preventDefault();
+        $(this).tab('show');
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}

@@ -679,12 +679,11 @@
   </div>
 
   <script>
-    window.__BEANTHENTIC_USER__ = {{ {'email': user_email, 'full_name': user_full_name} | tojson }};
+    window.__BEANTHENTIC_USER__ = null; // Will be set by Flask template
   </script>
   <!-- JavaScript Files -->
   <script src="js/main.js"></script>
   <script src="js/navigation.js"></script>
-  <script src="data/farmer-data.js"></script>
   <script src="js/dashboard.js"></script>
   
   <!-- Component Loader -->

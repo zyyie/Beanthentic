@@ -1636,31 +1636,33 @@ class DashboardApp {
 
   async loadExcelData() {
     try {
-      console.log('Loading farmer data from data file...');
+      console.log('Loading farmer data from database API...');
       
-      // Prefer admin-edited data (localStorage), then fall back to seeded data
+      // Prefer admin-edited data (localStorage), then fetch from API
       const saved = this.loadSavedFarmers();
-      const source = (Array.isArray(saved) && saved.length)
-        ? saved
-        : (window.farmerData && window.farmerData.length > 0 ? window.farmerData : null);
-
-      if (source) {
-        this.data = Array.isArray(source) ? source.slice(0, this.maxFarmers) : [];
-        this.filteredData = [...this.data];
-        this.totalRecords = this.data.length;
-        
-        console.log('Successfully loaded farmer data:', this.data.length, 'records');
-        console.log('First farmer:', this.data[0]);
-        console.log('Sample of farmers:', this.data.slice(0, 3));
-        
-        this.updateStats();
-        this.createCharts();
-        this.updateTable();
-        this.updateStats();
-        
+      if (Array.isArray(saved) && saved.length) {
+        this.data = saved.slice(0, this.maxFarmers);
       } else {
-        throw new Error('Farmer data not available');
+        // Fetch from database API
+        const response = await fetch('/api/farmer-data');
+        if (!response.ok) {
+          throw new Error('Failed to fetch farmer data from database');
+        }
+        const apiData = await response.json();
+        this.data = Array.isArray(apiData) ? apiData.slice(0, this.maxFarmers) : [];
       }
+      
+      this.filteredData = [...this.data];
+      this.totalRecords = this.data.length;
+      
+      console.log('Successfully loaded farmer data:', this.data.length, 'records');
+      console.log('First farmer:', this.data[0]);
+      console.log('Sample of farmers:', this.data.slice(0, 3));
+      
+      this.updateStats();
+      this.createCharts();
+      this.updateTable();
+      this.updateStats();
       
     } catch (error) {
       console.error('Error loading farmer data:', error);

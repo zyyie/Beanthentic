@@ -7,7 +7,6 @@ import time
 from datetime import datetime
 from pathlib import Path
 import io
-import ast
 
 from flask import Flask, redirect, render_template, request, session, url_for, jsonify, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -32,6 +31,65 @@ class ProtectedModelView(ModelView):
 
     def inaccessible_callback(self, name, **kwargs):
         return redirect(url_for("login"))
+
+
+class FarmerModelView(ProtectedModelView):
+    """Custom admin view for Farmer model with tabbed structure like the farmer's record table"""
+    
+    # Main table columns (like your image shows)
+    column_list = ('no', 'last_name', 'first_name', 'address_barangay', 'birthday', 'remarks')
+    column_labels = {
+        'no': 'NO.',
+        'last_name': 'LAST NAME',
+        'first_name': 'FIRST NAME', 
+        'address_barangay': 'ADDRESS (BARANGAY)',
+        'birthday': 'BIRTHDAY',
+        'remarks': 'REMARKS'
+    }
+    
+    # Search and filter (using actual database columns)
+    column_searchable_list = ['name', 'address_barangay']
+    column_filters = ['address_barangay', 'rsbsa_registered']
+    
+    # Form organized in tabs like your interface (using actual database fields)
+    form_columns = ('no', 'name', 'address_barangay', 'fa_officer_member', 'birthday',
+                   'rsbsa_registered', 'status_ownership', 'total_area_planted_ha',
+                   'liberica_bearing', 'liberica_non_bearing', 'excelsa_bearing',
+                   'excelsa_non_bearing', 'robusta_bearing', 'robusta_non_bearing',
+                   'total_bearing', 'total_non_bearing', 'total_trees',
+                   'liberica_production', 'excelsa_production', 'robusta_production',
+                   'ncfrs', 'remarks')
+    
+    # Pagination
+    page_size = 50
+    
+    # Sort by NO. by default
+    column_default_sort = 'no'
+    
+    # Custom templates - tabs only for edit/create, use default for list view
+    edit_template = 'admin/edit_farmer.html'
+    create_template = 'admin/create_farmer.html'
+    
+    def get_query(self):
+        # Split the name field into last_name and first_name for display
+        return super(FarmerModelView, self).get_query()
+    
+    def on_model_change(self, form, model, is_created):
+        # Combine last_name and first_name into the name field
+        if hasattr(form, 'last_name') and hasattr(form, 'first_name'):
+            model.name = f"{form.last_name.data} {form.first_name.data}".strip()
+        return super(FarmerModelView, self).on_model_change(form, model, is_created)
+    
+    def edit_form(self, obj=None):
+        form = super(FarmerModelView, self).edit_form(obj=obj)
+        # Split existing name into last_name and first_name
+        if obj and obj.name:
+            name_parts = obj.name.split(' ', 1)
+            if hasattr(form, 'last_name'):
+                form.last_name.data = name_parts[0] if len(name_parts) > 0 else ''
+            if hasattr(form, 'first_name'):
+                form.first_name.data = name_parts[1] if len(name_parts) > 1 else ''
+        return form
 
 
 # Initialize Flask-Admin interface (protected by session login)
@@ -68,11 +126,27 @@ class Farmer(db.Model):
     ncfrs = db.Column(db.String(50))
     remarks = db.Column(db.Text)
 
+    @property
+    def last_name(self):
+        """Extract last name from the name field"""
+        if self.name:
+            name_parts = self.name.split(' ', 1)
+            return name_parts[0] if len(name_parts) > 0 else ''
+        return ''
+    
+    @property  
+    def first_name(self):
+        """Extract first name from the name field"""
+        if self.name:
+            name_parts = self.name.split(' ', 1)
+            return name_parts[1] if len(name_parts) > 1 else ''
+        return ''
+    
     def __repr__(self):
         return f"Farmer('{self.name}', '{self.address_barangay}')"
 
-# Add Farmer model to Flask-Admin interface
-admin.add_view(ProtectedModelView(Farmer, db.session))
+# Add Farmer model to Flask-Admin interface with custom view
+admin.add_view(FarmerModelView(Farmer, db.session, name='Farmer Records'))
 
 
 class AdminUser(db.Model):
@@ -105,161 +179,12 @@ class ActivityLogEntry(db.Model):
 admin.add_view(ProtectedModelView(AdminUser, db.session))
 admin.add_view(ProtectedModelView(ActivityLogEntry, db.session))
 
-# Function to populate database with existing farmer data
-def populate_farmer_data():
-    # Check if data already exists by trying to query
-    try:
-        if Farmer.query.first() is not None:
-            return  # Data already exists, exit
-    except:
-        pass  # Table doesn't exist yet, continue with population
-    
-    # Prefer JSON source; generate it from JS once if needed.
-    try:
-        base = Path(__file__).resolve().parent
-        json_path = base / "data" / "farmer-data.json"
-        js_path = base / "data" / "farmer-data.js"
-
-        if not json_path.exists() and js_path.exists():
-            # One-time conversion so the source is easier to maintain.
-            content = js_path.read_text(encoding="utf-8")
-            start = content.find("[")
-            end = content.rfind("]") + 1
-            if start != -1 and end != 0:
-                js_array = content[start:end]
-                farmer_list = ast.literal_eval(js_array)
-                json_path.write_text(json.dumps(farmer_list, indent=2), encoding="utf-8")
-
-        farmer_list = None
-        if json_path.exists():
-            farmer_list = json.loads(json_path.read_text(encoding="utf-8"))
-        elif js_path.exists():
-            # Fallback (should be rare): load directly from JS.
-            content = js_path.read_text(encoding="utf-8")
-            start = content.find("[")
-            end = content.rfind("]") + 1
-            if start != -1 and end != 0:
-                farmer_list = ast.literal_eval(content[start:end])
-
-        if isinstance(farmer_list, list) and farmer_list:
-            for farmer_data in farmer_list:
-                if not isinstance(farmer_data, dict):
-                    continue
-                farmer = Farmer(
-                    no=farmer_data.get("NO.", 0),
-                    name=farmer_data.get("NAME OF FARMER", ""),
-                    address_barangay=farmer_data.get("ADDRESS (BARANGAY)", ""),
-                    fa_officer_member=farmer_data.get("FA OFFICER / MEMBER", ""),
-                    birthday=farmer_data.get("BIRTHDAY", ""),
-                    rsbsa_registered=farmer_data.get("RSBSA Registered (Yes/No)", ""),
-                    status_ownership=farmer_data.get("STATUS OF OWNERSHIP", ""),
-                    total_area_planted_ha=farmer_data.get("Total Area Planted (HA.)", 0),
-                    liberica_bearing=farmer_data.get("LIBERICA BEARING", 0),
-                    liberica_non_bearing=farmer_data.get("LIBERICA NON-BEARING", 0),
-                    excelsa_bearing=farmer_data.get("EXCELSA BEARING", 0),
-                    excelsa_non_bearing=farmer_data.get("EXCELSA NON-BEARING", 0),
-                    robusta_bearing=farmer_data.get("ROBUSTA BEARING", 0),
-                    robusta_non_bearing=farmer_data.get("ROBUSTA NON-BEARING", 0),
-                    total_bearing=farmer_data.get("TOTAL BEARING", 0),
-                    total_non_bearing=farmer_data.get("TOTAL NON-BEARING", 0),
-                    total_trees=farmer_data.get("TOTAL TREES", 0),
-                    liberica_production=farmer_data.get("LIBERICA PRODUCTION", 0),
-                    excelsa_production=farmer_data.get("EXCELSA PRODUCTION", 0),
-                    robusta_production=farmer_data.get("ROBUSTA PRODUCTION", 0),
-                    ncfrs=farmer_data.get("NCFRS", ""),
-                    remarks=farmer_data.get("REMARKS", ""),
-                )
-                db.session.add(farmer)
-            db.session.commit()
-            print(f"Successfully populated {len(farmer_list)} farmer records")
-    except Exception as e:
-        print(f"Error populating farmer data: {e}")
 
 USER_DB = Path(__file__).resolve().parent / "users.json"
 SETTINGS_DB = Path(__file__).resolve().parent / "settings.json"
-ACTIVITY_LOG_DB = Path(__file__).resolve().parent / "activity_log.json"
-
-FARMER_JSON_DB = Path(__file__).resolve().parent / "data" / "farmer-data.json"
 
 
-def sync_farmers_json_to_db() -> None:
-    """Upsert farmer-data.json into sqlite so Flask-Admin shows all farmer records."""
-    if not FARMER_JSON_DB.exists():
-        return
-    try:
-        raw = json.loads(FARMER_JSON_DB.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return
-    if not isinstance(raw, list) or not raw:
-        return
 
-    # Deduplicate existing DB rows by farmer no (keep one row per no).
-    try:
-        duplicates = (
-            db.session.query(Farmer.no)
-            .group_by(Farmer.no)
-            .having(db.func.count(Farmer.id) > 1)
-            .all()
-        )
-        dup_nos = [n for (n,) in duplicates if n is not None]
-        for no in dup_nos:
-            rows = Farmer.query.filter_by(no=no).order_by(Farmer.id.asc()).all()
-            # Keep the first row, remove the rest.
-            for extra in rows[1:]:
-                db.session.delete(extra)
-        if dup_nos:
-            db.session.commit()
-    except Exception:
-        # Best effort; don't block sync if aggregation isn't available.
-        pass
-
-    for farmer_data in raw:
-        if not isinstance(farmer_data, dict):
-            continue
-        try:
-            no = int(farmer_data.get("NO.", 0) or 0)
-        except Exception:
-            no = 0
-        if no <= 0:
-            continue
-
-        existing = Farmer.query.filter_by(no=no).first()
-        if existing is None:
-            existing = Farmer(no=no, name="", address_barangay="", fa_officer_member="", rsbsa_registered="yes", total_area_planted_ha=0.0)
-            db.session.add(existing)
-
-        existing.no = no
-        existing.name = farmer_data.get("NAME OF FARMER", "") or ""
-        existing.address_barangay = farmer_data.get("ADDRESS (BARANGAY)", "") or ""
-        existing.fa_officer_member = farmer_data.get("FA OFFICER / MEMBER", "") or ""
-        existing.birthday = farmer_data.get("BIRTHDAY", "") or ""
-        existing.rsbsa_registered = farmer_data.get("RSBSA Registered (Yes/No)", "") or ""
-        existing.status_ownership = farmer_data.get("STATUS OF OWNERSHIP", "") or ""
-        existing.total_area_planted_ha = float(farmer_data.get("Total Area Planted (HA.)", 0) or 0)
-        existing.liberica_bearing = int(farmer_data.get("LIBERICA BEARING", 0) or 0)
-        existing.liberica_non_bearing = int(farmer_data.get("LIBERICA NON-BEARING", 0) or 0)
-        existing.excelsa_bearing = int(farmer_data.get("EXCELSA BEARING", 0) or 0)
-        existing.excelsa_non_bearing = int(farmer_data.get("EXCELSA NON-BEARING", 0) or 0)
-        existing.robusta_bearing = int(farmer_data.get("ROBUSTA BEARING", 0) or 0)
-        existing.robusta_non_bearing = int(farmer_data.get("ROBUSTA NON-BEARING", 0) or 0)
-        existing.total_bearing = int(farmer_data.get("TOTAL BEARING", 0) or 0)
-        existing.total_non_bearing = int(farmer_data.get("TOTAL NON-BEARING", 0) or 0)
-        existing.total_trees = int(farmer_data.get("TOTAL TREES", 0) or 0)
-        existing.liberica_production = float(farmer_data.get("LIBERICA PRODUCTION", 0) or 0)
-        existing.excelsa_production = float(farmer_data.get("EXCELSA PRODUCTION", 0) or 0)
-        existing.robusta_production = float(farmer_data.get("ROBUSTA PRODUCTION", 0) or 0)
-        existing.ncfrs = farmer_data.get("NCFRS", "") or ""
-        existing.remarks = farmer_data.get("REMARKS", "") or ""
-
-    db.session.commit()
-
-def _parse_iso_dt(value: str) -> datetime | None:
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(value)
-    except ValueError:
-        return None
 
 
 def sync_users_json_to_db() -> None:
@@ -285,49 +210,6 @@ def sync_users_json_to_db() -> None:
     db.session.commit()
 
 
-def sync_activity_log_json_to_db() -> None:
-    """Import activity_log.json into sqlite (append-only, de-duplicated)."""
-    log = load_activity_log()
-    if not isinstance(log, list) or not log:
-        return
-
-    # De-dupe using (timestamp, user_email, action, details, ip) fingerprint
-    existing = ActivityLogEntry.query.with_entities(
-        ActivityLogEntry.timestamp,
-        ActivityLogEntry.user_email,
-        ActivityLogEntry.action,
-        ActivityLogEntry.details,
-        ActivityLogEntry.ip_address,
-    ).all()
-    seen = set(existing)
-
-    for entry in log:
-        if not isinstance(entry, dict):
-            continue
-        ts = _parse_iso_dt((entry.get("timestamp") or "").strip())
-        if not ts:
-            continue
-        user_email = (entry.get("user_email") or "").strip()
-        action = (entry.get("action") or "").strip()
-        details = (entry.get("details") or "").strip()
-        ip = (entry.get("ip_address") or "").strip()
-        if not action:
-            continue
-
-        key = (ts, user_email, action, details, ip)
-        if key in seen:
-            continue
-        seen.add(key)
-        db.session.add(
-            ActivityLogEntry(
-                timestamp=ts,
-                user_email=user_email,
-                action=action,
-                details=details,
-                ip_address=ip,
-            )
-        )
-    db.session.commit()
 
 
 def load_users() -> dict:
@@ -401,34 +283,12 @@ def save_settings(settings: dict) -> None:
     SETTINGS_DB.write_text(json.dumps(settings, indent=2), encoding="utf-8")
 
 
-def load_activity_log() -> list:
-    if not ACTIVITY_LOG_DB.exists():
-        return []
-    try:
-        return json.loads(ACTIVITY_LOG_DB.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return []
-
-
-def save_activity_log(log: list) -> None:
-    ACTIVITY_LOG_DB.write_text(json.dumps(log, indent=2), encoding="utf-8")
 
 
 def log_activity(user_email: str, action: str, details: str = "", ip_address: str = "") -> None:
-    log = load_activity_log()
-    ts = datetime.now()
-    log.append({
-        "timestamp": ts.isoformat(),
-        "user_email": user_email,
-        "action": action,
-        "details": details,
-        "ip_address": ip_address
-    })
-    # Keep only last 1000 entries
-    log = log[-1000:]
-    save_activity_log(log)
-    # Also write to sqlite for Flask-Admin visibility.
+    # Write directly to database for Flask-Admin visibility
     try:
+        ts = datetime.now()
         db.session.add(
             ActivityLogEntry(
                 timestamp=ts,
@@ -536,7 +396,18 @@ def settings():
         return redirect(url_for("login"))
     
     settings_data = load_settings()
-    activity_log = load_activity_log()
+    # Get activity log from database instead of JSON
+    activity_log_entries = ActivityLogEntry.query.order_by(ActivityLogEntry.timestamp.desc()).limit(1000).all()
+    activity_log = [
+        {
+            "timestamp": entry.timestamp.isoformat(),
+            "user_email": entry.user_email,
+            "action": entry.action,
+            "details": entry.details,
+            "ip_address": entry.ip_address
+        }
+        for entry in activity_log_entries
+    ]
     users = load_users()
     current_user = users.get(session.get("user_email"), {})
     
@@ -580,12 +451,56 @@ def api_activity_feed():
     """Recent account activity for the dashboard Notifications module (refresh)."""
     if not session.get("user_email"):
         return jsonify({"error": "Unauthorized"}), 401
-    log = load_activity_log()
-    if not isinstance(log, list):
-        log = []
-    # Newest entries are appended last in the file — take tail and reverse
-    recent = log[-50:][::-1]
+    # Get activity log from database
+    log_entries = ActivityLogEntry.query.order_by(ActivityLogEntry.timestamp.desc()).limit(50).all()
+    recent = [
+        {
+            "timestamp": entry.timestamp.isoformat(),
+            "user_email": entry.user_email,
+            "action": entry.action,
+            "details": entry.details,
+            "ip_address": entry.ip_address
+        }
+        for entry in log_entries
+    ]
     return jsonify({"items": recent})
+
+
+@app.route("/api/farmer-data", methods=["GET"])
+def api_farmer_data():
+    """Provide farmer data for dashboard in the same format as the original JSON."""
+    farmers = Farmer.query.order_by(Farmer.no.asc()).all()
+    
+    # Convert to the same format as the original JSON data
+    farmer_data = []
+    for farmer in farmers:
+        farmer_record = {
+            "NO.": farmer.no,
+            "NAME OF FARMER": farmer.name,
+            "ADDRESS (BARANGAY)": farmer.address_barangay,
+            "FA OFFICER / MEMBER": farmer.fa_officer_member,
+            "BIRTHDAY": farmer.birthday or "",
+            "RSBSA Registered (Yes/No)": farmer.rsbsa_registered,
+            "STATUS OF OWNERSHIP": farmer.status_ownership or "",
+            "Total Area Planted (HA.)": farmer.total_area_planted_ha,
+            "LIBERICA BEARING": farmer.liberica_bearing,
+            "LIBERICA NON-BEARING": farmer.liberica_non_bearing,
+            "EXCELSA BEARING": farmer.excelsa_bearing,
+            "EXCELSA NON-BEARING": farmer.excelsa_non_bearing,
+            "ROBUSTA BEARING": farmer.robusta_bearing,
+            "ROBUSTA NON-BEARING": farmer.robusta_non_bearing,
+            "TOTAL BEARING": farmer.total_bearing,
+            "TOTAL NON-BEARING": farmer.total_non_bearing,
+            "TOTAL TREES": farmer.total_trees,
+            "LIBERICA PRODUCTION": farmer.liberica_production,
+            "EXCELSA PRODUCTION": farmer.excelsa_production,
+            "ROBUSTA PRODUCTION": farmer.robusta_production,
+            "NCFRS": farmer.ncfrs or "",
+            "REMARKS": farmer.remarks or ""
+        }
+        farmer_data.append(farmer_record)
+    
+    return jsonify(farmer_data)
 
 
 @app.route("/settings/security", methods=["POST"])
@@ -844,10 +759,7 @@ def export_csv():
 # Create database tables and populate with data
 with app.app_context():
     db.create_all()
-    populate_farmer_data()
-    sync_farmers_json_to_db()
-    sync_users_json_to_db()
-    sync_activity_log_json_to_db()
+    # Database is now the single source of truth - no more JSON syncing
 
 if __name__ == "__main__":
     app.run(debug=True, port=5001)
