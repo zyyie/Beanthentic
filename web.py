@@ -10,173 +10,23 @@ import io
 
 from flask import Flask, redirect, render_template, request, session, url_for, jsonify, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
-from flask_admin import Admin, AdminIndexView
-from flask_admin.contrib.sqla import ModelView
 from flask_sqlalchemy import SQLAlchemy
+from models import (db, Farmer, AdminUser, ActivityLogEntry, 
+                    Affiliation, FarmInfo, TreeCounts, Production)
 
 app = Flask(__name__, template_folder=".", static_folder=".", static_url_path="")
 app.secret_key = "beanthentic-dev-secret-change-this"
 
-class ProtectedAdminIndexView(AdminIndexView):
-    def is_accessible(self):
-        return bool(session.get("user_email"))
+# Simple Flask app - no admin interface
 
-    def inaccessible_callback(self, name, **kwargs):
-        return redirect(url_for("login"))
-
-
-class ProtectedModelView(ModelView):
-    def is_accessible(self):
-        return bool(session.get("user_email"))
-
-    def inaccessible_callback(self, name, **kwargs):
-        return redirect(url_for("login"))
-
-
-class FarmerModelView(ProtectedModelView):
-    """Custom admin view for Farmer model with tabbed structure like the farmer's record table"""
-    
-    # Main table columns (like your image shows)
-    column_list = ('no', 'last_name', 'first_name', 'address_barangay', 'birthday', 'remarks')
-    column_labels = {
-        'no': 'NO.',
-        'last_name': 'LAST NAME',
-        'first_name': 'FIRST NAME', 
-        'address_barangay': 'ADDRESS (BARANGAY)',
-        'birthday': 'BIRTHDAY',
-        'remarks': 'REMARKS'
-    }
-    
-    # Search and filter (using actual database columns)
-    column_searchable_list = ['name', 'address_barangay']
-    column_filters = ['address_barangay', 'rsbsa_registered']
-    
-    # Form organized in tabs like your interface (using actual database fields)
-    form_columns = ('no', 'name', 'address_barangay', 'fa_officer_member', 'birthday',
-                   'rsbsa_registered', 'status_ownership', 'total_area_planted_ha',
-                   'liberica_bearing', 'liberica_non_bearing', 'excelsa_bearing',
-                   'excelsa_non_bearing', 'robusta_bearing', 'robusta_non_bearing',
-                   'total_bearing', 'total_non_bearing', 'total_trees',
-                   'liberica_production', 'excelsa_production', 'robusta_production',
-                   'ncfrs', 'remarks')
-    
-    # Pagination
-    page_size = 50
-    
-    # Sort by NO. by default
-    column_default_sort = 'no'
-    
-    # Custom templates - tabs only for edit/create, use default for list view
-    edit_template = 'admin/edit_farmer.html'
-    create_template = 'admin/create_farmer.html'
-    
-        
-    def on_model_change(self, form, model, is_created):
-        # Combine last_name and first_name into the name field
-        if hasattr(form, 'last_name') and hasattr(form, 'first_name'):
-            model.name = f"{form.last_name.data} {form.first_name.data}".strip()
-        return super(FarmerModelView, self).on_model_change(form, model, is_created)
-    
-    def edit_form(self, obj=None):
-        form = super(FarmerModelView, self).edit_form(obj=obj)
-        # Split existing name into last_name and first_name
-        if obj and obj.name:
-            name_parts = obj.name.split(' ', 1)
-            if hasattr(form, 'last_name'):
-                form.last_name.data = name_parts[0] if len(name_parts) > 0 else ''
-            if hasattr(form, 'first_name'):
-                form.first_name.data = name_parts[1] if len(name_parts) > 1 else ''
-        return form
-
-
-# Initialize Flask-Admin interface (protected by session login)
-admin = Admin(app, name="Beanthentic Admin", index_view=ProtectedAdminIndexView())
-
-# SQLAlchemy configuration
-import os
-db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'beanthentic.db')
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+# SQLAlchemy configuration - MySQL with pymysql (root with no password)
+app.config["SQLALCHEMY_DATABASE_URI"] = (
+    'mysql+pymysql://root@localhost/beanthentic_records'
+)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-db = SQLAlchemy(app)
+db.init_app(app)
 
-# Farmer model
-class Farmer(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    no = db.Column(db.Integer, nullable=False)
-    name = db.Column(db.String(200), nullable=False)
-    address_barangay = db.Column(db.String(100), nullable=False)
-    fa_officer_member = db.Column(db.String(50), nullable=False)
-    birthday = db.Column(db.String(50))
-    rsbsa_registered = db.Column(db.String(10), nullable=False)
-    status_ownership = db.Column(db.String(10))
-    total_area_planted_ha = db.Column(db.Float, nullable=False)
-    liberica_bearing = db.Column(db.Integer, default=0)
-    liberica_non_bearing = db.Column(db.Integer, default=0)
-    excelsa_bearing = db.Column(db.Integer, default=0)
-    excelsa_non_bearing = db.Column(db.Integer, default=0)
-    robusta_bearing = db.Column(db.Integer, default=0)
-    robusta_non_bearing = db.Column(db.Integer, default=0)
-    total_bearing = db.Column(db.Integer, default=0)
-    total_non_bearing = db.Column(db.Integer, default=0)
-    total_trees = db.Column(db.Integer, default=0)
-    liberica_production = db.Column(db.Float, default=0)
-    excelsa_production = db.Column(db.Float, default=0)
-    robusta_production = db.Column(db.Float, default=0)
-    ncfrs = db.Column(db.String(50))
-    remarks = db.Column(db.Text)
-
-    @property
-    def last_name(self):
-        """Extract last name from the name field"""
-        if self.name:
-            name_parts = self.name.split(' ', 1)
-            return name_parts[0] if len(name_parts) > 0 else ''
-        return ''
-    
-    @property  
-    def first_name(self):
-        """Extract first name from the name field"""
-        if self.name:
-            name_parts = self.name.split(' ', 1)
-            return name_parts[1] if len(name_parts) > 1 else ''
-        return ''
-    
-    def __repr__(self):
-        return f"Farmer('{self.name}', '{self.address_barangay}')"
-
-# Add Farmer model to Flask-Admin interface with custom view
-admin.add_view(FarmerModelView(Farmer, db.session, name='Farmer Records'))
-
-
-class AdminUser(db.Model):
-    __tablename__ = "admin_user"
-
-    email = db.Column(db.String(255), primary_key=True)
-    full_name = db.Column(db.String(255), nullable=False)
-    password_hash = db.Column(db.String(512), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-
-    def __repr__(self):
-        return f"AdminUser('{self.email}')"
-
-
-class ActivityLogEntry(db.Model):
-    __tablename__ = "activity_log_entry"
-
-    id = db.Column(db.Integer, primary_key=True)
-    timestamp = db.Column(db.DateTime, nullable=False, index=True)
-    user_email = db.Column(db.String(255), nullable=False, index=True)
-    action = db.Column(db.String(80), nullable=False, index=True)
-    details = db.Column(db.Text, default="")
-    ip_address = db.Column(db.String(64), default="")
-
-    def __repr__(self):
-        return f"ActivityLogEntry('{self.action}', '{self.user_email}')"
-
-
-# Add JSON-backed models to Flask-Admin interface
-admin.add_view(ProtectedModelView(AdminUser, db.session))
-admin.add_view(ProtectedModelView(ActivityLogEntry, db.session))
+# Database models initialized
 
 
 USER_DB = Path(__file__).resolve().parent / "users.json"
