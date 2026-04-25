@@ -66,6 +66,10 @@
               <i class="nav-icon fa-solid fa-file-export" aria-hidden="true"></i>
               <span>Export Data</span>
             </a>
+            <a href="#social-media" class="nav-link" data-module="social-media">
+              <i class="nav-icon fa-solid fa-share-nodes" aria-hidden="true"></i>
+              <span>Social Media</span>
+            </a>
             <a href="#settings" class="nav-link" data-module="settings" id="sidebarSettingsLink">
               <i class="nav-icon fa-solid fa-gear" aria-hidden="true"></i>
               <span>Settings</span>
@@ -889,6 +893,29 @@
                   <p>Export data as CSV file</p>
                   <button class="export-option-btn" onclick="window.location.href='/export/csv'">Export to CSV</button>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Social Media Module -->
+          <div class="module hidden" id="social-media-module" data-module="social-media">
+            <section class="module-header">
+              <h1>Social Media</h1>
+              <p>Manage and access Beanthentic's social channels</p>
+            </section>
+            <div class="export-content">
+              <div class="export-options">
+                <article class="export-card">
+                  <h3><i class="fa-brands fa-facebook card-heading-icon"></i> Facebook</h3>
+                  <p>View page activity and publish community updates.</p>
+                  <button
+                    class="export-option-btn"
+                    type="button"
+                    onclick="window.open('https://www.facebook.com/login.php?next=https%3A%2F%2Fwww.facebook.com%2Fme', '_blank', 'noopener')"
+                  >
+                    Open Beanthentic Facebook
+                  </button>
+                </article>
               </div>
             </div>
           </div>

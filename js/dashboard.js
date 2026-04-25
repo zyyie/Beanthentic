@@ -537,6 +537,14 @@ class DashboardApp {
       link.addEventListener('click', (e) => {
         e.preventDefault();
         const module = link.dataset.module;
+        if (module === 'social-media') {
+          window.open(
+            'https://www.facebook.com/login.php?next=https%3A%2F%2Fwww.facebook.com%2Fme',
+            '_blank',
+            'noopener'
+          );
+          return;
+        }
         if (module === 'settings') {
           this.settingsViewMode = 'landing';
           this.syncSettingsSubmenuActive(null);
@@ -909,6 +917,7 @@ class DashboardApp {
       'analytics': 'Analytics',
       'ipophl': 'IPOPHL',
       'export': 'Export Data',
+      'social-media': 'Social Media',
       'settings': 'Settings'
     };
     currentModule.textContent = moduleNames[moduleName] || 'Overview';
