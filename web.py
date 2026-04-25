@@ -93,7 +93,9 @@ class FarmerModelView(ProtectedModelView):
 admin = Admin(app, name="Beanthentic Admin", index_view=ProtectedAdminIndexView())
 
 # SQLAlchemy configuration
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///beanthentic.db"
+import os
+db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'beanthentic.db')
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 

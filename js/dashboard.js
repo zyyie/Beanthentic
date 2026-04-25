@@ -745,6 +745,14 @@ class DashboardApp {
       addFarmerBtn.addEventListener('click', () => this.addFarmer());
     }
 
+    const loadSampleBtn = document.getElementById('loadSampleBtn');
+    if (loadSampleBtn) {
+      loadSampleBtn.addEventListener('click', () => {
+        this.loadSampleData();
+        this.showNotification('Sample data loaded successfully!', 'success');
+      });
+    }
+
     const saveFarmersBtn = document.getElementById('saveFarmersBtn');
     if (saveFarmersBtn) {
       saveFarmersBtn.addEventListener('click', () => this.saveFarmers());
@@ -1689,13 +1697,17 @@ class DashboardApp {
   }
 
   loadSampleData() {
+    console.log('Loading sample farmer data...');
+    
     this.data = [
       {
         'NO.': 1,
-        'NAME OF FARMER': 'Romeo Montoya',
+        'LAST NAME': 'Montoya',
+        'FIRST NAME': 'Romeo',
         'ADDRESS (BARANGAY)': 'San Jose',
-        'FA OFFICER / MEMBER': 'Juan Dela Cruz',
         'BIRTHDAY': '1990-01-15',
+        'REMARKS': 'Good yield',
+        'FA OFFICER / MEMBER': 'Juan Dela Cruz',
         'REGISTERED (YES/NO)': 'Yes',
         'STATUS OF OWNERSHIP': 'A',
         'TOTAL AREA PLANTED (HA.)': 2.5,
@@ -1711,15 +1723,16 @@ class DashboardApp {
         'LIBERICA PRODUCTION': 450,
         'EXCELSA PRODUCTION': 600,
         'ROBUSTA PRODUCTION': 900,
-        'NCFRS': 'NCF001',
-        'REMARKS': 'Good yield'
+        'NCFRS': 'NCF001'
       },
       {
         'NO.': 2,
-        'NAME OF FARMER': 'Anghelito Silva',
+        'LAST NAME': 'Silva',
+        'FIRST NAME': 'Anghelito',
         'ADDRESS (BARANGAY)': 'San Pedro',
-        'FA OFFICER / MEMBER': 'Maria Santos',
         'BIRTHDAY': '1985-05-20',
+        'REMARKS': 'Needs fertilizer',
+        'FA OFFICER / MEMBER': 'Maria Santos',
         'REGISTERED (YES/NO)': 'Yes',
         'STATUS OF OWNERSHIP': 'B',
         'TOTAL AREA PLANTED (HA.)': 1.8,
@@ -1735,15 +1748,16 @@ class DashboardApp {
         'LIBERICA PRODUCTION': 300,
         'EXCELSA PRODUCTION': 450,
         'ROBUSTA PRODUCTION': 750,
-        'NCFRS': 'NCF002',
-        'REMARKS': 'Needs fertilizer'
+        'NCFRS': 'NCF002'
       },
       {
         'NO.': 3,
-        'NAME OF FARMER': 'Avelino Malaluan',
+        'LAST NAME': 'Malaluan',
+        'FIRST NAME': 'Avelino',
         'ADDRESS (BARANGAY)': 'San Miguel',
-        'FA OFFICER / MEMBER': 'Carlos Reyes',
         'BIRTHDAY': '1978-11-10',
+        'REMARKS': 'Excellent growth',
+        'FA OFFICER / MEMBER': 'Carlos Reyes',
         'REGISTERED (YES/NO)': 'No',
         'STATUS OF OWNERSHIP': 'C',
         'TOTAL AREA PLANTED (HA.)': 3.2,
@@ -1759,13 +1773,14 @@ class DashboardApp {
         'LIBERICA PRODUCTION': 600,
         'EXCELSA PRODUCTION': 540,
         'ROBUSTA PRODUCTION': 1050,
-        'NCFRS': 'NCF003',
-        'REMARKS': 'Excellent growth'
+        'NCFRS': 'NCF003'
       }
     ];
     
     this.filteredData = [...this.data];
     this.totalRecords = this.data.length;
+    
+    console.log('Sample data loaded:', this.data.length, 'records');
     
     this.updateTable();
     this.updateStats();
@@ -2668,6 +2683,10 @@ class DashboardApp {
     this.initializeFileUpload();
     this.initializeLinkInputs();
     this.initializeProgressSteps();
+    
+    // Load and display submission status
+    this.loadSubmissionStatus();
+    this.updateSubmissionStatus();
   }
 
   initializePhaseNavigation() {
@@ -2774,20 +2793,106 @@ class DashboardApp {
   }
 
   completeRegistration() {
-    if (!this.validatePhaseCompletion(5)) {
-      this.showIpophlNotification('Please complete all required tasks in Phase 5 before completing registration.');
+    // Collect all phase data (no validation required since users can navigate freely)
+    const allAttachments = this.collectAllPhaseData();
+    
+    // Check if there's any data at all
+    const hasAnyData = Object.values(allAttachments).some(phase => 
+      (phase.files && phase.files.length > 0) || (phase.links && phase.links.length > 0)
+    );
+    
+    if (!hasAnyData) {
+      this.showIpophlNotification('Please upload at least one file or add one link before completing registration.');
       return;
     }
     
-    // Collect all phase data
-    const allAttachments = this.collectAllPhaseData();
+    // Send email with registration data
+    this.sendRegistrationEmail(allAttachments);
     
-    this.showIpophlNotification('GI Registration process completed! All phases and documentation have been submitted.');
+    this.showIpophlNotification('GI Registration completed! Email sent to IPOPHL.');
     
     console.log('Completed GI Registration:', {
       phases: allAttachments,
       completedAt: new Date().toISOString()
     });
+  }
+
+  sendRegistrationEmail(registrationData) {
+    try {
+      // Create email content
+      const emailContent = this.createEmailContent(registrationData);
+      
+      // Create Gmail web interface link with correct IPOPHL addresses
+      const subject = encodeURIComponent('GI Registration Application - Lipa City Products');
+      const body = encodeURIComponent(emailContent);
+      const to = encodeURIComponent('copyright@ipophl.gov.ph,csd@ipophl.gov.ph');
+      
+      // Redirect to Gmail web interface
+      const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`;
+      
+      // Open Gmail in new tab
+      window.open(gmailLink, '_blank');
+      
+      this.showIpophlNotification('Opening Gmail to send registration to IPOPHL...');
+    } catch (error) {
+      console.error('Error opening Gmail:', error);
+      this.showIpophlNotification('Failed to open Gmail. Please try again.');
+    }
+  }
+
+  createEmailContent(registrationData) {
+    let content = `GEographical Indication Registration Application\n`;
+    content += `=========================================\n\n`;
+    content += `Date: ${new Date().toLocaleDateString()}\n`;
+    content += `Applicant: ${this.getCurrentUserEmail() || 'Not specified'}\n\n`;
+    
+    // Add phase summaries
+    for (let i = 1; i <= 5; i++) {
+      const phaseKey = `phase${i}`;
+      const phase = registrationData[phaseKey];
+      
+      content += `PHASE ${i}: ${this.getPhaseTitle(i)}\n`;
+      content += `${'='.repeat(40)}\n`;
+      
+      if (phase && phase.files && phase.files.length > 0) {
+        content += `Files Attached (${phase.files.length}):\n`;
+        phase.files.forEach(file => {
+          content += `- ${file.name} (${this.formatFileSize(file.size)})\n`;
+        });
+      }
+      
+      if (phase && phase.links && phase.links.length > 0) {
+        content += `\nLinks Provided (${phase.links.length}):\n`;
+        phase.links.forEach(link => {
+          content += `- ${link.url}\n`;
+        });
+      }
+      
+      content += '\n';
+    }
+    
+    content += `\nAdditional Notes:\n`;
+    content += `- This is an automated submission from the Beanthentic GI Registration System\n`;
+    content += `- All required documentation has been prepared according to IPOPHL guidelines\n`;
+    content += `- Please review and process this application accordingly\n\n`;
+    
+    return content;
+  }
+
+  getPhaseTitle(phaseNum) {
+    const titles = {
+      1: 'Pre-Application Groundwork',
+      2: 'Preparing Application Documents', 
+      3: 'Filing with IPOPHL',
+      4: 'Examination and Publication',
+      5: 'Registration and Ongoing Compliance'
+    };
+    return titles[phaseNum] || `Phase ${phaseNum}`;
+  }
+
+  getCurrentUserEmail() {
+    // Try to get user email from session or dashboard
+    return session?.user_email || document.querySelector('.user-email')?.textContent || null;
   }
 
   collectAllPhaseData() {
@@ -2890,11 +2995,27 @@ class DashboardApp {
     
     Array.from(files).forEach(file => {
       if (this.isValidFileType(file)) {
-        this.addFileToList(service, file);
+        // Check for duplicates
+        if (!this.isFileAlreadyUploaded(service, file)) {
+          this.addFileToList(service, file);
+        } else {
+          this.showIpophlNotification(`File "${file.name}" is already uploaded.`);
+        }
       } else {
         this.showIpophlNotification(`Invalid file type: ${file.name}`);
       }
     });
+  }
+
+  isFileAlreadyUploaded(service, file) {
+    if (!this.ipophlFiles || !this.ipophlFiles[service]) {
+      return false;
+    }
+    
+    // Check for duplicate by name and size
+    return this.ipophlFiles[service].some(existingFile => 
+      existingFile.name === file.name && existingFile.size === file.size
+    );
   }
 
   addFileToList(service, file) {

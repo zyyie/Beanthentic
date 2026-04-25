@@ -1918,6 +1918,98 @@ body.dashboard-page {
   transform: none;
 }
 
+/* Submission Status Tracking */
+.submission-status-container {
+  margin-bottom: 2rem;
+}
+
+.submission-status-card {
+  background: white;
+  border: 1px solid rgba(212, 177, 141, 0.2);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(40, 25, 15, 0.05);
+  transition: all 0.3s ease;
+}
+
+.submission-status-card:hover {
+  border-color: rgba(139, 74, 43, 0.3);
+  box-shadow: 0 8px 20px rgba(40, 25, 15, 0.08);
+}
+
+.status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(212, 177, 141, 0.2);
+}
+
+.status-header i {
+  font-size: 1.2rem;
+  margin-right: 0.5rem;
+}
+
+.status-text {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #25130c;
+}
+
+.status-time {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.status-pending .status-text {
+  color: #d97706;
+}
+
+.status-sent .status-text {
+  color: #059669;
+}
+
+.status-confirmed .status-text {
+  color: #047857;
+}
+
+.status-details {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #6b7280;
+  margin-bottom: 1rem;
+}
+
+.status-details strong {
+  color: #25130c;
+  font-weight: 600;
+}
+
+.status-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mark-sent-btn, .mark-confirmed-btn {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.mark-sent-btn:hover, .mark-confirmed-btn:hover {
+  background: linear-gradient(135deg, #047857, #065f46);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3);
+}
+
 /* File Attachment Components */
 .attachment-area {
   margin: 1.25rem 0;
@@ -2188,6 +2280,60 @@ body.dashboard-page {
 .btn-secondary:hover {
   background: rgba(139, 74, 43, 0.1);
   border-color: #8b4a2b;
+}
+
+/* Enhanced Farmer Toolbar Buttons - matching system admin design */
+.action-buttons {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.add-farmer-btn, .load-sample-btn, .save-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.add-farmer-btn {
+  background: linear-gradient(135deg, #8b4a2b, #5a2e1c);
+  color: #ffffff;
+}
+
+.add-farmer-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 74, 43, 0.3);
+}
+
+.load-sample-btn {
+  background: #ffffff;
+  color: #8b4a2b;
+  border: 1px solid rgba(139, 74, 43, 0.45);
+}
+
+.load-sample-btn:hover {
+  background: rgba(139, 74, 43, 0.08);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 74, 43, 0.2);
+}
+
+.save-btn {
+  background: linear-gradient(135deg, #8b4a2b, #5a2e1c);
+  color: #ffffff;
+}
+
+.save-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 74, 43, 0.3);
 }
 
 /* Module Placeholders */

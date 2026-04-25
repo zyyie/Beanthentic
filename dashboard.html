@@ -296,9 +296,10 @@
                   </div>
                 </div>
                 <div class="toolbar-right farmer-toolbar-actions" role="group" aria-label="Farmer records actions">
-                  <div class="crud-actions">
-                    <button type="button" class="crud-btn" id="addFarmerBtn">Add Farmer</button>
-                    <button type="button" class="crud-btn secondary" id="saveFarmersBtn">Save</button>
+                  <div class="action-buttons">
+                    <button class="add-farmer-btn">Add Farmer</button>
+                    <button id="loadSampleBtn" class="load-sample-btn">Load Sample Data</button>
+                    <button class="save-btn">Save</button>
                   </div>
                   <label class="select-field farmer-rows-field" for="pageSizeSelect">
                     <span class="field-label">Rows</span>
@@ -539,6 +540,10 @@
             </section>
 
             <section class="ipophl-content">
+              <div class="submission-status-container" id="submission-status">
+                <!-- Submission status will be displayed here -->
+              </div>
+              
               <div class="phase-progress">
                 <div class="progress-step active" data-phase="1">
                   <div class="step-number">1</div>
