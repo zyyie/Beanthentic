@@ -535,8 +535,36 @@
           <!-- IPOPHL Module -->
           <div class="module hidden" id="ipophl-module" data-module="ipophl">
             <section class="module-header">
-              <h1>IPOPHL GI Registration</h1>
-              <p>Geographical Indication Registration Process for Lipa City Products</p>
+              <div class="ipophl-header-layout">
+                <div class="ipophl-header-copy">
+                  <h1>IPOPHL GI Registration</h1>
+                  <p>Geographical Indication Registration Process for Lipa City Products</p>
+                </div>
+
+                <aside class="gi-status-card" aria-label="GI process analysis status">
+                  <div class="gi-status-card__head">
+                    <h2>GI Process Indicator</h2>
+                    <span class="gi-status-pill gi-status-pill--pending" id="giAiStatus">Pending AI review</span>
+                  </div>
+
+                  <div class="gi-status-percent-row">
+                    <span class="gi-status-percent" id="giProcessPercent">0%</span>
+                    <span class="gi-status-meta" id="giProcessMeta">0 of 13 document groups completed</span>
+                  </div>
+
+                  <div
+                    class="gi-status-track"
+                    id="giProcessTrack"
+                    role="progressbar"
+                    aria-label="GI process completion"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow="0"
+                  >
+                    <span class="gi-status-fill" id="giProcessFill"></span>
+                  </div>
+                </aside>
+              </div>
             </section>
 
             <section class="ipophl-content">

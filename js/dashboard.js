@@ -2687,6 +2687,7 @@ class DashboardApp {
     // Load and display submission status
     this.loadSubmissionStatus();
     this.updateSubmissionStatus();
+    this.updateGiProcessIndicator();
   }
 
   initializePhaseNavigation() {
@@ -2743,6 +2744,7 @@ class DashboardApp {
     this.currentPhase = phaseNum;
     this.showPhase(phaseNum);
     this.updateProgress(phaseNum);
+    this.updateGiProcessIndicator();
   }
 
   showPhase(phaseNum) {
@@ -3067,6 +3069,8 @@ class DashboardApp {
     fileItem.querySelector('.delete').addEventListener('click', () => {
       this.removeFile(service, fileId);
     });
+
+    this.updateGiProcessIndicator();
   }
 
   addLink(service, url) {
@@ -3099,6 +3103,8 @@ class DashboardApp {
     linkItem.querySelector('.delete').addEventListener('click', () => {
       this.removeLink(service, linkId);
     });
+
+    this.updateGiProcessIndicator();
   }
 
   removeFile(service, fileId) {
@@ -3110,6 +3116,8 @@ class DashboardApp {
     if (this.ipophlFiles && this.ipophlFiles[service]) {
       this.ipophlFiles[service] = this.ipophlFiles[service].filter(f => f.id !== fileId);
     }
+
+    this.updateGiProcessIndicator();
   }
 
   removeLink(service, linkId) {
@@ -3121,6 +3129,67 @@ class DashboardApp {
     if (this.ipophlLinks && this.ipophlLinks[service]) {
       this.ipophlLinks[service] = this.ipophlLinks[service].filter(l => l.id !== linkId);
     }
+
+    this.updateGiProcessIndicator();
+  }
+
+  getIpophlServicesByPhase() {
+    return {
+      1: ['phase1-product', 'phase1-entity', 'phase1-stakeholders'],
+      2: ['phase2-mop', 'phase2-cert', 'phase2-details'],
+      3: ['phase3-filing', 'phase3-payment'],
+      4: ['phase4-exam', 'phase4-response', 'phase4-pub'],
+      5: ['phase5-cert', 'phase5-compliance']
+    };
+  }
+
+  getIpophlCompletionSnapshot() {
+    const servicesByPhase = this.getIpophlServicesByPhase();
+    const allServices = Object.values(servicesByPhase).flat();
+    const completedServices = allServices.filter((service) => {
+      const hasFiles = Boolean(this.ipophlFiles && this.ipophlFiles[service] && this.ipophlFiles[service].length > 0);
+      const hasLinks = Boolean(this.ipophlLinks && this.ipophlLinks[service] && this.ipophlLinks[service].length > 0);
+      return hasFiles || hasLinks;
+    });
+
+    const total = allServices.length;
+    const completed = completedServices.length;
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    return { total, completed, percentage };
+  }
+
+  getGiAiStatusDescriptor() {
+    const aiResult = this.randomForestGiResult;
+
+    if (aiResult === true || aiResult?.status === 'pass') {
+      return { label: 'AI pass', className: 'gi-status-pill--pass' };
+    }
+    if (aiResult === false || aiResult?.status === 'fail') {
+      return { label: 'AI fail', className: 'gi-status-pill--fail' };
+    }
+    return { label: 'Pending AI review', className: 'gi-status-pill--pending' };
+  }
+
+  updateGiProcessIndicator() {
+    const percentEl = document.getElementById('giProcessPercent');
+    const metaEl = document.getElementById('giProcessMeta');
+    const fillEl = document.getElementById('giProcessFill');
+    const trackEl = document.getElementById('giProcessTrack');
+    const aiStatusEl = document.getElementById('giAiStatus');
+
+    if (!percentEl || !metaEl || !fillEl || !trackEl || !aiStatusEl) return;
+
+    const snapshot = this.getIpophlCompletionSnapshot();
+    percentEl.textContent = `${snapshot.percentage}%`;
+    metaEl.textContent = `${snapshot.completed} of ${snapshot.total} document groups completed`;
+    fillEl.style.width = `${snapshot.percentage}%`;
+    trackEl.setAttribute('aria-valuenow', String(snapshot.percentage));
+
+    const aiStatus = this.getGiAiStatusDescriptor();
+    aiStatusEl.textContent = aiStatus.label;
+    aiStatusEl.classList.remove('gi-status-pill--pending', 'gi-status-pill--pass', 'gi-status-pill--fail');
+    aiStatusEl.classList.add(aiStatus.className);
   }
 
   previewFile(file) {

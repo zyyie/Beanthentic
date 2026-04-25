@@ -14,5 +14,9 @@
   "nycoalecbalaogan@gmail.com": {
     "full_name": "Nyco Alec Balaogan",
     "password_hash": "scrypt:32768:8:1$793z15cZd2CAnYez$88830e1ad596be55219cf2cbce9fe99baaeacd1ceca3a1f2083c4087b5cdcecad698fc9faf125a4759beb0240cbd92a568bfe9b89b5da39eefc8def2b6d52bd3"
+  },
+  "eliazamaemalibiran@gmail.com": {
+    "full_name": "Eliaza Mae Malibiran",
+    "password_hash": "scrypt:32768:8:1$D8dzvoF648qyV1Vn$e3a1270f323b00eac8e5c8f990acd8ad6e70b46f5e8da15290e5cf31d1309954b4fcca1c4fb99e6005d458deafbe138f3e490c064e34326352593b833b448a85"
   }
 }

@@ -1629,6 +1629,123 @@ body.dashboard-page {
   padding: 1rem 0;
 }
 
+#ipophl-module .module-header {
+  background: linear-gradient(140deg, #ffffff, #f7f3ee);
+  border: 1px solid rgba(212, 177, 141, 0.3);
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+  box-shadow: 0 8px 20px rgba(40, 25, 15, 0.06);
+}
+
+.ipophl-header-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.85fr);
+  align-items: stretch;
+  gap: 1rem;
+}
+
+.ipophl-header-copy h1 {
+  margin: 0 0 0.4rem 0;
+}
+
+.ipophl-header-copy p {
+  margin: 0;
+}
+
+.gi-status-card {
+  background: #ffffff;
+  border: 1px solid rgba(212, 177, 141, 0.35);
+  border-radius: 12px;
+  padding: 0.85rem 0.95rem;
+  box-shadow: 0 6px 16px rgba(40, 25, 15, 0.06);
+  display: grid;
+  gap: 0.55rem;
+}
+
+.gi-status-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.gi-status-card__head h2 {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #3b2107;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.gi-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.22rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.gi-status-pill--pending {
+  color: #7a4d1f;
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(217, 119, 6, 0.25);
+}
+
+.gi-status-pill--pass {
+  color: #065f46;
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(5, 150, 105, 0.25);
+}
+
+.gi-status-pill--fail {
+  color: #9f1239;
+  background: rgba(244, 63, 94, 0.14);
+  border-color: rgba(225, 29, 72, 0.25);
+}
+
+.gi-status-percent-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.gi-status-percent {
+  font-size: 1.35rem;
+  line-height: 1;
+  font-weight: 800;
+  color: #3b2107;
+}
+
+.gi-status-meta {
+  text-align: right;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.gi-status-track {
+  width: 100%;
+  height: 9px;
+  background: #eee3d8;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(139, 74, 43, 0.12);
+}
+
+.gi-status-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8b4a2b, #a6693e);
+  transition: width 0.3s ease;
+}
+
 .ipophl-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -1823,16 +1940,17 @@ body.dashboard-page {
 
 .phase-tasks {
   display: grid;
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
   margin-bottom: 2rem;
 }
 
 .task-card {
-  background: white;
+  background: linear-gradient(145deg, #ffffff, #fbf7f2);
   border: 1px solid rgba(212, 177, 141, 0.2);
   border-radius: 12px;
-  padding: 1.5rem;
-  box-shadow: 0 4px 12px rgba(40, 25, 15, 0.05);
+  padding: 1rem;
+  box-shadow: 0 3px 10px rgba(40, 25, 15, 0.05);
   transition: all 0.3s ease;
 }
 
@@ -1843,9 +1961,9 @@ body.dashboard-page {
 }
 
 .task-card h3 {
-  margin: 0 0 0.75rem 0;
+  margin: 0 0 0.5rem 0;
   color: #25130c;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -1858,10 +1976,10 @@ body.dashboard-page {
 }
 
 .task-card p {
-  margin: 0 0 1.25rem 0;
+  margin: 0 0 0.9rem 0;
   color: #6b7280;
-  font-size: 0.9rem;
-  line-height: 1.5;
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
 .phase-actions {
@@ -2012,10 +2130,10 @@ body.dashboard-page {
 
 /* File Attachment Components */
 .attachment-area {
-  margin: 1.25rem 0;
-  padding: 1rem;
+  margin: 0.85rem 0 0;
+  padding: 0.75rem;
   background: rgba(255, 255, 255, 0.5);
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid rgba(212, 177, 141, 0.2);
 }
 
@@ -2029,7 +2147,7 @@ body.dashboard-page {
 .file-upload-zone {
   border: 2px dashed rgba(139, 74, 43, 0.3);
   border-radius: 8px;
-  padding: 1.5rem;
+  padding: 1rem;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -2049,15 +2167,15 @@ body.dashboard-page {
 }
 
 .file-upload-zone i {
-  font-size: 2rem;
+  font-size: 1.5rem;
   color: #8B4A2B;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
   display: block;
 }
 
 .file-upload-zone p {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: #6b7280;
 }
 
@@ -3645,6 +3763,14 @@ body.confirm-dialog-active {
     font-size: 0.65rem;
     padding: 0.2rem 0.5rem;
     min-width: 40px;
+  }
+
+  .ipophl-header-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .gi-status-card {
+    padding: 0.75rem 0.8rem;
   }
 }
 
