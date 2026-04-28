@@ -1,0 +1,92 @@
+{
+  "accuracy": 0.0,
+  "cv_mean": 0.5833333333333333,
+  "cv_std": 0.08333333333333331,
+  "best_params": {
+    "max_depth": 10,
+    "max_features": "sqrt",
+    "min_samples_leaf": 1,
+    "min_samples_split": 2,
+    "n_estimators": 50
+  },
+  "classification_report": {
+    "0": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1-score": 0.0,
+      "support": 0.0
+    },
+    "1": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1-score": 0.0,
+      "support": 1.0
+    },
+    "accuracy": 0.0,
+    "macro avg": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1-score": 0.0,
+      "support": 1.0
+    },
+    "weighted avg": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1-score": 0.0,
+      "support": 1.0
+    }
+  },
+  "confusion_matrix": [
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      0
+    ]
+  ],
+  "training_date": "2026-04-28T22:08:14.692512",
+  "feature_importance_top10": [
+    {
+      "feature": "Barako",
+      "importance": 0.18402777777777782
+    },
+    {
+      "feature": "geographical",
+      "importance": 0.11458333333333334
+    },
+    {
+      "feature": "distinctive",
+      "importance": 0.09375000000000001
+    },
+    {
+      "feature": "standards",
+      "importance": 0.07291666666666667
+    },
+    {
+      "feature": "association",
+      "importance": 0.07291666666666667
+    },
+    {
+      "feature": "word_count",
+      "importance": 0.06250000000000001
+    },
+    {
+      "feature": "altitude",
+      "importance": 0.06250000000000001
+    },
+    {
+      "feature": "notary",
+      "importance": 0.06250000000000001
+    },
+    {
+      "feature": "Batangas",
+      "importance": 0.06250000000000001
+    },
+    {
+      "feature": "climate",
+      "importance": 0.05902777777777778
+    }
+  ]
+}

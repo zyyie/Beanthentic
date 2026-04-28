@@ -1,5 +1,6 @@
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
+import json
 
 db = SQLAlchemy()
 
@@ -133,3 +134,55 @@ class ActivityLogEntry(db.Model):
 
     def __repr__(self):
         return f"ActivityLogEntry('{self.action}', '{self.user_email}')"
+
+# Document analysis table for IPOPHL AI processing
+class DocumentAnalysis(db.Model):
+    __tablename__ = "document_analysis"
+
+    id = db.Column(db.Integer, primary_key=True)
+    file_uuid = db.Column(db.String(36), unique=True, nullable=False, index=True)
+    original_filename = db.Column(db.String(255), nullable=False)
+    file_path = db.Column(db.String(500), nullable=False)
+    file_type = db.Column(db.String(50), nullable=False)
+    file_size = db.Column(db.Integer, nullable=False)
+    
+    # AI Analysis results
+    ai_score = db.Column(db.Integer, default=0)  # 0-100
+    ai_status = db.Column(db.String(20), default="Not Ready")
+    detected_features = db.Column(db.Text)  # JSON string
+    missing_requirements = db.Column(db.Text)  # JSON string
+    analysis_method = db.Column(db.String(50), default="rule_based")
+    text_length = db.Column(db.Integer, default=0)
+    
+    # Metadata
+    upload_timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    analysis_timestamp = db.Column(db.DateTime)
+    ipophl_phase = db.Column(db.String(50))  # Which phase this document belongs to
+    task_id = db.Column(db.String(100))  # Which specific task
+    
+    def __repr__(self):
+        return f"DocumentAnalysis('{self.original_filename}', score={self.ai_score})"
+    
+    @property
+    def detected_features_list(self):
+        if self.detected_features:
+            try:
+                return json.loads(self.detected_features)
+            except:
+                return []
+        return []
+    
+    @property
+    def missing_requirements_list(self):
+        if self.missing_requirements:
+            try:
+                return json.loads(self.missing_requirements)
+            except:
+                return []
+        return []
+    
+    def set_detected_features(self, features_list):
+        self.detected_features = json.dumps(features_list)
+    
+    def set_missing_requirements(self, requirements_list):
+        self.missing_requirements = json.dumps(requirements_list)

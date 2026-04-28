@@ -2,34 +2,50 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import secrets
 import time
 from datetime import datetime
 from pathlib import Path
 import io
+from werkzeug.utils import secure_filename
 
 from flask import Flask, redirect, render_template, request, session, url_for, jsonify, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
 from flask_sqlalchemy import SQLAlchemy
-from models import (db, Farmer, AdminUser, ActivityLogEntry, 
-                    Affiliation, FarmInfo, TreeCounts, Production)
+from config.models import (db, Farmer, AdminUser, ActivityLogEntry, 
+                    Affiliation, FarmInfo, TreeCounts, Production, DocumentAnalysis)
 
 app = Flask(__name__, template_folder=".", static_folder=".", static_url_path="")
 app.secret_key = "beanthentic-dev-secret-change-this"
 
 # Simple Flask app - no admin interface
 
-# SQLAlchemy configuration - MySQL with pymysql (root with no password)
-app.config["SQLALCHEMY_DATABASE_URI"] = (
-    'mysql+pymysql://root@localhost/beanthentic_records'
-)
+# SQLAlchemy configuration
+# Priority:
+# 1) DATABASE_URL env var (full SQLAlchemy URL)
+# 2) MySQL from env vars (MYSQL_USER/MYSQL_PASSWORD/MYSQL_HOST/MYSQL_DB)
+# 3) Local SQLite fallback for easy local startup
+database_url = os.getenv("DATABASE_URL", "").strip()
+if not database_url:
+    mysql_user = os.getenv("MYSQL_USER", "").strip()
+    mysql_password = os.getenv("MYSQL_PASSWORD", "")
+    mysql_host = os.getenv("MYSQL_HOST", "localhost").strip()
+    mysql_db = os.getenv("MYSQL_DB", "beanthentic_records").strip()
+    if mysql_user:
+        database_url = f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}/{mysql_db}"
+    else:
+        sqlite_path = Path(__file__).resolve().parent / "data" / "beanthentic.db"
+        database_url = f"sqlite:///{sqlite_path.as_posix()}"
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 
 # Database models initialized
 
 
-USER_DB = Path(__file__).resolve().parent / "users.json"
+USER_DB = Path(__file__).resolve().parent / "data" / "users.json"
 SETTINGS_DB = Path(__file__).resolve().parent / "settings.json"
 
 
@@ -224,7 +240,7 @@ def dashboard():
     user = users.get(email, {})
     full_name = user.get("full_name") or session.get("user_name") or email
     return render_template(
-        "dashboard.html",
+        "templates/dashboard.html",
         user_email=email,
         user_full_name=full_name,
     )
@@ -604,6 +620,316 @@ def export_csv():
         mimetype='text/csv'
     )
 
+
+# File Preview Route for IPOPHL Module
+@app.route("/api/ipo-preview/<file_uuid>")
+def api_ipo_file_preview(file_uuid):
+    """Preview a specific uploaded file in the IPOPHL module"""
+    if not session.get("user_email"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Find document record
+        doc_analysis = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
+        if not doc_analysis:
+            return jsonify({"error": "File not found"}), 404
+        
+        # Check if file exists
+        file_path = Path(doc_analysis.file_path)
+        if not file_path.exists():
+            return jsonify({"error": "File not found on disk"}), 404
+        
+        # Return file info and preview URL
+        return jsonify({
+            "success": True,
+            "file_info": {
+                "filename": doc_analysis.original_filename,
+                "file_type": doc_analysis.file_type,
+                "file_size": doc_analysis.file_size,
+                "upload_timestamp": doc_analysis.upload_timestamp.isoformat(),
+                "ipophl_phase": doc_analysis.ipophl_phase,
+                "task_id": doc_analysis.task_id
+            },
+            "preview_url": f"/api/file-preview/{file_uuid}{doc_analysis.file_type}",
+            "analysis": {
+                "ai_score": doc_analysis.ai_score,
+                "ai_status": doc_analysis.ai_status,
+                "detected_features": doc_analysis.detected_features_list,
+                "missing_requirements": doc_analysis.missing_requirements_list
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Preview failed: {str(e)}"}), 500
+
+# IPOPHL AI Analysis Routes
+@app.route("/api/ipo-analyze", methods=["POST"])
+def api_ipo_analyze():
+    """Handle file upload and AI analysis for IPOPHL documents"""
+    if not session.get("user_email"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Import AI engine
+        from machinelearning.ai_engine import gi_analyzer
+        
+        # Check if file was uploaded
+        if 'file' not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+        
+        # Get additional metadata
+        ipophl_phase = request.form.get('phase', 'unknown')
+        task_id = request.form.get('task_id', 'unknown')
+        
+        # Validate file type
+        allowed_extensions = {'.pdf', '.doc', '.docx', '.txt', '.md'}
+        file_ext = Path(file.filename).suffix.lower()
+        if file_ext not in allowed_extensions:
+            return jsonify({"error": f"Unsupported file type: {file_ext}"}), 400
+        
+        # Save file securely
+        file_path = gi_analyzer.save_uploaded_file(file, file.filename)
+        
+        # Perform AI analysis
+        analysis_result = gi_analyzer.analyze_document(file_path)
+        
+        if not analysis_result.get('success', False):
+            return jsonify({"error": analysis_result.get('error', 'Analysis failed')}), 500
+        
+        # Save analysis to database
+        file_uuid = Path(file_path).stem  # UUID without extension
+        
+        # Check if analysis already exists
+        existing_analysis = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
+        if existing_analysis:
+            # Update existing record
+            doc_analysis = existing_analysis
+        else:
+            # Create new record
+            doc_analysis = DocumentAnalysis(
+                file_uuid=file_uuid,
+                original_filename=secure_filename(file.filename),
+                file_path=file_path,
+                file_type=file_ext,
+                file_size=os.path.getsize(file_path),
+                ipophl_phase=ipophl_phase,
+                task_id=task_id
+            )
+        
+        # Update analysis results
+        doc_analysis.ai_score = analysis_result.get('readiness_score', 0)
+        doc_analysis.ai_status = analysis_result.get('status', 'Not Ready')
+        doc_analysis.set_detected_features(analysis_result.get('detected_features', []))
+        doc_analysis.set_missing_requirements(analysis_result.get('missing_requirements', []))
+        doc_analysis.analysis_method = analysis_result.get('analysis_method', 'rule_based')
+        doc_analysis.text_length = analysis_result.get('text_length', 0)
+        doc_analysis.analysis_timestamp = datetime.utcnow()
+        
+        # Save to database
+        if existing_analysis:
+            db.session.commit()
+        else:
+            db.session.add(doc_analysis)
+            db.session.commit()
+        
+        # Log activity
+        user_email = session.get("user_email")
+        log_activity(user_email, "IPOPHL_DOCUMENT_ANALYZED", 
+                    f"Analyzed {file.filename} - Score: {doc_analysis.ai_score}%", 
+                    request.remote_addr)
+        
+        # Return analysis results
+        return jsonify({
+            "success": True,
+            "file_uuid": file_uuid,
+            "filename": file.filename,
+            "analysis": {
+                "readiness_score": doc_analysis.ai_score,
+                "status": doc_analysis.ai_status,
+                "detected_features": doc_analysis.detected_features_list,
+                "missing_requirements": doc_analysis.missing_requirements_list,
+                "analysis_method": doc_analysis.analysis_method,
+                "text_length": doc_analysis.text_length
+            },
+            "preview_url": gi_analyzer.get_file_preview_url(file_path),
+            "ipophl_phase": ipophl_phase,
+            "task_id": task_id
+        })
+        
+    except Exception as e:
+        # Log error
+        user_email = session.get("user_email")
+        log_activity(user_email, "IPOPHL_ANALYSIS_ERROR", str(e), request.remote_addr)
+        return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
+
+@app.route("/api/file-preview/<filename>")
+def api_file_preview(filename):
+    """Serve uploaded files for preview"""
+    if not session.get("user_email"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Validate filename to prevent directory traversal
+        filename = secure_filename(filename)
+        if not filename:
+            return jsonify({"error": "Invalid filename"}), 400
+        
+        # Construct file path
+        file_path = Path("uploads") / filename
+        
+        # Check if file exists
+        if not file_path.exists():
+            return jsonify({"error": "File not found"}), 404
+        
+        # Determine MIME type
+        if filename.endswith('.pdf'):
+            mimetype = 'application/pdf'
+        elif filename.endswith(('.doc', '.docx')):
+            mimetype = 'application/msword'
+        elif filename.endswith(('.txt', '.md')):
+            mimetype = 'text/plain'
+        else:
+            mimetype = 'application/octet-stream'
+        
+        return send_file(str(file_path), mimetype=mimetype)
+        
+    except Exception as e:
+        return jsonify({"error": f"Preview failed: {str(e)}"}), 500
+
+@app.route("/api/ipo-analysis/<file_uuid>", methods=["GET"])
+def api_get_analysis(file_uuid):
+    """Get existing analysis results for a file"""
+    if not session.get("user_email"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Find analysis record
+        doc_analysis = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
+        if not doc_analysis:
+            return jsonify({"error": "Analysis not found"}), 404
+        
+        return jsonify({
+            "success": True,
+            "file_uuid": file_uuid,
+            "filename": doc_analysis.original_filename,
+            "analysis": {
+                "readiness_score": doc_analysis.ai_score,
+                "status": doc_analysis.ai_status,
+                "detected_features": doc_analysis.detected_features_list,
+                "missing_requirements": doc_analysis.missing_requirements_list,
+                "analysis_method": doc_analysis.analysis_method,
+                "text_length": doc_analysis.text_length
+            },
+            "preview_url": f"/api/file-preview/{file_uuid}{doc_analysis.file_type}",
+            "ipophl_phase": doc_analysis.ipophl_phase,
+            "task_id": doc_analysis.task_id,
+            "upload_timestamp": doc_analysis.upload_timestamp.isoformat(),
+            "analysis_timestamp": doc_analysis.analysis_timestamp.isoformat() if doc_analysis.analysis_timestamp else None
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Failed to get analysis: {str(e)}"}), 500
+
+@app.route("/api/ipo-analysis/<file_uuid>", methods=["POST"])
+def api_refresh_analysis(file_uuid):
+    """Re-run analysis on an existing file"""
+    if not session.get("user_email"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Find analysis record
+        doc_analysis = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
+        if not doc_analysis:
+            return jsonify({"error": "Analysis not found"}), 404
+        
+        # Import AI engine
+        from machinelearning.ai_engine import gi_analyzer
+        
+        # Re-run analysis
+        analysis_result = gi_analyzer.analyze_document(doc_analysis.file_path)
+        
+        if not analysis_result.get('success', False):
+            return jsonify({"error": analysis_result.get('error', 'Analysis failed')}), 500
+        
+        # Update analysis results
+        doc_analysis.ai_score = analysis_result.get('readiness_score', 0)
+        doc_analysis.ai_status = analysis_result.get('status', 'Not Ready')
+        doc_analysis.set_detected_features(analysis_result.get('detected_features', []))
+        doc_analysis.set_missing_requirements(analysis_result.get('missing_requirements', []))
+        doc_analysis.analysis_method = analysis_result.get('analysis_method', 'rule_based')
+        doc_analysis.text_length = analysis_result.get('text_length', 0)
+        doc_analysis.analysis_timestamp = datetime.utcnow()
+        
+        db.session.commit()
+        
+        # Log activity
+        user_email = session.get("user_email")
+        log_activity(user_email, "IPOPHL_ANALYSIS_REFRESHED", 
+                    f"Refreshed analysis for {doc_analysis.original_filename} - Score: {doc_analysis.ai_score}%", 
+                    request.remote_addr)
+        
+        return jsonify({
+            "success": True,
+            "message": "Analysis refreshed successfully",
+            "analysis": {
+                "readiness_score": doc_analysis.ai_score,
+                "status": doc_analysis.ai_status,
+                "detected_features": doc_analysis.detected_features_list,
+                "missing_requirements": doc_analysis.missing_requirements_list,
+                "analysis_method": doc_analysis.analysis_method,
+                "text_length": doc_analysis.text_length
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Refresh failed: {str(e)}"}), 500
+
+@app.route("/api/ipo-documents", methods=["GET"])
+def api_list_documents():
+    """List all analyzed documents"""
+    if not session.get("user_email"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Get query parameters
+        phase = request.args.get('phase')
+        limit = int(request.args.get('limit', 50))
+        
+        # Build query
+        query = DocumentAnalysis.query
+        if phase:
+            query = query.filter_by(ipophl_phase=phase)
+        
+        documents = query.order_by(DocumentAnalysis.upload_timestamp.desc()).limit(limit).all()
+        
+        results = []
+        for doc in documents:
+            results.append({
+                "file_uuid": doc.file_uuid,
+                "filename": doc.original_filename,
+                "file_type": doc.file_type,
+                "file_size": doc.file_size,
+                "ai_score": doc.ai_score,
+                "ai_status": doc.ai_status,
+                "ipophl_phase": doc.ipophl_phase,
+                "task_id": doc.task_id,
+                "upload_timestamp": doc.upload_timestamp.isoformat(),
+                "analysis_timestamp": doc.analysis_timestamp.isoformat() if doc.analysis_timestamp else None,
+                "preview_url": f"/api/file-preview/{doc.file_uuid}{doc.file_type}"
+            })
+        
+        return jsonify({
+            "success": True,
+            "documents": results,
+            "total": len(results)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Failed to list documents: {str(e)}"}), 500
 
 # Create database tables and populate with data
 with app.app_context():
