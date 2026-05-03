@@ -33,63 +33,82 @@
               {% if error %}
               <p class="fineprint" style="color: #c0392b">{{ error }}</p>
               {% endif %}
+
               <div class="field">
-                <label class="label" for="fullName">Full Name</label>
+                <label class="label" for="fullName">Full Name:</label>
                 <input
                   class="input"
                   id="fullName"
                   name="fullName"
                   type="text"
                   autocomplete="name"
-                  placeholder="Juan Dela Cruz"
+                  placeholder=""
                   required
                 />
               </div>
 
               <div class="field">
-                <label class="label" for="email">Email</label>
-                <input
-                  class="input"
-                  id="email"
-                  name="email"
-                  type="email"
-                  autocomplete="email"
-                  placeholder="you@example.com"
-                  required
-                />
+                <label class="label" for="phone">Phone number:</label>
+                <div class="input-group">
+                  <span class="input-prefix">+63</span>
+                  <input
+                    class="input"
+                    id="phone"
+                    name="phone"
+                    type="text"
+                    autocomplete="username"
+                    placeholder="9123456789"
+                    required
+                  />
+                </div>
               </div>
 
               <div class="field">
-                <label class="label" for="password">Password</label>
-                <input
-                  class="input"
-                  id="password"
-                  name="password"
-                  type="password"
-                  autocomplete="new-password"
-                  placeholder="••••••••"
-                  required
-                />
+                <label class="label" for="password">Password:</label>
+                <div class="password-wrap">
+                  <input
+                    class="input"
+                    id="password"
+                    name="password"
+                    type="password"
+                    autocomplete="new-password"
+                    placeholder=""
+                    required
+                  />
+                  <button type="button" class="password-toggle" id="togglePassword" aria-label="Show password">
+                    <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               <div class="field">
-                <label class="label" for="confirmPassword">Confirm Password</label>
-                <input
-                  class="input"
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  autocomplete="new-password"
-                  placeholder="••••••••"
-                  required
-                />
+                <label class="label" for="confirmPassword">Confirm Password:</label>
+                <div class="password-wrap">
+                  <input
+                    class="input"
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type="password"
+                    autocomplete="new-password"
+                    placeholder=""
+                    required
+                  />
+                  <button type="button" class="password-toggle" id="toggleConfirmPassword" aria-label="Show confirm password">
+                    <svg id="eyeIconConfirm" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
-              <button class="btn" type="submit">Sign up</button>
+              <button class="btn" type="submit">Sign Up</button>
 
               <p class="fineprint">
-                Already have an account?
-                <a class="link" href="{{ url_for('login') }}">Log in</a>
+                Already have an account? <a class="link" href="{{ url_for('login') }}">Login</a>
               </p>
             </form>
           </div>
@@ -97,7 +116,61 @@
       </div>
     </main>
     <script>
-      document.getElementById("year").textContent = new Date().getFullYear();
+      (function () {
+        function setupToggle(btnId, inputId, iconId) {
+          const btn = document.getElementById(btnId);
+          const input = document.getElementById(inputId);
+          const icon = document.getElementById(iconId);
+          if (!btn || !input) return;
+          btn.addEventListener("click", function () {
+            const isHidden = input.type === "password";
+            input.type = isHidden ? "text" : "password";
+            if (icon) {
+              icon.innerHTML = isHidden
+                ? '<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />'
+                : '<path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />';
+            }
+          });
+        }
+        setupToggle("togglePassword", "password", "eyeIcon");
+        setupToggle("toggleConfirmPassword", "confirmPassword", "eyeIconConfirm");
+
+        // Phone number validation
+        const phoneInput = document.getElementById("phone");
+        if (phoneInput) {
+          phoneInput.addEventListener("input", function (e) {
+            // Remove any non-numeric characters
+            let value = e.target.value.replace(/\D/g, '');
+            
+            // Limit to 10 digits (Philippines mobile number format)
+            if (value.length > 10) {
+              value = value.slice(0, 10);
+            }
+            
+            e.target.value = value;
+          });
+
+          phoneInput.addEventListener("keydown", function (e) {
+            // Allow: backspace, delete, tab, escape, enter
+            if ([8, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
+                // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+                (e.keyCode === 65 && (e.ctrlKey === true || e.metaKey === true)) ||
+                (e.keyCode === 67 && (e.ctrlKey === true || e.metaKey === true)) ||
+                (e.keyCode === 86 && (e.ctrlKey === true || e.metaKey === true)) ||
+                (e.keyCode === 88 && (e.ctrlKey === true || e.metaKey === true)) ||
+                // Allow: home, end, left, right
+                (e.keyCode >= 35 && e.keyCode <= 39)) {
+              // let it happen, don't do anything
+              return;
+            }
+            
+            // Ensure that it is a number and stop the keypress
+            if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+              e.preventDefault();
+            }
+          });
+        }
+      })();
     </script>
   </body>
 </html>

@@ -113,13 +113,13 @@ class Production(db.Model):
 class AdminUser(db.Model):
     __tablename__ = "admin_user"
 
-    email = db.Column(db.String(255), primary_key=True)
+    phone_number = db.Column(db.String(255), primary_key=True)
     full_name = db.Column(db.String(255), nullable=False)
     password_hash = db.Column(db.String(512), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     def __repr__(self):
-        return f"AdminUser('{self.email}')"
+        return f"AdminUser('{self.phone_number}')"
 
 # Activity log table (keeping existing)
 class ActivityLogEntry(db.Model):
@@ -127,13 +127,13 @@ class ActivityLogEntry(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     timestamp = db.Column(db.DateTime, nullable=False, index=True)
-    user_email = db.Column(db.String(255), nullable=False, index=True)
+    user_phone = db.Column(db.String(255), nullable=False, index=True)
     action = db.Column(db.String(80), nullable=False, index=True)
     details = db.Column(db.Text, default="")
     ip_address = db.Column(db.String(64), default="")
 
     def __repr__(self):
-        return f"ActivityLogEntry('{self.action}', '{self.user_email}')"
+        return f"ActivityLogEntry('{self.action}', '{self.user_phone}')"
 
 # Document analysis table for IPOPHL AI processing
 class DocumentAnalysis(db.Model):

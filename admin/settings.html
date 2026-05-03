@@ -765,9 +765,9 @@
                   <input type="text" id="fullName" name="fullName" value="{{ current_user.get('full_name', '') }}" required>
                 </div>
                 <div class="form-group">
-                  <label for="email">Email Address</label>
-                  <input type="email" id="email" name="email" value="{{ session.get('user_email', '') }}" readonly>
-                  <small>Email address cannot be changed</small>
+                  <label for="phone">Phone Number</label>
+                  <input type="text" id="phone" name="phone" value="{{ session.get('user_phone', '') }}" readonly>
+                  <small>Phone number cannot be changed</small>
                 </div>
                 <button type="submit" class="btn btn-primary">Update Profile</button>
               </form>

@@ -13,6 +13,7 @@ from werkzeug.utils import secure_filename
 from flask import Flask, redirect, render_template, request, session, url_for, jsonify, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 from config.models import (db, Farmer, AdminUser, ActivityLogEntry, 
                     Affiliation, FarmInfo, TreeCounts, Production, DocumentAnalysis)
 
@@ -58,20 +59,20 @@ def sync_users_json_to_db() -> None:
     if not isinstance(users, dict) or not users:
         return
 
-    for email, info in users.items():
-        if not email or not isinstance(info, dict):
+    for phone, info in users.items():
+        if not phone or not isinstance(info, dict):
             continue
-        full_name = (info.get("full_name") or "").strip() or email
+        full_name = (info.get("full_name") or "").strip() or phone
         pw_hash = (info.get("password_hash") or "").strip()
         if not pw_hash:
             continue
 
-        existing = db.session.get(AdminUser, email)
+        existing = db.session.get(AdminUser, phone)
         if existing:
             existing.full_name = full_name
             existing.password_hash = pw_hash
         else:
-            db.session.add(AdminUser(email=email, full_name=full_name, password_hash=pw_hash))
+            db.session.add(AdminUser(phone_number=phone, full_name=full_name, password_hash=pw_hash))
     db.session.commit()
 
 
@@ -98,6 +99,15 @@ def save_users(users: dict) -> None:
 
 def has_admin_account() -> bool:
     """True if at least one admin user exists."""
+    # First check if there are users in the database
+    try:
+        admin_count = AdminUser.query.count()
+        if admin_count > 0:
+            return True
+    except Exception:
+        pass
+    
+    # Fallback to checking JSON file
     return bool(load_users())
 
 
@@ -150,14 +160,14 @@ def save_settings(settings: dict) -> None:
 
 
 
-def log_activity(user_email: str, action: str, details: str = "", ip_address: str = "") -> None:
+def log_activity(user_phone: str, action: str, details: str = "", ip_address: str = "") -> None:
     # Write directly to database for Flask-Admin visibility
     try:
         ts = datetime.now()
         db.session.add(
             ActivityLogEntry(
                 timestamp=ts,
-                user_email=user_email or "",
+                user_phone=user_phone or "",
                 action=action or "",
                 details=details or "",
                 ip_address=ip_address or "",
@@ -170,7 +180,7 @@ def log_activity(user_email: str, action: str, details: str = "", ip_address: st
 
 @app.route("/")
 def home():
-    if session.get("user_email"):
+    if session.get("user_phone"):
         return redirect(url_for("dashboard"))
     if has_admin_account():
         return redirect(url_for("login"))
@@ -183,20 +193,24 @@ def signup():
 
     if request.method == "POST":
         full_name = request.form.get("fullName", "").strip()
-        email = request.form.get("email", "").strip().lower()
+        phone = request.form.get("phone", "").strip()
         password = request.form.get("password", "")
         confirm_password = request.form.get("confirmPassword", "")
 
-        if not full_name or not email or not password or not confirm_password:
+        if not full_name or not phone or not password or not confirm_password:
             error = "Please fill in all fields."
+        elif not phone.isdigit():
+            error = "Phone number must contain only numbers."
+        elif len(phone) != 10:
+            error = "Phone number must be exactly 10 digits (e.g., 9123456789)."
         elif password != confirm_password:
             error = "Passwords do not match."
         else:
             users = load_users()
-            if email in users:
-                error = "Email is already registered."
+            if phone in users:
+                error = "Phone number is already registered."
             else:
-                users[email] = {
+                users[phone] = {
                     "full_name": full_name,
                     "password_hash": generate_password_hash(password),
                 }
@@ -214,50 +228,94 @@ def login():
     error = ""
 
     if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
+        phone = request.form.get("phone", "").strip()
         password = request.form.get("password", "")
-        users = load_users()
-        user = users.get(email)
-
-        if not user or not check_password_hash(user.get("password_hash", ""), password):
-            error = "Invalid email or password."
-            log_activity(email, "LOGIN_FAILED", "Failed login attempt", request.remote_addr)
+        
+        # Validate phone number
+        if not phone:
+            error = "Phone number is required."
+        elif not phone.isdigit():
+            error = "Phone number must contain only numbers."
+        elif len(phone) != 10:
+            error = "Phone number must be exactly 10 digits (e.g., 9123456789)."
         else:
-            session["user_email"] = email
-            session["user_name"] = user.get("full_name", "Admin")
-            log_activity(email, "LOGIN", "User logged in successfully", request.remote_addr)
-            return redirect(url_for("dashboard"))
+            users = load_users()
+            user = users.get(phone)
+
+            if not user or not check_password_hash(user.get("password_hash", ""), password):
+                error = "Invalid phone number or password."
+                log_activity(phone, "LOGIN_FAILED", "Failed login attempt", request.remote_addr)
+            else:
+                session["user_phone"] = phone
+                session["user_name"] = user.get("full_name", "Admin")
+                log_activity(phone, "LOGIN", "User logged in successfully", request.remote_addr)
+                return redirect(url_for("dashboard"))
 
     return render_template("admin/login.html", error=error)
 
 
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    error = ""
+    success = ""
+
+    if request.method == "POST":
+        phone = request.form.get("phone", "").strip()
+        
+        # Validate phone number
+        if not phone:
+            error = "Phone number is required."
+        elif not phone.isdigit():
+            error = "Phone number must contain only numbers."
+        elif len(phone) != 10:
+            error = "Phone number must be exactly 10 digits (e.g., 9123456789)."
+        else:
+            users = load_users()
+            user = users.get(phone)
+            
+            if not user:
+                error = "Phone number not found in our system."
+            else:
+                # Log the password reset request
+                log_activity(phone, "PASSWORD_RESET_REQUESTED", "User requested password reset", request.remote_addr)
+                
+                # For demo purposes, show a success message
+                # In a real application, you would send an SMS or email with reset instructions
+                success = f"Password reset instructions have been sent to +63{phone}. For demo: Your account exists and you can contact admin to reset password."
+                
+                # You could also generate a reset token and store it temporarily
+                # For now, we'll just show a success message
+
+    return render_template("admin/forgot-password.html", error=error, success=success)
+
+
 @app.route("/dashboard")
 def dashboard():
-    if not session.get("user_email"):
+    if not session.get("user_phone"):
         return redirect(url_for("login"))
-    email = session.get("user_email", "")
+    phone = session.get("user_phone", "")
     users = load_users()
-    user = users.get(email, {})
-    full_name = user.get("full_name") or session.get("user_name") or email
+    user = users.get(phone, {})
+    full_name = user.get("full_name") or session.get("user_name") or phone
     return render_template(
         "templates/dashboard.html",
-        user_email=email,
+        user_phone=phone,
         user_full_name=full_name,
     )
 
 
 @app.route("/logout")
 def logout():
-    user_email = session.get("user_email", "")
-    if user_email:
-        log_activity(user_email, "LOGOUT", "User logged out", request.remote_addr)
+    user_phone = session.get("user_phone", "")
+    if user_phone:
+        log_activity(user_phone, "LOGOUT", "User logged out", request.remote_addr)
     session.clear()
     return redirect(url_for("login"))
 
 
 @app.route("/settings")
 def settings():
-    if not session.get("user_email"):
+    if not session.get("user_phone"):
         return redirect(url_for("login"))
     
     settings_data = load_settings()
@@ -266,7 +324,7 @@ def settings():
     activity_log = [
         {
             "timestamp": entry.timestamp.isoformat(),
-            "user_email": entry.user_email,
+            "user_phone": entry.user_phone,
             "action": entry.action,
             "details": entry.details,
             "ip_address": entry.ip_address
@@ -274,7 +332,7 @@ def settings():
         for entry in activity_log_entries
     ]
     users = load_users()
-    current_user = users.get(session.get("user_email"), {})
+    current_user = users.get(session.get("user_phone"), {})
     
     return render_template("admin/settings.html", 
                          settings=settings_data,
@@ -284,13 +342,13 @@ def settings():
 
 @app.route("/settings/state", methods=["GET"])
 def settings_state():
-    if not session.get("user_email"):
+    if not session.get("user_phone"):
         return jsonify({"error": "Unauthorized"}), 401
 
     settings = load_settings()
-    user_email = session.get("user_email", "")
+    user_phone = session.get("user_phone", "")
     users = load_users()
-    user = users.get(user_email, {})
+    user = users.get(user_phone, {})
     notifications = settings.get("notifications", {})
     sec = settings.get("security", {})
     tf_enabled = bool(sec.get("two_factor_enabled"))
@@ -304,7 +362,7 @@ def settings_state():
                 "backup_codes": (sec.get("backup_codes") if tf_enabled else None),
             },
             "user": {
-                "email": user_email,
+                "phone": user_phone,
                 "full_name": user.get("full_name") or session.get("user_name", ""),
             },
         }
@@ -314,14 +372,14 @@ def settings_state():
 @app.route("/api/activity-feed", methods=["GET"])
 def api_activity_feed():
     """Recent account activity for the dashboard Notifications module (refresh)."""
-    if not session.get("user_email"):
+    if not session.get("user_phone"):
         return jsonify({"error": "Unauthorized"}), 401
     # Get activity log from database
     log_entries = ActivityLogEntry.query.order_by(ActivityLogEntry.timestamp.desc()).limit(50).all()
     recent = [
         {
             "timestamp": entry.timestamp.isoformat(),
-            "user_email": entry.user_email,
+            "user_phone": entry.user_phone,
             "action": entry.action,
             "details": entry.details,
             "ip_address": entry.ip_address
@@ -370,13 +428,13 @@ def api_farmer_data():
 
 @app.route("/settings/security", methods=["POST"])
 def settings_security():
-    if not session.get("user_email"):
+    if not session.get("user_phone"):
         return jsonify({"error": "Unauthorized"}), 401
     
     action = request.form.get("action")
-    user_email = session.get("user_email")
+    user_phone = session.get("user_phone")
     users = load_users()
-    current_user = users.get(user_email, {})
+    current_user = users.get(user_phone, {})
     
     if action == "verify_current_password":
         attempt = request.form.get("current_password") or request.form.get("currentPassword") or ""
@@ -392,7 +450,7 @@ def settings_security():
         confirm_password = request.form.get("confirm_password") or request.form.get("confirmPassword")
         
         if not check_password_hash(current_user.get("password_hash", ""), current_password):
-            log_activity(user_email, "PASSWORD_CHANGE_FAILED", "Incorrect current password", request.remote_addr)
+            log_activity(user_phone, "PASSWORD_CHANGE_FAILED", "Incorrect current password", request.remote_addr)
             return jsonify({"error": "Current password is incorrect"})
         
         if new_password != confirm_password:
@@ -401,9 +459,9 @@ def settings_security():
         if len(new_password) < 8:
             return jsonify({"error": "Password must be at least 8 characters long"})
         
-        users[user_email]["password_hash"] = generate_password_hash(new_password)
+        users[user_phone]["password_hash"] = generate_password_hash(new_password)
         save_users(users)
-        log_activity(user_email, "PASSWORD_CHANGED", "Password successfully changed", request.remote_addr)
+        log_activity(user_phone, "PASSWORD_CHANGED", "Password successfully changed", request.remote_addr)
         return jsonify({"success": "Password updated successfully"})
     
     elif action == "toggle_2fa":
@@ -437,7 +495,7 @@ def settings_security():
             sec["backup_codes"] = backup_codes
 
             save_settings(settings)
-            log_activity(user_email, "2FA_ENABLED", "Two-factor authentication enabled", request.remote_addr)
+            log_activity(user_phone, "2FA_ENABLED", "Two-factor authentication enabled", request.remote_addr)
             return jsonify(
                 {
                     "success": "2FA enabled successfully",
@@ -464,7 +522,7 @@ def settings_security():
             sec["backup_codes"] = []
             
             save_settings(settings)
-            log_activity(user_email, "2FA_DISABLED", "Two-factor authentication disabled", request.remote_addr)
+            log_activity(user_phone, "2FA_DISABLED", "Two-factor authentication disabled", request.remote_addr)
             return jsonify({"success": "2FA disabled successfully"})
     
     return jsonify({"error": "Invalid action"})
@@ -472,42 +530,49 @@ def settings_security():
 
 @app.route("/settings/notifications", methods=["POST"])
 def settings_notifications():
-    if not session.get("user_email"):
+    if not session.get("user_phone"):
         return jsonify({"error": "Unauthorized"}), 401
     
     settings = load_settings()
-    notifications = settings.get("notifications", {})
     
-    # Update notification preferences
-    for key in notifications.keys():
-        notifications[key] = request.form.get(key) == "true"
+    notifications = {
+        "email_system_events": request.form.get("email_system_events") == "true",
+        "email_user_registrations": request.form.get("email_user_registrations") == "true",
+        "email_security_breaches": request.form.get("email_security_breaches") == "true",
+        "sms_system_events": request.form.get("sms_system_events") == "true",
+        "sms_user_registrations": request.form.get("sms_user_registrations") == "true",
+        "sms_security_breaches": request.form.get("sms_security_breaches") == "true",
+        "in_app_system_events": request.form.get("in_app_system_events") == "true",
+        "in_app_user_registrations": request.form.get("in_app_user_registrations") == "true",
+        "in_app_security_breaches": request.form.get("in_app_security_breaches") == "true",
+    }
     
     settings["notifications"] = notifications
     save_settings(settings)
     
-    user_email = session.get("user_email")
-    log_activity(user_email, "NOTIFICATIONS_UPDATED", "Notification preferences updated", request.remote_addr)
+    user_phone = session.get("user_phone")
+    log_activity(user_phone, "NOTIFICATIONS_UPDATED", "Notification preferences updated", request.remote_addr)
     
     return jsonify({"success": "Notification settings updated"})
 
 
 @app.route("/settings/profile", methods=["POST"])
 def settings_profile():
-    if not session.get("user_email"):
+    if not session.get("user_phone"):
         return jsonify({"error": "Unauthorized"}), 401
     
-    user_email = session.get("user_email")
+    user_phone = session.get("user_phone")
     full_name = request.form.get("full_name", "").strip()
     
     if not full_name:
         return jsonify({"error": "Full name is required"})
     
     users = load_users()
-    users[user_email]["full_name"] = full_name
+    users[user_phone]["full_name"] = full_name
     save_users(users)
     
     session["user_name"] = full_name
-    log_activity(user_email, "PROFILE_UPDATED", f"Profile updated: {full_name}", request.remote_addr)
+    log_activity(user_phone, "PROFILE_UPDATED", f"Profile updated: {full_name}", request.remote_addr)
     
     return jsonify({"success": "Profile updated successfully"})
 
@@ -515,7 +580,7 @@ def settings_profile():
 # Export Routes
 @app.route("/export/excel")
 def export_excel():
-    if not session.get("user_email"):
+    if not session.get("user_phone"):
         return redirect(url_for("login"))
     
     # Get actual farmer data from database
@@ -544,7 +609,7 @@ def export_excel():
 
 @app.route("/export/pdf")
 def export_pdf():
-    if not session.get("user_email"):
+    if not session.get("user_phone"):
         return redirect(url_for("login"))
     
     # Get actual farmer data from database
@@ -594,7 +659,7 @@ def export_pdf():
 
 @app.route("/export/csv")
 def export_csv():
-    if not session.get("user_email"):
+    if not session.get("user_phone"):
         return redirect(url_for("login"))
     
     # Get actual farmer data from database
@@ -625,7 +690,7 @@ def export_csv():
 @app.route("/api/ipo-preview/<file_uuid>")
 def api_ipo_file_preview(file_uuid):
     """Preview a specific uploaded file in the IPOPHL module"""
-    if not session.get("user_email"):
+    if not session.get("user_phone"):
         return jsonify({"error": "Unauthorized"}), 401
     
     try:
@@ -666,7 +731,7 @@ def api_ipo_file_preview(file_uuid):
 @app.route("/api/ipo-analyze", methods=["POST"])
 def api_ipo_analyze():
     """Handle file upload and AI analysis for IPOPHL documents"""
-    if not session.get("user_email"):
+    if not session.get("user_phone"):
         return jsonify({"error": "Unauthorized"}), 401
     
     try:
@@ -737,8 +802,8 @@ def api_ipo_analyze():
             db.session.commit()
         
         # Log activity
-        user_email = session.get("user_email")
-        log_activity(user_email, "IPOPHL_DOCUMENT_ANALYZED", 
+        user_phone = session.get("user_phone")
+        log_activity(user_phone, "IPOPHL_DOCUMENT_ANALYZED", 
                     f"Analyzed {file.filename} - Score: {doc_analysis.ai_score}%", 
                     request.remote_addr)
         
@@ -762,14 +827,14 @@ def api_ipo_analyze():
         
     except Exception as e:
         # Log error
-        user_email = session.get("user_email")
-        log_activity(user_email, "IPOPHL_ANALYSIS_ERROR", str(e), request.remote_addr)
+        user_phone = session.get("user_phone")
+        log_activity(user_phone, "IPOPHL_ANALYSIS_ERROR", str(e), request.remote_addr)
         return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
 
 @app.route("/api/file-preview/<filename>")
 def api_file_preview(filename):
     """Serve uploaded files for preview"""
-    if not session.get("user_email"):
+    if not session.get("user_phone"):
         return jsonify({"error": "Unauthorized"}), 401
     
     try:
@@ -803,7 +868,7 @@ def api_file_preview(filename):
 @app.route("/api/ipo-analysis/<file_uuid>", methods=["GET"])
 def api_get_analysis(file_uuid):
     """Get existing analysis results for a file"""
-    if not session.get("user_email"):
+    if not session.get("user_phone"):
         return jsonify({"error": "Unauthorized"}), 401
     
     try:
@@ -837,7 +902,7 @@ def api_get_analysis(file_uuid):
 @app.route("/api/ipo-analysis/<file_uuid>", methods=["POST"])
 def api_refresh_analysis(file_uuid):
     """Re-run analysis on an existing file"""
-    if not session.get("user_email"):
+    if not session.get("user_phone"):
         return jsonify({"error": "Unauthorized"}), 401
     
     try:
@@ -867,8 +932,8 @@ def api_refresh_analysis(file_uuid):
         db.session.commit()
         
         # Log activity
-        user_email = session.get("user_email")
-        log_activity(user_email, "IPOPHL_ANALYSIS_REFRESHED", 
+        user_phone = session.get("user_phone")
+        log_activity(user_phone, "IPOPHL_ANALYSIS_REFRESHED", 
                     f"Refreshed analysis for {doc_analysis.original_filename} - Score: {doc_analysis.ai_score}%", 
                     request.remote_addr)
         
@@ -891,7 +956,7 @@ def api_refresh_analysis(file_uuid):
 @app.route("/api/ipo-documents", methods=["GET"])
 def api_list_documents():
     """List all analyzed documents"""
-    if not session.get("user_email"):
+    if not session.get("user_phone"):
         return jsonify({"error": "Unauthorized"}), 401
     
     try:
@@ -933,8 +998,33 @@ def api_list_documents():
 
 # Create database tables and populate with data
 with app.app_context():
+    # Migrate old email-based admin tables to phone_number schema
+    try:
+        inspector = db.inspect(db.engine)
+        tables = inspector.get_table_names()
+        if "admin_user" in tables:
+            columns = [c["name"] for c in inspector.get_columns("admin_user")]
+            if "email" in columns and "phone_number" not in columns:
+                with db.engine.connect() as conn:
+                    conn.execute(text("DROP TABLE IF EXISTS admin_user"))
+                    conn.execute(text("DROP TABLE IF EXISTS activity_log_entry"))
+                    conn.commit()
+    except Exception:
+        pass
+
     db.create_all()
-    # Database is now the single source of truth - no more JSON syncing
+
+    # Backup old email-based users.json since auth now uses phone numbers
+    if USER_DB.exists():
+        try:
+            old_data = json.loads(USER_DB.read_text(encoding="utf-8"))
+            if old_data and isinstance(old_data, dict):
+                backup = USER_DB.with_suffix(".json.bak")
+                if backup.exists():
+                    backup.unlink()
+                USER_DB.rename(backup)
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     app.run(debug=True, port=5001)

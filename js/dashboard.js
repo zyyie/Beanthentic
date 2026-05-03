@@ -455,6 +455,8 @@ class DashboardApp {
       this.loadExcelData();
     }, 500);
     this.renderNotificationsList();
+    // Initialize new dashboard features
+    this.initNewDashboardFeatures();
   }
 
   updateNotificationsToolbarState() {
@@ -530,6 +532,54 @@ class DashboardApp {
         this.toggleSidePanel();
       });
     }
+
+    // Header icon buttons
+    const messagingBtn = document.getElementById('messagingBtn');
+    if (messagingBtn) {
+      messagingBtn.addEventListener('click', () => {
+        this.showNotification('Messaging feature coming soon!', 'info');
+      });
+    }
+
+    const accountBtn = document.getElementById('accountBtn');
+    if (accountBtn) {
+      accountBtn.addEventListener('click', () => {
+        this.showNotification('Account settings coming soon!', 'info');
+      });
+    }
+
+    // Sidebar submenu toggles
+    const submenuToggles = [
+      { link: 'sidebarFarmersLink', submenu: 'sidebarFarmersSubmenu' },
+      { link: 'sidebarIpophlLink', submenu: 'sidebarIpophlSubmenu' },
+      { link: 'sidebarSettingsLink', submenu: 'sidebarSettingsSubmenu' }
+    ];
+
+    submenuToggles.forEach(({ link, submenu }) => {
+      const linkEl = document.getElementById(link);
+      const submenuEl = document.getElementById(submenu);
+      
+      if (linkEl && submenuEl) {
+        linkEl.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.toggleSubmenu(linkEl, submenuEl);
+        });
+      }
+    });
+
+    // Submenu navigation links
+    const submenuLinks = document.querySelectorAll('.submenu .nav-link');
+    submenuLinks.forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const module = link.dataset.module;
+        if (module) {
+          this.switchModule(module);
+          this.setActiveNavLink(link);
+        }
+      });
+    });
 
     // Navigation links
     const navLinks = document.querySelectorAll('.nav-link');
@@ -976,13 +1026,13 @@ class DashboardApp {
     return res.json();
   }
 
-  buildTotpUri(email, secret) {
+  buildTotpUri(identifier, secret) {
     const enc = encodeURIComponent;
-    const id = email || 'admin';
+    const id = identifier || 'admin';
     return `otpauth://totp/Beanthentic:${enc(id)}?secret=${enc(secret)}&issuer=${enc('Beanthentic')}`;
   }
 
-  fill2faSetupPanel(containerEl, email, secret, backupCodes) {
+  fill2faSetupPanel(containerEl, identifier, secret, backupCodes) {
     const twoFaStatus = containerEl.querySelector('[id="2faStatus"]');
     const twoFaSetup = containerEl.querySelector('[id="2faSetup"]');
     const manualKey = containerEl.querySelector('#manualKey');
@@ -995,7 +1045,7 @@ class DashboardApp {
       backupCodesList.innerHTML = backupCodes.map((c) => `<code>${c}</code>`).join('');
     }
     if (qrHolder && secret) {
-      const uri = this.buildTotpUri(email, secret);
+      const uri = this.buildTotpUri(identifier, secret);
       const src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(uri)}`;
       qrHolder.innerHTML = `<img src="${src}" alt="Scan to add to authenticator app" width="200" height="200" loading="lazy" />`;
     }
@@ -1268,9 +1318,9 @@ class DashboardApp {
     if (profileForm) {
       const u = (state && state.user) || window.__BEANTHENTIC_USER__ || {};
       const fn = containerEl.querySelector('#fullName');
-      const em = containerEl.querySelector('#email');
+      const ph = containerEl.querySelector('#phone');
       if (fn) fn.value = u.full_name || '';
-      if (em) em.value = u.email || '';
+      if (ph) ph.value = u.phone || '';
 
       profileForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -1506,9 +1556,9 @@ class DashboardApp {
 
     let twoFaActive = !!(state && state.security && state.security.two_factor_enabled);
 
-    const userEmail =
-      (state && state.user && state.user.email) ||
-      (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.email) ||
+    const userIdentifier =
+      (state && state.user && state.user.phone) ||
+      (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.phone) ||
       '';
 
     const startEnable2fa = async (showSuccessMsg = true) => {
@@ -1529,7 +1579,7 @@ class DashboardApp {
         twoFaActive = true;
         if (enable2faToggle) enable2faToggle.checked = true;
         set2faEnabledState(true);
-        this.fill2faSetupPanel(containerEl, userEmail, result.secret, result.backup_codes);
+        this.fill2faSetupPanel(containerEl, userIdentifier, result.secret, result.backup_codes);
         if (showSuccessMsg) this.showNotification(result.success || '2FA enabled.', 'success');
       } catch {
         this.showNotification('Could not enable 2FA.', 'error');
@@ -1576,7 +1626,7 @@ class DashboardApp {
         }
         this.fill2faSetupPanel(
           containerEl,
-          fresh.user && fresh.user.email,
+          fresh.user && fresh.user.phone,
           fresh.security.totp_secret,
           fresh.security.backup_codes || []
         );
@@ -2855,7 +2905,7 @@ class DashboardApp {
     let content = `GEographical Indication Registration Application\n`;
     content += `=========================================\n\n`;
     content += `Date: ${new Date().toLocaleDateString()}\n`;
-    content += `Applicant: ${this.getCurrentUserEmail() || 'Not specified'}\n\n`;
+    content += `Applicant: ${this.getCurrentUserIdentifier() || 'Not specified'}\n\n`;
     
     // Add phase summaries
     for (let i = 1; i <= 5; i++) {
@@ -2901,9 +2951,9 @@ class DashboardApp {
     return titles[phaseNum] || `Phase ${phaseNum}`;
   }
 
-  getCurrentUserEmail() {
-    // Try to get user email from session or dashboard
-    return session?.user_email || document.querySelector('.user-email')?.textContent || null;
+  getCurrentUserIdentifier() {
+    // Try to get user phone from session or dashboard
+    return session?.user_phone || null;
   }
 
   collectAllPhaseData() {
@@ -3538,6 +3588,298 @@ class DashboardApp {
     setTimeout(() => {
       notification.remove();
     }, 3000);
+  }
+
+  // New dashboard functionality
+  initNewDashboardFeatures() {
+    this.initThemeToggle();
+    this.initGlobalSearch();
+    this.initDashboardActions();
+    this.updateNotificationBadges();
+    this.initLastUpdatedTime();
+  }
+
+  initThemeToggle() {
+    const themeToggle = document.getElementById('themeToggle');
+    if (!themeToggle) return;
+
+    // Check for saved theme preference
+    const savedTheme = localStorage.getItem('beanthentic-theme') || 'light';
+    this.applyTheme(savedTheme);
+
+    themeToggle.addEventListener('click', () => {
+      const currentTheme = document.body.getAttribute('data-theme') || 'light';
+      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      
+      this.applyTheme(newTheme);
+      localStorage.setItem('beanthentic-theme', newTheme);
+    });
+  }
+
+  applyTheme(theme) {
+    document.body.setAttribute('data-theme', theme);
+    const themeIcon = document.querySelector('#themeToggle .action-icon');
+    if (themeIcon) {
+      themeIcon.className = theme === 'dark' ? 'action-icon fa-solid fa-sun' : 'action-icon fa-solid fa-moon';
+    }
+  }
+
+  initGlobalSearch() {
+    const searchInput = document.getElementById('globalSearch');
+    if (!searchInput) return;
+
+    searchInput.addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase().trim();
+      this.performGlobalSearch(query);
+    });
+
+    searchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const query = e.target.value.trim();
+        if (query) {
+          this.handleSearchSubmit(query);
+        }
+      }
+    });
+  }
+
+  performGlobalSearch(query) {
+    if (!query) {
+      this.clearSearchResults();
+      return;
+    }
+
+    // Search across different data types
+    const results = {
+      farmers: this.searchFarmers(query),
+      records: this.searchRecords(query),
+      analytics: this.searchAnalytics(query)
+    };
+
+    this.displaySearchResults(results, query);
+  }
+
+  searchFarmers(query) {
+    if (!this.data || this.data.length === 0) return [];
+    
+    return this.data.filter(farmer => {
+      const searchableFields = [
+        farmer.fullName || '',
+        farmer.barangay || '',
+        farmer.municipality || '',
+        farmer.province || '',
+        farmer.contactNumber || '',
+        farmer.remarks || ''
+      ];
+      
+      return searchableFields.some(field => 
+        field.toLowerCase().includes(query)
+      );
+    }).slice(0, 5);
+  }
+
+  searchRecords(query) {
+    // Search in other records (implement as needed)
+    return [];
+  }
+
+  searchAnalytics(query) {
+    // Search in analytics data (implement as needed)
+    return [];
+  }
+
+  displaySearchResults(results, query) {
+    // Implement search results display
+    console.log('Search results for:', query, results);
+  }
+
+  clearSearchResults() {
+    // Clear search results display
+  }
+
+  handleSearchSubmit(query) {
+    // Handle search submission (navigate to results page)
+    console.log('Search submitted:', query);
+  }
+
+  initDashboardActions() {
+    const exportBtn = document.getElementById('exportOverviewBtn');
+    const refreshBtn = document.getElementById('refreshOverviewBtn');
+
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => {
+        this.exportOverviewReport();
+      });
+    }
+
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        this.refreshOverviewData();
+      });
+    }
+  }
+
+  exportOverviewReport() {
+    // Export dashboard overview as report
+    const reportData = {
+      totalFarmers: document.getElementById('totalFarmers')?.textContent || '0',
+      totalTrees: document.getElementById('totalTrees')?.textContent || '0',
+      totalArea: document.getElementById('totalArea')?.textContent || '0',
+      totalProduction: document.getElementById('totalProduction')?.textContent || '0',
+      exportDate: new Date().toISOString()
+    };
+
+    // Create and download CSV
+    const csvContent = this.generateOverviewCSV(reportData);
+    this.downloadFile(csvContent, 'dashboard-overview.csv', 'text/csv');
+    
+    this.showNotification('Dashboard overview exported successfully', 'success');
+  }
+
+  generateOverviewCSV(data) {
+    const headers = ['Metric', 'Value', 'Export Date'];
+    const rows = [
+      ['Total Farmers', data.totalFarmers, data.exportDate],
+      ['Total Trees', data.totalTrees, data.exportDate],
+      ['Total Area (hectares)', data.totalArea, data.exportDate],
+      ['Total Production (kilos)', data.totalProduction, data.exportDate]
+    ];
+
+    return [headers, ...rows].map(row => row.join(',')).join('\n');
+  }
+
+  downloadFile(content, filename, contentType) {
+    const blob = new Blob([content], { type: contentType });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }
+
+  refreshOverviewData() {
+    // Refresh dashboard data
+    this.loadDashboardData();
+    this.updateLastUpdatedTime();
+    this.showNotification('Dashboard data refreshed', 'success');
+  }
+
+  updateNotificationBadges() {
+    const headerBadge = document.getElementById('headerNotificationBadge');
+    const navBadge = document.getElementById('navNotificationBadge');
+    
+    const unreadCount = this.notificationsFeed.filter(n => !n.read).length;
+    
+    if (headerBadge) headerBadge.textContent = unreadCount;
+    if (navBadge) navBadge.textContent = unreadCount;
+  }
+
+  initLastUpdatedTime() {
+    const lastUpdatedElement = document.getElementById('lastUpdated');
+    if (!lastUpdatedElement) return;
+
+    this.updateLastUpdatedTime();
+    
+    // Update every minute
+    setInterval(() => {
+      this.updateLastUpdatedTime();
+    }, 60000);
+  }
+
+  updateLastUpdatedTime() {
+    const lastUpdatedElement = document.getElementById('lastUpdated');
+    if (!lastUpdatedElement) return;
+
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
+    
+    lastUpdatedElement.textContent = `Today at ${timeString}`;
+  }
+
+  // Toggle submenu visibility
+  toggleSubmenu(linkEl, submenuEl) {
+    const isExpanded = linkEl.getAttribute('aria-expanded') === 'true';
+    
+    if (isExpanded) {
+      linkEl.setAttribute('aria-expanded', 'false');
+      submenuEl.classList.remove('expanded');
+      linkEl.classList.remove('active');
+    } else {
+      // Close other submenus first
+      this.closeAllSubmenus();
+      linkEl.setAttribute('aria-expanded', 'true');
+      submenuEl.classList.add('expanded');
+      linkEl.classList.add('active');
+    }
+  }
+
+  // Close all submenus
+  closeAllSubmenus() {
+    const submenuLinks = document.querySelectorAll('.nav-link.has-submenu');
+    const submenus = document.querySelectorAll('.submenu');
+    
+    submenuLinks.forEach(link => {
+      link.setAttribute('aria-expanded', 'false');
+      link.classList.remove('active');
+    });
+    submenus.forEach(submenu => submenu.classList.remove('expanded'));
+  }
+
+  // Set active navigation link
+  setActiveNavLink(activeLink) {
+    // Remove active class from all nav links except parent dropdowns
+    const allNavLinks = document.querySelectorAll('.nav-link');
+    allNavLinks.forEach(link => {
+      // Keep parent dropdowns active if they have expanded submenus
+      if (!link.classList.contains('has-submenu') || link.getAttribute('aria-expanded') !== 'true') {
+        link.classList.remove('active');
+      }
+    });
+    
+    // Add active class to the clicked link
+    activeLink.classList.add('active');
+    
+    // If this is a submenu item, keep the parent active
+    const parentSubmenu = activeLink.closest('.submenu');
+    if (parentSubmenu) {
+      const parentLink = parentSubmenu.previousElementSibling;
+      if (parentLink && parentLink.classList.contains('has-submenu')) {
+        parentLink.classList.add('active');
+      }
+    }
+    
+    // Update breadcrumb if needed
+    const moduleName = activeLink.querySelector('span')?.textContent || '';
+    const currentModuleEl = document.getElementById('currentModule');
+    if (currentModuleEl && moduleName) {
+      currentModuleEl.textContent = moduleName;
+    }
+  }
+
+  // Switch to a specific module
+  switchModule(moduleName) {
+    // Hide all modules
+    const allModules = document.querySelectorAll('.module');
+    allModules.forEach(module => {
+      module.style.display = 'none';
+    });
+    
+    // Show the selected module
+    const targetModule = document.getElementById(`${moduleName}-module`) || 
+                        document.querySelector(`[data-module="${moduleName}"]`);
+    if (targetModule) {
+      targetModule.style.display = 'block';
+    }
+    
+    console.log('Switched to module:', moduleName);
   }
 }
 

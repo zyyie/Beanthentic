@@ -32,8 +32,12 @@
       <!-- Side Panel -->
       <aside class="side-panel">
         <div class="side-panel-header">
-          <img class="side-brand-img" src="assets/images/logo.png" alt="Beanthentic logo" />
+          <a href="#" class="side-brand">
+            <img class="side-brand-img" src="assets/images/logo.png" alt="Beanthentic logo" />
+            <span class="side-brand-text">Beanthentic</span>
+          </a>
         </div>
+
         <nav class="side-nav">
           <div class="nav-section">
             <h3>Overview</h3>
@@ -41,63 +45,82 @@
               <i class="nav-icon fa-solid fa-chart-pie" aria-hidden="true"></i>
               <span>Dashboard Overview</span>
             </a>
-            <a href="#notifications" class="nav-link" data-module="notifications">
-              <i class="nav-icon fa-solid fa-bell" aria-hidden="true"></i>
-              <span>Notifications</span>
-            </a>
           </div>
+          
           <div class="nav-section">
             <h3>Data Management</h3>
-            <a href="#farmers" class="nav-link" data-module="farmers">
+            <a href="#farmers" class="nav-link has-submenu" data-module="farmers" id="sidebarFarmersLink">
               <i class="nav-icon fa-solid fa-people-group" aria-hidden="true"></i>
               <span>Farmer Records</span>
+              <i class="submenu-arrow fa-solid fa-chevron-down" aria-hidden="true"></i>
             </a>
-            <a href="#analytics" class="nav-link" data-module="analytics">
-              <i class="nav-icon fa-solid fa-chart-line" aria-hidden="true"></i>
-              <span>Analytics</span>
-            </a>
-            <a href="#ipophl" class="nav-link" data-module="ipophl">
+            <div class="submenu" id="sidebarFarmersSubmenu">
+              <a href="#farmers-list" class="nav-link" data-module="farmers-list">
+                <i class="nav-icon fa-solid fa-user" aria-hidden="true"></i>
+                <span>Farmers</span>
+              </a>
+              <a href="#maps" class="nav-link" data-module="maps">
+                <i class="nav-icon fa-solid fa-map" aria-hidden="true"></i>
+                <span>Maps</span>
+              </a>
+              <a href="#transactions" class="nav-link" data-module="transactions">
+                <i class="nav-icon fa-solid fa-handshake" aria-hidden="true"></i>
+                <span>Transactions</span>
+              </a>
+            </div>
+            <a href="#ipophl" class="nav-link has-submenu" data-module="ipophl" id="sidebarIpophlLink">
               <i class="nav-icon fa-solid fa-certificate" aria-hidden="true"></i>
               <span>IPOPHL</span>
+              <i class="submenu-arrow fa-solid fa-chevron-down" aria-hidden="true"></i>
             </a>
+            <div class="submenu" id="sidebarIpophlSubmenu">
+              <a href="#register" class="nav-link" data-module="register">
+                <i class="nav-icon fa-solid fa-user-plus" aria-hidden="true"></i>
+                <span>Register</span>
+              </a>
+              <a href="#gi-seal" class="nav-link" data-module="gi-seal">
+                <i class="nav-icon fa-solid fa-award" aria-hidden="true"></i>
+                <span>GI Seal</span>
+              </a>
+              <a href="#analytics" class="nav-link" data-module="analytics">
+                <i class="nav-icon fa-solid fa-chart-line" aria-hidden="true"></i>
+                <span>Analytics</span>
+              </a>
+            </div>
           </div>
+
           <div class="nav-section">
             <h3>Tools</h3>
-            <a href="#export" class="nav-link" data-module="export">
-              <i class="nav-icon fa-solid fa-file-export" aria-hidden="true"></i>
-              <span>Export Data</span>
-            </a>
             <a href="#social-media" class="nav-link" data-module="social-media">
               <i class="nav-icon fa-solid fa-share-nodes" aria-hidden="true"></i>
               <span>Social Media</span>
             </a>
-            <a href="#settings" class="nav-link" data-module="settings" id="sidebarSettingsLink">
+            <a href="#settings" class="nav-link has-submenu" data-module="settings" id="sidebarSettingsLink">
               <i class="nav-icon fa-solid fa-gear" aria-hidden="true"></i>
               <span>Settings</span>
-              <i class="settings-arrow fa-solid fa-chevron-down" aria-hidden="true"></i>
+              <i class="submenu-arrow fa-solid fa-chevron-down" aria-hidden="true"></i>
             </a>
-
-            <div class="settings-submenu" id="sidebarSettingsSubmenu" aria-label="Settings fragments submenu">
-              <button type="button" class="settings-submenu-item" data-tab="security">
-                <i class="submenu-icon fa-solid fa-shield-halved" aria-hidden="true"></i>
-                Account Security
-              </button>
-              <button type="button" class="settings-submenu-item" data-tab="notifications">
-                <i class="submenu-icon fa-solid fa-bell" aria-hidden="true"></i>
-                Notifications Settings
-              </button>
-              <button type="button" class="settings-submenu-item" data-tab="activity">
-                <i class="submenu-icon fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
-                Activity Log
-              </button>
-              <button type="button" class="settings-submenu-item" data-tab="faq">
-                <i class="submenu-icon fa-solid fa-circle-question" aria-hidden="true"></i>
-                FAQ
-              </button>
-              <button type="button" class="settings-submenu-item" data-tab="profile">
-                <i class="submenu-icon fa-solid fa-user-gear" aria-hidden="true"></i>
-                Profile Actions
-              </button>
+            <div class="submenu" id="sidebarSettingsSubmenu">
+              <a href="#security" class="nav-link" data-module="security">
+                <i class="nav-icon fa-solid fa-shield-halved" aria-hidden="true"></i>
+                <span>Account Security</span>
+              </a>
+              <a href="#notifications" class="nav-link" data-module="notifications">
+                <i class="nav-icon fa-solid fa-bell" aria-hidden="true"></i>
+                <span>Notification Settings</span>
+              </a>
+              <a href="#activity" class="nav-link" data-module="activity">
+                <i class="nav-icon fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+                <span>Activity Log</span>
+              </a>
+              <a href="#faq" class="nav-link" data-module="faq">
+                <i class="nav-icon fa-solid fa-circle-question" aria-hidden="true"></i>
+                <span>FAQ</span>
+              </a>
+              <a href="#profile" class="nav-link" data-module="profile">
+                <i class="nav-icon fa-solid fa-user-gear" aria-hidden="true"></i>
+                <span>Profile Actions</span>
+              </a>
             </div>
           </div>
         </nav>
@@ -121,53 +144,22 @@
               <span class="breadcrumb-item active" id="currentModule">Overview</span>
             </div>
           </div>
+          
+          <div class="header-center">
+          </div>
+          
           <div class="header-right">
-            <div class="header-actions">
-              <button class="action-btn header-slate-btn header-slate-btn--text" id="refreshBtn" type="button">
-                <i class="action-icon fa-solid fa-rotate-right"></i>
-                <span>Refresh</span>
+            <div class="header-icon-actions">
+              <button class="icon-action-btn" id="messagingBtn" type="button" aria-label="Messages" title="Messages">
+                <i class="fa-solid fa-message"></i>
               </button>
-              <button class="action-btn header-slate-btn header-slate-btn--icon" id="notificationBtn" type="button" aria-label="Notifications">
-                <i class="action-icon fa-solid fa-bell"></i>
-                <span class="notification-badge" id="headerNotificationBadge" aria-hidden="true">0</span>
+              <button class="icon-action-btn" id="notificationBtn" type="button" aria-label="Notifications" title="Notifications">
+                <i class="fa-solid fa-bell"></i>
+                <span class="icon-badge" id="headerNotificationBadge">3</span>
               </button>
-            </div>
-            <div class="user-profile-dropdown" id="userProfileDropdown">
-              <button
-                type="button"
-                class="user-profile-trigger"
-                id="userProfileTrigger"
-                aria-expanded="false"
-                aria-haspopup="true"
-                aria-controls="userProfileMenu"
-              >
-                <div class="user-avatar" aria-hidden="true">
-                  <i class="fa-solid fa-user"></i>
-                </div>
-                <div class="user-info">
-                  <span class="user-name">{{ user_full_name }}</span>
-                  <span class="user-role">Administrator</span>
-                </div>
-                <span class="user-profile-chevron" aria-hidden="true">
-                  <i class="fa-solid fa-chevron-down"></i>
-                </span>
+              <button class="icon-action-btn" id="accountBtn" type="button" aria-label="Account" title="Administrator Account">
+                <i class="fa-solid fa-user"></i>
               </button>
-              <div
-                class="user-profile-menu"
-                id="userProfileMenu"
-                role="menu"
-                aria-labelledby="userProfileTrigger"
-                hidden
-              >
-                <button type="button" class="user-profile-menu-item user-profile-menu-item--account" role="menuitem" id="userProfileAccountBtn">
-                  <i class="fa-solid fa-id-card" aria-hidden="true"></i>
-                  <span>Account Information</span>
-                </button>
-                <button type="button" class="user-profile-menu-item user-profile-menu-item--logout" role="menuitem" id="userProfileLogoutBtn">
-                  <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
-                  <span>Log out</span>
-                </button>
-              </div>
             </div>
           </div>
         </header>
@@ -177,12 +169,8 @@
           <!-- Overview Module -->
           <div class="module" id="overview-module" data-module="overview">
             <section class="dashboard-title-section">
-              <div class="dashboard-title-row">
-                <div>
-                  <h1 class="dashboard-title">Coffee Database Dashboard</h1>
-                  <p class="dashboard-subtitle">Farmer Records Management System</p>
-                </div>
-              </div>
+              <h1 class="dashboard-title">Coffee Database Dashboard</h1>
+              <p class="dashboard-subtitle">Farmer Records Management System</p>
             </section>
 
             <!-- Stats Cards Section -->
@@ -193,7 +181,7 @@
                     <i class="fa-solid fa-people-group"></i>
                   </div>
                   <div class="stat-content">
-                    <h3>Total Farmers</h3>
+                    <h3>TOTAL FARMERS</h3>
                     <p class="stat-number" id="totalFarmers">0</p>
                     <span class="stat-label">Registered farmers</span>
                   </div>
@@ -203,7 +191,7 @@
                     <i class="fa-solid fa-tree"></i>
                   </div>
                   <div class="stat-content">
-                    <h3>Total Trees</h3>
+                    <h3>TOTAL TREES</h3>
                     <p class="stat-number" id="totalTrees">0</p>
                     <span class="stat-label">Coffee trees planted</span>
                   </div>
@@ -213,8 +201,8 @@
                     <i class="fa-solid fa-map"></i>
                   </div>
                   <div class="stat-content">
-                    <h3>Total Area</h3>
-                    <p class="stat-number" id="totalArea">0</p>
+                    <h3>TOTAL AREAS</h3>
+                    <p class="stat-number" id="totalArea">0.00</p>
                     <span class="stat-label">Hectares planted</span>
                   </div>
                 </div>
@@ -223,7 +211,7 @@
                     <i class="fa-solid fa-seedling"></i>
                   </div>
                   <div class="stat-content">
-                    <h3>Total Production</h3>
+                    <h3>TOTAL PRODUCTION</h3>
                     <p class="stat-number" id="totalProduction">0</p>
                     <span class="stat-label">Kilos produced</span>
                   </div>
@@ -1164,7 +1152,7 @@
   </div>
 
   <script>
-    window.__BEANTHENTIC_USER__ = null; // Will be set by Flask template
+    window.__BEANTHENTIC_USER__ = { phone: "{{ user_phone }}", full_name: "{{ user_full_name }}" };
   </script>
   <!-- JavaScript Files -->
   <script src="js/main.js"></script>
