@@ -186,3 +186,32 @@ class DocumentAnalysis(db.Model):
     
     def set_missing_requirements(self, requirements_list):
         self.missing_requirements = json.dumps(requirements_list)
+
+
+class FarmerCoffeeTransaction(db.Model):
+    """Ledger of coffee bean kg changes per farmer (sales to buyers, returns, corrections)."""
+
+    __tablename__ = "farmer_coffee_transaction"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    farmer_id = db.Column(db.Integer, db.ForeignKey("farmers.id", ondelete="CASCADE"), nullable=False, index=True)
+    recorded_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    # liberica | excelsa | robusta — one variety per row
+    variety = db.Column(db.String(20), nullable=False)
+    # Positive = farmer gains kg (e.g. correction, return). Negative = kg left stock (e.g. sale to buyer).
+    delta_kg = db.Column(db.Numeric(14, 4), nullable=False)
+    buyer_name = db.Column(db.String(200), default="")
+    notes = db.Column(db.Text, default="")
+    recorded_by_phone = db.Column(db.String(32), default="")
+
+    farmer = db.relationship(
+        "Farmer",
+        backref=db.backref(
+            "coffee_transactions",
+            lazy="dynamic",
+            order_by="FarmerCoffeeTransaction.recorded_at",
+        ),
+    )
+
+    def __repr__(self):
+        return f"FarmerCoffeeTransaction(farmer_id={self.farmer_id}, {self.delta_kg} kg {self.variety})"

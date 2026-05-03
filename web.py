@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import defaultdict
+
 import base64
 import json
 import os
@@ -14,8 +16,11 @@ from flask import Flask, redirect, render_template, request, session, url_for, j
 from werkzeug.security import check_password_hash, generate_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
-from config.models import (db, Farmer, AdminUser, ActivityLogEntry, 
-                    Affiliation, FarmInfo, TreeCounts, Production, DocumentAnalysis)
+from decimal import Decimal, InvalidOperation
+
+from config.models import (db, Farmer, AdminUser, ActivityLogEntry,
+                    Affiliation, FarmInfo, TreeCounts, Production, DocumentAnalysis,
+                    FarmerCoffeeTransaction)
 
 app = Flask(__name__, template_folder=".", static_folder=".", static_url_path="")
 app.secret_key = "beanthentic-dev-secret-change-this"
@@ -297,10 +302,12 @@ def dashboard():
     users = load_users()
     user = users.get(phone, {})
     full_name = user.get("full_name") or session.get("user_name") or phone
+    google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY", "").strip()
     return render_template(
         "templates/dashboard.html",
         user_phone=phone,
         user_full_name=full_name,
+        google_maps_api_key=google_maps_api_key,
     )
 
 
@@ -387,6 +394,309 @@ def api_activity_feed():
         for entry in log_entries
     ]
     return jsonify({"items": recent})
+
+
+_ALLOWED_COFFEE_VARIETIES = frozenset({"liberica", "excelsa", "robusta"})
+
+
+def _normalize_coffee_variety(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    v = str(raw).strip().lower()
+    return v if v in _ALLOWED_COFFEE_VARIETIES else None
+
+
+def _production_baseline_by_farmer() -> dict[int, dict[str, float]]:
+    """Harvest baseline (kg) per farmer from Production; current stock starts here before ledger deltas."""
+    out: dict[int, dict[str, float]] = defaultdict(
+        lambda: {"liberica": 0.0, "excelsa": 0.0, "robusta": 0.0}
+    )
+    for prod in Production.query.all():
+        out[prod.farmer_id] = {
+            "liberica": float(prod.liberica_kg or 0),
+            "excelsa": float(prod.excelsa_kg or 0),
+            "robusta": float(prod.robusta_kg or 0),
+        }
+    return out
+
+
+def _coffee_balance_after_by_txn_id() -> dict[int, float]:
+    """Run full ledger in time order; map each transaction id -> stock (kg) for that row's variety after applying it."""
+    baselines = _production_baseline_by_farmer()
+    state: dict[int, dict[str, float]] = {}
+    for fid, base in baselines.items():
+        state[fid] = dict(base)
+
+    txs = (
+        FarmerCoffeeTransaction.query.order_by(
+            FarmerCoffeeTransaction.recorded_at.asc(),
+            FarmerCoffeeTransaction.id.asc(),
+        ).all()
+    )
+    after: dict[int, float] = {}
+    for tx in txs:
+        fid = tx.farmer_id
+        v = _normalize_coffee_variety(tx.variety)
+        if v is None:
+            continue
+        if fid not in state:
+            state[fid] = {"liberica": 0.0, "excelsa": 0.0, "robusta": 0.0}
+        state[fid][v] = state[fid][v] + float(tx.delta_kg or 0)
+        after[tx.id] = state[fid][v]
+    return after
+
+
+@app.route("/api/farmer-picker", methods=["GET"])
+def api_farmer_picker():
+    """Minimal farmer list for admin selects (coffee transactions, etc.)."""
+    if not session.get("user_phone"):
+        return jsonify({"error": "Unauthorized"}), 401
+    farmers = Farmer.query.order_by(Farmer.no.asc()).all()
+    items = [
+        {"id": f.id, "no": f.no, "name": f.name or ""}
+        for f in farmers
+    ]
+    return jsonify({"items": items})
+
+
+@app.route("/api/farmer-coffee-transactions", methods=["GET", "POST"])
+def api_farmer_coffee_transactions():
+    """List or create farmer coffee bean kg ledger entries (admin Transactions module)."""
+    if not session.get("user_phone"):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    if request.method == "GET":
+        limit = request.args.get("limit", type=int) or 400
+        limit = min(max(limit, 1), 800)
+        farmer_id = request.args.get("farmer_id", type=int)
+
+        balance_after = _coffee_balance_after_by_txn_id()
+
+        q = FarmerCoffeeTransaction.query
+        if farmer_id:
+            q = q.filter(FarmerCoffeeTransaction.farmer_id == farmer_id)
+        rows = (
+            q.order_by(
+                FarmerCoffeeTransaction.recorded_at.desc(),
+                FarmerCoffeeTransaction.id.desc(),
+            )
+            .limit(limit)
+            .all()
+        )
+
+        farmer_cache: dict[int, Farmer] = {}
+        items = []
+        for tx in rows:
+            f = farmer_cache.get(tx.farmer_id)
+            if f is None:
+                f = db.session.get(Farmer, tx.farmer_id)
+                if f:
+                    farmer_cache[tx.farmer_id] = f
+            v = _normalize_coffee_variety(tx.variety) or (tx.variety or "").lower()
+            items.append(
+                {
+                    "id": tx.id,
+                    "farmer_id": tx.farmer_id,
+                    "farmer_no": f.no if f else None,
+                    "farmer_name": f.name if f else "",
+                    "recorded_at": tx.recorded_at.isoformat() if tx.recorded_at else "",
+                    "variety": v,
+                    "delta_kg": float(tx.delta_kg or 0),
+                    "balance_after_kg": balance_after.get(tx.id),
+                    "buyer_name": (tx.buyer_name or "").strip(),
+                    "notes": (tx.notes or "").strip(),
+                    "recorded_by_phone": (tx.recorded_by_phone or "").strip(),
+                }
+            )
+        return jsonify({"items": items})
+
+    # POST — record movement (negative delta = sale / stock out)
+    payload = request.get_json(silent=True) or {}
+    farmer_id_val = payload.get("farmer_id")
+    try:
+        farmer_id_val = int(farmer_id_val)
+    except (TypeError, ValueError):
+        return jsonify({"error": "farmer_id is required"}), 400
+
+    farmer = db.session.get(Farmer, farmer_id_val)
+    if not farmer:
+        return jsonify({"error": "Farmer not found"}), 404
+
+    variety = _normalize_coffee_variety(payload.get("variety"))
+    if not variety:
+        return jsonify({"error": "variety must be liberica, excelsa, or robusta"}), 400
+
+    try:
+        delta_kg = Decimal(str(payload.get("delta_kg")))
+    except (InvalidOperation, TypeError, ValueError):
+        return jsonify({"error": "delta_kg must be a number"}), 400
+
+    if delta_kg == 0:
+        return jsonify({"error": "delta_kg cannot be zero"}), 400
+
+    buyer = (payload.get("buyer_name") or "").strip()[:200]
+    notes = (payload.get("notes") or "").strip()
+    user_phone = session.get("user_phone") or ""
+
+    tx = FarmerCoffeeTransaction(
+        farmer_id=farmer_id_val,
+        recorded_at=datetime.utcnow(),
+        variety=variety,
+        delta_kg=delta_kg,
+        buyer_name=buyer,
+        notes=notes,
+        recorded_by_phone=user_phone,
+    )
+    db.session.add(tx)
+    db.session.commit()
+
+    sign_word = "Sale / out" if delta_kg < 0 else "Addition"
+    log_activity(
+        user_phone,
+        "COFFEE_BEAN_TX",
+        f"{sign_word}: {abs(delta_kg)} kg {variety} — {farmer.name} (No. {farmer.no})"
+        + (f" — buyer: {buyer}" if buyer else ""),
+        request.remote_addr,
+    )
+
+    return jsonify({"success": True, "id": tx.id})
+
+
+@app.route("/api/admin-notifications", methods=["GET"])
+def api_admin_notifications():
+    """Admin notification feed for dashboard bell and notifications module."""
+    if not session.get("user_phone"):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    now = datetime.utcnow()
+    notifications = []
+
+    # 1) Farmer coffee bean movements (sales / adjustments) recorded by admin.
+    coffee_rows = (
+        FarmerCoffeeTransaction.query.order_by(
+            FarmerCoffeeTransaction.recorded_at.desc(),
+            FarmerCoffeeTransaction.id.desc(),
+        )
+        .limit(15)
+        .all()
+    )
+    for tx in coffee_rows:
+        farmer = db.session.get(Farmer, tx.farmer_id)
+        fname = farmer.name if farmer else "Farmer"
+        fno = farmer.no if farmer else ""
+        v = _normalize_coffee_variety(tx.variety) or (tx.variety or "").lower()
+        kg = float(tx.delta_kg or 0)
+        buyer = (tx.buyer_name or "").strip()
+        if kg < 0:
+            title = f"Bean sale: {abs(kg):,.2f} kg {v.title()}"
+            detail = f"{fname} (No. {fno}) — stock reduced."
+        else:
+            title = f"Bean addition: {kg:,.2f} kg {v.title()}"
+            detail = f"{fname} (No. {fno}) — stock increased."
+        if buyer:
+            detail += f" Buyer: {buyer}."
+        notes = (tx.notes or "").strip()
+        if notes:
+            detail += f" {notes}"
+        notifications.append(
+            {
+                "id": f"coffee-tx-{tx.id}",
+                "icon": "fa-handshake",
+                "title": title,
+                "meta": (tx.recorded_at.isoformat() if tx.recorded_at else now.isoformat()),
+                "detail": detail.strip(),
+                "category": "transactions",
+                "category_label": "Coffee beans",
+                "read": False,
+            }
+        )
+
+    # 2) Pending farmer registrations inferred from remarks/status notes.
+    pending_keywords = (
+        "pending",
+        "for approval",
+        "for review",
+        "submission",
+        "submitted",
+        "new registration",
+    )
+    farmers = Farmer.query.order_by(Farmer.no.asc()).all()
+    pending_farmers = []
+    for farmer in farmers:
+        remark = (farmer.remarks or "").strip().lower()
+        if not remark:
+            continue
+        if any(token in remark for token in pending_keywords):
+            pending_farmers.append(farmer)
+
+    if pending_farmers:
+        preview_names = ", ".join(
+            [f.name for f in pending_farmers[:3] if getattr(f, "name", "").strip()]
+        )
+        more_count = max(len(pending_farmers) - 3, 0)
+        suffix = f" and {more_count} more" if more_count else ""
+        notifications.append(
+            {
+                "id": "pending-farmer-registrations",
+                "icon": "fa-user-clock",
+                "title": f"{len(pending_farmers)} pending farmer registration submission(s)",
+                "meta": now.isoformat(),
+                "detail": (
+                    f"Review farmer records marked pending in remarks. "
+                    f"Examples: {preview_names}{suffix}."
+                ),
+                "category": "pending-registrations",
+                "category_label": "Farmer Registration",
+                "read": False,
+            }
+        )
+
+    # 3) Current IPOPHL progress snapshot from analyzed documents.
+    ipo_docs = DocumentAnalysis.query.order_by(DocumentAnalysis.upload_timestamp.desc()).all()
+    if ipo_docs:
+        total_docs = len(ipo_docs)
+        avg_score = round(sum((doc.ai_score or 0) for doc in ipo_docs) / total_docs)
+        ready_docs = sum(
+            1
+            for doc in ipo_docs
+            if str(doc.ai_status or "").strip().lower() in {"ready", "registration ready"}
+        )
+        latest_doc = ipo_docs[0]
+        notifications.append(
+            {
+                "id": "ipophl-progress",
+                "icon": "fa-certificate",
+                "title": f"IPOPHL progress: {avg_score}% readiness",
+                "meta": (
+                    latest_doc.upload_timestamp.isoformat()
+                    if latest_doc.upload_timestamp
+                    else now.isoformat()
+                ),
+                "detail": (
+                    f"{ready_docs}/{total_docs} analyzed document(s) are marked ready. "
+                    "Open IPOPHL to continue the current GI registration flow."
+                ),
+                "category": "ipophl-progress",
+                "category_label": "IPOPHL",
+                "read": False,
+            }
+        )
+    else:
+        notifications.append(
+            {
+                "id": "ipophl-progress-empty",
+                "icon": "fa-certificate",
+                "title": "IPOPHL progress: no analyzed documents yet",
+                "meta": now.isoformat(),
+                "detail": "Upload and analyze IPOPHL files to start readiness tracking.",
+                "category": "ipophl-progress",
+                "category_label": "IPOPHL",
+                "read": False,
+            }
+        )
+
+    notifications.sort(key=lambda item: item.get("meta", ""), reverse=True)
+    return jsonify({"items": notifications})
 
 
 @app.route("/api/farmer-data", methods=["GET"])

@@ -465,6 +465,353 @@
             </div>
           </div>
 
+          <!-- Farmers List Module (card view + profile details) -->
+          <div class="module hidden" id="farmers-list-module" data-module="farmers-list">
+            <section class="module-header">
+              <h1>Farmers</h1>
+              <p>View all farmer profiles</p>
+            </section>
+
+            <section class="farmers-list-shell" aria-label="Farmers list">
+              <div class="farmers-list-toolbar" id="farmersListToolbar">
+                <label class="farmers-list-search-field" for="farmersListSearch">
+                  <span class="sr-only">Search farmers</span>
+                  <input
+                    id="farmersListSearch"
+                    type="search"
+                    placeholder="Search…"
+                    autocomplete="off"
+                  />
+                </label>
+
+                <label class="farmers-list-rows-field" for="farmersListPageSizeSelect">
+                  <span class="field-label">Rows</span>
+                  <select id="farmersListPageSizeSelect">
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="farmers-list-view" id="farmersListView">
+                <div class="farmers-card-grid" id="farmersCardGrid" aria-live="polite">
+                  <!-- Populated by dashboard.js -->
+                </div>
+
+                <div class="farmers-list-footer">
+                  <div class="table-info">
+                    <span id="farmersListRecordInfo">Loading...</span>
+                  </div>
+                  <div class="pagination pagination--compact" id="farmersListPagination"></div>
+                </div>
+              </div>
+
+              <div class="farmer-profile-view" id="farmerProfileView" hidden>
+                <div class="farmer-profile-toolbar">
+                  <button type="button" class="btn btn-secondary farmer-profile-back" id="farmerProfileBackBtn">
+                    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                    <span>Back to Profiles</span>
+                  </button>
+                </div>
+
+                <div class="farmer-profile-card" aria-label="Farmer profile">
+                  <aside class="farmer-profile-left">
+                    <div class="farmer-profile-avatar" aria-hidden="true">
+                      <i class="fa-solid fa-user"></i>
+                    </div>
+                    <h2 class="farmer-profile-name" id="farmerProfileName">Full Name</h2>
+                    <p class="farmer-profile-no" id="farmerProfileNo">No. #</p>
+
+                    <div class="farmer-profile-meta">
+                      <div class="farmer-profile-meta-row">
+                        <span class="meta-label">Date of Birth</span>
+                        <span class="meta-value" id="farmerProfileDob">—</span>
+                      </div>
+                      <div class="farmer-profile-meta-row">
+                        <span class="meta-label">Phone No.</span>
+                        <span class="meta-value" id="farmerProfilePhone">—</span>
+                      </div>
+                      <div class="farmer-profile-meta-row">
+                        <span class="meta-label">Current Address</span>
+                        <span class="meta-value" id="farmerProfileAddress">—</span>
+                      </div>
+                    </div>
+                  </aside>
+
+                  <section class="farmer-profile-right">
+                    <div class="farmer-profile-grid">
+                      <div class="form-group">
+                        <label>Last Name</label>
+                        <input id="farmerProfileLastName" type="text" disabled />
+                      </div>
+                      <div class="form-group">
+                        <label>First Name</label>
+                        <input id="farmerProfileFirstName" type="text" disabled />
+                      </div>
+                      <div class="form-group">
+                        <label>Province</label>
+                        <input id="farmerProfileProvince" type="text" disabled />
+                      </div>
+                      <div class="form-group">
+                        <label>Municipality</label>
+                        <input id="farmerProfileMunicipality" type="text" disabled />
+                      </div>
+                      <div class="form-group">
+                        <label>Barangay</label>
+                        <input id="farmerProfileBarangay" type="text" disabled />
+                      </div>
+                      <div class="form-group">
+                        <label>Federation Association</label>
+                        <input id="farmerProfileFederation" type="text" disabled />
+                      </div>
+                      <div class="form-group">
+                        <label>RSBSA Registered</label>
+                        <input id="farmerProfileRsbsa" type="text" disabled />
+                      </div>
+                      <div class="form-group">
+                        <label>RSBSA Registered Number</label>
+                        <input id="farmerProfileRsbsaNumber" type="text" disabled />
+                      </div>
+                      <div class="form-group">
+                        <label>Status Ownership</label>
+                        <input id="farmerProfileOwnership" type="text" disabled />
+                      </div>
+                      <div class="form-group">
+                        <label>Total Plant Area</label>
+                        <input id="farmerProfileTotalArea" type="text" disabled />
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- Maps Module -->
+          <div class="module hidden" id="maps-module" data-module="maps">
+            <section class="module-header">
+              <h1>Maps</h1>
+              <p>Track and manage mapped areas</p>
+            </section>
+
+            <section class="maps-toolbar" aria-label="Map filters">
+              <label class="maps-toolbar__search" for="mapsSearchInput">
+                <span class="sr-only">Search barangay</span>
+                <input id="mapsSearchInput" type="search" placeholder="Search barangay.." autocomplete="off" />
+              </label>
+              <div class="maps-toolbar__variety" role="tablist" aria-label="Coffee variety filter">
+                <button type="button" class="maps-variety-btn is-active" role="tab" aria-selected="true">Liberica</button>
+                <button type="button" class="maps-variety-btn" role="tab" aria-selected="false">Robusta</button>
+                <button type="button" class="maps-variety-btn" role="tab" aria-selected="false">Excelsa</button>
+              </div>
+            </section>
+
+            <section class="maps-module-layout" aria-label="Coffee farm map analytics">
+              <div class="maps-stage-card">
+                <header class="maps-stage-card__header">
+                  <h2>Lipa City Coffee Farms</h2>
+                  <div class="maps-stage-card__tools" aria-hidden="true">
+                    <button type="button"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                    <button type="button"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                  </div>
+                </header>
+                <div class="maps-stage-card__body">
+                  <span class="maps-coord-pill">13.9411° N, 121.1648° E</span>
+                  <div id="mapsGoogleCanvas" class="maps-google-canvas" role="img" aria-label="Lipa City coffee farms map"></div>
+                  <p id="mapsGoogleFallback" class="maps-google-fallback" hidden>
+                    Google Maps unavailable. Add a valid API key to enable map rendering.
+                  </p>
+
+                  <aside class="maps-density-legend" aria-label="Farmer density legend">
+                    <h3>Farmer Density</h3>
+                    <ul>
+                      <li><span class="dot dot--high"></span>High (150+)</li>
+                      <li><span class="dot dot--medium"></span>Medium (100-150)</li>
+                      <li><span class="dot dot--low"></span>Low (50-100)</li>
+                      <li><span class="dot dot--very-low"></span>Very Low (&lt;50)</li>
+                    </ul>
+                  </aside>
+                </div>
+              </div>
+
+              <aside class="maps-insights">
+                <article class="maps-panel maps-panel--overview">
+                  <h2>Geographic Overview</h2>
+                  <div class="overview-stat">
+                    <strong>80</strong>
+                    <span>Barangays Covered</span>
+                  </div>
+                  <div class="overview-stat">
+                    <strong>3,140ha</strong>
+                    <span>Total Farm Area</span>
+                  </div>
+                  <div class="overview-stat overview-stat--accent">
+                    <strong>2.5ha</strong>
+                    <span>Average Farm Size</span>
+                  </div>
+                </article>
+
+                <article class="maps-panel">
+                  <h2>Top Barangays</h2>
+                  <ul class="top-barangays-list">
+                    <li><span><em class="dot dot--high"></em>Bulacnin</span><strong>187</strong></li>
+                    <li><span><em class="dot dot--medium"></em>Tibig</span><strong>164</strong></li>
+                    <li><span><em class="dot dot--low"></em>Mataas na Lupa</span><strong>152</strong></li>
+                    <li><span><em class="dot dot--very-low"></em>Dagatan</span><strong>143</strong></li>
+                    <li><span><em class="dot dot--muted"></em>Antipolo</span><strong>128</strong></li>
+                  </ul>
+                </article>
+
+                <article class="maps-panel">
+                  <h2><i class="fa-solid fa-mug-hot" aria-hidden="true"></i> Coffee Trees</h2>
+                  <div class="trees-total-card">
+                    <strong>562,000</strong>
+                    <span>Total Trees</span>
+                  </div>
+                  <div class="trees-mini-grid">
+                    <div>
+                      <strong>179</strong>
+                      <span>Trees/ha</span>
+                    </div>
+                    <div>
+                      <strong>451</strong>
+                      <span>Avg/Farm</span>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="maps-panel">
+                  <h2>Map Layers</h2>
+                  <ul class="map-layers-list">
+                    <li><span>Farmer Locations</span><span class="layer-toggle is-on" aria-hidden="true"></span></li>
+                    <li><span>Farm Boundaries</span><span class="layer-toggle is-on" aria-hidden="true"></span></li>
+                    <li><span>Density Heatmap</span><span class="layer-toggle" aria-hidden="true"></span></li>
+                    <li><span>Road Network</span><span class="layer-toggle" aria-hidden="true"></span></li>
+                  </ul>
+                </article>
+              </aside>
+            </section>
+          </div>
+
+          <!-- Transactions Module (farmer ↔ buyer coffee bean kg ledger) -->
+          <div class="module hidden" id="transactions-module" data-module="transactions">
+            <section class="module-header">
+              <h1>Transactions</h1>
+              <p>Record sales and stock changes so each farmer’s current bean inventory (kg) stays accurate</p>
+            </section>
+
+            <div class="transactions-record-card settings-card" aria-label="Record coffee bean movement">
+              <h2 class="transactions-record-title">Record a movement</h2>
+              <p class="transactions-record-hint">
+                Baseline stock comes from each farmer’s production (Liberica / Excelsa / Robusta kg). Use a
+                <strong>negative</strong> amount when beans leave stock (e.g. sale to a buyer); use a
+                <strong>positive</strong> amount for additions (returns, corrections).
+              </p>
+              <form id="coffeeTxnRecordForm" class="coffee-txn-record-form">
+                <div class="coffee-txn-record-grid">
+                  <label class="coffee-txn-field" for="coffeeTxnFarmerSelect">
+                    <span class="field-label">Farmer</span>
+                    <select id="coffeeTxnFarmerSelect" name="farmer_id" required>
+                      <option value="">Loading farmers…</option>
+                    </select>
+                  </label>
+                  <label class="coffee-txn-field" for="coffeeTxnVariety">
+                    <span class="field-label">Variety</span>
+                    <select id="coffeeTxnVariety" name="variety" required>
+                      <option value="liberica">Liberica</option>
+                      <option value="excelsa">Excelsa</option>
+                      <option value="robusta">Robusta</option>
+                    </select>
+                  </label>
+                  <label class="coffee-txn-field" for="coffeeTxnDeltaKg">
+                    <span class="field-label">Δ kg</span>
+                    <input id="coffeeTxnDeltaKg" name="delta_kg" type="number" step="0.01" placeholder="e.g. -25.5" required />
+                  </label>
+                  <label class="coffee-txn-field coffee-txn-field--wide" for="coffeeTxnBuyer">
+                    <span class="field-label">Buyer / reference</span>
+                    <input id="coffeeTxnBuyer" name="buyer_name" type="text" maxlength="200" placeholder="Buyer name or reference (optional)" autocomplete="off" />
+                  </label>
+                  <label class="coffee-txn-field coffee-txn-field--full" for="coffeeTxnNotes">
+                    <span class="field-label">Notes</span>
+                    <textarea id="coffeeTxnNotes" name="notes" rows="2" placeholder="Optional notes"></textarea>
+                  </label>
+                </div>
+                <div class="coffee-txn-record-actions">
+                  <button type="submit" class="btn btn-primary" id="coffeeTxnSubmitBtn">
+                    <i class="fa-solid fa-circle-plus" aria-hidden="true"></i>
+                    <span>Save transaction</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <section class="module-toolbar transactions-toolbar" aria-label="Transactions ledger">
+              <div class="transactions-toolbar-inner">
+                <label class="transactions-filter-field" for="transactionsFarmerFilter">
+                  <span class="field-label">Farmer</span>
+                  <select id="transactionsFarmerFilter" aria-label="Filter by farmer">
+                    <option value="">All farmers</option>
+                  </select>
+                </label>
+                <label class="transactions-search-field" for="transactionsSearchInput">
+                  <span class="field-label">Search</span>
+                  <input
+                    id="transactionsSearchInput"
+                    type="search"
+                    placeholder="Filter by name, buyer, notes, variety…"
+                    autocomplete="off"
+                  />
+                </label>
+                <button type="button" class="btn btn-secondary" id="transactionsRefreshBtn">
+                  <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+                  <span>Refresh</span>
+                </button>
+              </div>
+              <p class="transactions-intro" role="note">
+                “Balance after” is that variety’s current kg for the farmer after this line: production baseline plus all prior ledger entries in order.
+              </p>
+            </section>
+
+            <div class="table-container transactions-table-wrap">
+              <div class="table-wrapper">
+                <table class="data-table transactions-table" aria-describedby="transactionsTableCaption">
+                  <caption id="transactionsTableCaption" class="sr-only">Farmer coffee bean transactions</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Date &amp; time</th>
+                      <th scope="col">Farmer</th>
+                      <th scope="col">Variety</th>
+                      <th scope="col">Δ kg</th>
+                      <th scope="col">Balance after (kg)</th>
+                      <th scope="col">Buyer / reference</th>
+                      <th scope="col">Notes</th>
+                      <th scope="col">Recorded by</th>
+                    </tr>
+                  </thead>
+                  <tbody id="transactionsTableBody">
+                    <tr><td colspan="8" class="transactions-loading-cell">Loading…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="transactions-empty" id="transactionsEmptyState" hidden>No matching transactions.</p>
+            </div>
+          </div>
+
+          <!-- Register Module -->
+          <div class="module hidden" id="register-module" data-module="register">
+            <section class="module-header">
+              <h1>IPOPHL Registration</h1>
+              <p>Current and ongoing document processes</p>
+            </section>
+
+            <section class="register-docs-shell" aria-label="Current IPOPHL documents">
+              <div class="register-docs-grid" id="registerDocsGrid">
+                <!-- Populated by dashboard.js -->
+              </div>
+            </section>
+          </div>
+
           <!-- Analytics Module -->
           <div class="module hidden" id="analytics-module" data-module="analytics">
             <section class="module-header">
@@ -1153,7 +1500,19 @@
 
   <script>
     window.__BEANTHENTIC_USER__ = { phone: "{{ user_phone }}", full_name: "{{ user_full_name }}" };
+    window.__GOOGLE_MAPS_API_KEY__ = "{{ google_maps_api_key }}";
   </script>
+  <script>
+    window.initBeanthenticGoogleMaps = function initBeanthenticGoogleMaps() {
+      if (window.dashboardApp && typeof window.dashboardApp.onGoogleMapsReady === 'function') {
+        window.dashboardApp.onGoogleMapsReady();
+      }
+      window.__BEANTHENTIC_GOOGLE_MAPS_READY__ = true;
+    };
+  </script>
+  {% if google_maps_api_key %}
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initBeanthenticGoogleMaps"></script>
+  {% endif %}
   <!-- JavaScript Files -->
   <script src="js/main.js"></script>
   <script src="js/navigation.js"></script>

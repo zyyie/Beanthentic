@@ -12,6 +12,12 @@ class DashboardApp {
     this.pageSize = 10;
     this.totalRecords = 0;
     this.farmerTableView = 'basic';
+    this.mapVarietyFilter = 'liberica';
+    this.mapSearchTerm = '';
+    this.googleMap = null;
+    this.googleMapMarkers = [];
+    this.googleMapsReady = false;
+    this.googleInfoWindow = null;
     this.activeSettingsTab = 'security';
     /** 'landing' = card hub; 'detail' = loaded fragment */
     this.settingsViewMode = 'landing';
@@ -19,6 +25,12 @@ class DashboardApp {
     this.notificationsFeed = this.hydrateNotificationsFeed();
     /** @type {number | null} */
     this.pendingDeleteRowIndex = null;
+    /** @type {Record<string, unknown>[]} */
+    this.transactionsRows = [];
+    /** @type {string} */
+    this.transactionsSearchTerm = '';
+    /** @type {number | null} */
+    this.transactionsFarmerFilterId = null;
     this.init();
   }
 
@@ -67,6 +79,30 @@ class DashboardApp {
     }));
   }
 
+  formatNotificationMeta(timestamp) {
+    if (!timestamp) return '';
+    try {
+      const d = new Date(timestamp);
+      if (Number.isNaN(d.getTime())) return String(timestamp);
+      return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    } catch {
+      return String(timestamp);
+    }
+  }
+
+  mapAdminNotificationToFeedItem(row, index) {
+    return {
+      id: row.id || `admin-feed-${index}`,
+      icon: row.icon || 'fa-bell',
+      title: row.title || 'Notification',
+      meta: this.formatNotificationMeta(row.meta || row.timestamp),
+      detail: row.detail || '',
+      category: row.category || '',
+      categoryLabel: row.category_label || '',
+      read: !!row.read,
+    };
+  }
+
   hydrateNotificationsFeed() {
     return this.applyReadStateToItems(this.getDefaultNotifications());
   }
@@ -83,6 +119,7 @@ class DashboardApp {
       '2FA_DISABLED': 'fa-shield-halved',
       NOTIFICATIONS_UPDATED: 'fa-bell',
       PROFILE_UPDATED: 'fa-user-pen',
+      COFFEE_BEAN_TX: 'fa-handshake',
     };
     return map[a] || 'fa-clock-rotate-left';
   }
@@ -99,6 +136,7 @@ class DashboardApp {
       '2FA_DISABLED': 'Two-factor authentication disabled',
       NOTIFICATIONS_UPDATED: 'Notification settings updated',
       PROFILE_UPDATED: 'Profile updated',
+      COFFEE_BEAN_TX: 'Coffee bean transaction recorded',
     };
     if (map[a]) return map[a];
     return (action || 'Activity').replace(/_/g, ' ');
@@ -135,13 +173,13 @@ class DashboardApp {
     }
     if (markAllBtn) markAllBtn.disabled = true;
     try {
-      const res = await fetch('/api/activity-feed');
+      const res = await fetch('/api/admin-notifications');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const rows = Array.isArray(data.items) ? data.items : [];
-      const activityItems = rows.map((row, i) => this.mapActivityLogToFeedItem(row, i));
+      const adminItems = rows.map((row, i) => this.mapAdminNotificationToFeedItem(row, i));
       const defaults = this.getDefaultNotifications();
-      this.notificationsFeed = this.applyReadStateToItems([...activityItems, ...defaults]);
+      this.notificationsFeed = this.applyReadStateToItems([...adminItems, ...defaults]);
       this.renderNotificationsList();
       this.showNotification('Notifications refreshed.', 'success');
     } catch (e) {
@@ -504,6 +542,9 @@ class DashboardApp {
     list.innerHTML = rows
       .map((n) => {
         const readClass = n.read ? ' notification-item--read' : '';
+        const categoryMarkup = n.categoryLabel
+          ? `<span class="notification-item-category">${esc(n.categoryLabel)}</span>`
+          : '';
         const actionMarkup = n.read
           ? '<span class="notification-read-badge" aria-hidden="true">Read</span>'
           : `<button type="button" class="btn btn-secondary notification-mark-read-btn" data-action="mark-notification-read" data-notification-id="${esc(
@@ -513,6 +554,7 @@ class DashboardApp {
       <div class="notification-item-icon" aria-hidden="true"><i class="fa-solid ${esc(n.icon)}"></i></div>
       <div class="notification-item-body">
         <p class="notification-item-title">${esc(n.title)}</p>
+        ${categoryMarkup}
         <p class="notification-item-meta">${esc(n.meta)}</p>
       </div>
       <div class="notification-item-actions">${actionMarkup}</div>
@@ -522,6 +564,264 @@ class DashboardApp {
 
     this.updateNotificationsToolbarState();
     this.updateHeaderNotificationBadge();
+  }
+
+  escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  applyTransactionsSearchAndRender() {
+    const term = (this.transactionsSearchTerm || '').trim().toLowerCase();
+    const all = this.transactionsRows || [];
+    const filtered =
+      !term
+        ? all
+        : all.filter((row) => {
+            const hay = [
+              row.farmer_name,
+              row.farmer_no,
+              row.buyer_name,
+              row.notes,
+              row.variety,
+              row.recorded_by_phone,
+              row.recorded_at,
+              row.delta_kg,
+              row.balance_after_kg,
+            ]
+              .map((x) => String(x || '').toLowerCase())
+              .join(' ');
+            return hay.includes(term);
+          });
+    this.renderTransactionsTableBody(filtered);
+  }
+
+  varietyLabel(variety) {
+    const v = String(variety || '').toLowerCase();
+    if (v === 'liberica') return 'Liberica';
+    if (v === 'excelsa') return 'Excelsa';
+    if (v === 'robusta') return 'Robusta';
+    return variety || '—';
+  }
+
+  formatCoffeeDeltaKg(delta) {
+    const n = Number(delta);
+    if (Number.isNaN(n)) return '—';
+    const abs = Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (n > 0) return `+${abs}`;
+    return `−${abs}`;
+  }
+
+  deltaCellClass(delta) {
+    const n = Number(delta);
+    if (Number.isNaN(n) || n === 0) return 'transactions-delta--zero';
+    return n < 0 ? 'transactions-delta--out' : 'transactions-delta--in';
+  }
+
+  async loadFarmerOptionsForTransactionsModule() {
+    const formSelect = document.getElementById('coffeeTxnFarmerSelect');
+    const filterSelect = document.getElementById('transactionsFarmerFilter');
+    if (!formSelect && !filterSelect) return;
+
+    const setLoading = () => {
+      if (formSelect) {
+        formSelect.innerHTML = '<option value="">Loading farmers…</option>';
+        formSelect.disabled = true;
+      }
+    };
+    setLoading();
+
+    try {
+      const res = await fetch('/api/farmer-picker');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const items = Array.isArray(data.items) ? data.items : [];
+      const opts = items
+        .map((f) => {
+          const id = f.id;
+          const no = f.no != null ? f.no : '';
+          const name = (f.name || '').trim() || 'Farmer';
+          const label = `#${no} — ${name}`;
+          return `<option value="${String(id)}">${this.escapeHtml(label)}</option>`;
+        })
+        .join('');
+
+      if (formSelect) {
+        formSelect.innerHTML = `<option value="">Select farmer…</option>${opts}`;
+        formSelect.disabled = false;
+      }
+      if (filterSelect) {
+        const cur = this.transactionsFarmerFilterId != null ? String(this.transactionsFarmerFilterId) : '';
+        filterSelect.innerHTML = `<option value="">All farmers</option>${opts}`;
+        filterSelect.value = cur;
+      }
+    } catch (e) {
+      console.warn('Farmer picker failed:', e);
+      if (formSelect) {
+        formSelect.innerHTML = '<option value="">Could not load farmers</option>';
+        formSelect.disabled = false;
+      }
+      this.showNotification('Could not load farmer list.', 'error');
+    }
+  }
+
+  renderTransactionsTableBody(rows) {
+    const tbody = document.getElementById('transactionsTableBody');
+    const emptyEl = document.getElementById('transactionsEmptyState');
+    if (!tbody) return;
+
+    const esc = (x) => this.escapeHtml(x);
+
+    if (!rows.length) {
+      tbody.innerHTML = '';
+      if (emptyEl) emptyEl.hidden = false;
+      return;
+    }
+    if (emptyEl) emptyEl.hidden = true;
+
+    tbody.innerHTML = rows
+      .map((row) => {
+        let dtLabel = '—';
+        if (row.recorded_at) {
+          try {
+            const d = new Date(row.recorded_at);
+            if (!Number.isNaN(d.getTime())) {
+              dtLabel = d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+            }
+          } catch {
+            dtLabel = String(row.recorded_at);
+          }
+        }
+        const farmerCell =
+          row.farmer_no != null && row.farmer_no !== ''
+            ? `${esc(row.farmer_no)} — ${esc(row.farmer_name || '')}`
+            : esc(row.farmer_name || '—');
+        const bal = row.balance_after_kg;
+        const balTxt =
+          typeof bal === 'number' && !Number.isNaN(bal)
+            ? bal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : '—';
+        const dClass = this.deltaCellClass(row.delta_kg);
+        const dText = this.formatCoffeeDeltaKg(row.delta_kg);
+        return `<tr>
+      <td>${esc(dtLabel)}</td>
+      <td>${farmerCell}</td>
+      <td><span class="transactions-variety-pill">${esc(this.varietyLabel(row.variety))}</span></td>
+      <td><span class="transactions-delta ${dClass}">${esc(dText)}</span></td>
+      <td>${esc(balTxt)}</td>
+      <td>${esc(row.buyer_name || '—')}</td>
+      <td class="transactions-details">${esc(row.notes || '—')}</td>
+      <td>${esc(row.recorded_by_phone || '—')}</td>
+    </tr>`;
+      })
+      .join('');
+  }
+
+  async loadTransactionsPage() {
+    const tbody = document.getElementById('transactionsTableBody');
+    const emptyEl = document.getElementById('transactionsEmptyState');
+    if (!tbody) return;
+
+    await this.loadFarmerOptionsForTransactionsModule();
+
+    tbody.innerHTML =
+      '<tr><td colspan="8" class="transactions-loading-cell">Loading…</td></tr>';
+    if (emptyEl) emptyEl.hidden = true;
+
+    try {
+      let url = '/api/farmer-coffee-transactions?limit=400';
+      if (this.transactionsFarmerFilterId != null && !Number.isNaN(this.transactionsFarmerFilterId)) {
+        url += `&farmer_id=${encodeURIComponent(String(this.transactionsFarmerFilterId))}`;
+      }
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      this.transactionsRows = Array.isArray(data.items) ? data.items : [];
+      this.applyTransactionsSearchAndRender();
+    } catch (e) {
+      console.warn('Transactions load failed:', e);
+      this.transactionsRows = [];
+      tbody.innerHTML =
+        '<tr><td colspan="8" class="transactions-error-cell">Could not load transactions. Try Refresh.</td></tr>';
+      this.showNotification('Could not load bean transactions.', 'error');
+    }
+  }
+
+  initTransactionsModuleControls() {
+    const refreshBtn = document.getElementById('transactionsRefreshBtn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => this.loadTransactionsPage());
+    }
+    const search = document.getElementById('transactionsSearchInput');
+    if (search) {
+      search.addEventListener('input', (e) => {
+        this.transactionsSearchTerm = ((e.target && e.target.value) || '').toString();
+        this.applyTransactionsSearchAndRender();
+      });
+    }
+    const farmerFilter = document.getElementById('transactionsFarmerFilter');
+    if (farmerFilter) {
+      farmerFilter.addEventListener('change', () => {
+        const v = farmerFilter.value;
+        this.transactionsFarmerFilterId = v ? parseInt(v, 10) : null;
+        if (v && Number.isNaN(this.transactionsFarmerFilterId)) {
+          this.transactionsFarmerFilterId = null;
+        }
+        this.loadTransactionsPage();
+      });
+    }
+
+    const form = document.getElementById('coffeeTxnRecordForm');
+    const submitBtn = document.getElementById('coffeeTxnSubmitBtn');
+    if (form && submitBtn) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(form);
+        const farmerId = parseInt(String(fd.get('farmer_id') || ''), 10);
+        const variety = String(fd.get('variety') || '').trim().toLowerCase();
+        const deltaKgRaw = String(fd.get('delta_kg') ?? '').trim();
+        const buyer_name = String(fd.get('buyer_name') ?? '').trim();
+        const notes = String(fd.get('notes') ?? '').trim();
+
+        if (!farmerId || Number.isNaN(farmerId)) {
+          this.showNotification('Choose a farmer.', 'error');
+          return;
+        }
+        const payload = {
+          farmer_id: farmerId,
+          variety,
+          delta_kg: deltaKgRaw,
+          buyer_name,
+          notes,
+        };
+
+        submitBtn.disabled = true;
+        submitBtn.setAttribute('aria-busy', 'true');
+        try {
+          const res = await fetch('/api/farmer-coffee-transactions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            throw new Error(body.error || `HTTP ${res.status}`);
+          }
+          form.reset();
+          this.showNotification('Coffee bean transaction saved.', 'success');
+          await this.loadTransactionsPage();
+        } catch (err) {
+          console.warn('Save coffee transaction failed:', err);
+          this.showNotification(err.message || 'Could not save transaction.', 'error');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.removeAttribute('aria-busy');
+        }
+      });
+    }
   }
 
   setupEventListeners() {
@@ -547,6 +847,16 @@ class DashboardApp {
         this.showNotification('Account settings coming soon!', 'info');
       });
     }
+
+    const notificationBtn = document.getElementById('notificationBtn');
+    if (notificationBtn) {
+      notificationBtn.addEventListener('click', () => {
+        this.switchModule('notifications-feed');
+        this.refreshNotificationsModule();
+      });
+    }
+
+    this.initTransactionsModuleControls();
 
     // Sidebar submenu toggles
     const submenuToggles = [
@@ -576,7 +886,6 @@ class DashboardApp {
         const module = link.dataset.module;
         if (module) {
           this.switchModule(module);
-          this.setActiveNavLink(link);
         }
       });
     });
@@ -773,6 +1082,18 @@ class DashboardApp {
       });
     }
 
+    // Farmers List (card view) search
+    const farmersListSearch = document.getElementById('farmersListSearch');
+    if (farmersListSearch) {
+      farmersListSearch.addEventListener('input', (e) => {
+        const term = (e.target.value || '').toString().trim().toLowerCase();
+        this.filterData(term);
+        if (farmerSearch && farmerSearch.value !== e.target.value) {
+          farmerSearch.value = e.target.value;
+        }
+      });
+    }
+
     // Page size selector
     const pageSizeSelect = document.getElementById('pageSizeSelect');
     if (pageSizeSelect) {
@@ -785,6 +1106,122 @@ class DashboardApp {
         }
       });
     }
+
+    // Farmers List page size selector (sync with table view)
+    const farmersListPageSizeSelect = document.getElementById('farmersListPageSizeSelect');
+    if (farmersListPageSizeSelect) {
+      farmersListPageSizeSelect.addEventListener('change', (e) => {
+        const nextSize = Number.parseInt(e.target.value, 10);
+        if (Number.isFinite(nextSize) && nextSize > 0) {
+          this.pageSize = nextSize;
+          this.currentPage = 1;
+          this.updateTable();
+          if (pageSizeSelect && pageSizeSelect.value !== e.target.value) {
+            pageSizeSelect.value = e.target.value;
+          }
+        }
+      });
+    }
+
+    // Farmers List: open profile details
+    const farmersCardGrid = document.getElementById('farmersCardGrid');
+    if (farmersCardGrid) {
+      farmersCardGrid.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action="open-farmer-profile"]');
+        if (btn) {
+          const nRaw = btn.getAttribute('data-farmer-no') || '';
+          const n = Number.parseInt(nRaw, 10);
+          if (Number.isFinite(n)) this.openFarmerProfile(n);
+          return;
+        }
+
+        const placeholderBtn = e.target.closest('[data-action="open-farmer-placeholder-profile"]');
+        if (placeholderBtn) {
+          const nRaw = placeholderBtn.getAttribute('data-farmer-no') || '1';
+          const n = Number.parseInt(nRaw, 10) || 1;
+          this.openFarmerPlaceholderProfile(n);
+        }
+      });
+    }
+
+    const farmerProfileBackBtn = document.getElementById('farmerProfileBackBtn');
+    if (farmerProfileBackBtn) {
+      farmerProfileBackBtn.addEventListener('click', () => this.closeFarmerProfile());
+    }
+
+    // Register module actions (download/share)
+    const registerDocsGrid = document.getElementById('registerDocsGrid');
+    if (registerDocsGrid) {
+      registerDocsGrid.addEventListener('click', async (e) => {
+        const actionBtn = e.target.closest('[data-register-action]');
+        if (!actionBtn) return;
+        const action = actionBtn.getAttribute('data-register-action');
+        const docId = actionBtn.getAttribute('data-doc-id');
+        if (!action || !docId) return;
+
+        const docs = this.getRegisterDocuments();
+        const doc = docs.find((d) => d.id === docId);
+        if (!doc) return;
+
+        if (action === 'download') {
+          if (doc.file) {
+            const url = URL.createObjectURL(doc.file);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = doc.name || 'document';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+          } else {
+            this.showNotification(`Preview document: ${doc.name}`, 'info');
+          }
+        }
+
+        if (action === 'share') {
+          const text = `${doc.name}${doc.service ? ` (${doc.service})` : ''}`;
+          if (navigator.share) {
+            try {
+              await navigator.share({ title: 'IPOPHL Document', text });
+            } catch (_) {
+              // user cancelled
+            }
+          } else if (navigator.clipboard && navigator.clipboard.writeText) {
+            try {
+              await navigator.clipboard.writeText(text);
+              this.showNotification('Document name copied to clipboard.', 'success');
+            } catch (_) {
+              this.showNotification(text, 'info');
+            }
+          } else {
+            this.showNotification(text, 'info');
+          }
+        }
+      });
+    }
+
+    // Maps module controls
+    const mapsSearchInput = document.getElementById('mapsSearchInput');
+    if (mapsSearchInput) {
+      mapsSearchInput.addEventListener('input', (e) => {
+        this.mapSearchTerm = (e.target.value || '').toString().trim().toLowerCase();
+        this.renderMapsModule();
+      });
+    }
+
+    const mapsVarietyButtons = document.querySelectorAll('#maps-module .maps-variety-btn');
+    mapsVarietyButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        mapsVarietyButtons.forEach((b) => {
+          b.classList.remove('is-active');
+          b.setAttribute('aria-selected', 'false');
+        });
+        btn.classList.add('is-active');
+        btn.setAttribute('aria-selected', 'true');
+        this.mapVarietyFilter = (btn.textContent || '').trim().toLowerCase();
+        this.renderMapsModule();
+      });
+    });
 
     // Farmer table view toggle (delegate: avoids missed hits on pseudo-element overlays / inner nodes)
     const farmersModule = document.getElementById('farmers-module');
@@ -949,12 +1386,30 @@ class DashboardApp {
   }
 
   switchModule(moduleName) {
+    const settingsTabs = new Set(['security', 'notifications', 'activity', 'faq', 'profile']);
+    const isSettingsTab = settingsTabs.has(moduleName);
+    const isHeaderNotificationsFeed = moduleName === 'notifications-feed';
+    const resolvedModuleName = isHeaderNotificationsFeed
+      ? 'notifications'
+      : (isSettingsTab ? 'settings' : moduleName);
+
+    if (isSettingsTab) {
+      this.activeSettingsTab = moduleName;
+      this.settingsViewMode = 'detail';
+      this.syncSettingsSubmenuActive(moduleName);
+    }
+
     // Update navigation active state
     const navLinks = document.querySelectorAll('.nav-link');
     navLinks.forEach(link => {
       link.classList.remove('active');
-      if (link.dataset.module === moduleName) {
+      link.removeAttribute('aria-current');
+      if (
+        link.dataset.module === moduleName ||
+        (!isSettingsTab && link.dataset.module === resolvedModuleName)
+      ) {
         link.classList.add('active');
+        link.setAttribute('aria-current', 'page');
       }
     });
 
@@ -963,7 +1418,16 @@ class DashboardApp {
     const moduleNames = {
       'overview': 'Overview',
       'notifications': 'Notifications',
+      'notifications-feed': 'Notifications',
       'farmers': 'Farmer Records',
+      'farmers-list': 'Farmers',
+      'maps': 'Maps',
+      'transactions': 'Transactions',
+      'register': 'IPOPHL Register',
+      'security': 'Account Security',
+      'activity': 'Activity Log',
+      'faq': 'FAQ',
+      'profile': 'Profile Actions',
       'analytics': 'Analytics',
       'ipophl': 'IPOPHL',
       'export': 'Export Data',
@@ -978,7 +1442,7 @@ class DashboardApp {
       module.classList.add('hidden');
     });
 
-    const targetModule = document.getElementById(`${moduleName}-module`);
+    const targetModule = document.getElementById(`${resolvedModuleName}-module`);
     if (targetModule) {
       targetModule.classList.remove('hidden');
     }
@@ -986,10 +1450,10 @@ class DashboardApp {
     // Scroll behavior: only lock page scroll for the Farmers module
     const moduleContent = document.querySelector('.module-content');
     if (moduleContent) {
-      moduleContent.classList.toggle('lock-scroll', moduleName === 'farmers');
+      moduleContent.classList.toggle('lock-scroll', resolvedModuleName === 'farmers');
     }
 
-    if (moduleName === 'settings') {
+    if (resolvedModuleName === 'settings') {
       if (this.settingsViewMode === 'landing') {
         this.loadSettingsLanding();
       } else {
@@ -997,14 +1461,24 @@ class DashboardApp {
       }
     }
 
-    if (moduleName === 'notifications') {
+    if (resolvedModuleName === 'notifications') {
       this.renderNotificationsList();
+      this.refreshNotificationsModule();
     }
-    if (moduleName === 'analytics') {
+    if (resolvedModuleName === 'analytics') {
       this.renderAnalyticsModule();
     }
-    if (moduleName === 'ipophl') {
+    if (resolvedModuleName === 'maps') {
+      this.renderMapsModule();
+    }
+    if (resolvedModuleName === 'register') {
+      this.renderRegisterModule();
+    }
+    if (resolvedModuleName === 'ipophl') {
       this.renderIpophlModule();
+    }
+    if (resolvedModuleName === 'transactions') {
+      this.loadTransactionsPage();
     }
 
     // Close mobile menu
@@ -1851,6 +2325,205 @@ class DashboardApp {
     this.renderPagination();
     this.updateRecordInfo();
     this.updateFarmerLimitBanner();
+    this.renderFarmersListCards();
+    this.renderMapsModule();
+    this.renderRegisterModule();
+  }
+
+  renderFarmersListCards() {
+    const grid = document.getElementById('farmersCardGrid');
+    if (!grid) return;
+
+    const startIndex = (this.currentPage - 1) * this.pageSize;
+    const endIndex = Math.min(startIndex + this.pageSize, this.filteredData.length);
+    const pageData = this.filteredData.slice(startIndex, endIndex);
+
+    if (!pageData.length) {
+      grid.innerHTML = Array.from({ length: 6 }, (_, idx) => {
+        const n = idx + 1;
+        return `<article class="farmer-card farmer-card--placeholder" aria-label="Placeholder farmer card ${n}">
+  <div class="farmer-card__media">
+    <div class="farmer-card__avatar farmer-card__avatar--media" aria-hidden="true"><i class="fa-solid fa-user"></i></div>
+  </div>
+  <div class="farmer-card__top">
+    <div class="farmer-card__name-row">
+      <h3 class="farmer-card__name">Name</h3>
+      <span class="farmer-card__badge" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
+    </div>
+    <p class="farmer-card__bio">Coffee farmer profile preview card.</p>
+  </div>
+  <div class="farmer-card__body">
+    <dl class="farmer-card__kv">
+      <dt>No.</dt><dd>#${n}</dd>
+      <dt>Birth</dt><dd>Month/Date/Year</dd>
+      <dt>Phone</dt><dd>+63 900 XXXX XXXX</dd>
+      <dt>Address</dt><dd>Barangay, Municipality, Province</dd>
+    </dl>
+    <div class="farmer-card__actions">
+      <button type="button" class="farmer-card__details" data-action="open-farmer-placeholder-profile" data-farmer-no="${n}">
+        <span>View Details</span>
+        <i class="fa-solid fa-arrow-right"></i>
+      </button>
+    </div>
+  </div>
+</article>`;
+      }).join('');
+      return;
+    }
+
+    const esc = (s) =>
+      String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    const formatNo = (row) => Number(row?.['NO.'] ?? row?.no ?? 0) || 0;
+    const buildName = (row) =>
+      this.getValue(row, ['NAME OF FARMER', 'name', 'FULL NAME', 'full_name', 'Name']) ||
+      [this.getValue(row, ['FIRST NAME', 'first_name', 'firstName']), this.getValue(row, ['LAST NAME', 'last_name', 'lastName'])]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+
+    grid.innerHTML = pageData
+      .map((row) => {
+        const n = formatNo(row);
+        const fullName = buildName(row) || `Farmer #${n || ''}`.trim();
+        const dob = this.getValue(row, ['BIRTHDAY', 'birthday', 'Date of Birth']);
+        const phone = this.getValue(row, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']);
+        const address = this.getValue(row, ['ADDRESS (BARANGAY)', 'barangay', 'BARANGAY', 'address']) || 'Address not set';
+        const remarks = this.getValue(row, ['REMARKS', 'remarks']) || 'Coffee farmer profile.';
+        const photo = this.getValue(row, ['PHOTO', 'photo', 'photo_url', 'image']);
+        const mediaMarkup = photo
+          ? `<img class="farmer-card__image" src="${esc(photo)}" alt="${esc(fullName)}" loading="lazy" />`
+          : `<div class="farmer-card__avatar farmer-card__avatar--media" aria-hidden="true"><i class="fa-solid fa-user"></i></div>`;
+
+        return `<article class="farmer-card" aria-label="${esc(fullName)}">
+  <div class="farmer-card__media">
+    ${mediaMarkup}
+  </div>
+  <div class="farmer-card__top">
+    <div class="farmer-card__name-row">
+      <h3 class="farmer-card__name">${esc(fullName)}</h3>
+      <span class="farmer-card__badge" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
+    </div>
+    <p class="farmer-card__bio">${esc(String(remarks).slice(0, 70))}</p>
+  </div>
+  <div class="farmer-card__body">
+    <dl class="farmer-card__kv">
+      <dt>No.</dt><dd>#${esc(n)}</dd>
+      <dt>Birth</dt><dd>${esc(dob || '—')}</dd>
+      <dt>Phone</dt><dd>${esc(phone || '—')}</dd>
+      <dt>Address</dt><dd>${esc(address || '—')}</dd>
+    </dl>
+    <div class="farmer-card__actions">
+      <button type="button" class="farmer-card__details" data-action="open-farmer-profile" data-farmer-no="${esc(n)}">
+        <span>View Details</span>
+        <i class="fa-solid fa-arrow-right"></i>
+      </button>
+    </div>
+  </div>
+</article>`;
+      })
+      .join('');
+  }
+
+  openFarmerProfile(farmerNo) {
+    const profileView = document.getElementById('farmerProfileView');
+    const listView = document.getElementById('farmersListView');
+    if (!profileView || !listView) return;
+
+    const farmer = (this.data || []).find((r) => Number(r['NO.']) === Number(farmerNo));
+    if (!farmer) {
+      this.showNotification('Farmer not found.', 'error');
+      return;
+    }
+
+    const fullName =
+      this.getValue(farmer, ['NAME OF FARMER', 'name', 'FULL NAME', 'full_name']) ||
+      [this.getValue(farmer, ['FIRST NAME', 'first_name', 'firstName']), this.getValue(farmer, ['LAST NAME', 'last_name', 'lastName'])]
+        .filter(Boolean)
+        .join(' ')
+        .trim() ||
+      `Farmer #${farmerNo}`;
+
+    const setText = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value || '—';
+    };
+    const setInput = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.value = value || '';
+    };
+
+    const nameParts = this.splitFarmerName(fullName);
+
+    setText('farmerProfileName', fullName);
+    setText('farmerProfileNo', `No. #${farmerNo}`);
+    setText('farmerProfileDob', this.getValue(farmer, ['BIRTHDAY', 'birthday']) || '—');
+    setText('farmerProfilePhone', this.getValue(farmer, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']) || '—');
+    setText('farmerProfileAddress', this.getValue(farmer, ['ADDRESS (BARANGAY)', 'address', 'BARANGAY']) || '—');
+
+    setInput('farmerProfileLastName', this.getValue(farmer, ['LAST NAME', 'last_name']) || nameParts.last);
+    setInput('farmerProfileFirstName', this.getValue(farmer, ['FIRST NAME', 'first_name']) || nameParts.first);
+    setInput('farmerProfileProvince', this.getValue(farmer, ['PROVINCE', 'province']) || '');
+    setInput('farmerProfileMunicipality', this.getValue(farmer, ['MUNICIPALITY', 'municipality', 'CITY']) || '');
+    setInput('farmerProfileBarangay', this.getValue(farmer, ['BARANGAY', 'ADDRESS (BARANGAY)', 'barangay']) || '');
+    setInput('farmerProfileFederation', this.getValue(farmer, ['FA OFFICER / MEMBER', 'FEDERATION', 'Federation Association']) || '');
+    setInput('farmerProfileRsbsa', this.getValue(farmer, ['REGISTERED (YES/NO)', 'RSBSA Registered']) || '');
+    setInput('farmerProfileRsbsaNumber', this.getValue(farmer, ['NCFRS', 'RSBSA Registered Number']) || '');
+    setInput('farmerProfileOwnership', this.getValue(farmer, ['STATUS OF OWNERSHIP', 'Status Ownership']) || '');
+    setInput(
+      'farmerProfileTotalArea',
+      this.formatValue(this.getValue(farmer, ['TOTAL AREA PLANTED (HA.)', 'Total Plant Area', 'TOTAL AREA']) || '')
+    );
+
+    listView.hidden = true;
+    profileView.hidden = false;
+  }
+
+  closeFarmerProfile() {
+    const profileView = document.getElementById('farmerProfileView');
+    const listView = document.getElementById('farmersListView');
+    if (!profileView || !listView) return;
+    profileView.hidden = true;
+    listView.hidden = false;
+  }
+
+  openFarmerPlaceholderProfile(farmerNo = 1) {
+    const profileView = document.getElementById('farmerProfileView');
+    const listView = document.getElementById('farmersListView');
+    if (!profileView || !listView) return;
+
+    const setText = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value || '—';
+    };
+    const setInput = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.value = value || '';
+    };
+
+    setText('farmerProfileName', 'Full Name');
+    setText('farmerProfileNo', `No. #${farmerNo}`);
+    setText('farmerProfileDob', 'Month / Date / Year');
+    setText('farmerProfilePhone', '+63 900 XXXX XXXX');
+    setText('farmerProfileAddress', 'Barangay, Municipality (or City), Province');
+
+    setInput('farmerProfileLastName', 'Last Name');
+    setInput('farmerProfileFirstName', 'First Name');
+    setInput('farmerProfileProvince', 'Batangas');
+    setInput('farmerProfileMunicipality', 'Lipa City');
+    setInput('farmerProfileBarangay', 'Barangay');
+    setInput('farmerProfileFederation', 'Federation Association');
+    setInput('farmerProfileRsbsa', 'Yes/No');
+    setInput('farmerProfileRsbsaNumber', 'NCFRS-0000');
+    setInput('farmerProfileOwnership', 'Landowner / Lease / Others');
+    setInput('farmerProfileTotalArea', '0.00');
+
+    listView.hidden = true;
+    profileView.hidden = false;
   }
 
   /** Show full-width notice when farmer count reaches max (reference: dismissible banner). */
@@ -2363,20 +3036,29 @@ class DashboardApp {
 
   renderPagination() {
     const pagination = document.getElementById('pagination');
+    const listPagination = document.getElementById('farmersListPagination');
     const totalPages = Math.ceil(this.filteredData.length / this.pageSize);
     
     if (totalPages <= 1) {
-      pagination.innerHTML = '';
+      if (pagination) {
+        pagination.innerHTML = '';
+        pagination.setAttribute('hidden', 'hidden');
+      }
+      if (listPagination) {
+        listPagination.innerHTML = '';
+        listPagination.setAttribute('hidden', 'hidden');
+      }
       return;
     }
 
     let paginationHTML = '';
     
-    // Previous button
+    // Previous button (icon)
     paginationHTML += `
-      <button class="page-btn" ${this.currentPage === 1 ? 'disabled' : ''} 
-        onclick="window.dashboardApp.goToPage(${this.currentPage - 1})">
-        Previous
+      <button class="page-btn page-btn--icon" ${this.currentPage === 1 ? 'disabled' : ''} 
+        onclick="window.dashboardApp.goToPage(${this.currentPage - 1})"
+        aria-label="Previous page">
+        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
       </button>
     `;
 
@@ -2392,21 +3074,30 @@ class DashboardApp {
     for (let i = startPage; i <= endPage; i++) {
       paginationHTML += `
         <button class="page-btn ${i === this.currentPage ? 'active' : ''}" 
-          onclick="window.dashboardApp.goToPage(${i})">
+          onclick="window.dashboardApp.goToPage(${i})"
+          aria-label="Page ${i}">
           ${i}
         </button>
       `;
     }
 
-    // Next button
+    // Next button (icon)
     paginationHTML += `
-      <button class="page-btn" ${this.currentPage === totalPages ? 'disabled' : ''} 
-        onclick="window.dashboardApp.goToPage(${this.currentPage + 1})">
-        Next
+      <button class="page-btn page-btn--icon" ${this.currentPage === totalPages ? 'disabled' : ''} 
+        onclick="window.dashboardApp.goToPage(${this.currentPage + 1})"
+        aria-label="Next page">
+        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
       </button>
     `;
 
-    pagination.innerHTML = paginationHTML;
+    if (pagination) {
+      pagination.innerHTML = paginationHTML;
+      pagination.removeAttribute('hidden');
+    }
+    if (listPagination) {
+      listPagination.innerHTML = paginationHTML;
+      listPagination.removeAttribute('hidden');
+    }
   }
 
   goToPage(page) {
@@ -2422,8 +3113,11 @@ class DashboardApp {
     const recordInfo = document.getElementById('recordInfo');
     const startIndex = (this.currentPage - 1) * this.pageSize + 1;
     const endIndex = Math.min(this.currentPage * this.pageSize, this.filteredData.length);
-    
-    recordInfo.textContent = `Showing ${startIndex}-${endIndex} of ${this.filteredData.length} records`;
+    const listRecordInfo = document.getElementById('farmersListRecordInfo');
+    const text = `Showing ${startIndex}-${endIndex} of ${this.filteredData.length} records`;
+
+    if (recordInfo) recordInfo.textContent = text;
+    if (listRecordInfo) listRecordInfo.textContent = text;
   }
 
   updateStats() {
@@ -3574,6 +4268,299 @@ class DashboardApp {
     });
   }
 
+  onGoogleMapsReady() {
+    this.googleMapsReady = true;
+    this.renderMapsModule();
+  }
+
+  getLipaCityCenter() {
+    return { lat: 13.9411, lng: 121.1648 };
+  }
+
+  getLipaCityBounds() {
+    return {
+      north: 14.09,
+      south: 13.82,
+      west: 121.08,
+      east: 121.27,
+    };
+  }
+
+  getBarangayCoordinates() {
+    return {
+      'antipolo del norte': { lat: 13.9492, lng: 121.1642 },
+      'antipolo del sur': { lat: 13.9365, lng: 121.1601 },
+      balintawak: { lat: 13.9472, lng: 121.1719 },
+      bulacnin: { lat: 13.9241, lng: 121.1748 },
+      dagatan: { lat: 13.9618, lng: 121.1398 },
+      'mataas na lupa': { lat: 13.9652, lng: 121.1825 },
+      'san benito': { lat: 13.9559, lng: 121.1536 },
+      'san carlos': { lat: 13.9523, lng: 121.1838 },
+      'san jose': { lat: 13.9276, lng: 121.1568 },
+      'san lucas': { lat: 13.9223, lng: 121.1789 },
+      tibig: { lat: 13.9328, lng: 121.1447 },
+      tambo: { lat: 13.9024, lng: 121.1599 },
+      marauoy: { lat: 13.9138, lng: 121.1388 },
+      bolbok: { lat: 13.9675, lng: 121.2064 },
+      sabang: { lat: 13.9769, lng: 121.1712 },
+      lodlod: { lat: 13.9271, lng: 121.1328 },
+      halang: { lat: 13.9528, lng: 121.2098 },
+      plaridel: { lat: 13.9714, lng: 121.1967 },
+      'poblacion barangay 1': { lat: 13.9418, lng: 121.1638 },
+      'poblacion barangay 2': { lat: 13.9427, lng: 121.1657 },
+      'poblacion barangay 3': { lat: 13.9404, lng: 121.1617 },
+      'poblacion barangay 4': { lat: 13.9395, lng: 121.1678 },
+    };
+  }
+
+  normalizeBarangayName(name) {
+    return (name || '').toString().trim().toLowerCase();
+  }
+
+  isVarietyMatch(row, variety) {
+    if (variety === 'liberica') {
+      return (
+        Number(this.getValue(row, ['LIBERICA BEARING']) || 0) > 0 ||
+        Number(this.getValue(row, ['LIBERICA NON-BEARING']) || 0) > 0 ||
+        Number(this.getValue(row, ['LIBERICA PRODUCTION']) || 0) > 0
+      );
+    }
+    if (variety === 'robusta') {
+      return (
+        Number(this.getValue(row, ['ROBUSTA BEARING']) || 0) > 0 ||
+        Number(this.getValue(row, ['ROBUSTA NON-BEARING']) || 0) > 0 ||
+        Number(this.getValue(row, ['ROBUSTA PRODUCTION']) || 0) > 0
+      );
+    }
+    if (variety === 'excelsa') {
+      return (
+        Number(this.getValue(row, ['EXCELSA BEARING']) || 0) > 0 ||
+        Number(this.getValue(row, ['EXCELSA NON-BEARING']) || 0) > 0 ||
+        Number(this.getValue(row, ['EXCELSA PRODUCTION']) || 0) > 0
+      );
+    }
+    return true;
+  }
+
+  getFilteredMapRows() {
+    return (this.data || []).filter((row) => {
+      const barangay = this.normalizeBarangayName(
+        this.getValue(row, ['ADDRESS (BARANGAY)', 'BARANGAY', 'barangay', 'address'])
+      );
+      const searchOk = !this.mapSearchTerm || barangay.includes(this.mapSearchTerm);
+      const varietyOk = this.isVarietyMatch(row, this.mapVarietyFilter || 'liberica');
+      return searchOk && varietyOk;
+    });
+  }
+
+  buildMapBarangayPoints(rows) {
+    const coordsByBarangay = this.getBarangayCoordinates();
+    const bounds = this.getLipaCityBounds();
+    const center = this.getLipaCityCenter();
+    const pointsMap = new Map();
+
+    const toFallbackCoordinate = (name) => {
+      let hash = 0;
+      for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+      const lat = bounds.south + ((hash % 1000) / 1000) * (bounds.north - bounds.south);
+      const lng = bounds.west + ((((hash >> 10) % 1000) / 1000) * (bounds.east - bounds.west));
+      return { lat: Number.isFinite(lat) ? lat : center.lat, lng: Number.isFinite(lng) ? lng : center.lng };
+    };
+
+    rows.forEach((row) => {
+      const raw = this.getValue(row, ['ADDRESS (BARANGAY)', 'BARANGAY', 'barangay', 'address']) || 'Unknown';
+      const key = this.normalizeBarangayName(raw);
+      const coords = coordsByBarangay[key] || toFallbackCoordinate(key || 'unknown');
+      const current = pointsMap.get(key) || { barangay: raw, lat: coords.lat, lng: coords.lng, count: 0 };
+      current.count += 1;
+      pointsMap.set(key, current);
+    });
+
+    return Array.from(pointsMap.values());
+  }
+
+  densityTier(count) {
+    if (count >= 150) return 'high';
+    if (count >= 100) return 'medium';
+    if (count >= 50) return 'low';
+    return 'very-low';
+  }
+
+  markerColorForDensity(tier) {
+    if (tier === 'high') return '#784421';
+    if (tier === 'medium') return '#2f855a';
+    if (tier === 'low') return '#9c7a54';
+    return '#b0895f';
+  }
+
+  ensureGoogleMap() {
+    if (this.googleMap || !window.google?.maps) return;
+    const canvas = document.getElementById('mapsGoogleCanvas');
+    if (!canvas) return;
+    this.googleMap = new window.google.maps.Map(canvas, {
+      center: this.getLipaCityCenter(),
+      zoom: 12,
+      minZoom: 11,
+      maxZoom: 16,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+      restriction: { latLngBounds: this.getLipaCityBounds(), strictBounds: true },
+    });
+    this.googleInfoWindow = new window.google.maps.InfoWindow();
+  }
+
+  clearMapMarkers() {
+    this.googleMapMarkers.forEach((marker) => marker.setMap(null));
+    this.googleMapMarkers = [];
+  }
+
+  renderGoogleMapMarkers(points) {
+    if (!this.googleMap || !window.google?.maps) return;
+    this.clearMapMarkers();
+    const fitBounds = new window.google.maps.LatLngBounds();
+
+    points.forEach((point) => {
+      const tier = this.densityTier(point.count);
+      const marker = new window.google.maps.Marker({
+        position: { lat: point.lat, lng: point.lng },
+        map: this.googleMap,
+        title: `${point.barangay} (${point.count})`,
+        icon: {
+          path: window.google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: this.markerColorForDensity(tier),
+          fillOpacity: 0.95,
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+        },
+      });
+      marker.addListener('click', () => {
+        if (!this.googleInfoWindow) return;
+        this.googleInfoWindow.setContent(
+          `<div style="min-width:160px"><strong>${point.barangay}</strong><br/>Farmers: ${point.count}<br/>Variety: ${(
+            this.mapVarietyFilter || 'liberica'
+          ).toUpperCase()}</div>`
+        );
+        this.googleInfoWindow.open(this.googleMap, marker);
+      });
+      this.googleMapMarkers.push(marker);
+      fitBounds.extend(marker.getPosition());
+    });
+
+    if (points.length > 1) this.googleMap.fitBounds(fitBounds, 70);
+    else if (points.length === 1) {
+      this.googleMap.setCenter({ lat: points[0].lat, lng: points[0].lng });
+      this.googleMap.setZoom(13);
+    } else {
+      this.googleMap.setCenter(this.getLipaCityCenter());
+      this.googleMap.setZoom(12);
+    }
+  }
+
+  updateMapInsights(points, rows) {
+    const covered = points.length;
+    const totalArea = rows.reduce(
+      (sum, row) => sum + (Number(this.getValue(row, ['Total Area Planted (HA.)', 'TOTAL AREA PLANTED (HA.)']) || 0) || 0),
+      0
+    );
+    const avgArea = rows.length ? totalArea / rows.length : 0;
+
+    const statEls = document.querySelectorAll('#maps-module .maps-panel--overview .overview-stat strong');
+    if (statEls[0]) statEls[0].textContent = String(covered);
+    if (statEls[1]) statEls[1].textContent = `${totalArea.toLocaleString(undefined, { maximumFractionDigits: 1 })}ha`;
+    if (statEls[2]) statEls[2].textContent = `${avgArea.toLocaleString(undefined, { maximumFractionDigits: 1 })}ha`;
+
+    const topList = document.querySelector('#maps-module .top-barangays-list');
+    if (topList) {
+      const sorted = [...points].sort((a, b) => b.count - a.count).slice(0, 5);
+      topList.innerHTML = sorted
+        .map((p) => {
+          const tier = this.densityTier(p.count);
+          return `<li><span><em class="dot dot--${tier}"></em>${p.barangay}</span><strong>${p.count}</strong></li>`;
+        })
+        .join('');
+      if (!sorted.length) topList.innerHTML = '<li><span>No matching barangays</span><strong>0</strong></li>';
+    }
+  }
+
+  renderMapsModule() {
+    const fallback = document.getElementById('mapsGoogleFallback');
+    const canvas = document.getElementById('mapsGoogleCanvas');
+    const hasKey = !!(window.__GOOGLE_MAPS_API_KEY__ || '').trim();
+    const ready = this.googleMapsReady || !!window.__BEANTHENTIC_GOOGLE_MAPS_READY__;
+    const rows = this.getFilteredMapRows();
+    const points = this.buildMapBarangayPoints(rows);
+
+    this.updateMapInsights(points, rows);
+    if (!canvas) return;
+
+    if (!hasKey || !ready || !window.google?.maps) {
+      if (fallback) fallback.hidden = false;
+      canvas.classList.add('is-hidden');
+      return;
+    }
+
+    if (fallback) fallback.hidden = true;
+    canvas.classList.remove('is-hidden');
+    this.ensureGoogleMap();
+    if (this.googleMap && window.google?.maps?.event) {
+      window.google.maps.event.trigger(this.googleMap, 'resize');
+    }
+    this.renderGoogleMapMarkers(points);
+  }
+
+  getRegisterDocuments() {
+    const docs = [];
+    const filesByService = this.ipophlFiles || {};
+    Object.entries(filesByService).forEach(([service, files]) => {
+      (files || []).forEach((entry) => {
+        docs.push({
+          id: entry.id || `${service}-${entry.name || Date.now()}`,
+          name: entry.name || 'Document',
+          service,
+          file: entry.file || null,
+        });
+      });
+    });
+
+    if (docs.length > 0) return docs.slice(0, 12);
+
+    return [
+      { id: 'placeholder-logo', name: 'Logo', service: 'Brand Assets', file: null, placeholder: true },
+      { id: 'placeholder-cert', name: 'Certification', service: 'GI Certificate', file: null, placeholder: true },
+    ];
+  }
+
+  renderRegisterModule() {
+    const grid = document.getElementById('registerDocsGrid');
+    if (!grid) return;
+    const docs = this.getRegisterDocuments();
+
+    const esc = (s) =>
+      String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    grid.innerHTML = docs
+      .map(
+        (doc) => `<article class="register-doc-card${doc.placeholder ? ' is-placeholder' : ''}">
+  <div class="register-doc-card__preview">${esc(doc.name)}</div>
+  <div class="register-doc-card__actions">
+    <button type="button" class="register-doc-btn register-doc-btn--primary" data-register-action="download" data-doc-id="${esc(doc.id)}">
+      Download
+    </button>
+    <button type="button" class="register-doc-btn register-doc-btn--secondary" data-register-action="share" data-doc-id="${esc(doc.id)}">
+      Share
+    </button>
+  </div>
+</article>`
+      )
+      .join('');
+  }
+
   showNotification(message, type = 'success', options = {}) {
     const { placement = 'center' } = options;
     const notification = document.createElement('div');
@@ -3833,59 +4820,15 @@ class DashboardApp {
     submenus.forEach(submenu => submenu.classList.remove('expanded'));
   }
 
-  // Set active navigation link
-  setActiveNavLink(activeLink) {
-    // Remove active class from all nav links except parent dropdowns
-    const allNavLinks = document.querySelectorAll('.nav-link');
-    allNavLinks.forEach(link => {
-      // Keep parent dropdowns active if they have expanded submenus
-      if (!link.classList.contains('has-submenu') || link.getAttribute('aria-expanded') !== 'true') {
-        link.classList.remove('active');
-      }
-    });
-    
-    // Add active class to the clicked link
-    activeLink.classList.add('active');
-    
-    // If this is a submenu item, keep the parent active
-    const parentSubmenu = activeLink.closest('.submenu');
-    if (parentSubmenu) {
-      const parentLink = parentSubmenu.previousElementSibling;
-      if (parentLink && parentLink.classList.contains('has-submenu')) {
-        parentLink.classList.add('active');
-      }
-    }
-    
-    // Update breadcrumb if needed
-    const moduleName = activeLink.querySelector('span')?.textContent || '';
-    const currentModuleEl = document.getElementById('currentModule');
-    if (currentModuleEl && moduleName) {
-      currentModuleEl.textContent = moduleName;
-    }
-  }
-
-  // Switch to a specific module
-  switchModule(moduleName) {
-    // Hide all modules
-    const allModules = document.querySelectorAll('.module');
-    allModules.forEach(module => {
-      module.style.display = 'none';
-    });
-    
-    // Show the selected module
-    const targetModule = document.getElementById(`${moduleName}-module`) || 
-                        document.querySelector(`[data-module="${moduleName}"]`);
-    if (targetModule) {
-      targetModule.style.display = 'block';
-    }
-    
-    console.log('Switched to module:', moduleName);
-  }
+  // Legacy duplicate methods removed: main switchModule() above is the source of truth.
 }
 
 // Initialize dashboard when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   window.dashboardApp = new DashboardApp();
+  if (window.__BEANTHENTIC_GOOGLE_MAPS_READY__ && typeof window.dashboardApp.onGoogleMapsReady === 'function') {
+    window.dashboardApp.onGoogleMapsReady();
+  }
 });
 
 // Export for potential module usage
