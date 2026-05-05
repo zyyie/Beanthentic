@@ -1,13 +1,24 @@
+"""
+Import coffee farmer data from Excel file.
+
+This script reads coffee farmer data from an Excel file and exports it
+to both JSON and JavaScript formats for use in the application.
+"""
+
 from __future__ import annotations
 
 import json
 from datetime import datetime
 from pathlib import Path
 
-from openpyxl import load_workbook
+try:
+    from openpyxl import load_workbook
+except ImportError:
+    load_workbook = None  # type: ignore
 
 
 def norm_yesno(v) -> str:
+    """Normalize yes/no values."""
     if v is None:
         return ""
     s = str(v).strip().lower()
@@ -19,6 +30,7 @@ def norm_yesno(v) -> str:
 
 
 def fmt_date(v) -> str:
+    """Format date value."""
     if v is None or v == "":
         return ""
     if isinstance(v, datetime):
@@ -27,25 +39,31 @@ def fmt_date(v) -> str:
 
 
 def num(v, default=0.0) -> float:
+    """Convert value to float."""
     if v is None or v == "":
         return float(default)
     try:
         return float(v)
-    except Exception:
+    except (ValueError, TypeError):
         try:
             return float(str(v).replace(",", ""))
-        except Exception:
+        except (ValueError, TypeError):
             return float(default)
 
 
 def intnum(v, default=0) -> int:
+    """Convert value to integer."""
     try:
         return int(round(num(v, default)))
-    except Exception:
+    except (ValueError, TypeError):
         return int(default)
 
 
 def main() -> int:
+    """Main function to import coffee database."""
+    if load_workbook is None:
+        raise ImportError("openpyxl is required to run this script")
+
     repo_root = Path(__file__).resolve().parents[1]
 
     xlsx = Path(r"C:\Users\ARLYN\Downloads\coffee-database.xlsx")
@@ -111,7 +129,7 @@ def main() -> int:
             continue
         try:
             no_i = int(float(no_val))
-        except Exception:
+        except (ValueError, TypeError):
             continue
 
         if no_i in existing_nos:
@@ -135,14 +153,18 @@ def main() -> int:
             "ADDRESS (BARANGAY)": sval("ADDRESS (BARANGAY)"),
             "FA OFFICER / MEMBER": sval("FA OFFICER / MEMBER"),
             "BIRTHDAY": fmt_date(ws.cell(r, col["BIRTHDAY"]).value),
-            "RSBSA Registered (Yes/No)": norm_yesno(ws.cell(r, col["RSBSA Registered (Yes/No)"]).value),
+            "RSBSA Registered (Yes/No)": norm_yesno(
+                ws.cell(r, col["RSBSA Registered (Yes/No)"]).value
+            ),
             "STATUS OF OWNERSHIP": status_ownership,
             "OWNER_OPERATOR": owner_vals["OWNER_OPERATOR"],
             "LESSOR": owner_vals["LESSOR"],
             "LESSEE": owner_vals["LESSEE"],
             "SHAREHOLDER": owner_vals["SHAREHOLDER"],
             "OTHERS": owner_vals["OTHERS"],
-            "Total Area Planted (HA.)": num(ws.cell(r, col["Total Area Planted (HA.)"]).value, 0.0),
+            "Total Area Planted (HA.)": num(
+                ws.cell(r, col["Total Area Planted (HA.)"]).value, 0.0
+            ),
             "LIBERICA BEARING": intnum(ws.cell(r, col["LIBERICA BEARING"]).value, 0),
             "LIBERICA NON-BEARING": intnum(ws.cell(r, col["LIBERICA NON-BEARING"]).value, 0),
             "EXCELSA BEARING": intnum(ws.cell(r, col["EXCELSA BEARING"]).value, 0),

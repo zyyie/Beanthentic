@@ -3936,11 +3936,158 @@ body.confirm-dialog-active {
   justify-content: flex-end;
 }
 
-.notification-detail-dialog__footer .confirm-dialog__btn--primary {
-  min-width: 100px;
-}
+ .notification-detail-dialog__footer .confirm-dialog__btn--primary {
+   min-width: 100px;
+ }
 
-/* Notification System — top center by default */
+ /* Account modal (header user icon) */
+ .account-settings-modal {
+   position: fixed;
+   inset: 0;
+   z-index: 10056;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   padding: 1.25rem;
+   font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+ }
+
+ .account-settings-modal[hidden] {
+   display: none;
+ }
+
+ .account-settings-modal__backdrop {
+   position: absolute;
+   inset: 0;
+   background: rgba(15, 23, 42, 0.45);
+   backdrop-filter: blur(2px);
+ }
+
+ .account-settings-modal__card {
+   position: relative;
+   z-index: 1;
+   width: 100%;
+   max-width: min(92vw, 400px);
+   padding: 1.5rem 1.65rem 1.35rem;
+   background: linear-gradient(180deg, #ffffff 0%, #faf9f7 100%);
+   border: 1px solid rgba(122, 74, 52, 0.35);
+   border-radius: 16px;
+   box-shadow: 0 22px 48px rgba(40, 25, 15, 0.16);
+   text-align: center;
+ }
+
+ .account-settings-modal__close-btn {
+   position: absolute;
+   top: 0.65rem;
+   right: 0.65rem;
+   width: 2.25rem;
+   height: 2.25rem;
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   border: none;
+   border-radius: 10px;
+   background: rgba(44, 62, 80, 0.08);
+   color: #475569;
+   cursor: pointer;
+   transition: background 0.2s ease, color 0.2s ease;
+ }
+
+ .account-settings-modal__close-btn:hover {
+   background: rgba(220, 38, 38, 0.12);
+   color: #b91c1c;
+ }
+
+ .account-settings-modal__icon-wrap {
+   width: 56px;
+   height: 56px;
+   margin: 0 auto 0.75rem;
+   border-radius: 50%;
+   background: linear-gradient(135deg, rgba(44, 122, 62, 0.12), rgba(212, 177, 141, 0.25));
+   border: 1px solid rgba(139, 74, 43, 0.22);
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   color: #276749;
+   font-size: 1.65rem;
+ }
+
+ .account-settings-modal__title {
+   margin: 0 0 0.2rem;
+   font-family: 'Playfair Display', Georgia, serif;
+   font-size: 1.28rem;
+   font-weight: 700;
+   color: #662e0c;
+ }
+
+ .account-settings-modal__subtitle {
+   margin: 0 0 1.1rem;
+   font-size: 0.84rem;
+   color: #64748b;
+ }
+
+ .account-settings-modal__fields {
+   margin: 0 0 1.25rem;
+   padding: 0.95rem 1rem;
+   border-radius: 12px;
+   background: rgba(255, 252, 249, 0.92);
+   border: 1px solid rgba(212, 177, 141, 0.35);
+   text-align: left;
+ }
+
+ .account-settings-modal__row {
+   display: grid;
+   grid-template-columns: 88px 1fr;
+   gap: 0.35rem 0.85rem;
+   align-items: baseline;
+   padding: 0.45rem 0;
+   border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+ }
+
+ .account-settings-modal__row:last-child {
+   border-bottom: none;
+ }
+
+ .account-settings-modal__row dt {
+   margin: 0;
+   font-size: 0.72rem;
+   font-weight: 800;
+   text-transform: uppercase;
+   letter-spacing: 0.05em;
+   color: #8b5a36;
+ }
+
+ .account-settings-modal__row dd {
+   margin: 0;
+   font-size: 0.92rem;
+   font-weight: 600;
+   color: #1e293b;
+   word-break: break-word;
+ }
+
+ .account-settings-modal__actions {
+   display: flex;
+   flex-direction: column;
+   gap: 0.6rem;
+ }
+
+ .account-settings-modal__actions .btn {
+   width: 100%;
+   justify-content: center;
+   gap: 0.45rem;
+   min-height: 44px;
+ }
+
+ .account-settings-modal__logout {
+   background: linear-gradient(135deg, #b45309 0%, #c2410c 100%);
+   border-color: transparent;
+ }
+
+ .account-settings-modal__logout:hover {
+   filter: brightness(1.06);
+ }
+
+ /* Notification System — top center by default */
 .notification {
   position: fixed;
   top: 20px;
@@ -5828,3 +5975,5 @@ body.dashboard-page #register-module .register-doc-btn--secondary:hover {
   transform: translateY(-1px);
 }
 
+ 
+ 

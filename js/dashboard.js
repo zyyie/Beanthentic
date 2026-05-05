@@ -495,6 +495,8 @@ class DashboardApp {
     this.renderNotificationsList();
     // Initialize new dashboard features
     this.initNewDashboardFeatures();
+    // Initialize account module
+    this.initAccountModule();
   }
 
   updateNotificationsToolbarState() {
@@ -837,14 +839,14 @@ class DashboardApp {
     const messagingBtn = document.getElementById('messagingBtn');
     if (messagingBtn) {
       messagingBtn.addEventListener('click', () => {
-        this.showNotification('Messaging feature coming soon!', 'info');
+        this.switchModule('messaging');
       });
     }
 
     const accountBtn = document.getElementById('accountBtn');
     if (accountBtn) {
       accountBtn.addEventListener('click', () => {
-        this.showNotification('Account settings coming soon!', 'info');
+        this.switchModule('account');
       });
     }
 
@@ -1432,9 +1434,16 @@ class DashboardApp {
       'ipophl': 'IPOPHL',
       'export': 'Export Data',
       'social-media': 'Social Media',
-      'settings': 'Settings'
+      'settings': 'Settings',
+      'account': 'Account',
+      'messaging': 'Messaging'
     };
     currentModule.textContent = moduleNames[moduleName] || 'Overview';
+
+    // Load account data when switching to account module
+    if (moduleName === 'account') {
+      this.loadAccountData();
+    }
 
     // Switch modules
     const modules = document.querySelectorAll('.module');
@@ -1479,6 +1488,10 @@ class DashboardApp {
     }
     if (resolvedModuleName === 'transactions') {
       this.loadTransactionsPage();
+    }
+    if (resolvedModuleName === 'messaging') {
+      this.initMessagingModule();
+      this.loadMessagingFolder();
     }
 
     // Close mobile menu
@@ -4821,6 +4834,545 @@ class DashboardApp {
   }
 
   // Legacy duplicate methods removed: main switchModule() above is the source of truth.
+
+  async loadAccountData() {
+    try {
+      const response = await fetch('/settings/state');
+      if (!response.ok) throw new Error('Failed to load user data');
+      const data = await response.json();
+      
+      const displayName = data.user?.full_name || 'Admin';
+      const phone = data.user?.phone || '—';
+      
+      const displayNameEl = document.getElementById('accountDisplayName');
+      const phoneEl = document.getElementById('accountPhone');
+      
+      if (displayNameEl) displayNameEl.textContent = displayName;
+      if (phoneEl) phoneEl.textContent = phone;
+    } catch (error) {
+      console.error('Failed to load account data:', error);
+      const displayNameEl = document.getElementById('accountDisplayName');
+      const phoneEl = document.getElementById('accountPhone');
+      
+      if (displayNameEl) displayNameEl.textContent = 'Admin';
+      if (phoneEl) phoneEl.textContent = '—';
+    }
+  }
+
+  initAccountModule() {
+    const manageSettingsBtn = document.getElementById('manageSettingsBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    
+    if (manageSettingsBtn) {
+      manageSettingsBtn.addEventListener('click', () => {
+        this.switchModule('settings');
+        this.activeSettingsTab = 'profile';
+        this.settingsViewMode = 'detail';
+        this.syncSettingsSubmenuActive('profile');
+      });
+    }
+    
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to log out?')) {
+          window.location.href = '/logout';
+        }
+      });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════
+  // MESSAGING MODULE
+  // ═══════════════════════════════════════════════════
+
+  initMessagingModule() {
+    if (this._messagingInitialized) return;
+    this._messagingInitialized = true;
+
+    this.messagingFolder = 'inbox';
+    this.messagingCategory = '';
+    this.messagingSearchTerm = '';
+    this.messagingMessages = [];
+    this.messagingSelectedId = null;
+
+    // Folder clicks
+    const folderList = document.getElementById('messagingFolders');
+    if (folderList) {
+      folderList.addEventListener('click', (e) => {
+        const item = e.target.closest('.messaging-folder-item');
+        if (!item) return;
+        const folder = item.getAttribute('data-folder');
+        if (!folder) return;
+        this.messagingFolder = folder;
+        this.messagingSelectedId = null;
+        folderList.querySelectorAll('.messaging-folder-item').forEach(el => el.classList.remove('is-active'));
+        item.classList.add('is-active');
+        this.closeMessagingDetail();
+        this.loadMessagingFolder();
+      });
+    }
+
+    // Category clicks
+    const categories = document.querySelectorAll('.messaging-category-item');
+    categories.forEach(cat => {
+      cat.addEventListener('click', () => {
+        this.messagingCategory = cat.getAttribute('data-category') || '';
+        categories.forEach(c => c.classList.remove('is-active'));
+        cat.classList.add('is-active');
+        this.loadMessagingFolder();
+      });
+    });
+
+    // Search
+    const searchInput = document.getElementById('messagingSearchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        this.messagingSearchTerm = (e.target.value || '').trim();
+        this.loadMessagingFolder();
+      });
+    }
+
+    // Refresh
+    const refreshBtn = document.getElementById('messagingRefreshBtn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => this.loadMessagingFolder());
+    }
+
+    // Mark all read
+    const markAllBtn = document.getElementById('messagingMarkAllReadBtn');
+    if (markAllBtn) {
+      markAllBtn.addEventListener('click', () => this.messagingMarkAllRead());
+    }
+
+    // Compose
+    const composeBtn = document.getElementById('messagingComposeBtn');
+    if (composeBtn) {
+      composeBtn.addEventListener('click', () => this.openMessagingCompose());
+    }
+    const composeClose = document.getElementById('messagingComposeClose');
+    if (composeClose) {
+      composeClose.addEventListener('click', () => this.closeMessagingCompose());
+    }
+    const composeCancel = document.getElementById('messagingComposeCancel');
+    if (composeCancel) {
+      composeCancel.addEventListener('click', () => this.closeMessagingCompose());
+    }
+    const composeOverlay = document.getElementById('messagingComposeOverlay');
+    if (composeOverlay) {
+      composeOverlay.addEventListener('click', (e) => {
+        if (e.target === composeOverlay) this.closeMessagingCompose();
+      });
+    }
+    const composeForm = document.getElementById('messagingComposeForm');
+    if (composeForm) {
+      composeForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.sendMessage();
+      });
+    }
+
+    // Message list clicks
+    const listEl = document.getElementById('messagingList');
+    if (listEl) {
+      listEl.addEventListener('click', (e) => {
+        const starBtn = e.target.closest('.messaging-item__star');
+        if (starBtn) {
+          e.stopPropagation();
+          const id = Number(starBtn.getAttribute('data-msg-id'));
+          if (id) this.toggleMessagingStar(id);
+          return;
+        }
+        const item = e.target.closest('.messaging-item');
+        if (item) {
+          const id = Number(item.getAttribute('data-msg-id'));
+          if (id) this.openMessagingDetail(id);
+        }
+      });
+    }
+
+    // Detail actions
+    const backBtn = document.getElementById('messagingDetailBackBtn');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => this.closeMessagingDetail());
+    }
+    const starBtn = document.getElementById('messagingDetailStarBtn');
+    if (starBtn) {
+      starBtn.addEventListener('click', () => {
+        if (this.messagingSelectedId) this.toggleMessagingStar(this.messagingSelectedId);
+      });
+    }
+    const archiveBtn = document.getElementById('messagingDetailArchiveBtn');
+    if (archiveBtn) {
+      archiveBtn.addEventListener('click', () => {
+        if (this.messagingSelectedId) this.toggleMessagingArchive(this.messagingSelectedId);
+      });
+    }
+    const deleteBtn = document.getElementById('messagingDetailDeleteBtn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', () => {
+        if (this.messagingSelectedId) this.deleteMessagingMessage(this.messagingSelectedId);
+      });
+    }
+
+    // Escape to close compose / detail
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const overlay = document.getElementById('messagingComposeOverlay');
+      if (overlay && overlay.classList.contains('is-visible')) {
+        this.closeMessagingCompose();
+        return;
+      }
+    });
+
+    // Fetch unread count for header badge on init
+    this.updateMessagingBadge();
+  }
+
+  async loadMessagingFolder() {
+    const listEl = document.getElementById('messagingList');
+    if (!listEl) return;
+
+    listEl.innerHTML = '<li class="messaging-loading"><i class="fa-solid fa-spinner"></i><span>Loading messages…</span></li>';
+
+    try {
+      let url = `/api/messages?folder=${encodeURIComponent(this.messagingFolder)}`;
+      if (this.messagingCategory) url += `&category=${encodeURIComponent(this.messagingCategory)}`;
+      if (this.messagingSearchTerm) url += `&search=${encodeURIComponent(this.messagingSearchTerm)}`;
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      this.messagingMessages = Array.isArray(data.items) ? data.items : [];
+
+      // Update badge
+      const badge = document.getElementById('messagingInboxBadge');
+      if (badge) {
+        const unread = data.unread_count || 0;
+        badge.textContent = unread > 0 ? (unread > 99 ? '99+' : String(unread)) : '';
+      }
+      this.updateMessagingBadge();
+
+      this.renderMessagingList();
+    } catch (err) {
+      console.warn('Failed to load messages:', err);
+      listEl.innerHTML = '<li class="messaging-list-empty"><i class="fa-solid fa-circle-exclamation"></i><p>Could not load messages. Try refreshing.</p></li>';
+    }
+  }
+
+  renderMessagingList() {
+    const listEl = document.getElementById('messagingList');
+    if (!listEl) return;
+
+    const msgs = this.messagingMessages;
+    if (!msgs.length) {
+      const folderLabels = { inbox: 'inbox', sent: 'sent folder', starred: 'starred list', archived: 'archive' };
+      const label = folderLabels[this.messagingFolder] || 'folder';
+      listEl.innerHTML = `<li class="messaging-list-empty">
+        <i class="fa-solid fa-envelope-open"></i>
+        <p>No messages in your ${this.escapeHtml(label)}.</p>
+      </li>`;
+      return;
+    }
+
+    const esc = (s) => this.escapeHtml(s);
+    listEl.innerHTML = msgs.map(m => {
+      const unreadClass = m.is_read ? '' : ' is-unread';
+      const activeClass = m.id === this.messagingSelectedId ? ' is-active' : '';
+      const initials = this.getInitials(m.sender_name);
+      const avatarClass = this.getAvatarClass(m.category);
+      const categoryTag = this.getCategoryTag(m.category);
+      const timeStr = this.formatMessageTime(m.created_at);
+      const starClass = m.is_starred ? ' is-starred' : '';
+      const starIcon = m.is_starred ? 'fa-solid fa-star' : 'fa-regular fa-star';
+      const preview = (m.body || '').substring(0, 100);
+
+      return `<li class="messaging-item${unreadClass}${activeClass}" data-msg-id="${m.id}">
+        <div class="messaging-item__avatar ${avatarClass}">${esc(initials)}</div>
+        <div class="messaging-item__content">
+          <div class="messaging-item__top">
+            <span class="messaging-item__sender">${esc(m.sender_name || m.sender_phone)}</span>
+            <span class="messaging-item__time">${esc(timeStr)}</span>
+          </div>
+          <div class="messaging-item__subject">${esc(m.subject)}</div>
+          <div class="messaging-item__preview">${esc(preview)}</div>
+          <div class="messaging-item__meta">
+            ${categoryTag}
+            <button type="button" class="messaging-item__star${starClass}" data-msg-id="${m.id}" title="Star">
+              <i class="${starIcon}"></i>
+            </button>
+          </div>
+        </div>
+      </li>`;
+    }).join('');
+  }
+
+  getInitials(name) {
+    if (!name) return '?';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  }
+
+  getAvatarClass(category) {
+    const map = {
+      'announcement': 'messaging-item__avatar--announcement',
+      'farmer-update': 'messaging-item__avatar--farmer',
+      'reminder': 'messaging-item__avatar--reminder',
+    };
+    return map[category] || '';
+  }
+
+  getCategoryTag(category) {
+    const labels = {
+      'general': 'General',
+      'farmer-update': 'Farmer Update',
+      'announcement': 'Announcement',
+      'reminder': 'Reminder',
+    };
+    const label = labels[category] || '';
+    if (!label) return '';
+    const cssClass = `messaging-item__category-tag--${category}`;
+    return `<span class="messaging-item__category-tag ${cssClass}">${this.escapeHtml(label)}</span>`;
+  }
+
+  formatMessageTime(isoStr) {
+    if (!isoStr) return '';
+    try {
+      const d = new Date(isoStr);
+      if (isNaN(d.getTime())) return isoStr;
+      const now = new Date();
+      const diffMs = now - d;
+      const diffH = diffMs / 3600000;
+      if (diffH < 1) {
+        const mins = Math.floor(diffMs / 60000);
+        return mins <= 1 ? 'Just now' : `${mins}m ago`;
+      }
+      if (diffH < 24 && d.getDate() === now.getDate()) {
+        return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
+      }
+      if (diffH < 168) {
+        return d.toLocaleDateString(undefined, { weekday: 'short' });
+      }
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    } catch {
+      return isoStr;
+    }
+  }
+
+  async openMessagingDetail(id) {
+    this.messagingSelectedId = id;
+    const main = document.getElementById('messagingMain');
+    const detail = document.getElementById('messagingDetail');
+    if (main) main.classList.add('has-detail');
+    if (detail) detail.classList.add('is-visible');
+
+    // Highlight in list
+    document.querySelectorAll('.messaging-item').forEach(el => {
+      el.classList.toggle('is-active', Number(el.getAttribute('data-msg-id')) === id);
+    });
+
+    try {
+      const res = await fetch(`/api/messages/${id}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const m = data.message;
+      if (!m) throw new Error('No message data');
+
+      // Populate detail pane
+      const subjectEl = document.getElementById('messagingDetailSubject');
+      const avatarEl = document.getElementById('messagingDetailAvatar');
+      const nameEl = document.getElementById('messagingDetailSenderName');
+      const phoneEl = document.getElementById('messagingDetailSenderPhone');
+      const tsEl = document.getElementById('messagingDetailTimestamp');
+      const bodyEl = document.getElementById('messagingDetailBody');
+
+      if (subjectEl) subjectEl.textContent = m.subject;
+      if (avatarEl) {
+        avatarEl.textContent = this.getInitials(m.sender_name);
+        avatarEl.className = 'messaging-detail__sender-avatar';
+      }
+      if (nameEl) nameEl.textContent = m.sender_name || m.sender_phone;
+      if (phoneEl) phoneEl.textContent = m.sender_phone ? `+63${m.sender_phone}` : '';
+      if (tsEl) {
+        try {
+          const d = new Date(m.created_at);
+          tsEl.textContent = d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+        } catch {
+          tsEl.textContent = m.created_at || '';
+        }
+      }
+      if (bodyEl) bodyEl.textContent = m.body;
+
+      // Mark as read in list UI
+      const listItem = document.querySelector(`.messaging-item[data-msg-id="${id}"]`);
+      if (listItem) listItem.classList.remove('is-unread');
+
+      // Update unread count in local data
+      const local = this.messagingMessages.find(x => x.id === id);
+      if (local && !local.is_read) {
+        local.is_read = true;
+        this.updateMessagingBadge();
+      }
+    } catch (err) {
+      console.warn('Failed to load message detail:', err);
+      const bodyEl = document.getElementById('messagingDetailBody');
+      if (bodyEl) bodyEl.textContent = 'Could not load this message.';
+    }
+  }
+
+  closeMessagingDetail() {
+    this.messagingSelectedId = null;
+    const main = document.getElementById('messagingMain');
+    const detail = document.getElementById('messagingDetail');
+    if (main) main.classList.remove('has-detail');
+    if (detail) detail.classList.remove('is-visible');
+    document.querySelectorAll('.messaging-item').forEach(el => el.classList.remove('is-active'));
+  }
+
+  async toggleMessagingStar(id) {
+    try {
+      const res = await fetch(`/api/messages/${id}/star`, { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      // Update local data
+      const m = this.messagingMessages.find(x => x.id === id);
+      if (m) m.is_starred = data.is_starred;
+
+      // Update star in list
+      const starBtn = document.querySelector(`.messaging-item__star[data-msg-id="${id}"]`);
+      if (starBtn) {
+        starBtn.classList.toggle('is-starred', data.is_starred);
+        const icon = starBtn.querySelector('i');
+        if (icon) icon.className = data.is_starred ? 'fa-solid fa-star' : 'fa-regular fa-star';
+      }
+    } catch (err) {
+      console.warn('Star toggle failed:', err);
+    }
+  }
+
+  async toggleMessagingArchive(id) {
+    try {
+      const res = await fetch(`/api/messages/${id}/archive`, { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      this.showNotification(data.is_archived ? 'Message archived.' : 'Message unarchived.', 'success');
+      this.closeMessagingDetail();
+      this.loadMessagingFolder();
+    } catch (err) {
+      console.warn('Archive toggle failed:', err);
+      this.showNotification('Could not archive message.', 'error');
+    }
+  }
+
+  async deleteMessagingMessage(id) {
+    if (!confirm('Delete this message permanently?')) return;
+    try {
+      const res = await fetch(`/api/messages/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      this.showNotification('Message deleted.', 'success');
+      this.closeMessagingDetail();
+      this.loadMessagingFolder();
+    } catch (err) {
+      console.warn('Delete failed:', err);
+      this.showNotification('Could not delete message.', 'error');
+    }
+  }
+
+  async messagingMarkAllRead() {
+    try {
+      const res = await fetch('/api/messages/mark-all-read', { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      this.showNotification('All messages marked as read.', 'success');
+      this.loadMessagingFolder();
+    } catch (err) {
+      console.warn('Mark all read failed:', err);
+    }
+  }
+
+  openMessagingCompose() {
+    const overlay = document.getElementById('messagingComposeOverlay');
+    if (overlay) overlay.classList.add('is-visible');
+    const subjectInput = document.getElementById('msgComposeSubject');
+    if (subjectInput) setTimeout(() => subjectInput.focus(), 100);
+  }
+
+  closeMessagingCompose() {
+    const overlay = document.getElementById('messagingComposeOverlay');
+    if (overlay) overlay.classList.remove('is-visible');
+    const form = document.getElementById('messagingComposeForm');
+    if (form) form.reset();
+  }
+
+  async sendMessage() {
+    const subject = (document.getElementById('msgComposeSubject')?.value || '').trim();
+    const body = (document.getElementById('msgComposeBody')?.value || '').trim();
+    const category = document.getElementById('msgComposeCategory')?.value || 'general';
+    const recipientPhone = (document.getElementById('msgComposeRecipient')?.value || '').trim();
+
+    if (!subject || !body) {
+      this.showNotification('Subject and message body are required.', 'error');
+      return;
+    }
+
+    const sendBtn = document.getElementById('messagingComposeSend');
+    if (sendBtn) {
+      sendBtn.disabled = true;
+      sendBtn.setAttribute('aria-busy', 'true');
+    }
+
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ subject, body, category, recipient_phone: recipientPhone }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      this.showNotification('Message sent!', 'success');
+      this.closeMessagingCompose();
+      this.loadMessagingFolder();
+    } catch (err) {
+      console.warn('Send message failed:', err);
+      this.showNotification(err.message || 'Could not send message.', 'error');
+    } finally {
+      if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.removeAttribute('aria-busy');
+      }
+    }
+  }
+
+  async updateMessagingBadge() {
+    try {
+      const res = await fetch('/api/messages/unread-count');
+      if (!res.ok) return;
+      const data = await res.json();
+      const count = data.unread_count || 0;
+
+      const headerBadge = document.getElementById('headerMessageBadge');
+      if (headerBadge) {
+        if (count > 0) {
+          headerBadge.textContent = count > 99 ? '99+' : String(count);
+          headerBadge.classList.add('is-visible');
+        } else {
+          headerBadge.textContent = '';
+          headerBadge.classList.remove('is-visible');
+        }
+      }
+
+      const inboxBadge = document.getElementById('messagingInboxBadge');
+      if (inboxBadge) {
+        inboxBadge.textContent = count > 0 ? (count > 99 ? '99+' : String(count)) : '';
+      }
+    } catch {
+      // Silently fail
+    }
+  }
 }
 
 // Initialize dashboard when DOM is ready

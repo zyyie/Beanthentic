@@ -1,0 +1,127 @@
+/* Account Module Styles */
+
+.account-module-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.account-card {
+  background: white;
+  border-radius: 12px;
+  padding: 40px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+  border: 1px solid #e5e7eb;
+}
+
+.account-icon {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.account-icon i {
+  font-size: 100px;
+  color: #8b4a2b;
+  background: linear-gradient(135deg, #8b4a2b 0%, #a05e3a 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.account-info {
+  margin-bottom: 40px;
+}
+
+.account-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.2s ease;
+}
+
+.account-info-row:hover {
+  background-color: #f9fafb;
+  margin: 0 -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.account-info-row:last-child {
+  border-bottom: none;
+}
+
+.account-info-label {
+  font-weight: 600;
+  color: #374151;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-info-label i {
+  color: #8b4a2b;
+  font-size: 16px;
+}
+
+.account-info-value {
+  color: #6b7280;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.account-actions {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding-top: 20px;
+  border-top: 2px solid #f3f4f6;
+}
+
+.account-actions .btn {
+  padding: 14px 28px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.account-actions .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.account-actions .btn:active {
+  transform: translateY(0);
+}
+
+.account-actions .btn-secondary {
+  background-color: #6b7280;
+  color: white;
+}
+
+.account-actions .btn-secondary:hover {
+  background-color: #4b5563;
+}
+
+.account-actions .btn-danger {
+  background-color: #dc2626;
+  color: white;
+}
+
+.account-actions .btn-danger:hover {
+  background-color: #b91c1c;
+}

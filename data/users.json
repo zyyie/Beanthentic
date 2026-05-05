@@ -1,0 +1,10 @@
+{
+  "9999999999": {
+    "full_name": "Anne Hathaway",
+    "password_hash": "scrypt:32768:8:1$pI8B3Bf3ulYzsZke$8aef40cb4604f8b7cf3bcbe8af92b5efbb619aacbfeabc8fff4e19fcbb8152e4110380ddb206a83e2f7fc9e162f87deedf34163470ee0e2fc1acf4713fb583eb"
+  },
+  "9123456789": {
+    "full_name": "Admin User",
+    "password_hash": "scrypt:32768:8:1$Pfem1uOe0aHHWd4Q$589194ba952e2af8ce107217f43eaf61b41f8f514e168d00f89bcf267f45425835772e3be29a397b0db6f9dd0dd955a3c54aeeb66ce8bb397cdcaaec25b30f5d"
+  }
+}
