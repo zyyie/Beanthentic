@@ -6308,6 +6308,23 @@ class DashboardApp {
       btn.addEventListener('click', () => this.handleToolbarAction(btn));
     });
 
+    // Detail modal controls
+    const detailModal = document.getElementById('beanthenticContributionDetailModal');
+    const detailCloseBtn = document.getElementById('beanthenticContributionDetailClose');
+    const detailBackdrop = detailModal ? detailModal.querySelector('.beanthentic-detail-dialog__backdrop') : null;
+
+    if (detailCloseBtn) {
+      detailCloseBtn.addEventListener('click', () => this.closeContributionDetailModal());
+    }
+    if (detailBackdrop) {
+      detailBackdrop.addEventListener('click', () => this.closeContributionDetailModal());
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        this.closeContributionDetailModal();
+      }
+    });
+
     // Contribution item interactions
     this.bindContributionItemEvents();
   }
@@ -6598,8 +6615,49 @@ class DashboardApp {
       contribution.unread = false;
       contribution.seen = true;
       this.renderContributions();
-      this.showNotification(`Opening: ${contribution.subject}`, 'info');
+      this.openContributionDetailModal(contribution);
     }
+  }
+
+  openContributionDetailModal(contribution) {
+    const modal = document.getElementById('beanthenticContributionDetailModal');
+    if (!modal || !contribution) return;
+
+    const farmerEl = document.getElementById('beanthenticContributionDetailFarmer');
+    const dateEl = document.getElementById('beanthenticContributionDetailDate');
+    const subjectEl = document.getElementById('beanthenticContributionDetailSubject');
+    const statusEl = document.getElementById('beanthenticContributionDetailStatus');
+    const categoryEl = document.getElementById('beanthenticContributionDetailCategory');
+    const previewEl = document.getElementById('beanthenticContributionDetailPreview');
+
+    if (farmerEl) farmerEl.textContent = contribution.farmer || '—';
+    if (dateEl) dateEl.textContent = contribution.date || '—';
+    if (subjectEl) subjectEl.textContent = contribution.subject || '—';
+    if (previewEl) previewEl.textContent = contribution.preview || 'No details available.';
+
+    if (statusEl) {
+      statusEl.textContent = contribution.status || 'pending';
+      statusEl.className = `beanthentic-tag beanthentic-tag--${contribution.status || 'pending'}`;
+    }
+
+    if (categoryEl) {
+      const category = contribution.category || 'documents';
+      categoryEl.textContent = this.getContributionCategoryLabel(category);
+      categoryEl.className = `beanthentic-tag beanthentic-tag--${category}`;
+    }
+
+    modal.removeAttribute('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('beanthentic-dialog-open');
+  }
+
+  closeContributionDetailModal() {
+    const modal = document.getElementById('beanthenticContributionDetailModal');
+    if (!modal || modal.hasAttribute('hidden')) return;
+
+    modal.setAttribute('hidden', '');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('beanthentic-dialog-open');
   }
 
   showAddContributionModal() {

@@ -984,6 +984,59 @@
             </div>
           </div>
 
+          <!-- Farmer's Contribution Detail Modal -->
+          <div
+            id="beanthenticContributionDetailModal"
+            class="beanthentic-detail-dialog"
+            hidden
+            aria-hidden="true"
+          >
+            <div class="beanthentic-detail-dialog__backdrop" tabindex="-1"></div>
+            <div
+              class="beanthentic-detail-dialog__card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="beanthenticContributionDetailTitle"
+            >
+              <button
+                type="button"
+                class="beanthentic-detail-dialog__close"
+                id="beanthenticContributionDetailClose"
+                aria-label="Close contribution details"
+              >
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+              </button>
+
+              <h2 id="beanthenticContributionDetailTitle">Contribution Details</h2>
+
+              <div class="beanthentic-detail-dialog__meta">
+                <div>
+                  <div class="beanthentic-detail-dialog__meta-label">Farmer</div>
+                  <div class="beanthentic-detail-dialog__meta-value" id="beanthenticContributionDetailFarmer">—</div>
+                </div>
+                <div>
+                  <div class="beanthentic-detail-dialog__meta-label">Date</div>
+                  <div class="beanthentic-detail-dialog__meta-value" id="beanthenticContributionDetailDate">—</div>
+                </div>
+              </div>
+
+              <div class="beanthentic-detail-dialog__subject" id="beanthenticContributionDetailSubject"></div>
+
+              <div class="beanthentic-detail-dialog__tags">
+                <span
+                  id="beanthenticContributionDetailStatus"
+                  class="beanthentic-tag beanthentic-tag--pending"
+                >Pending</span>
+                <span
+                  id="beanthenticContributionDetailCategory"
+                  class="beanthentic-tag beanthentic-tag--documents"
+                >Document</span>
+              </div>
+
+              <div class="beanthentic-detail-dialog__preview" id="beanthenticContributionDetailPreview"></div>
+            </div>
+          </div>
+
           <!-- Analytics Module -->
           <div class="module hidden" id="analytics-module" data-module="analytics">
             <section class="module-header">

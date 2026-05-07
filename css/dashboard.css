@@ -6668,6 +6668,116 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   max-width: 520px;
 }
 
+/* Farmer's Contribution Detail Modal */
+.beanthentic-detail-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.beanthentic-detail-dialog[hidden] {
+  display: none;
+}
+
+.beanthentic-detail-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.beanthentic-detail-dialog__card {
+  position: relative;
+  width: 90%;
+  max-width: 820px;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.25),
+    0 4px 16px rgba(0, 0, 0, 0.10);
+  padding: 18px 20px 20px;
+}
+
+.beanthentic-detail-dialog__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: #f3f4f6;
+  color: #374151;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.beanthentic-detail-dialog__close:hover {
+  background: #e5e7eb;
+  transform: translateY(-1px);
+}
+
+.beanthentic-detail-dialog__card h2 {
+  margin: 0 36px 10px 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #14532d;
+}
+
+.beanthentic-detail-dialog__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0 12px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 12px;
+}
+
+.beanthentic-detail-dialog__meta-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #6b7280;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.beanthentic-detail-dialog__meta-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.beanthentic-detail-dialog__subject {
+  font-size: 14px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 12px;
+}
+
+.beanthentic-detail-dialog__tags {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.beanthentic-detail-dialog__preview {
+  color: #374151;
+  font-size: 13.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding-top: 6px;
+}
+
 /* Custom Confirmation Dialog Styles */
 .beanthentic-confirm-dialog {
   position: fixed;
