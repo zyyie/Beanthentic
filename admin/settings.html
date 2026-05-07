@@ -381,25 +381,25 @@
         <nav class="side-nav">
           <div class="nav-section">
             <h3>Overview</h3>
-            <a href="../dashboard.html" class="nav-link" data-module="overview">
+            <a href="/dashboard" class="nav-link" data-module="overview">
               <i class="nav-icon fa-solid fa-chart-pie" aria-hidden="true"></i>
               <span>Dashboard Overview</span>
             </a>
           </div>
           <div class="nav-section">
             <h3>Data Management</h3>
-            <a href="../dashboard.html#farmers" class="nav-link" data-module="farmers">
+            <a href="/dashboard#farmers" class="nav-link" data-module="farmers">
               <i class="nav-icon fa-solid fa-people-group" aria-hidden="true"></i>
               <span>Farmer Records</span>
             </a>
-            <a href="../dashboard.html#analytics" class="nav-link" data-module="analytics">
+            <a href="/dashboard#analytics" class="nav-link" data-module="analytics">
               <i class="nav-icon fa-solid fa-chart-line" aria-hidden="true"></i>
               <span>Analytics</span>
             </a>
           </div>
           <div class="nav-section">
             <h3>Tools</h3>
-            <a href="../dashboard.html#export" class="nav-link" data-module="export">
+            <a href="/dashboard#export" class="nav-link" data-module="export">
               <i class="nav-icon fa-solid fa-file-export" aria-hidden="true"></i>
               <span>Export Data</span>
             </a>
@@ -991,7 +991,8 @@
     })();
 
     // 2FA toggle
-    document.getElementById('enable2faBtn').addEventListener('click', async function() {
+    const enable2faBtn = document.getElementById('enable2faBtn');
+    if (enable2faBtn) enable2faBtn.addEventListener('click', async function() {
       try {
         const response = await fetch('/settings/security', {
           method: 'POST',
@@ -1020,7 +1021,8 @@
       }
     });
 
-    document.getElementById('disable2faBtn').addEventListener('click', async function() {
+    const disable2faBtn = document.getElementById('disable2faBtn');
+    if (disable2faBtn) disable2faBtn.addEventListener('click', async function() {
       const password = prompt('Enter your password to disable 2FA:');
       if (!password) return;
       
@@ -1050,7 +1052,8 @@
     });
 
     // View backup codes
-    document.getElementById('viewBackupCodesBtn').addEventListener('click', function() {
+    const viewBackupCodesBtn = document.getElementById('viewBackupCodesBtn');
+    if (viewBackupCodesBtn) viewBackupCodesBtn.addEventListener('click', function() {
       if (settingsData.security.backup_codes && settingsData.security.backup_codes.length > 0) {
         const backupCodesList = document.getElementById('backupCodesList');
         backupCodesList.innerHTML = settingsData.security.backup_codes.map(code => `<code>${code}</code>`).join('');

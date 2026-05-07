@@ -2,5 +2,9 @@
   "9999999999": {
     "full_name": "Marco Malibiran",
     "password_hash": "scrypt:32768:8:1$hfXgLGSm6eFEkTOQ$ceab008f60bc06fc47430f87eca74823d811e74031ba671c7c83eb360c95c341687efdfa541b1b78666ac6f313288beab885c7f90ae70b292085546556577091"
+  },
+  "9930152544": {
+    "full_name": "Ericka Maynete",
+    "password_hash": "scrypt:32768:8:1$3TRFytVtgi0FRBqk$52c829ed94ef1da87f307bfae2b18e31ba90f091b8cb2692afeddd599e9a323adffb8253793c6c2a61836231cd7f57c4b8d74eab55c16a23cd4b0ad1ce7bbb77"
   }
 }

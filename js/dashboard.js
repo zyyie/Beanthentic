@@ -18,6 +18,7 @@ class DashboardApp {
     this.googleMapMarkers = [];
     this.googleMapsReady = false;
     this.googleInfoWindow = null;
+    this.lipaBoundaryOverlay = null;
     this.activeSettingsTab = 'security';
     /** 'landing' = card hub; 'detail' = loaded fragment */
     this.settingsViewMode = 'landing';
@@ -25,12 +26,10 @@ class DashboardApp {
     this.notificationsFeed = this.hydrateNotificationsFeed();
     /** @type {number | null} */
     this.pendingDeleteRowIndex = null;
-    /** @type {Record<string, unknown>[]} */
     this.transactionsRows = [];
-    /** @type {string} */
     this.transactionsSearchTerm = '';
-    /** @type {number | null} */
     this.transactionsFarmerFilterId = null;
+    this.transactionsVarietyFilter = '';
     this.init();
   }
 
@@ -497,6 +496,8 @@ class DashboardApp {
     this.initNewDashboardFeatures();
     // Initialize account module
     this.initAccountModule();
+    // Initialize Farmer's Contribution module
+    this.initBeanthenticContributions();
   }
 
   updateNotificationsToolbarState() {
@@ -576,31 +577,6 @@ class DashboardApp {
       .replace(/"/g, '&quot;');
   }
 
-  applyTransactionsSearchAndRender() {
-    const term = (this.transactionsSearchTerm || '').trim().toLowerCase();
-    const all = this.transactionsRows || [];
-    const filtered =
-      !term
-        ? all
-        : all.filter((row) => {
-            const hay = [
-              row.farmer_name,
-              row.farmer_no,
-              row.buyer_name,
-              row.notes,
-              row.variety,
-              row.recorded_by_phone,
-              row.recorded_at,
-              row.delta_kg,
-              row.balance_after_kg,
-            ]
-              .map((x) => String(x || '').toLowerCase())
-              .join(' ');
-            return hay.includes(term);
-          });
-    this.renderTransactionsTableBody(filtered);
-  }
-
   varietyLabel(variety) {
     const v = String(variety || '').toLowerCase();
     if (v === 'liberica') return 'Liberica';
@@ -609,33 +585,59 @@ class DashboardApp {
     return variety || '—';
   }
 
-  formatCoffeeDeltaKg(delta) {
-    const n = Number(delta);
-    if (Number.isNaN(n)) return '—';
-    const abs = Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    if (n > 0) return `+${abs}`;
-    return `−${abs}`;
-  }
-
   deltaCellClass(delta) {
     const n = Number(delta);
     if (Number.isNaN(n) || n === 0) return 'transactions-delta--zero';
     return n < 0 ? 'transactions-delta--out' : 'transactions-delta--in';
   }
 
+  formatCoffeeDeltaKg(delta) {
+    const n = Number(delta);
+    if (Number.isNaN(n)) return '—';
+    const abs = Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return n >= 0 ? `+${abs}` : `−${abs}`;
+  }
+
+  movementLabel(delta) {
+    const n = Number(delta);
+    if (Number.isNaN(n) || n === 0) return 'No Change';
+    return n < 0 ? 'Stock Out' : 'Stock In';
+  }
+
+  applyTransactionsFiltersAndRender() {
+    const term = (this.transactionsSearchTerm || '').trim().toLowerCase();
+    const rows = (this.transactionsRows || []).filter((row) => {
+      const varietyOk =
+        !this.transactionsVarietyFilter ||
+        String(row.variety || '').toLowerCase() === this.transactionsVarietyFilter;
+
+      const delta = Number(row.delta_kg);
+      const farmerOk =
+        this.transactionsFarmerFilterId == null ||
+        String(row.farmer_id || '') === String(this.transactionsFarmerFilterId);
+
+      const haystack = [
+        row.farmer_name,
+        row.farmer_no,
+        row.buyer_name,
+        row.notes,
+        row.variety,
+        row.recorded_by_phone,
+        row.recorded_at,
+      ]
+        .map((x) => String(x || '').toLowerCase())
+        .join(' ');
+      const termOk = !term || haystack.includes(term);
+
+      return varietyOk && farmerOk && termOk;
+    });
+
+    this.renderTransactionsTableBody(rows);
+  }
+
   async loadFarmerOptionsForTransactionsModule() {
-    const formSelect = document.getElementById('coffeeTxnFarmerSelect');
     const filterSelect = document.getElementById('transactionsFarmerFilter');
-    if (!formSelect && !filterSelect) return;
-
-    const setLoading = () => {
-      if (formSelect) {
-        formSelect.innerHTML = '<option value="">Loading farmers…</option>';
-        formSelect.disabled = true;
-      }
-    };
-    setLoading();
-
+    if (!filterSelect) return;
     try {
       const res = await fetch('/api/farmer-picker');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -643,30 +645,18 @@ class DashboardApp {
       const items = Array.isArray(data.items) ? data.items : [];
       const opts = items
         .map((f) => {
-          const id = f.id;
-          const no = f.no != null ? f.no : '';
-          const name = (f.name || '').trim() || 'Farmer';
-          const label = `#${no} — ${name}`;
-          return `<option value="${String(id)}">${this.escapeHtml(label)}</option>`;
+          const id = String(f.id || '');
+          const no = f.no != null ? `#${f.no} — ` : '';
+          const name = this.escapeHtml((f.name || '').trim() || 'Farmer');
+          return `<option value="${id}">${no}${name}</option>`;
         })
         .join('');
-
-      if (formSelect) {
-        formSelect.innerHTML = `<option value="">Select farmer…</option>${opts}`;
-        formSelect.disabled = false;
-      }
-      if (filterSelect) {
-        const cur = this.transactionsFarmerFilterId != null ? String(this.transactionsFarmerFilterId) : '';
-        filterSelect.innerHTML = `<option value="">All farmers</option>${opts}`;
-        filterSelect.value = cur;
-      }
+      const cur = this.transactionsFarmerFilterId != null ? String(this.transactionsFarmerFilterId) : '';
+      filterSelect.innerHTML = `<option value="">All farmers</option>${opts}`;
+      filterSelect.value = cur;
     } catch (e) {
-      console.warn('Farmer picker failed:', e);
-      if (formSelect) {
-        formSelect.innerHTML = '<option value="">Could not load farmers</option>';
-        formSelect.disabled = false;
-      }
-      this.showNotification('Could not load farmer list.', 'error');
+      console.warn('Transactions farmer-picker failed:', e);
+      filterSelect.innerHTML = '<option value="">All farmers</option>';
     }
   }
 
@@ -674,8 +664,6 @@ class DashboardApp {
     const tbody = document.getElementById('transactionsTableBody');
     const emptyEl = document.getElementById('transactionsEmptyState');
     if (!tbody) return;
-
-    const esc = (x) => this.escapeHtml(x);
 
     if (!rows.length) {
       tbody.innerHTML = '';
@@ -686,38 +674,35 @@ class DashboardApp {
 
     tbody.innerHTML = rows
       .map((row) => {
-        let dtLabel = '—';
+        const farmerLabel =
+          row.farmer_no != null && row.farmer_no !== ''
+            ? `#${this.escapeHtml(row.farmer_no)} — ${this.escapeHtml(row.farmer_name || '')}`
+            : this.escapeHtml(row.farmer_name || '—');
+        const deltaText = this.formatCoffeeDeltaKg(row.delta_kg);
+        const deltaClass = this.deltaCellClass(row.delta_kg);
+        const balance =
+          typeof row.balance_after_kg === 'number' && !Number.isNaN(row.balance_after_kg)
+            ? row.balance_after_kg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : '—';
+        let recordedAt = '—';
         if (row.recorded_at) {
           try {
             const d = new Date(row.recorded_at);
-            if (!Number.isNaN(d.getTime())) {
-              dtLabel = d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-            }
+            if (!Number.isNaN(d.getTime())) recordedAt = d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
           } catch {
-            dtLabel = String(row.recorded_at);
+            recordedAt = String(row.recorded_at);
           }
         }
-        const farmerCell =
-          row.farmer_no != null && row.farmer_no !== ''
-            ? `${esc(row.farmer_no)} — ${esc(row.farmer_name || '')}`
-            : esc(row.farmer_name || '—');
-        const bal = row.balance_after_kg;
-        const balTxt =
-          typeof bal === 'number' && !Number.isNaN(bal)
-            ? bal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-            : '—';
-        const dClass = this.deltaCellClass(row.delta_kg);
-        const dText = this.formatCoffeeDeltaKg(row.delta_kg);
         return `<tr>
-      <td>${esc(dtLabel)}</td>
-      <td>${farmerCell}</td>
-      <td><span class="transactions-variety-pill">${esc(this.varietyLabel(row.variety))}</span></td>
-      <td><span class="transactions-delta ${dClass}">${esc(dText)}</span></td>
-      <td>${esc(balTxt)}</td>
-      <td>${esc(row.buyer_name || '—')}</td>
-      <td class="transactions-details">${esc(row.notes || '—')}</td>
-      <td>${esc(row.recorded_by_phone || '—')}</td>
-    </tr>`;
+          <td>${farmerLabel}</td>
+          <td><span class="transactions-variety-pill">${this.escapeHtml(this.varietyLabel(row.variety))}</span></td>
+          <td><span class="transactions-delta ${deltaClass}">${this.escapeHtml(deltaText)}</span></td>
+          <td>${this.escapeHtml(balance)}</td>
+          <td>${this.escapeHtml(row.buyer_name || '—')}</td>
+          <td><span class="transactions-status-pill">${this.escapeHtml(this.movementLabel(row.delta_kg))}</span></td>
+          <td>${this.escapeHtml(recordedAt)}</td>
+          <td><button type="button" class="transactions-action-btn transactions-action-btn--primary" disabled>View</button></td>
+        </tr>`;
       })
       .join('');
   }
@@ -728,102 +713,62 @@ class DashboardApp {
     if (!tbody) return;
 
     await this.loadFarmerOptionsForTransactionsModule();
-
-    tbody.innerHTML =
-      '<tr><td colspan="8" class="transactions-loading-cell">Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="transactions-loading-cell">Loading...</td></tr>';
     if (emptyEl) emptyEl.hidden = true;
 
     try {
-      let url = '/api/farmer-coffee-transactions?limit=400';
-      if (this.transactionsFarmerFilterId != null && !Number.isNaN(this.transactionsFarmerFilterId)) {
-        url += `&farmer_id=${encodeURIComponent(String(this.transactionsFarmerFilterId))}`;
-      }
-      const res = await fetch(url);
+      const res = await fetch('/api/farmer-coffee-transactions?limit=500');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       this.transactionsRows = Array.isArray(data.items) ? data.items : [];
-      this.applyTransactionsSearchAndRender();
+      this.applyTransactionsFiltersAndRender();
     } catch (e) {
       console.warn('Transactions load failed:', e);
-      this.transactionsRows = [];
       tbody.innerHTML =
         '<tr><td colspan="8" class="transactions-error-cell">Could not load transactions. Try Refresh.</td></tr>';
-      this.showNotification('Could not load bean transactions.', 'error');
+      this.transactionsRows = [];
+      this.showNotification('Could not load transactions.', 'error');
     }
   }
 
   initTransactionsModuleControls() {
     const refreshBtn = document.getElementById('transactionsRefreshBtn');
-    if (refreshBtn) {
-      refreshBtn.addEventListener('click', () => this.loadTransactionsPage());
-    }
+    if (refreshBtn) refreshBtn.addEventListener('click', () => this.loadTransactionsPage());
+
     const search = document.getElementById('transactionsSearchInput');
     if (search) {
       search.addEventListener('input', (e) => {
-        this.transactionsSearchTerm = ((e.target && e.target.value) || '').toString();
-        this.applyTransactionsSearchAndRender();
+        this.transactionsSearchTerm = String((e.target && e.target.value) || '');
+        this.applyTransactionsFiltersAndRender();
       });
     }
+
     const farmerFilter = document.getElementById('transactionsFarmerFilter');
     if (farmerFilter) {
       farmerFilter.addEventListener('change', () => {
-        const v = farmerFilter.value;
-        this.transactionsFarmerFilterId = v ? parseInt(v, 10) : null;
-        if (v && Number.isNaN(this.transactionsFarmerFilterId)) {
-          this.transactionsFarmerFilterId = null;
-        }
-        this.loadTransactionsPage();
+        const value = String(farmerFilter.value || '');
+        this.transactionsFarmerFilterId = value ? value : null;
+        this.applyTransactionsFiltersAndRender();
       });
     }
 
-    const form = document.getElementById('coffeeTxnRecordForm');
-    const submitBtn = document.getElementById('coffeeTxnSubmitBtn');
-    if (form && submitBtn) {
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const fd = new FormData(form);
-        const farmerId = parseInt(String(fd.get('farmer_id') || ''), 10);
-        const variety = String(fd.get('variety') || '').trim().toLowerCase();
-        const deltaKgRaw = String(fd.get('delta_kg') ?? '').trim();
-        const buyer_name = String(fd.get('buyer_name') ?? '').trim();
-        const notes = String(fd.get('notes') ?? '').trim();
-
-        if (!farmerId || Number.isNaN(farmerId)) {
-          this.showNotification('Choose a farmer.', 'error');
-          return;
-        }
-        const payload = {
-          farmer_id: farmerId,
-          variety,
-          delta_kg: deltaKgRaw,
-          buyer_name,
-          notes,
-        };
-
-        submitBtn.disabled = true;
-        submitBtn.setAttribute('aria-busy', 'true');
-        try {
-          const res = await fetch('/api/farmer-coffee-transactions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          const body = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            throw new Error(body.error || `HTTP ${res.status}`);
-          }
-          form.reset();
-          this.showNotification('Coffee bean transaction saved.', 'success');
-          await this.loadTransactionsPage();
-        } catch (err) {
-          console.warn('Save coffee transaction failed:', err);
-          this.showNotification(err.message || 'Could not save transaction.', 'error');
-        } finally {
-          submitBtn.disabled = false;
-          submitBtn.removeAttribute('aria-busy');
-        }
+    const varietyFilter = document.getElementById('transactionsVarietyFilter');
+    if (varietyFilter) {
+      varietyFilter.addEventListener('change', () => {
+        this.transactionsVarietyFilter = String(varietyFilter.value || '').toLowerCase();
+        this.applyTransactionsFiltersAndRender();
       });
     }
+
+  }
+
+  openAccountModuleFromHeader() {
+    this.switchModule('account');
+    // Keep URL state in sync when opening from the header icon.
+    if (window.location.hash !== '#account') {
+      window.location.hash = 'account';
+    }
+    this.loadAccountData();
   }
 
   setupEventListeners() {
@@ -846,7 +791,7 @@ class DashboardApp {
     const accountBtn = document.getElementById('accountBtn');
     if (accountBtn) {
       accountBtn.addEventListener('click', () => {
-        this.switchModule('account');
+        this.openAccountModuleFromHeader();
       });
     }
 
@@ -1206,7 +1151,7 @@ class DashboardApp {
     const mapsSearchInput = document.getElementById('mapsSearchInput');
     if (mapsSearchInput) {
       mapsSearchInput.addEventListener('input', (e) => {
-        this.mapSearchTerm = (e.target.value || '').toString().trim().toLowerCase();
+        this.mapSearchTerm = this.normalizeBarangayName((e.target.value || '').toString());
         this.renderMapsModule();
       });
     }
@@ -1483,11 +1428,11 @@ class DashboardApp {
     if (resolvedModuleName === 'register') {
       this.renderRegisterModule();
     }
-    if (resolvedModuleName === 'ipophl') {
-      this.renderIpophlModule();
-    }
     if (resolvedModuleName === 'transactions') {
       this.loadTransactionsPage();
+    }
+    if (resolvedModuleName === 'ipophl') {
+      this.renderIpophlModule();
     }
     if (resolvedModuleName === 'messaging') {
       this.initMessagingModule();
@@ -4301,23 +4246,46 @@ class DashboardApp {
 
   getBarangayCoordinates() {
     return {
+      adya: { lat: 13.9536, lng: 121.1542 },
       'antipolo del norte': { lat: 13.9492, lng: 121.1642 },
       'antipolo del sur': { lat: 13.9365, lng: 121.1601 },
+      'bagong pook': { lat: 13.9398, lng: 121.1562 },
       balintawak: { lat: 13.9472, lng: 121.1719 },
       bulacnin: { lat: 13.9241, lng: 121.1748 },
       dagatan: { lat: 13.9618, lng: 121.1398 },
+      halang: { lat: 13.9528, lng: 121.2098 },
+      kayumanggi: { lat: 13.9473, lng: 121.1498 },
+      latag: { lat: 13.9414, lng: 121.1454 },
+      lodlod: { lat: 13.9271, lng: 121.1328 },
+      lumbang: { lat: 13.9289, lng: 121.1476 },
+      malagonlong: { lat: 13.9198, lng: 121.1541 },
+      malitlit: { lat: 13.9154, lng: 121.1761 },
       'mataas na lupa': { lat: 13.9652, lng: 121.1825 },
+      'pag olingin west': { lat: 13.9108, lng: 121.1876 },
+      pangao: { lat: 13.9214, lng: 121.1657 },
+      pinagkawitan: { lat: 13.9332, lng: 121.1968 },
+      'pinagtong ulan': { lat: 13.8995, lng: 121.1861 },
+      pusil: { lat: 13.9047, lng: 121.1699 },
+      quezon: { lat: 13.9186, lng: 121.1834 },
+      rizal: { lat: 13.9397, lng: 121.1934 },
       'san benito': { lat: 13.9559, lng: 121.1536 },
+      'san celestino': { lat: 13.9586, lng: 121.1468 },
       'san carlos': { lat: 13.9523, lng: 121.1838 },
+      'san isidro': { lat: 13.9496, lng: 121.1364 },
       'san jose': { lat: 13.9276, lng: 121.1568 },
       'san lucas': { lat: 13.9223, lng: 121.1789 },
+      'san salvador': { lat: 13.9678, lng: 121.1498 },
+      'sto nino': { lat: 13.9044, lng: 121.1628 },
+      'sto toribio': { lat: 13.8976, lng: 121.1702 },
+      talisay: { lat: 13.8884, lng: 121.1504 },
+      tangob: { lat: 13.8859, lng: 121.1788 },
+      tangway: { lat: 13.8958, lng: 121.1446 },
+      tipakan: { lat: 13.8919, lng: 121.1862 },
       tibig: { lat: 13.9328, lng: 121.1447 },
       tambo: { lat: 13.9024, lng: 121.1599 },
       marauoy: { lat: 13.9138, lng: 121.1388 },
       bolbok: { lat: 13.9675, lng: 121.2064 },
       sabang: { lat: 13.9769, lng: 121.1712 },
-      lodlod: { lat: 13.9271, lng: 121.1328 },
-      halang: { lat: 13.9528, lng: 121.2098 },
       plaridel: { lat: 13.9714, lng: 121.1967 },
       'poblacion barangay 1': { lat: 13.9418, lng: 121.1638 },
       'poblacion barangay 2': { lat: 13.9427, lng: 121.1657 },
@@ -4326,8 +4294,207 @@ class DashboardApp {
     };
   }
 
+  getLipaPdfBarangayWhitelist() {
+    // Based on coffee-database.pdf (Municipality: Lipa City)
+    return new Set([
+      'adya',
+      'antipolo del sur',
+      'bagong pook',
+      'bulacnin',
+      'halang',
+      'kayumanggi',
+      'latag',
+      'lodlod',
+      'lumbang',
+      'malagonlong',
+      'malitlit',
+      'pag olingin west',
+      'pangao',
+      'pinagkawitan',
+      'pinagtong ulan',
+      'pusil',
+      'quezon',
+      'rizal',
+      'san benito',
+      'san celestino',
+      'san isidro',
+      'san salvador',
+      'sto nino',
+      'sto toribio',
+      'talisay',
+      'tangway',
+      'tipakan',
+      'tangob',
+    ]);
+  }
+
+  getLipaPdfBarangayAliases() {
+    return {
+      'pinagtongulan': 'pinagtong ulan',
+      'pinagtong-ulan': 'pinagtong ulan',
+      'pinagtong ulan': 'pinagtong ulan',
+      'sto. nino': 'sto nino',
+      'sto nino': 'sto nino',
+      'santo nino': 'sto nino',
+      'sto. toribio': 'sto toribio',
+      'sto toribio': 'sto toribio',
+      'santo toribio': 'sto toribio',
+      'rizal p bata': 'rizal',
+      'rizal/ p bata': 'rizal',
+      'pag-olingin west': 'pag olingin west',
+      'pag olingin west': 'pag olingin west',
+      'san jose': 'san jose',
+      'san jose ': 'san jose',
+    };
+  }
+
   normalizeBarangayName(name) {
-    return (name || '').toString().trim().toLowerCase();
+    const normalized = (name || '')
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/[.,]/g, ' ')
+      .replace(/-/g, ' ')
+      .replace(/\bsto\b/g, 'sto')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return normalized;
+  }
+
+  getCanonicalLipaBarangay(name) {
+    const key = this.normalizeBarangayName(name);
+    if (!key) return null;
+    const aliases = this.getLipaPdfBarangayAliases();
+    const canonical = aliases[key] || key;
+    return this.getLipaPdfBarangayWhitelist().has(canonical) ? canonical : null;
+  }
+
+  formatBarangayLabel(name) {
+    const label = (name || '')
+      .split(' ')
+      .filter(Boolean)
+      .map((part) => {
+        if (part === 'sto') return 'Sto.';
+        return part.charAt(0).toUpperCase() + part.slice(1);
+      })
+      .join(' ');
+    return label || 'Unknown';
+  }
+
+  formatCoordinatePill(lat, lng) {
+    const latVal = Number(lat);
+    const lngVal = Number(lng);
+    if (!Number.isFinite(latVal) || !Number.isFinite(lngVal)) return 'Coordinates unavailable';
+    const ns = latVal >= 0 ? 'N' : 'S';
+    const ew = lngVal >= 0 ? 'E' : 'W';
+    return `${Math.abs(latVal).toFixed(6)}° ${ns}, ${Math.abs(lngVal).toFixed(6)}° ${ew}`;
+  }
+
+  updateMapCoordPill(lat, lng) {
+    const pill = document.getElementById('mapsCoordPill');
+    if (!pill) return;
+    pill.textContent = this.formatCoordinatePill(lat, lng);
+  }
+
+  isLipaPdfBarangay(name) {
+    return !!this.getCanonicalLipaBarangay(name);
+  }
+
+  getLipaPdfBarangaySummary() {
+    // Aggregated from coffee-database.pdf (Lipa City, Batangas; June 2023).
+    return {
+      'adya': { farmers: 2, areaHa: 2.24, productionKg: { liberica: 1245, excelsa: 15, robusta: 122 }, varietyFarmers: { liberica: 2, excelsa: 1, robusta: 1 } },
+      'antipolo del sur': { farmers: 2, areaHa: 1.04, productionKg: { liberica: 834, excelsa: 49, robusta: 189 }, varietyFarmers: { liberica: 2, excelsa: 1, robusta: 2 } },
+      'bagong pook': { farmers: 6, areaHa: 2.36, productionKg: { liberica: 207, excelsa: 663, robusta: 1053 }, varietyFarmers: { liberica: 4, excelsa: 6, robusta: 6 } },
+      'bulacnin': { farmers: 1, areaHa: 0.4, productionKg: { liberica: 24, excelsa: 0, robusta: 400 }, varietyFarmers: { liberica: 1, excelsa: 0, robusta: 1 } },
+      'halang': { farmers: 1, areaHa: 0.14, productionKg: { liberica: 29, excelsa: 40, robusta: 66 }, varietyFarmers: { liberica: 1, excelsa: 1, robusta: 1 } },
+      'kayumanggi': { farmers: 2, areaHa: 1.35, productionKg: { liberica: 180, excelsa: 460, robusta: 320 }, varietyFarmers: { liberica: 2, excelsa: 2, robusta: 2 } },
+      'latag': { farmers: 1, areaHa: 2.33, productionKg: { liberica: 300, excelsa: 0, robusta: 200 }, varietyFarmers: { liberica: 1, excelsa: 0, robusta: 1 } },
+      'lodlod': { farmers: 15, areaHa: 8.66, productionKg: { liberica: 2254, excelsa: 2025, robusta: 1083 }, varietyFarmers: { liberica: 12, excelsa: 12, robusta: 9 } },
+      'lumbang': { farmers: 6, areaHa: 3.38, productionKg: { liberica: 13, excelsa: 233, robusta: 1674 }, varietyFarmers: { liberica: 2, excelsa: 5, robusta: 4 } },
+      'malagonlong': { farmers: 1, areaHa: 0.41, productionKg: { liberica: 150, excelsa: 112, robusta: 99 }, varietyFarmers: { liberica: 1, excelsa: 1, robusta: 1 } },
+      'malitlit': { farmers: 12, areaHa: 4.47, productionKg: { liberica: 693, excelsa: 1022, robusta: 1084 }, varietyFarmers: { liberica: 9, excelsa: 8, robusta: 11 } },
+      'pag olingin west': { farmers: 9, areaHa: 3.14, productionKg: { liberica: 395, excelsa: 378, robusta: 258 }, varietyFarmers: { liberica: 7, excelsa: 5, robusta: 7 } },
+      'pangao': { farmers: 5, areaHa: 0.88, productionKg: { liberica: 79, excelsa: 298, robusta: 290 }, varietyFarmers: { liberica: 3, excelsa: 4, robusta: 4 } },
+      'pinagkawitan': { farmers: 3, areaHa: 1.08, productionKg: { liberica: 0, excelsa: 0, robusta: 708 }, varietyFarmers: { liberica: 0, excelsa: 0, robusta: 3 } },
+      'pinagtong ulan': { farmers: 25, areaHa: 14.36, productionKg: { liberica: 1114, excelsa: 3131, robusta: 3098 }, varietyFarmers: { liberica: 8, excelsa: 10, robusta: 21 } },
+      'pusil': { farmers: 1, areaHa: 0.33, productionKg: { liberica: 115, excelsa: 0, robusta: 0 }, varietyFarmers: { liberica: 1, excelsa: 0, robusta: 0 } },
+      'quezon': { farmers: 14, areaHa: 4.39, productionKg: { liberica: 632, excelsa: 1013, robusta: 1690 }, varietyFarmers: { liberica: 9, excelsa: 10, robusta: 14 } },
+      'rizal': { farmers: 13, areaHa: 3.63, productionKg: { liberica: 510, excelsa: 577, robusta: 1568 }, varietyFarmers: { liberica: 9, excelsa: 10, robusta: 13 } },
+      'san benito': { farmers: 34, areaHa: 11.8, productionKg: { liberica: 2004, excelsa: 3361, robusta: 2896 }, varietyFarmers: { liberica: 24, excelsa: 30, robusta: 32 } },
+      'san celestino': { farmers: 4, areaHa: 3.33, productionKg: { liberica: 393, excelsa: 600, robusta: 490 }, varietyFarmers: { liberica: 4, excelsa: 4, robusta: 4 } },
+      'san isidro': { farmers: 25, areaHa: 19.1, productionKg: { liberica: 2355, excelsa: 8832, robusta: 3620 }, varietyFarmers: { liberica: 13, excelsa: 25, robusta: 22 } },
+      'san salvador': { farmers: 25, areaHa: 28.29, productionKg: { liberica: 5620, excelsa: 5489, robusta: 5799 }, varietyFarmers: { liberica: 21, excelsa: 23, robusta: 20 } },
+      'sto nino': { farmers: 34, areaHa: 22.86, productionKg: { liberica: 1647, excelsa: 9049, robusta: 2990 }, varietyFarmers: { liberica: 18, excelsa: 34, robusta: 28 } },
+      'sto toribio': { farmers: 6, areaHa: 2.13, productionKg: { liberica: 265, excelsa: 875, robusta: 486 }, varietyFarmers: { liberica: 4, excelsa: 3, robusta: 5 } },
+      'talisay': { farmers: 13, areaHa: 4.08, productionKg: { liberica: 437, excelsa: 789, robusta: 624 }, varietyFarmers: { liberica: 9, excelsa: 12, robusta: 8 } },
+      'tangway': { farmers: 5, areaHa: 4.56, productionKg: { liberica: 775, excelsa: 740, robusta: 1579 }, varietyFarmers: { liberica: 4, excelsa: 3, robusta: 4 } },
+      'tipakan': { farmers: 2, areaHa: 0.61, productionKg: { liberica: 10, excelsa: 150, robusta: 145 }, varietyFarmers: { liberica: 1, excelsa: 2, robusta: 2 } },
+      'tangob': { farmers: 4, areaHa: 0.78, productionKg: { liberica: 65, excelsa: 0, robusta: 525 }, varietyFarmers: { liberica: 2, excelsa: 0, robusta: 4 } },
+    };
+  }
+
+  getPdfVarietyKey() {
+    const key = (this.mapVarietyFilter || 'liberica').toString().trim().toLowerCase();
+    if (key === 'robusta') return 'robusta';
+    if (key === 'excelsa') return 'excelsa';
+    return 'liberica';
+  }
+
+  buildMapBarangayPointsFromPdf() {
+    const coordsByBarangay = this.getBarangayCoordinates();
+    const bounds = this.getLipaCityBounds();
+    const center = this.getLipaCityCenter();
+    const summary = this.getLipaPdfBarangaySummary();
+    const varietyKey = this.getPdfVarietyKey();
+    const visibleBarangays = [...this.getLipaPdfBarangayWhitelist()].filter(
+      (name) => !this.mapSearchTerm || name.includes(this.mapSearchTerm)
+    );
+    const toFallbackCoordinate = (name) => {
+      let hash = 0;
+      for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+      const lat = bounds.south + ((hash % 1000) / 1000) * (bounds.north - bounds.south);
+      const lng = bounds.west + ((((hash >> 10) % 1000) / 1000) * (bounds.east - bounds.west));
+      return { lat: Number.isFinite(lat) ? lat : center.lat, lng: Number.isFinite(lng) ? lng : center.lng };
+    };
+
+    return visibleBarangays.map((canonical) => {
+      const coords = coordsByBarangay[canonical] || toFallbackCoordinate(canonical);
+      const s = summary[canonical] || {
+        farmers: 0,
+        areaHa: 0,
+        productionKg: { liberica: 0, excelsa: 0, robusta: 0 },
+        varietyFarmers: { liberica: 0, excelsa: 0, robusta: 0 },
+      };
+      return {
+        barangay: this.formatBarangayLabel(canonical),
+        canonical,
+        lat: coords.lat,
+        lng: coords.lng,
+        count: Number(s.varietyFarmers?.[varietyKey] || 0),
+        totalFarmers: Number(s.farmers || 0),
+        areaHa: Number(s.areaHa || 0),
+        productionKg: Number(s.productionKg?.[varietyKey] || 0),
+      };
+    }).filter((point) => point.count > 0);
+  }
+
+  drawLipaCityBoundary() {
+    if (!this.googleMap || !window.google?.maps) return;
+    if (this.lipaBoundaryOverlay) {
+      this.lipaBoundaryOverlay.setMap(this.googleMap);
+      return;
+    }
+    this.lipaBoundaryOverlay = new window.google.maps.Rectangle({
+      bounds: this.getLipaCityBounds(),
+      strokeColor: '#2f855a',
+      strokeOpacity: 0.9,
+      strokeWeight: 2,
+      fillColor: '#2f855a',
+      fillOpacity: 0.08,
+      clickable: false,
+      map: this.googleMap,
+    });
   }
 
   isVarietyMatch(row, variety) {
@@ -4357,16 +4524,22 @@ class DashboardApp {
 
   getFilteredMapRows() {
     return (this.data || []).filter((row) => {
-      const barangay = this.normalizeBarangayName(
-        this.getValue(row, ['ADDRESS (BARANGAY)', 'BARANGAY', 'barangay', 'address'])
-      );
-      const searchOk = !this.mapSearchTerm || barangay.includes(this.mapSearchTerm);
+      const rawBarangay = this.getValue(row, ['ADDRESS (BARANGAY)', 'BARANGAY', 'barangay', 'address']);
+      const barangay = this.normalizeBarangayName(rawBarangay);
+      const canonical = this.getCanonicalLipaBarangay(rawBarangay);
+      const searchableBarangay = canonical || barangay;
+      const lipaBarangayOk = !!canonical;
+      const searchOk = !this.mapSearchTerm || searchableBarangay.includes(this.mapSearchTerm);
       const varietyOk = this.isVarietyMatch(row, this.mapVarietyFilter || 'liberica');
-      return searchOk && varietyOk;
+      return lipaBarangayOk && searchOk && varietyOk;
     });
   }
 
   buildMapBarangayPoints(rows) {
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return this.buildMapBarangayPointsFromPdf();
+    }
+
     const coordsByBarangay = this.getBarangayCoordinates();
     const bounds = this.getLipaCityBounds();
     const center = this.getLipaCityCenter();
@@ -4382,14 +4555,82 @@ class DashboardApp {
 
     rows.forEach((row) => {
       const raw = this.getValue(row, ['ADDRESS (BARANGAY)', 'BARANGAY', 'barangay', 'address']) || 'Unknown';
-      const key = this.normalizeBarangayName(raw);
-      const coords = coordsByBarangay[key] || toFallbackCoordinate(key || 'unknown');
-      const current = pointsMap.get(key) || { barangay: raw, lat: coords.lat, lng: coords.lng, count: 0 };
+      const canonical = this.getCanonicalLipaBarangay(raw);
+      if (!canonical) return;
+      const coords = coordsByBarangay[canonical] || toFallbackCoordinate(canonical);
+      const current = pointsMap.get(canonical) || {
+        barangay: this.formatBarangayLabel(canonical),
+        canonical,
+        lat: coords.lat,
+        lng: coords.lng,
+        count: 0,
+      };
       current.count += 1;
-      pointsMap.set(key, current);
+      pointsMap.set(canonical, current);
     });
 
     return Array.from(pointsMap.values());
+  }
+
+  updateMapInsights(points, rows) {
+    const covered = points.length;
+    const usePdf = !Array.isArray(rows) || rows.length === 0;
+    const totalArea = usePdf
+      ? points.reduce((sum, point) => sum + (Number(point.areaHa) || 0), 0)
+      : rows.reduce(
+          (sum, row) => sum + (Number(this.getValue(row, ['Total Area Planted (HA.)', 'TOTAL AREA PLANTED (HA.)']) || 0) || 0),
+          0
+        );
+    const farmerBase = usePdf
+      ? points.reduce((sum, point) => sum + (Number(point.totalFarmers) || Number(point.count) || 0), 0)
+      : rows.length;
+    const avgArea = farmerBase ? totalArea / farmerBase : 0;
+
+    const statEls = document.querySelectorAll('#maps-module .maps-panel--overview .overview-stat strong');
+    if (statEls[0]) statEls[0].textContent = String(covered);
+    if (statEls[1]) statEls[1].textContent = `${totalArea.toLocaleString(undefined, { maximumFractionDigits: 1 })}ha`;
+    if (statEls[2]) statEls[2].textContent = `${avgArea.toLocaleString(undefined, { maximumFractionDigits: 1 })}ha`;
+
+    const topList = document.querySelector('#maps-module .top-barangays-list');
+    if (topList) {
+      const sorted = points
+        .map((point) => ({
+          canonical: point.canonical || this.normalizeBarangayName(point.barangay),
+          label: point.barangay || this.formatBarangayLabel(point.canonical),
+          count: Number(point.count || 0),
+          lat: Number(point.lat),
+          lng: Number(point.lng),
+        }))
+        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+
+      topList.innerHTML = sorted
+        .map((p) => {
+          const tier = this.densityTier(p.count);
+          const coords = this.formatCoordinatePill(p.lat, p.lng);
+          return `<li><span><em class="dot dot--${tier}"></em>${p.label}<small style="display:block; font-size:11px; color:#6b7280;">${coords}</small></span><strong>${p.count}</strong></li>`;
+        })
+        .join('');
+      if (!sorted.length) topList.innerHTML = '<li><span>No matching barangays</span><strong>0</strong></li>';
+    }
+
+    const treesTotalEl = document.querySelector('#maps-module .trees-total-card strong');
+    const treesTotalLabelEl = document.querySelector('#maps-module .trees-total-card span');
+    const treesMini = document.querySelectorAll('#maps-module .trees-mini-grid strong');
+    const treesMiniLabels = document.querySelectorAll('#maps-module .trees-mini-grid span');
+    if (usePdf) {
+      const activeVarietyFarmers = points.reduce((sum, point) => sum + (Number(point.count) || 0), 0);
+      const activeVarietyProduction = points.reduce((sum, point) => sum + (Number(point.productionKg) || 0), 0);
+      if (treesTotalEl) treesTotalEl.textContent = `${activeVarietyProduction.toLocaleString()} kg`;
+      if (treesTotalLabelEl) treesTotalLabelEl.textContent = `${this.getPdfVarietyKey().toUpperCase()} Production`;
+      if (treesMini[0]) treesMini[0].textContent = activeVarietyFarmers ? (activeVarietyProduction / activeVarietyFarmers).toFixed(1) : '0';
+      if (treesMini[1]) treesMini[1].textContent = activeVarietyFarmers.toLocaleString();
+      if (treesMiniLabels[0]) treesMiniLabels[0].textContent = 'kg/farmer';
+      if (treesMiniLabels[1]) treesMiniLabels[1].textContent = 'Variety Farmers';
+    } else {
+      if (treesTotalLabelEl) treesTotalLabelEl.textContent = 'Total Trees';
+      if (treesMiniLabels[0]) treesMiniLabels[0].textContent = 'Trees/ha';
+      if (treesMiniLabels[1]) treesMiniLabels[1].textContent = 'Avg/Farm';
+    }
   }
 
   densityTier(count) {
@@ -4406,6 +4647,25 @@ class DashboardApp {
     return '#b0895f';
   }
 
+  getBarangayPinIcon(point) {
+    const opacity = point.count > 0 ? 1 : 0.72;
+    // Simple red map-pin SVG with white center (similar visual to standard pin icon).
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="44" height="64" viewBox="0 0 44 64">
+        <path d="M22 2C11.5 2 3 10.5 3 21c0 14 19 41 19 41s19-27 19-41C41 10.5 32.5 2 22 2z" fill="#e11d2e" stroke="#b91c1c" stroke-width="2"/>
+        <circle cx="22" cy="21" r="9.5" fill="#ffffff"/>
+      </svg>
+    `.trim();
+    const encoded = encodeURIComponent(svg);
+    return {
+      url: `data:image/svg+xml;charset=UTF-8,${encoded}`,
+      scaledSize: new window.google.maps.Size(32, 46),
+      anchor: new window.google.maps.Point(16, 45),
+      labelOrigin: new window.google.maps.Point(16, 20),
+      opacity,
+    };
+  }
+
   ensureGoogleMap() {
     if (this.googleMap || !window.google?.maps) return;
     const canvas = document.getElementById('mapsGoogleCanvas');
@@ -4413,14 +4673,14 @@ class DashboardApp {
     this.googleMap = new window.google.maps.Map(canvas, {
       center: this.getLipaCityCenter(),
       zoom: 12,
-      minZoom: 11,
-      maxZoom: 16,
+      minZoom: 6,
+      maxZoom: 18,
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
-      restriction: { latLngBounds: this.getLipaCityBounds(), strictBounds: true },
     });
     this.googleInfoWindow = new window.google.maps.InfoWindow();
+    this.drawLipaCityBoundary();
   }
 
   clearMapMarkers() {
@@ -4434,24 +4694,33 @@ class DashboardApp {
     const fitBounds = new window.google.maps.LatLngBounds();
 
     points.forEach((point) => {
-      const tier = this.densityTier(point.count);
+      const pinIcon = this.getBarangayPinIcon(point);
       const marker = new window.google.maps.Marker({
         position: { lat: point.lat, lng: point.lng },
         map: this.googleMap,
         title: `${point.barangay} (${point.count})`,
         icon: {
-          path: window.google.maps.SymbolPath.CIRCLE,
-          scale: 8,
-          fillColor: this.markerColorForDensity(tier),
-          fillOpacity: 0.95,
-          strokeColor: '#ffffff',
-          strokeWeight: 2,
+          url: pinIcon.url,
+          scaledSize: pinIcon.scaledSize,
+          anchor: pinIcon.anchor,
+          labelOrigin: pinIcon.labelOrigin,
+        },
+        opacity: pinIcon.opacity,
+        label: {
+          text: String(point.count),
+          color: '#111827',
+          fontSize: '10px',
+          fontWeight: '700',
         },
       });
       marker.addListener('click', () => {
         if (!this.googleInfoWindow) return;
+        this.updateMapCoordPill(point.lat, point.lng);
         this.googleInfoWindow.setContent(
-          `<div style="min-width:160px"><strong>${point.barangay}</strong><br/>Farmers: ${point.count}<br/>Variety: ${(
+          `<div style="min-width:190px"><strong>${point.barangay}</strong><br/>Farmers: ${point.count}<br/>Coordinates: ${this.formatCoordinatePill(
+            point.lat,
+            point.lng
+          )}<br/>Variety: ${(
             this.mapVarietyFilter || 'liberica'
           ).toUpperCase()}</div>`
         );
@@ -4471,50 +4740,37 @@ class DashboardApp {
     }
   }
 
-  updateMapInsights(points, rows) {
-    const covered = points.length;
-    const totalArea = rows.reduce(
-      (sum, row) => sum + (Number(this.getValue(row, ['Total Area Planted (HA.)', 'TOTAL AREA PLANTED (HA.)']) || 0) || 0),
-      0
-    );
-    const avgArea = rows.length ? totalArea / rows.length : 0;
-
-    const statEls = document.querySelectorAll('#maps-module .maps-panel--overview .overview-stat strong');
-    if (statEls[0]) statEls[0].textContent = String(covered);
-    if (statEls[1]) statEls[1].textContent = `${totalArea.toLocaleString(undefined, { maximumFractionDigits: 1 })}ha`;
-    if (statEls[2]) statEls[2].textContent = `${avgArea.toLocaleString(undefined, { maximumFractionDigits: 1 })}ha`;
-
-    const topList = document.querySelector('#maps-module .top-barangays-list');
-    if (topList) {
-      const sorted = [...points].sort((a, b) => b.count - a.count).slice(0, 5);
-      topList.innerHTML = sorted
-        .map((p) => {
-          const tier = this.densityTier(p.count);
-          return `<li><span><em class="dot dot--${tier}"></em>${p.barangay}</span><strong>${p.count}</strong></li>`;
-        })
-        .join('');
-      if (!sorted.length) topList.innerHTML = '<li><span>No matching barangays</span><strong>0</strong></li>';
-    }
-  }
 
   renderMapsModule() {
     const fallback = document.getElementById('mapsGoogleFallback');
     const canvas = document.getElementById('mapsGoogleCanvas');
+    const embed = document.getElementById('mapsGoogleEmbed');
     const hasKey = !!(window.__GOOGLE_MAPS_API_KEY__ || '').trim();
     const ready = this.googleMapsReady || !!window.__BEANTHENTIC_GOOGLE_MAPS_READY__;
     const rows = this.getFilteredMapRows();
     const points = this.buildMapBarangayPoints(rows);
 
     this.updateMapInsights(points, rows);
+    this.updateMapCoordPill(this.getLipaCityCenter().lat, this.getLipaCityCenter().lng);
     if (!canvas) return;
 
-    if (!hasKey || !ready || !window.google?.maps) {
+    // No API key: fall back to Google Maps embed centered on Lipa City.
+    if (!hasKey) {
+      if (fallback) fallback.hidden = true;
+      canvas.classList.add('is-hidden');
+      if (embed) embed.classList.remove('is-hidden');
+      return;
+    }
+
+    if (!ready || !window.google?.maps) {
       if (fallback) fallback.hidden = false;
+      if (embed) embed.classList.add('is-hidden');
       canvas.classList.add('is-hidden');
       return;
     }
 
     if (fallback) fallback.hidden = true;
+    if (embed) embed.classList.add('is-hidden');
     canvas.classList.remove('is-hidden');
     this.ensureGoogleMap();
     if (this.googleMap && window.google?.maps?.event) {
@@ -4846,16 +5102,24 @@ class DashboardApp {
       
       const displayNameEl = document.getElementById('accountDisplayName');
       const phoneEl = document.getElementById('accountPhone');
+      const heroNameEl = document.getElementById('accountHeroName');
+      const heroPhoneEl = document.getElementById('accountHeroPhone');
       
       if (displayNameEl) displayNameEl.textContent = displayName;
       if (phoneEl) phoneEl.textContent = phone;
+      if (heroNameEl) heroNameEl.textContent = displayName;
+      if (heroPhoneEl) heroPhoneEl.textContent = phone;
     } catch (error) {
       console.error('Failed to load account data:', error);
       const displayNameEl = document.getElementById('accountDisplayName');
       const phoneEl = document.getElementById('accountPhone');
+      const heroNameEl = document.getElementById('accountHeroName');
+      const heroPhoneEl = document.getElementById('accountHeroPhone');
       
       if (displayNameEl) displayNameEl.textContent = 'Admin';
       if (phoneEl) phoneEl.textContent = '—';
+      if (heroNameEl) heroNameEl.textContent = 'Admin';
+      if (heroPhoneEl) heroPhoneEl.textContent = '—';
     }
   }
 
@@ -5014,6 +5278,36 @@ class DashboardApp {
       });
     }
 
+    // Inline Reply functionality
+    const inlineReplySendBtn = document.getElementById('msgInlineReplySendBtn');
+    if (inlineReplySendBtn) {
+      inlineReplySendBtn.addEventListener('click', () => {
+        this.sendInlineReply();
+      });
+    }
+    const inlineReplyInput = document.getElementById('msgInlineReplyInput');
+    if (inlineReplyInput) {
+      // Send on Enter (new line with Shift+Enter)
+      inlineReplyInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          this.sendInlineReply();
+        }
+      });
+      // Auto-resize textarea and typing indicators
+      inlineReplyInput.addEventListener('input', () => {
+        this.autoResizeTextarea(inlineReplyInput);
+        this.handleTypingIndicator(inlineReplyInput);
+      });
+      // Focus/blur events for typing status
+      inlineReplyInput.addEventListener('focus', () => {
+        this.handleTypingStart();
+      });
+      inlineReplyInput.addEventListener('blur', () => {
+        this.handleTypingStop();
+      });
+    }
+
     // Escape to close compose / detail
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
@@ -5044,10 +5338,28 @@ class DashboardApp {
       const data = await res.json();
       this.messagingMessages = Array.isArray(data.items) ? data.items : [];
 
+      // If no messages from API, add sample data for demonstration
+      if (this.messagingMessages.length === 0 && this.messagingFolder === 'inbox') {
+        this.messagingMessages = this.getSampleFarmerMessages();
+      }
+
+      // Filter messages based on selected category
+      if (this.messagingCategory) {
+        this.messagingMessages = this.messagingMessages.filter(m => {
+          if (this.messagingCategory === 'farmers') {
+            // Only show messages from farmers (category: 'farmers' or sender_type: 'farmer')
+            return m.category === 'farmers' || m.sender_type === 'farmer';
+          } else {
+            // Other categories filter by exact category match
+            return m.category === this.messagingCategory;
+          }
+        });
+      }
+
       // Update badge
       const badge = document.getElementById('messagingInboxBadge');
       if (badge) {
-        const unread = data.unread_count || 0;
+        const unread = data.unread_count || this.messagingMessages.filter(m => !m.is_read).length;
         badge.textContent = unread > 0 ? (unread > 99 ? '99+' : String(unread)) : '';
       }
       this.updateMessagingBadge();
@@ -5055,7 +5367,27 @@ class DashboardApp {
       this.renderMessagingList();
     } catch (err) {
       console.warn('Failed to load messages:', err);
-      listEl.innerHTML = '<li class="messaging-list-empty"><i class="fa-solid fa-circle-exclamation"></i><p>Could not load messages. Try refreshing.</p></li>';
+      // Add sample data on error for demonstration
+      if (this.messagingFolder === 'inbox') {
+        this.messagingMessages = this.getSampleFarmerMessages();
+        
+        // Apply category filtering even for error-loaded sample data
+        if (this.messagingCategory) {
+          this.messagingMessages = this.messagingMessages.filter(m => {
+            if (this.messagingCategory === 'farmers') {
+              // Only show messages from farmers (category: 'farmers' or sender_type: 'farmer')
+              return m.category === 'farmers' || m.sender_type === 'farmer';
+            } else {
+              // Other categories filter by exact category match
+              return m.category === this.messagingCategory;
+            }
+          });
+        }
+        
+        this.renderMessagingList();
+      } else {
+        listEl.innerHTML = '<li class="messaging-list-empty"><i class="fa-solid fa-circle-exclamation"></i><p>Could not load messages. Try refreshing.</p></li>';
+      }
     }
   }
 
@@ -5106,6 +5438,366 @@ class DashboardApp {
     }).join('');
   }
 
+  renderConversation(message) {
+    const esc = (s) => this.escapeHtml(s);
+    
+    // If message has conversation array, render it
+    if (message.conversation && Array.isArray(message.conversation)) {
+      return message.conversation.map(msg => {
+        const isSent = msg.sender_type === 'admin';
+        const direction = isSent ? 'sent' : 'received';
+        const avatarInitials = this.getInitials(msg.sender_name);
+        const timeStr = this.formatMessageTime(msg.created_at);
+        
+        return `
+          <div class="messaging-message messaging-message--${direction}">
+            <div class="messaging-message__avatar">${esc(avatarInitials)}</div>
+            <div class="messaging-message__content">
+              ${!isSent ? `<div class="messaging-message__sender">${esc(msg.sender_name)}</div>` : ''}
+              <div class="messaging-message__bubble">${esc(msg.body)}</div>
+              <div class="messaging-message__timestamp">${esc(timeStr)}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    
+    // Fallback: render single message as conversation
+    const isFarmerMessage = message.category === 'farmers' || message.sender_type === 'farmer';
+    const avatarInitials = this.getInitials(message.sender_name || message.sender_phone);
+    const timeStr = this.formatMessageTime(message.created_at);
+    
+    return `
+      <div class="messaging-message messaging-message--received">
+        <div class="messaging-message__avatar">${esc(avatarInitials)}</div>
+        <div class="messaging-message__content">
+          <div class="messaging-message__sender">${esc(message.sender_name || message.sender_phone)}</div>
+          <div class="messaging-message__bubble">${esc(message.body || '')}</div>
+          <div class="messaging-message__timestamp">${esc(timeStr)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  sendInlineReply() {
+    console.log('sendInlineReply called, selectedId:', this.messagingSelectedId);
+    
+    if (!this.messagingSelectedId) {
+      console.log('No selected ID, returning');
+      return;
+    }
+
+    const inlineReplyInput = document.getElementById('msgInlineReplyInput');
+    console.log('Reply input element:', inlineReplyInput);
+    
+    const message = (inlineReplyInput?.value || '').trim();
+    console.log('Message content:', message);
+    
+    if (!message) {
+      this.showNotification('Message is required.', 'error');
+      return;
+    }
+
+    const sendBtn = document.getElementById('msgInlineReplySendBtn');
+    if (sendBtn) {
+      sendBtn.disabled = true;
+      sendBtn.setAttribute('aria-busy', 'true');
+    }
+
+    try {
+      // Get the original message to extract recipient info
+      const originalMessage = this.messagingMessages.find(m => m.id === this.messagingSelectedId);
+      if (!originalMessage) throw new Error('Original message not found');
+
+      // For demo purposes, append the reply to the conversation immediately
+      const replyData = {
+        body: message,
+        sender_name: "Admin User",
+        sender_type: "admin",
+        created_at: new Date().toISOString()
+      };
+
+      // Initialize conversation array if it doesn't exist
+      if (!originalMessage.conversation) {
+        originalMessage.conversation = [];
+      }
+
+      // Add the reply to the conversation
+      originalMessage.conversation.push(replyData);
+
+      // Update the conversation view
+      const bodyEl = document.getElementById('messagingDetailBody');
+      if (bodyEl) {
+        // Only update the conversation part, keep reply section intact
+        const replySection = document.getElementById('messagingConversationReply');
+        
+        // Temporarily remove reply section
+        if (replySection) {
+          replySection.remove();
+        }
+        
+        // Update conversation content
+        bodyEl.innerHTML = this.renderConversation(originalMessage);
+        
+        // Re-add reply section
+        if (replySection) {
+          bodyEl.appendChild(replySection);
+        }
+        
+        // Scroll to bottom to show the new message
+        bodyEl.scrollTop = bodyEl.scrollHeight;
+      }
+
+      // Clear the input field
+      if (inlineReplyInput) {
+        inlineReplyInput.value = '';
+        inlineReplyInput.style.height = 'auto'; // Reset height
+      }
+
+      this.showNotification('Reply sent successfully!', 'success');
+      this.loadMessagingFolder();
+    } catch (err) {
+      console.warn('Send reply failed:', err);
+      this.showNotification(err.message || 'Could not send reply.', 'error');
+    } finally {
+      if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.removeAttribute('aria-busy');
+      }
+    }
+  }
+
+  autoResizeTextarea(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+  }
+
+  handleTypingIndicator(textarea) {
+    const hasContent = textarea.value.trim().length > 0;
+    const replySection = document.getElementById('messagingConversationReply');
+    
+    if (replySection) {
+      if (hasContent) {
+        replySection.setAttribute('data-typing', 'true');
+        textarea.setAttribute('data-typing', 'true');
+      } else {
+        replySection.removeAttribute('data-typing');
+        textarea.removeAttribute('data-typing');
+      }
+    }
+  }
+
+  handleTypingStart() {
+    const replySection = document.getElementById('messagingConversationReply');
+    if (replySection && this.messagingSelectedId) {
+      const inlineReplyInput = document.getElementById('msgInlineReplyInput');
+      if (inlineReplyInput && inlineReplyInput.value.trim().length > 0) {
+        replySection.setAttribute('data-typing', 'true');
+      }
+    }
+  }
+
+  handleTypingStop() {
+    const replySection = document.getElementById('messagingConversationReply');
+    if (replySection) {
+      replySection.removeAttribute('data-typing');
+    }
+    const inlineReplyInput = document.getElementById('msgInlineReplyInput');
+    if (inlineReplyInput) {
+      inlineReplyInput.removeAttribute('data-typing');
+    }
+  }
+
+  getSampleFarmerMessages() {
+    const now = new Date();
+    return [
+      {
+        id: 1001,
+        subject: "Question about coffee bean pricing",
+        body: "Good day! I would like to inquire about the current pricing for our coffee beans.",
+        sender_name: "Juan Santos",
+        sender_phone: "9123456789",
+        category: "farmers",
+        sender_type: "farmer",
+        is_read: false,
+        is_starred: false,
+        created_at: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+        conversation: [
+          {
+            body: "Good day! I would like to inquire about the current pricing for our coffee beans. I noticed that the market price has been fluctuating lately and I want to make sure we're getting the right rates for our premium Arabica beans.",
+            sender_name: "Juan Santos",
+            sender_type: "farmer",
+            created_at: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            body: "Hello Juan! Thank you for reaching out. The current price for premium Arabica beans is ₱120 per kilogram. We've recently updated our pricing structure to better reflect market conditions. Would you like me to send you the complete price list?",
+            sender_name: "Admin User",
+            sender_type: "admin",
+            created_at: new Date(now.getTime() - 1.5 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            body: "That sounds reasonable. Yes, please send me the complete price list. Also, are there any bonuses for quality this season?",
+            sender_name: "Juan Santos",
+            sender_type: "farmer",
+            created_at: new Date(now.getTime() - 1 * 60 * 60 * 1000).toISOString()
+          }
+        ]
+      },
+      {
+        id: 1002,
+        subject: "Request for farm visit next week",
+        body: "Hi admin team, I would like to request a farm visit next Tuesday morning.",
+        sender_name: "Maria Reyes",
+        sender_phone: "9234567890",
+        category: "farmers",
+        sender_type: "farmer",
+        is_read: false,
+        is_starred: false,
+        created_at: new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
+        conversation: [
+          {
+            body: "Hi admin team, I would like to request a farm visit next Tuesday morning. I need guidance on the new organic certification requirements and would appreciate it if someone could come by to inspect our current setup. Our farm is located in Batangas and we have about 2 hectares of coffee plants.",
+            sender_name: "Maria Reyes",
+            sender_type: "farmer",
+            created_at: new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString()
+          }
+        ]
+      },
+      {
+        id: 1003,
+        subject: "Issue with recent delivery",
+        body: "I received the delivery from last week but there seems to be an issue with the packaging.",
+        sender_name: "Carlos Mendoza",
+        sender_phone: "9345678901",
+        category: "farmers",
+        sender_type: "farmer",
+        is_read: true,
+        is_starred: true,
+        created_at: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
+        conversation: [
+          {
+            body: "I received the delivery from last week but there seems to be an issue with the packaging. Some of the bags were torn and the quality was affected.",
+            sender_name: "Carlos Mendoza",
+            sender_type: "farmer",
+            created_at: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            body: "Hi Carlos, I'm sorry to hear about the packaging issue. We take quality seriously. Can you please send photos of the damaged goods? We'll arrange for a replacement immediately.",
+            sender_name: "Admin User",
+            sender_type: "admin",
+            created_at: new Date(now.getTime() - 23 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            body: "I've already sent the photos via email. Thank you for the quick response. When can we expect the replacement?",
+            sender_name: "Carlos Mendoza",
+            sender_type: "farmer",
+            created_at: new Date(now.getTime() - 22 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            body: "We've received your photos and processed the replacement. You should receive it within 2-3 business days. We've also added a 10% credit for the inconvenience.",
+            sender_name: "Admin User",
+            sender_type: "admin",
+            created_at: new Date(now.getTime() - 20 * 60 * 60 * 1000).toISOString()
+          }
+        ]
+      },
+      {
+        id: 1004,
+        subject: "Thank you for the training session",
+        body: "I just wanted to express my gratitude for the excellent training session last week.",
+        sender_name: "Elena Cruz",
+        sender_phone: "9456789012",
+        category: "farmers",
+        sender_type: "farmer",
+        is_read: true,
+        is_starred: false,
+        created_at: new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString(), // 2 days ago
+        conversation: [
+          {
+            body: "I just wanted to express my gratitude for the excellent training session last week. The new harvesting techniques you taught us have already improved our yield quality.",
+            sender_name: "Elena Cruz",
+            sender_type: "farmer",
+            created_at: new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            body: "Thank you for the feedback, Elena! We're thrilled to hear the techniques are working well. Keep up the great work!",
+            sender_name: "Admin User",
+            sender_type: "admin",
+            created_at: new Date(now.getTime() - 47 * 60 * 60 * 1000).toISOString()
+          }
+        ]
+      },
+      {
+        id: 1005,
+        subject: "Test Chat - Simple Conversation",
+        body: "Hello! This is a test message to verify chat functionality.",
+        sender_name: "Test Farmer",
+        sender_phone: "9999999999",
+        category: "farmers",
+        sender_type: "farmer",
+        is_read: false,
+        is_starred: false,
+        created_at: new Date(now.getTime() - 10 * 60 * 1000).toISOString(), // 10 minutes ago
+        conversation: [
+          {
+            body: "Hello! This is a test message to verify chat functionality.",
+            sender_name: "Test Farmer",
+            sender_type: "farmer",
+            created_at: new Date(now.getTime() - 10 * 60 * 1000).toISOString()
+          },
+          {
+            body: "Hi Test Farmer! This is a reply from admin. The chat system is working perfectly!",
+            sender_name: "Admin User",
+            sender_type: "admin",
+            created_at: new Date(now.getTime() - 8 * 60 * 1000).toISOString()
+          },
+          {
+            body: "Great! I can see the chat bubbles and they look amazing. The green and white theme is perfect!",
+            sender_name: "Test Farmer",
+            sender_type: "farmer",
+            created_at: new Date(now.getTime() - 5 * 60 * 1000).toISOString()
+          }
+        ]
+      },
+      {
+        id: 2001,
+        subject: "System Maintenance Notice",
+        body: "The system will be undergoing maintenance this weekend from 2AM to 6AM. Please save your work and log out before the maintenance window.",
+        sender_name: "System Admin",
+        sender_phone: "",
+        category: "announcement",
+        sender_type: "admin",
+        is_read: false,
+        is_starred: false,
+        created_at: new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString(), // 3 hours ago
+      },
+      {
+        id: 2002,
+        subject: "Monthly Report Available",
+        body: "The monthly coffee production report is now available for download. Please check the reports section for detailed analytics.",
+        sender_name: "Admin Team",
+        sender_phone: "",
+        category: "general",
+        sender_type: "admin",
+        is_read: true,
+        is_starred: false,
+        created_at: new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString(), // 6 hours ago
+      },
+      {
+        id: 2003,
+        subject: "Farmer Training Reminder",
+        body: "Reminder: Advanced coffee farming techniques training is scheduled for next Monday at 10AM. All registered farmers should attend.",
+        sender_name: "Training Coordinator",
+        sender_phone: "",
+        category: "farmer-update",
+        sender_type: "admin",
+        is_read: true,
+        is_starred: true,
+        created_at: new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString(), // 12 hours ago
+      }
+    ];
+  }
+
   getInitials(name) {
     if (!name) return '?';
     const parts = name.trim().split(/\s+/);
@@ -5117,6 +5809,7 @@ class DashboardApp {
     const map = {
       'announcement': 'messaging-item__avatar--announcement',
       'farmer-update': 'messaging-item__avatar--farmer',
+      'farmers': 'messaging-item__avatar--farmer-message',
       'reminder': 'messaging-item__avatar--reminder',
     };
     return map[category] || '';
@@ -5126,6 +5819,7 @@ class DashboardApp {
     const labels = {
       'general': 'General',
       'farmer-update': 'Farmer Update',
+      'farmers': 'Farmer',
       'announcement': 'Announcement',
       'reminder': 'Reminder',
     };
@@ -5172,11 +5866,19 @@ class DashboardApp {
     });
 
     try {
-      const res = await fetch(`/api/messages/${id}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const m = data.message;
-      if (!m) throw new Error('No message data');
+      // Use local sample data instead of API call for demo
+      let m = this.messagingMessages.find(msg => msg.id === id);
+      
+      // If not found in local data, try API (for production)
+      if (!m) {
+        const res = await fetch(`/api/messages/${id}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        m = data.message;
+        if (!m) throw new Error('No message data');
+      }
+
+      if (!m) throw new Error('Message not found');
 
       // Populate detail pane
       const subjectEl = document.getElementById('messagingDetailSubject');
@@ -5190,6 +5892,10 @@ class DashboardApp {
       if (avatarEl) {
         avatarEl.textContent = this.getInitials(m.sender_name);
         avatarEl.className = 'messaging-detail__sender-avatar';
+        // Add farmer-specific avatar styling
+        if (m.category === 'farmers' || m.sender_type === 'farmer') {
+          avatarEl.classList.add('messaging-detail__sender-avatar--farmer');
+        }
       }
       if (nameEl) nameEl.textContent = m.sender_name || m.sender_phone;
       if (phoneEl) phoneEl.textContent = m.sender_phone ? `+63${m.sender_phone}` : '';
@@ -5201,7 +5907,30 @@ class DashboardApp {
           tsEl.textContent = m.created_at || '';
         }
       }
-      if (bodyEl) bodyEl.textContent = m.body;
+      if (bodyEl) bodyEl.innerHTML = this.renderConversation(m);
+
+      // Show/hide inline reply input based on message category
+      const inlineReplySection = document.getElementById('messagingConversationReply');
+      if (inlineReplySection) {
+        const isFarmerMessage = m.category === 'farmers' || m.sender_type === 'farmer';
+        console.log('Inline reply visibility check:', {
+          messageId: m.id,
+          category: m.category,
+          sender_type: m.sender_type,
+          isFarmerMessage: isFarmerMessage
+        });
+        // Show inline reply for farmer messages
+        if (isFarmerMessage) {
+          inlineReplySection.classList.add('messaging-conversation__reply--visible');
+          // Focus on the inline reply input
+          const inlineReplyInput = document.getElementById('msgInlineReplyInput');
+          if (inlineReplyInput) {
+            inlineReplyInput.focus();
+          }
+        } else {
+          inlineReplySection.classList.remove('messaging-conversation__reply--visible');
+        }
+      }
 
       // Mark as read in list UI
       const listItem = document.querySelector(`.messaging-item[data-msg-id="${id}"]`);
@@ -5216,7 +5945,7 @@ class DashboardApp {
     } catch (err) {
       console.warn('Failed to load message detail:', err);
       const bodyEl = document.getElementById('messagingDetailBody');
-      if (bodyEl) bodyEl.textContent = 'Could not load this message.';
+      if (bodyEl) bodyEl.innerHTML = '<div class="messaging-list-empty"><i class="fa-solid fa-circle-exclamation"></i><p>Could not load this message.</p></div>';
     }
   }
 
@@ -5347,6 +6076,101 @@ class DashboardApp {
     }
   }
 
+  showMessagingReply() {
+    const replySection = document.getElementById('messagingDetailReply');
+    if (replySection) {
+      replySection.style.display = 'block';
+      // Focus on the reply textarea
+      const textarea = document.getElementById('msgReplyMessage');
+      if (textarea) {
+        textarea.focus();
+        textarea.value = '';
+      }
+    }
+  }
+
+  hideMessagingReply() {
+    const replySection = document.getElementById('messagingDetailReply');
+    if (replySection) {
+      replySection.style.display = 'none';
+      const textarea = document.getElementById('msgReplyMessage');
+      if (textarea) textarea.value = '';
+    }
+  }
+
+  async sendMessagingReply() {
+    if (!this.messagingSelectedId) return;
+
+    const message = (document.getElementById('msgReplyMessage')?.value || '').trim();
+    if (!message) {
+      this.showNotification('Reply message is required.', 'error');
+      return;
+    }
+
+    const sendBtn = document.getElementById('msgReplySendBtn');
+    if (sendBtn) {
+      sendBtn.disabled = true;
+      sendBtn.setAttribute('aria-busy', 'true');
+    }
+
+    try {
+      // Get the original message to extract recipient info
+      const originalMessage = this.messagingMessages.find(m => m.id === this.messagingSelectedId);
+      if (!originalMessage) throw new Error('Original message not found');
+
+      // For demo purposes, append the reply to the conversation immediately
+      const replyData = {
+        body: message,
+        sender_name: "Admin User",
+        sender_type: "admin",
+        created_at: new Date().toISOString()
+      };
+
+      // Initialize conversation array if it doesn't exist
+      if (!originalMessage.conversation) {
+        originalMessage.conversation = [];
+      }
+
+      // Add the reply to the conversation
+      originalMessage.conversation.push(replyData);
+
+      // Update the conversation view
+      const bodyEl = document.getElementById('messagingDetailBody');
+      if (bodyEl) {
+        bodyEl.innerHTML = this.renderConversation(originalMessage);
+        // Scroll to bottom to show the new message
+        bodyEl.scrollTop = bodyEl.scrollHeight;
+      }
+
+      // In a real implementation, this would send to the API
+      // const res = await fetch('/api/messages', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      //   body: JSON.stringify({ 
+      //     subject: `Re: ${originalMessage.subject}`,
+      //     body: message,
+      //     category: 'general',
+      //     recipient_phone: originalMessage.sender_phone,
+      //     reply_to_message_id: this.messagingSelectedId
+      //   }),
+      // });
+      // const data = await res.json().catch(() => ({}));
+      // if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      this.showNotification('Reply sent successfully!', 'success');
+      this.hideMessagingReply();
+      this.loadMessagingFolder();
+    } catch (err) {
+      console.warn('Send reply failed:', err);
+      this.showNotification(err.message || 'Could not send reply.', 'error');
+    } finally {
+      if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.removeAttribute('aria-busy');
+      }
+    }
+  }
+
   async updateMessagingBadge() {
     try {
       const res = await fetch('/api/messages/unread-count');
@@ -5372,6 +6196,519 @@ class DashboardApp {
     } catch {
       // Silently fail
     }
+  }
+
+  // Farmer's Contribution Module Functionality
+  initBeanthenticContributions() {
+    this.contributions = [
+      {
+        id: 1,
+        farmer: 'Juan Dela Cruz',
+        subject: 'GI Certification Application - Farm ID #1234',
+        preview: 'Submitted complete documentation for geographical indication certification including farm ownership papers and coffee variety verification...',
+        date: '2:30 PM',
+        status: 'pending',
+        category: 'documents',
+        starred: false,
+        unread: true,
+        seen: false
+      },
+      {
+        id: 2,
+        farmer: 'Maria Santos',
+        subject: 'Farm Photos - Harvest Season 2026',
+        preview: 'High-resolution images of coffee farm during harvest season showing ripe cherries and processing facilities...',
+        date: 'Yesterday',
+        status: 'approved',
+        category: 'images',
+        starred: false,
+        unread: false,
+        seen: true
+      },
+      {
+        id: 3,
+        farmer: 'Roberto Reyes',
+        subject: 'Land Title Documents',
+        preview: 'Scanned copies of land ownership certificates and property tax receipts for farm verification...',
+        date: 'Mar 15',
+        status: 'pending',
+        category: 'documents',
+        starred: true,
+        unread: true,
+        seen: false
+      },
+      {
+        id: 4,
+        farmer: 'Carmela Lopez',
+        subject: 'Coffee Processing Equipment Images',
+        preview: 'Professional photographs of coffee processing equipment including drying beds and milling machines...',
+        date: 'Mar 14',
+        status: 'approved',
+        category: 'images',
+        starred: false,
+        unread: false,
+        seen: true
+      }
+    ];
+
+    this.currentFilter = 'all';
+    this.searchTerm = '';
+    this.selectedContributions = new Set();
+    
+    this.bindBeanthenticEvents();
+    this.renderContributions();
+  }
+
+  bindBeanthenticEvents() {
+    // Menu button
+    const menuBtn = document.getElementById('beanthenticMenuBtn');
+    if (menuBtn) {
+      menuBtn.addEventListener('click', () => this.toggleSidebar());
+    }
+
+    // Search functionality
+    const searchInput = document.getElementById('beanthenticSearchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        this.searchTerm = e.target.value.toLowerCase();
+        this.renderContributions();
+      });
+    }
+
+    // Add Contribution button
+    const addBtn = document.getElementById('beanthenticAddBtn');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => this.showAddContributionModal());
+    }
+
+    // Sidebar navigation
+    const sidebarItems = document.querySelectorAll('.beanthentic-sidebar-item');
+    console.log('Found sidebar items:', sidebarItems.length);
+    sidebarItems.forEach((item, index) => {
+      console.log(`Binding item ${index}:`, item.dataset.filter);
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        console.log('Clicked item:', item.dataset.filter);
+        const filter = item.dataset.filter;
+        if (filter) {
+          this.setActiveFilter(filter);
+        }
+      });
+    });
+
+    // Toolbar buttons
+    const selectAllCheckbox = document.getElementById('beanthenticSelectAll');
+    if (selectAllCheckbox) {
+      selectAllCheckbox.addEventListener('change', (e) => this.selectAllContributions(e.target.checked));
+    }
+
+    // Toolbar action buttons
+    const toolbarBtns = document.querySelectorAll('.beanthentic-toolbar-btn');
+    toolbarBtns.forEach(btn => {
+      btn.addEventListener('click', () => this.handleToolbarAction(btn));
+    });
+
+    // Contribution item interactions
+    this.bindContributionItemEvents();
+  }
+
+  bindContributionItemEvents() {
+    // Checkbox interactions
+    const checkboxes = document.querySelectorAll('.beanthentic-contribution-checkbox input');
+    checkboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', (e) => {
+        const id = parseInt(e.target.closest('.beanthentic-contribution-item').dataset.id);
+        if (e.target.checked) {
+          this.selectedContributions.add(id);
+        } else {
+          this.selectedContributions.delete(id);
+        }
+        this.updateSelectAllState();
+      });
+    });
+
+    // Star interactions
+    const stars = document.querySelectorAll('.beanthentic-contribution-star');
+    stars.forEach(star => {
+      star.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const item = e.target.closest('.beanthentic-contribution-item');
+        const id = parseInt(item.dataset.id);
+        this.toggleStar(id);
+      });
+    });
+
+    // Item click interactions
+    const items = document.querySelectorAll('.beanthentic-contribution-item');
+    items.forEach(item => {
+      item.addEventListener('click', (e) => {
+        if (!e.target.closest('.beanthentic-contribution-checkbox') && 
+            !e.target.closest('.beanthentic-contribution-star')) {
+          const id = parseInt(item.dataset.id);
+          this.openContribution(id);
+        }
+      });
+    });
+  }
+
+  toggleSidebar() {
+    const sidebar = document.getElementById('beanthenticSidebar');
+    if (sidebar) {
+      sidebar.classList.toggle('open');
+    }
+  }
+
+  setActiveFilter(filter) {
+    this.currentFilter = filter;
+    
+    // Update active state
+    const sidebarItems = document.querySelectorAll('.beanthentic-sidebar-item');
+    sidebarItems.forEach(item => {
+      item.classList.remove('active');
+      if (item.dataset.filter === filter) {
+        item.classList.add('active');
+      }
+    });
+    
+    this.renderContributions();
+  }
+
+  getFilteredContributions() {
+    let filtered = this.contributions;
+
+    // Apply status/category/seen filter
+    if (this.currentFilter !== 'all') {
+      filtered = filtered.filter(c => 
+        c.status === this.currentFilter || 
+        c.category === this.currentFilter ||
+        c.seen === (this.currentFilter === 'seen') ||
+        !c.seen === (this.currentFilter === 'unseen')
+      );
+    }
+
+    // Apply search filter
+    if (this.searchTerm) {
+      filtered = filtered.filter(c =>
+        c.farmer.toLowerCase().includes(this.searchTerm) ||
+        c.subject.toLowerCase().includes(this.searchTerm) ||
+        c.preview.toLowerCase().includes(this.searchTerm)
+      );
+    }
+
+    return filtered;
+  }
+
+  getContributionCategoryLabel(category) {
+    const labels = {
+      documents: 'Document',
+      images: 'Image',
+    };
+    return labels[category] || category;
+  }
+
+  renderContributions() {
+    const container = document.getElementById('beanthenticContributionList');
+    if (!container) return;
+
+    const filtered = this.getFilteredContributions();
+
+    if (filtered.length === 0) {
+      container.innerHTML = `
+        <div class="beanthentic-contribution-empty" role="status" aria-live="polite">
+          <img
+            src="assets/images/image-3b7ad4d5-6948-477a-98eb-2f613bf8819b.png"
+            alt="Onboarding concept illustration"
+          />
+          <h3>No contributions found</h3>
+          <p>Submit documents and photos to start building the farmer review queue.</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = filtered.map(contribution => `
+      <div class="beanthentic-contribution-item ${contribution.unread ? 'unread' : ''}" data-id="${contribution.id}">
+        <div class="beanthentic-contribution-checkbox">
+          <input type="checkbox" ${this.selectedContributions.has(contribution.id) ? 'checked' : ''}>
+        </div>
+        <div class="beanthentic-contribution-star ${contribution.starred ? 'starred' : ''}">
+          <i class="${contribution.starred ? 'fa-solid' : 'fa-regular'} fa-star"></i>
+        </div>
+        <div class="beanthentic-contribution-farmer">${contribution.farmer}</div>
+        <div class="beanthentic-contribution-subject">
+          <span class="beanthentic-contribution-subject-text">${contribution.subject}</span>
+          <span class="beanthentic-contribution-tags">
+            <span class="beanthentic-tag beanthentic-tag--${contribution.status}">${contribution.status}</span>
+            <span class="beanthentic-tag beanthentic-tag--${contribution.category}">${this.getContributionCategoryLabel(contribution.category)}</span>
+          </span>
+          <span class="beanthentic-contribution-preview-inline">${contribution.preview}</span>
+        </div>
+      </div>
+    `).join('');
+
+    // Re-bind events after rendering
+    this.bindContributionItemEvents();
+  }
+
+  toggleStar(id) {
+    const contribution = this.contributions.find(c => c.id === id);
+    if (contribution) {
+      contribution.starred = !contribution.starred;
+      this.renderContributions();
+      this.showNotification(
+        contribution.starred ? 'Contribution starred' : 'Contribution unstarred',
+        'success'
+      );
+    }
+  }
+
+  selectAllContributions(checked) {
+    const filtered = this.getFilteredContributions();
+    if (checked) {
+      filtered.forEach(c => this.selectedContributions.add(c.id));
+    } else {
+      this.selectedContributions.clear();
+    }
+    this.renderContributions();
+  }
+
+  updateSelectAllState() {
+    const selectAllCheckbox = document.getElementById('beanthenticSelectAll');
+    const filtered = this.getFilteredContributions();
+    const allSelected = filtered.length > 0 && filtered.every(c => this.selectedContributions.has(c.id));
+    
+    if (selectAllCheckbox) {
+      selectAllCheckbox.checked = allSelected;
+    }
+  }
+
+  handleToolbarAction(btn) {
+    const title = btn.getAttribute('title');
+    const selectedCount = this.selectedContributions.size;
+
+    if (selectedCount === 0 && title !== 'Refresh' && title !== 'More') {
+      this.showNotification('Please select contributions first', 'warning');
+      return;
+    }
+
+    switch (title) {
+      case 'Archive':
+        this.archiveContributions();
+        break;
+      case 'Report Issue':
+        this.reportIssues();
+        break;
+      case 'Delete':
+        this.deleteContributions();
+        break;
+      case 'Mark as Reviewed':
+        this.markAsReviewed();
+        break;
+      case 'Mark as New':
+        this.markAsNew();
+        break;
+      case 'Snooze':
+        this.snoozeContributions();
+        break;
+      case 'Refresh':
+        this.refreshContributions();
+        break;
+      case 'More':
+        this.showMoreOptions();
+        break;
+    }
+  }
+
+  archiveContributions() {
+    const selected = Array.from(this.selectedContributions);
+    selected.forEach(id => {
+      const contribution = this.contributions.find(c => c.id === id);
+      if (contribution) {
+        contribution.status = 'archived';
+      }
+    });
+    this.selectedContributions.clear();
+    this.renderContributions();
+    this.showNotification(`${selected.length} contribution(s) archived`, 'success');
+  }
+
+  async deleteContributions() {
+    const confirmed = await this.showConfirmDialog(
+      `Are you sure you want to delete ${this.selectedContributions.size} contribution(s)?`,
+      'Delete Contributions'
+    );
+    
+    if (confirmed) {
+      const selected = Array.from(this.selectedContributions);
+      this.contributions = this.contributions.filter(c => !this.selectedContributions.has(c.id));
+      this.selectedContributions.clear();
+      this.renderContributions();
+      this.showNotification(`${selected.length} contribution(s) deleted`, 'success');
+    }
+  }
+
+  markAsReviewed() {
+    const selected = Array.from(this.selectedContributions);
+    selected.forEach(id => {
+      const contribution = this.contributions.find(c => c.id === id);
+      if (contribution) {
+        contribution.unread = false;
+      }
+    });
+    this.selectedContributions.clear();
+    this.renderContributions();
+    this.showNotification(`${selected.length} contribution(s) marked as reviewed`, 'success');
+  }
+
+  markAsNew() {
+    const selected = Array.from(this.selectedContributions);
+    selected.forEach(id => {
+      const contribution = this.contributions.find(c => c.id === id);
+      if (contribution) {
+        contribution.unread = true;
+      }
+    });
+    this.selectedContributions.clear();
+    this.renderContributions();
+    this.showNotification(`${selected.length} contribution(s) marked as new`, 'success');
+  }
+
+  snoozeContributions() {
+    this.showNotification('Contributions snoozed for 1 week', 'success');
+    this.selectedContributions.clear();
+    this.renderContributions();
+  }
+
+  refreshContributions() {
+    this.showNotification('Contributions refreshed', 'success');
+    this.renderContributions();
+  }
+
+  reportIssues() {
+    this.showNotification('Issue reported to admin', 'success');
+  }
+
+  showMoreOptions() {
+    this.showNotification('More options menu', 'info');
+  }
+
+  openContribution(id) {
+    const contribution = this.contributions.find(c => c.id === id);
+    if (contribution) {
+      contribution.unread = false;
+      contribution.seen = true;
+      this.renderContributions();
+      this.showNotification(`Opening: ${contribution.subject}`, 'info');
+    }
+  }
+
+  showAddContributionModal() {
+    this.showNotification('Add Contribution modal - Feature coming soon!', 'info');
+  }
+
+  showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `beanthentic-notification beanthentic-notification--${type}`;
+    notification.textContent = message;
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : type === 'warning' ? '#ff9800' : '#2196F3'};
+      color: white;
+      border-radius: 4px;
+      z-index: 9999;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      font-size: 14px;
+      transition: opacity 0.3s ease;
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+      notification.style.opacity = '0';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 300);
+    }, 3000);
+  }
+
+  // Custom Confirmation Dialog System
+  showConfirmDialog(message, title = 'Confirm Action') {
+    return new Promise((resolve) => {
+      const dialog = document.getElementById('beanthenticConfirmDialog');
+      const messageEl = document.getElementById('beanthenticConfirmMessage');
+      const titleEl = document.querySelector('.beanthentic-confirm-title');
+      const cancelBtn = document.getElementById('beanthenticConfirmCancel');
+      const okBtn = document.getElementById('beanthenticConfirmOk');
+      
+      if (!dialog || !messageEl || !cancelBtn || !okBtn) {
+        // Fallback to browser confirm if elements are missing
+        resolve(window.confirm(message));
+        return;
+      }
+      
+      // Set message and title
+      messageEl.textContent = message;
+      if (titleEl) {
+        titleEl.textContent = title;
+      }
+      
+      // Show dialog
+      dialog.removeAttribute('hidden');
+      document.body.classList.add('beanthentic-dialog-open');
+      
+      // Focus on OK button
+      okBtn.focus();
+      
+      // Handle button clicks
+      const handleCancel = () => {
+        dialog.setAttribute('hidden', '');
+        document.body.classList.remove('beanthentic-dialog-open');
+        cleanup();
+        resolve(false);
+      };
+      
+      const handleOk = () => {
+        dialog.setAttribute('hidden', '');
+        document.body.classList.remove('beanthentic-dialog-open');
+        cleanup();
+        resolve(true);
+      };
+      
+      const cleanup = () => {
+        cancelBtn.removeEventListener('click', handleCancel);
+        okBtn.removeEventListener('click', handleOk);
+        document.removeEventListener('keydown', handleKeydown);
+        backdrop.removeEventListener('click', handleBackdrop);
+      };
+      
+      const handleKeydown = (e) => {
+        if (e.key === 'Escape') {
+          handleCancel();
+        } else if (e.key === 'Enter') {
+          handleOk();
+        }
+      };
+      
+      const backdrop = dialog.querySelector('.beanthentic-confirm-backdrop');
+      const handleBackdrop = (e) => {
+        if (e.target === backdrop) {
+          handleCancel();
+        }
+      };
+      
+      // Add event listeners
+      cancelBtn.addEventListener('click', handleCancel);
+      okBtn.addEventListener('click', handleOk);
+      document.addEventListener('keydown', handleKeydown);
+      backdrop.addEventListener('click', handleBackdrop);
+    });
   }
 }
 

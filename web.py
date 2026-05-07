@@ -21,6 +21,8 @@ from routes.dashboard import register_dashboard_routes
 
 app = Flask(__name__, template_folder=".", static_folder=".", static_url_path="")
 app.secret_key = "beanthentic-dev-secret-change-this"
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
 # SQLAlchemy configuration
 # Priority:

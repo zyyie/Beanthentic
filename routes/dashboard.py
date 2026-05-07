@@ -22,6 +22,7 @@ from config.utils import (
 
 def register_dashboard_routes(app):
     """Register dashboard and settings routes with the Flask app."""
+    demo_google_maps_api_key = "AIzaSyDC_FHQoHhtZA883eOefAbbzKYs58qElhg"
 
     @app.route("/dashboard")
     def dashboard():
@@ -32,7 +33,7 @@ def register_dashboard_routes(app):
         users = load_users()
         user = users.get(phone, {})
         full_name = user.get("full_name") or session.get("user_name") or phone
-        google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY", "").strip()
+        google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY", "").strip() or demo_google_maps_api_key
         return render_template(
             "templates/dashboard.html",
             user_phone=phone,
@@ -282,7 +283,7 @@ def register_dashboard_routes(app):
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
-        full_name = request.form.get("full_name", "").strip()
+        full_name = (request.form.get("full_name") or request.form.get("fullName") or "").strip()
         if not full_name:
             return jsonify({"error": "Full name is required"}), 400
 
