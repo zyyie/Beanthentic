@@ -4824,25 +4824,25 @@ body.dashboard-page #farmers-list-module #farmersListPageSizeSelect {
 
 body.dashboard-page #farmers-list-module .farmers-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1.35rem;
-  padding: 0.35rem 0.1rem;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 1rem;
+  padding: 0.2rem 0;
 }
 
 body.dashboard-page #farmers-list-module .farmer-card {
   position: relative;
-  border-radius: 22px;
-  border: 1px solid rgba(15, 23, 42, 0.07);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 20px 36px rgba(15, 23, 42, 0.10);
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
   overflow: hidden;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 body.dashboard-page #farmers-list-module .farmer-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 22px 40px rgba(15, 23, 42, 0.14);
-  border-color: rgba(44, 122, 62, 0.30);
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+  border-color: rgba(22, 163, 74, 0.28);
 }
 
 body.dashboard-page #farmers-list-module .farmer-card--placeholder {
@@ -4850,10 +4850,10 @@ body.dashboard-page #farmers-list-module .farmer-card--placeholder {
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__media {
-  height: 180px;
-  margin: 0.9rem 0.9rem 0;
-  border-radius: 16px;
-  background: linear-gradient(145deg, #e9efee, #dde7e5);
+  height: 155px;
+  margin: 0.7rem 0.7rem 0;
+  border-radius: 14px;
+  background: linear-gradient(160deg, #edf2f3, #dfe7e8);
   overflow: hidden;
   display: grid;
   place-items: center;
@@ -4867,24 +4867,24 @@ body.dashboard-page #farmers-list-module .farmer-card__image {
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__top {
-  padding: 0.85rem 1.15rem 0.6rem;
+  padding: 0.75rem 0.95rem 0.5rem;
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__avatar {
-  width: 58px;
-  height: 58px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
   color: #ffffff;
   display: grid;
   place-items: center;
-  box-shadow: 0 12px 24px rgba(44, 122, 62, 0.24);
+  box-shadow: 0 8px 18px rgba(44, 122, 62, 0.22);
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__avatar--media {
-  width: 72px;
-  height: 72px;
-  font-size: 1.1rem;
+  width: 64px;
+  height: 64px;
+  font-size: 1rem;
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__name-row {
@@ -4895,11 +4895,11 @@ body.dashboard-page #farmers-list-module .farmer-card__name-row {
 
 body.dashboard-page #farmers-list-module .farmer-card__name {
   margin: 0;
-  font-weight: 900;
+  font-weight: 800;
   color: #0f172a;
-  font-size: 1.55rem;
+  font-size: 2rem;
   letter-spacing: 0.01em;
-  line-height: 1.1;
+  line-height: 1.02;
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__badge {
@@ -4916,23 +4916,23 @@ body.dashboard-page #farmers-list-module .farmer-card__badge {
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__bio {
-  margin: 0.45rem 0 0;
+  margin: 0.35rem 0 0;
   color: #6b7280;
-  font-size: 0.88rem;
-  line-height: 1.45;
+  font-size: 0.95rem;
+  line-height: 1.35;
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__body {
-  padding: 0.45rem 1.15rem 1rem;
+  padding: 0.35rem 0.95rem 0.85rem;
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__kv {
   display: grid;
-  grid-template-columns: 76px 1fr;
-  gap: 0.28rem 0.65rem;
-  margin: 0 0 0.75rem;
-  font-size: 0.83rem;
-  line-height: 1.35;
+  grid-template-columns: 70px 1fr;
+  gap: 0.18rem 0.55rem;
+  margin: 0 0 0.65rem;
+  font-size: 0.78rem;
+  line-height: 1.3;
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__kv dt {
@@ -4974,26 +4974,26 @@ body.dashboard-page #farmers-list-module .farmer-card__actions {
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__details {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.95));
-  border: 1px solid rgba(44, 122, 62, 0.22);
+  background: #f6f7f8;
+  border: 1px solid rgba(15, 23, 42, 0.10);
   color: #166534;
   font-weight: 800;
-  font-size: 0.9rem;
+  font-size: 0.78rem;
   cursor: pointer;
   border-radius: 999px;
-  padding: 0.45rem 0.85rem 0.45rem 0.95rem;
+  padding: 0.4rem 0.75rem 0.4rem 0.85rem;
   text-decoration: none;
   transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.38rem;
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__details:hover {
-  background: linear-gradient(135deg, rgba(236, 253, 245, 0.95), rgba(220, 252, 231, 0.95));
+  background: #ecfdf5;
   border-color: rgba(44, 122, 62, 0.35);
   transform: translateY(-1px);
-  box-shadow: 0 10px 16px rgba(22, 101, 52, 0.16);
+  box-shadow: 0 6px 14px rgba(22, 101, 52, 0.14);
 }
 
 body.dashboard-page #farmers-list-module .farmers-list-footer {
@@ -6192,6 +6192,11 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   background-color: rgba(255, 255, 255, 0.3);
 }
 
+/* Remove header menu icon in Farmer's Contribution */
+#register-module .beanthentic-menu-btn {
+  display: none;
+}
+
 .beanthentic-title {
   font-size: 22px;
   font-weight: 400;
@@ -6259,24 +6264,26 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 .beanthentic-layout {
   display: flex;
   height: calc(100vh - 80px);
+  width: 100%;
+  gap: 12px;
 }
 
 /* Beanthentic Sidebar */
 .beanthentic-sidebar {
-  width: 320px;
+  width: 220px;
   background: #ffffff;
-  border-right: 1px solid #e0e0e0;
-  padding: 8px 0;
+  border-right: none;
+  padding: 6px 0;
   overflow-y: auto;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
   min-height: 100%;
   flex-shrink: 0;
 }
 
 .beanthentic-sidebar-section {
-  margin-bottom: 20px;
-  border-bottom: 1px solid #f0f0f0;
-  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: none;
+  padding-bottom: 10px;
 }
 
 .beanthentic-sidebar-section:last-child {
@@ -6285,38 +6292,37 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 }
 
 .beanthentic-sidebar-section h3 {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   color: #9e9e9e;
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin: 0 0 12px 0;
-  padding: 0 24px;
+  margin: 0 0 10px 0;
+  padding: 0 12px;
 }
 
 .beanthentic-sidebar-item {
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 8px 16px;
-  border: 1px solid #e0e0e0;
+  padding: 6px 10px;
+  border: none;
   background: #ffffff;
   cursor: pointer;
   font-size: 12px;
   color: #333333;
   text-align: left;
-  border-radius: 6px;
+  border-radius: 5px;
   transition: all 0.2s ease;
   position: relative;
   box-sizing: border-box;
   margin-bottom: 3px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
 }
 
 .beanthentic-sidebar-item:hover {
   background-color: #f8f9fa;
-  border-color: #4CAF50;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  box-shadow: none;
   transform: translateY(-1px);
 }
 
@@ -6324,8 +6330,7 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   background-color: #4CAF50;
   color: #fff;
   font-weight: 600;
-  border-color: #45a049;
-  box-shadow: 0 3px 10px rgba(76, 175, 80, 0.3);
+  box-shadow: none;
 }
 
 .beanthentic-sidebar-item.active::before {
@@ -6364,14 +6369,14 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 }
 
 .beanthentic-item-title {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   color: inherit;
   line-height: 1.1;
 }
 
 .beanthentic-item-count {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   color: #757575;
   background: transparent;
@@ -6411,7 +6416,10 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  min-width: 0;
+  background: #f3f4f6;
+  padding: 12px 14px 16px;
+  border-radius: 12px;
 }
 
 /* Beanthentic Toolbar */
@@ -6419,9 +6427,11 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 16px;
-  border-bottom: 1px solid #e0e0e0;
-  background: #fafafa;
+  padding: 9px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+  margin-bottom: 10px;
 }
 
 .beanthentic-toolbar-left,
@@ -6464,21 +6474,31 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 .beanthentic-contribution-list {
   flex: 1;
   overflow-y: auto;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 8px;
 }
 
 .beanthentic-contribution-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 24px 24px 190px minmax(0, 1fr);
   align-items: center;
-  padding: 10px 14px;
-  min-height: 44px;
-  border-bottom: 1px solid #f0f0f0;
+  column-gap: 10px;
+  padding: 10px 12px;
+  min-height: 48px;
+  border: 1px solid transparent;
+  border-radius: 10px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, border-color 0.2s;
   position: relative;
+  margin-bottom: 6px;
 }
 
 .beanthentic-contribution-item:hover {
-  background-color: #f8f8f8;
+  background-color: #f8fafc;
+  border-color: #e5e7eb;
 }
 
 .beanthentic-contribution-item.unread {
@@ -6487,10 +6507,10 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 }
 
 .beanthentic-contribution-checkbox {
-  margin-right: 10px;
+  margin-right: 0;
   display: flex;
   align-items: center;
-  flex-shrink: 0;
+  justify-content: center;
 }
 
 .beanthentic-contribution-checkbox input[type="checkbox"] {
@@ -6502,7 +6522,7 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 }
 
 .beanthentic-contribution-star {
-  margin-right: 10px;
+  margin-right: 0;
   color: #757575;
   cursor: pointer;
   padding: 4px;
@@ -6524,10 +6544,9 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 }
 
 .beanthentic-contribution-farmer {
-  width: 160px;
+  width: auto;
   font-size: 14px;
   color: #333333;
-  margin-right: 16px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6624,7 +6643,7 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   flex: 1;
   min-width: 0;
   display: block;
-  max-width: 420px; /* constrain how much preview we show before ellipsis */
+  max-width: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6908,7 +6927,7 @@ body.beanthentic-dialog-open {
 @media (max-width: 768px) {
   .beanthentic-sidebar {
     position: fixed;
-    left: -320px;
+    left: -220px;
     top: 80px;
     height: calc(100vh - 80px);
     z-index: 200;
@@ -6924,9 +6943,20 @@ body.beanthentic-dialog-open {
   }
   
   .beanthentic-contribution-farmer {
-    width: 120px;
+    width: auto;
   }
   
+  .beanthentic-main {
+    padding: 10px;
+    border-radius: 0;
+  }
+
+  .beanthentic-contribution-item {
+    grid-template-columns: 22px 22px 130px minmax(0, 1fr);
+    column-gap: 8px;
+    padding: 9px 10px;
+  }
+
   .beanthentic-contribution-preview,
   .beanthentic-contribution-preview-inline {
     display: none;
