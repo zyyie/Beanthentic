@@ -5853,34 +5853,38 @@ class DashboardApp {
       const displayName = data.user?.full_name || 'Admin';
       const phone = data.user?.phone || '—';
       
-      const displayNameEl = document.getElementById('accountDisplayName');
-      const phoneEl = document.getElementById('accountPhone');
       const heroNameEl = document.getElementById('accountHeroName');
-      const heroPhoneEl = document.getElementById('accountHeroPhone');
-      const quickNameEl = document.getElementById('accountQuickFullName');
-      const quickPhoneEl = document.getElementById('accountQuickPhone');
+      const firstNameEl = document.getElementById('accountFirstName');
+      const lastNameEl = document.getElementById('accountLastName');
+      const phoneEl = document.getElementById('accountPhone');
+
+      const editFirstNameEl = document.getElementById('accountEditFirstName');
+      const editLastNameEl = document.getElementById('accountEditLastName');
+      const editPhoneEl = document.getElementById('accountEditPhone');
       
-      if (displayNameEl) displayNameEl.textContent = displayName;
-      if (phoneEl) phoneEl.textContent = phone;
+      const nameParts = displayName.split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
       if (heroNameEl) heroNameEl.textContent = displayName;
-      if (heroPhoneEl) heroPhoneEl.textContent = phone;
-      if (quickNameEl) quickNameEl.value = displayName;
-      if (quickPhoneEl) quickPhoneEl.value = phone;
+      if (firstNameEl) firstNameEl.textContent = firstName;
+      if (lastNameEl) lastNameEl.textContent = lastName;
+      if (phoneEl) phoneEl.textContent = phone;
+
+      if (editFirstNameEl) editFirstNameEl.value = firstName;
+      if (editLastNameEl) editLastNameEl.value = lastName;
+      if (editPhoneEl) editPhoneEl.value = phone;
     } catch (error) {
       console.error('Failed to load account data:', error);
-      const displayNameEl = document.getElementById('accountDisplayName');
-      const phoneEl = document.getElementById('accountPhone');
       const heroNameEl = document.getElementById('accountHeroName');
-      const heroPhoneEl = document.getElementById('accountHeroPhone');
-      const quickNameEl = document.getElementById('accountQuickFullName');
-      const quickPhoneEl = document.getElementById('accountQuickPhone');
-      
-      if (displayNameEl) displayNameEl.textContent = 'Admin';
-      if (phoneEl) phoneEl.textContent = '—';
+      const firstNameEl = document.getElementById('accountFirstName');
+      const lastNameEl = document.getElementById('accountLastName');
+      const phoneEl = document.getElementById('accountPhone');
+
       if (heroNameEl) heroNameEl.textContent = 'Admin';
-      if (heroPhoneEl) heroPhoneEl.textContent = '—';
-      if (quickNameEl) quickNameEl.value = 'Admin';
-      if (quickPhoneEl) quickPhoneEl.value = '—';
+      if (firstNameEl) firstNameEl.textContent = 'Admin';
+      if (lastNameEl) lastNameEl.textContent = '';
+      if (phoneEl) phoneEl.textContent = '—';
     }
   }
 
@@ -5889,7 +5893,36 @@ class DashboardApp {
     const logoutBtn = document.getElementById('logoutBtn');
     const quickProfileForm = document.getElementById('accountQuickProfileForm');
     const quickPasswordForm = document.getElementById('accountQuickPasswordForm');
-    const passwordToggles = document.querySelectorAll('.account-password-toggle[data-target]');
+    const passwordToggles = document.querySelectorAll('.password-toggle[data-target]');
+    const openEditModalBtn = document.getElementById('openEditProfileModalBtn');
+    const closeEditModalBtn = document.getElementById('closeEditProfileModalBtn');
+    const editProfileModal = document.getElementById('editProfileModal');
+
+    if (openEditModalBtn && editProfileModal) {
+      openEditModalBtn.addEventListener('click', () => {
+        editProfileModal.removeAttribute('hidden');
+        editProfileModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('confirm-dialog-active');
+      });
+    }
+
+    if (closeEditModalBtn && editProfileModal) {
+      closeEditModalBtn.addEventListener('click', () => {
+        editProfileModal.setAttribute('hidden', '');
+        editProfileModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('confirm-dialog-active');
+      });
+    }
+
+    // Close modal on backdrop click
+    const modalBackdrop = editProfileModal?.querySelector('.profile-modal-backdrop');
+    if (modalBackdrop && editProfileModal) {
+      modalBackdrop.addEventListener('click', () => {
+        editProfileModal.setAttribute('hidden', '');
+        editProfileModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('confirm-dialog-active');
+      });
+    }
     
     if (manageSettingsBtn) {
       manageSettingsBtn.addEventListener('click', () => {
@@ -5902,9 +5935,7 @@ class DashboardApp {
     
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => {
-        if (confirm('Are you sure you want to log out?')) {
-          window.location.href = '/logout';
-        }
+        this.openLogoutConfirmModal();
       });
     }
 
@@ -5926,7 +5957,10 @@ class DashboardApp {
     if (quickProfileForm) {
       quickProfileForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const fullName = (document.getElementById('accountQuickFullName')?.value || '').trim();
+        const firstName = (document.getElementById('accountEditFirstName')?.value || '').trim();
+        const lastName = (document.getElementById('accountEditLastName')?.value || '').trim();
+        const fullName = `${firstName} ${lastName}`.trim();
+        
         if (!fullName) {
           this.showNotification('Full name is required.', 'error');
           return;
@@ -5937,7 +5971,17 @@ class DashboardApp {
           const res = await fetch('/settings/profile', { method: 'POST', body: fd });
           const result = await res.json();
           if (!res.ok || result.error) throw new Error(result.error || 'Could not update profile.');
+          
           this.showNotification(result.success || 'Profile updated successfully.', 'success');
+          
+          // Close modal
+          const editProfileModal = document.getElementById('editProfileModal');
+          if (editProfileModal) {
+            editProfileModal.setAttribute('hidden', '');
+            editProfileModal.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('confirm-dialog-active');
+          }
+          
           this.loadAccountData();
         } catch (err) {
           this.showNotification(err.message || 'Could not update profile.', 'error');

@@ -2098,98 +2098,159 @@
           <!-- Account Module -->
           <div class="module hidden" id="account-module" data-module="account">
             <section class="module-header">
-              <h1>Account</h1>
-              <p>Manage your administrator account</p>
+              <h1>My Profile</h1>
             </section>
-            <div class="account-module-content">
-              <div class="account-card">
-                <div class="account-pane account-pane--summary">
-                  <div class="account-icon">
-                    <i class="fa-solid fa-circle-user"></i>
-                  </div>
-                  <h2 class="account-hero-name" id="accountHeroName">Loading...</h2>
-                  <p class="account-hero-phone" id="accountHeroPhone">—</p>
-                  <div class="account-hero-role">
-                    <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
-                    <span>Administrator</span>
+            
+            <div class="account-profile-container">
+              <!-- Header Card -->
+              <div class="profile-header-card">
+                <div class="profile-avatar-section">
+                  <div class="profile-avatar">
+                    <i class="fa-solid fa-user"></i>
+                    <button class="avatar-edit-btn" title="Change photo">
+                      <i class="fa-solid fa-camera"></i>
+                    </button>
                   </div>
                 </div>
+                <div class="profile-title-section">
+                  <h2 id="accountHeroName">Loading...</h2>
+                  <p class="profile-role">Admin</p>
+                  <p class="profile-location">Leeds, United Kingdom</p>
+                </div>
+              </div>
 
-                <div class="account-pane account-pane--details">
-                  <div class="account-info">
-                    <div class="account-info-row">
-                      <span class="account-info-label"><i class="fa-solid fa-user"></i> Full Name</span>
-                      <span class="account-info-value" id="accountDisplayName">Loading...</span>
-                    </div>
-                    <div class="account-info-row">
-                      <span class="account-info-label"><i class="fa-solid fa-phone"></i> Mobile Number</span>
-                      <span class="account-info-value" id="accountPhone">Loading...</span>
-                    </div>
-                    <div class="account-info-row">
-                      <span class="account-info-label"><i class="fa-solid fa-shield-halved"></i> Role</span>
-                      <span class="account-info-value">Administrator</span>
-                    </div>
-                    <div class="account-info-row">
-                      <span class="account-info-label"><i class="fa-solid fa-calendar"></i> Account Status</span>
-                      <span class="account-info-value" style="color: #059669; font-weight: 600;"><i class="fa-solid fa-circle-check" style="font-size: 12px; margin-right: 6px;"></i> Active</span>
-                    </div>
+              <!-- Personal Information Card -->
+              <div class="profile-info-card">
+                <div class="card-header">
+                  <h3>Personal Information</h3>
+                  <button type="button" class="btn-edit" id="openEditProfileModalBtn">
+                    <span>Edit</span>
+                    <i class="fa-solid fa-pen"></i>
+                  </button>
+                </div>
+                <div class="card-grid">
+                  <div class="info-group">
+                    <label>First Name</label>
+                    <p id="accountFirstName">Loading...</p>
                   </div>
-
-                  <div class="account-actions">
-                    <button type="button" class="btn btn-secondary" id="manageSettingsBtn">
-                      <i class="fa-solid fa-sliders" aria-hidden="true"></i>
-                      <span>Manage in Settings</span>
-                    </button>
-                    <button type="button" class="btn btn-danger" id="logoutBtn">
-                      <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
-                      <span>Log out</span>
-                    </button>
+                  <div class="info-group">
+                    <label>Last Name</label>
+                    <p id="accountLastName">Loading...</p>
                   </div>
-
-                  <div class="account-tools">
-                    <section class="account-tool-card" aria-label="Quick profile update">
-                      <h3><i class="fa-solid fa-user-pen" aria-hidden="true"></i> Quick Profile Update</h3>
-                      <form id="accountQuickProfileForm" class="account-tool-form">
-                        <label for="accountQuickFullName">Full Name</label>
-                        <input id="accountQuickFullName" type="text" maxlength="80" placeholder="Enter full name" required />
-                        <label for="accountQuickPhone">Mobile Number</label>
-                        <input id="accountQuickPhone" type="text" readonly />
-                        <p class="account-tool-hint">Mobile number is managed by the administrator account registry.</p>
-                        <button type="submit" class="btn account-tool-btn">Save Profile</button>
-                      </form>
-                    </section>
-
-                    <section class="account-tool-card" aria-label="Change password">
-                      <h3><i class="fa-solid fa-lock" aria-hidden="true"></i> Change Password</h3>
-                      <form id="accountQuickPasswordForm" class="account-tool-form">
-                        <label for="accountCurrentPassword">Current Password</label>
-                        <div class="account-password-wrap">
-                          <input id="accountCurrentPassword" type="password" autocomplete="current-password" required />
-                          <button type="button" class="account-password-toggle" data-target="accountCurrentPassword" aria-label="Show current password">
-                            <i class="fa-regular fa-eye"></i>
-                          </button>
-                        </div>
-                        <label for="accountNewPassword">New Password</label>
-                        <div class="account-password-wrap">
-                          <input id="accountNewPassword" type="password" autocomplete="new-password" minlength="8" required />
-                          <button type="button" class="account-password-toggle" data-target="accountNewPassword" aria-label="Show new password">
-                            <i class="fa-regular fa-eye"></i>
-                          </button>
-                        </div>
-                        <label for="accountConfirmPassword">Confirm New Password</label>
-                        <div class="account-password-wrap">
-                          <input id="accountConfirmPassword" type="password" autocomplete="new-password" minlength="8" required />
-                          <button type="button" class="account-password-toggle" data-target="accountConfirmPassword" aria-label="Show confirm new password">
-                            <i class="fa-regular fa-eye"></i>
-                          </button>
-                        </div>
-                        <p class="account-tool-hint">Use at least 8 characters.</p>
-                        <button type="submit" class="btn account-tool-btn">Update Password</button>
-                      </form>
-                    </section>
+                  <div class="info-group">
+                    <label>Date of Birth</label>
+                    <p>12-10-1990</p>
+                  </div>
+                  <div class="info-group">
+                    <label>Email Address</label>
+                    <p>info@binary-fusion.com</p>
+                  </div>
+                  <div class="info-group">
+                    <label>Phone Number</label>
+                    <p id="accountPhone">Loading...</p>
+                  </div>
+                  <div class="info-group">
+                    <label>User Role</label>
+                    <p>Admin</p>
                   </div>
                 </div>
               </div>
+
+              <!-- Address Card -->
+              <div class="profile-info-card">
+                <div class="card-header">
+                  <h3>Address</h3>
+                  <button type="button" class="btn-edit-secondary">
+                    <span>Edit</span>
+                    <i class="fa-solid fa-pen"></i>
+                  </button>
+                </div>
+                <div class="card-grid">
+                  <div class="info-group">
+                    <label>Country</label>
+                    <p>United Kingdom</p>
+                  </div>
+                  <div class="info-group">
+                    <label>City</label>
+                    <p>Leeds, East London</p>
+                  </div>
+                  <div class="info-group">
+                    <label>Postal Code</label>
+                    <p>ERT 1254</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Security Card -->
+              <div class="profile-info-card">
+                <div class="security-card-content">
+                  <h3>Security</h3>
+                  <div class="card-actions-vertical">
+                    <button type="button" class="btn-secondary" id="manageSettingsBtn">
+                      <i class="fa-solid fa-sliders"></i>
+                      <span>Advanced Settings</span>
+                    </button>
+                    <button type="button" class="btn-logout-alt" id="logoutBtn">
+                      <i class="fa-solid fa-right-from-bracket"></i>
+                      <span>Log out</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Edit Profile Modal -->
+          <div id="editProfileModal" class="profile-modal" hidden aria-hidden="true">
+            <div class="profile-modal-backdrop"></div>
+            <div class="profile-modal-card" role="dialog" aria-modal="true">
+              <div class="profile-modal-header">
+                <h2>Edit Personal Information</h2>
+                <button type="button" class="profile-modal-close" id="closeEditProfileModalBtn">
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+              <form id="accountQuickProfileForm" class="profile-modal-form">
+                <div class="modal-form-row">
+                  <div class="modal-form-group">
+                    <label for="accountEditFirstName">First Name</label>
+                    <input type="text" id="accountEditFirstName" value="Natashia" required />
+                  </div>
+                  <div class="modal-form-group">
+                    <label for="accountEditLastName">Last Name</label>
+                    <input type="text" id="accountEditLastName" value="Khaleira" required />
+                  </div>
+                </div>
+                <div class="modal-form-group">
+                  <label for="accountEditEmail">Email Address</label>
+                  <input type="email" id="accountEditEmail" value="info@binary-fusion.com" />
+                </div>
+                <div class="modal-form-group">
+                  <label for="accountEditPhone">Phone Number</label>
+                  <input type="text" id="accountEditPhone" value="(+62) 821 2554-5846" />
+                </div>
+                <div class="modal-form-group">
+                  <label for="accountEditDob">Date of Birth</label>
+                  <div class="modal-input-icon-wrapper">
+                    <input type="text" id="accountEditDob" value="12/10/1990" />
+                    <i class="fa-solid fa-calendar-days"></i>
+                  </div>
+                </div>
+                <div class="modal-form-group">
+                  <label for="accountEditRole">User Role</label>
+                  <div class="modal-select-wrapper">
+                    <select id="accountEditRole">
+                      <option value="Admin" selected>Admin</option>
+                      <option value="Editor">Editor</option>
+                      <option value="Viewer">Viewer</option>
+                    </select>
+                    <i class="fa-solid fa-chevron-down"></i>
+                  </div>
+                </div>
+                <div class="modal-form-footer">
+                  <button type="submit" class="btn-save-changes">Save Changes</button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
