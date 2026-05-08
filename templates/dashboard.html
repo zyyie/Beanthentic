@@ -536,99 +536,215 @@
                   </button>
                 </div>
 
-                <div class="farmer-profile-card" aria-label="Farmer profile">
-                  <aside class="farmer-profile-left">
-                    <div class="farmer-profile-avatar" aria-hidden="true">
-                      <i class="fa-solid fa-user"></i>
-                    </div>
-                    <h2 class="farmer-profile-name" id="farmerProfileName">Full Name</h2>
-                    <p class="farmer-profile-no" id="farmerProfileNo">No. #</p>
-
-                    <div class="farmer-profile-meta">
-                      <div class="farmer-profile-meta-row">
-                        <span class="meta-label">Date of Birth</span>
-                        <span class="meta-value" id="farmerProfileDob">—</span>
-                      </div>
-                      <div class="farmer-profile-meta-row">
-                        <span class="meta-label">Phone No.</span>
-                        <span class="meta-value" id="farmerProfilePhone">—</span>
-                      </div>
-                      <div class="farmer-profile-meta-row">
-                        <span class="meta-label">Current Address</span>
-                        <span class="meta-value" id="farmerProfileAddress">—</span>
-                      </div>
-                    </div>
-                  </aside>
-
-                  <section class="farmer-profile-right">
-                    <div class="farmer-profile-tabs" role="tablist">
-                      <button class="farmer-profile-tab-btn active" data-profile-tab="personal" role="tab" aria-selected="true">Personal Info</button>
-                      <button class="farmer-profile-tab-btn" data-profile-tab="affiliation" role="tab" aria-selected="false">Affiliation & Status</button>
-                      <button class="farmer-profile-tab-btn" data-profile-tab="farm" role="tab" aria-selected="false">Farm Details</button>
-                    </div>
-
-                    <div class="farmer-profile-content">
-                      <div class="farmer-profile-pane active" id="profilePanePersonal">
-                        <h3 class="pane-title">Personal Information</h3>
-                        <div class="farmer-profile-grid">
-                          <div class="form-group">
-                            <label>Last Name</label>
-                            <input id="farmerProfileLastName" type="text" disabled />
+                <div class="farmer-profile-layout-new">
+                  <!-- Left Column -->
+                  <div class="farmer-profile-column-left">
+                    <!-- Unified Profile & Details Card -->
+                    <div class="farmer-unified-profile-card">
+                      <!-- Top Section: Basic Info -->
+                      <div class="profile-card-top-section">
+                        <div class="farmer-profile-avatar-large">
+                          <i class="fa-solid fa-user"></i>
+                        </div>
+                        <h2 class="farmer-profile-name" id="farmerProfileName">Full Name</h2>
+                        <p class="farmer-profile-id" id="farmerProfileNo">No. #</p>
+                        <div class="farmer-profile-actions-btns">
+                          <button class="btn-profile-action"><i class="fa-solid fa-comment-dots"></i> TEXT</button>
+                          <button class="btn-profile-action"><i class="fa-solid fa-envelope"></i> EMAIL</button>
+                        </div>
+                        
+                        <div class="farmer-profile-demographics">
+                          <div class="demo-item">
+                            <span class="demo-label">Date of Birth</span>
+                            <span class="demo-value" id="farmerProfileDob">—</span>
                           </div>
-                          <div class="form-group">
-                            <label>First Name</label>
-                            <input id="farmerProfileFirstName" type="text" disabled />
+                          <div class="demo-item">
+                            <span class="demo-label">Phone No.</span>
+                            <span class="demo-value" id="farmerProfilePhone">—</span>
                           </div>
-                          <div class="form-group">
-                            <label>Province</label>
-                            <input id="farmerProfileProvince" type="text" disabled />
-                          </div>
-                          <div class="form-group">
-                            <label>Municipality</label>
-                            <input id="farmerProfileMunicipality" type="text" disabled />
-                          </div>
-                          <div class="form-group">
-                            <label>Barangay</label>
-                            <input id="farmerProfileBarangay" type="text" disabled />
+                          <div class="demo-item">
+                            <span class="demo-label">Current Address</span>
+                            <span class="demo-value" id="farmerProfileAddress">—</span>
                           </div>
                         </div>
                       </div>
 
-                      <div class="farmer-profile-pane" id="profilePaneAffiliation" hidden>
-                        <h3 class="pane-title">Affiliation & Status</h3>
-                        <div class="farmer-profile-grid">
-                          <div class="form-group">
-                            <label>Federation Association</label>
-                            <input id="farmerProfileFederation" type="text" disabled />
-                          </div>
-                          <div class="form-group">
-                            <label>RSBSA Registered</label>
-                            <input id="farmerProfileRsbsa" type="text" disabled />
-                          </div>
-                          <div class="form-group">
-                            <label>RSBSA Registered Number</label>
-                            <input id="farmerProfileRsbsaNumber" type="text" disabled />
-                          </div>
+                      <!-- Bottom Section: Registration Details (Collapsible) -->
+                      <div class="profile-card-details-section">
+                        <div class="details-collapsible-content" id="detailsScrollArea">
+                          <!-- Personal Information -->
+                          <section class="registration-detail-section">
+                            <h3>Personal Information</h3>
+                            <div class="registration-detail-grid">
+                              <div class="detail-field">
+                                <label>Last Name</label>
+                                <span id="farmerProfileLastNameText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>First Name</label>
+                                <span id="farmerProfileFirstNameText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Province</label>
+                                <span id="farmerProfileProvinceText" class="bold-value">Batangas</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Municipality</label>
+                                <span id="farmerProfileMunicipalityText" class="bold-value">Lipa City</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Barangay</label>
+                                <span id="farmerProfileBarangayText" class="bold-value">—</span>
+                              </div>
+                            </div>
+                          </section>
+
+                          <!-- Affiliation -->
+                          <section class="registration-detail-section">
+                            <h3>Affiliation & Status</h3>
+                            <div class="registration-detail-grid">
+                              <div class="detail-field">
+                                <label>Federation Association</label>
+                                <span id="farmerProfileFederationText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>RSBSA Registered</label>
+                                <span id="farmerProfileRsbsaText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>RSBSA Registered Number</label>
+                                <span id="farmerProfileRsbsaNumberText" class="bold-value">—</span>
+                              </div>
+                            </div>
+                          </section>
+
+                          <!-- Farm Information -->
+                          <section class="registration-detail-section">
+                            <h3>Farm Information</h3>
+                            <div class="registration-detail-grid">
+                              <div class="detail-field">
+                                <label>Status of Ownership</label>
+                                <span id="farmerProfileOwnershipText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Total Plant Area</label>
+                                <span id="farmerProfileTotalAreaText" class="bold-value">—</span>
+                              </div>
+                            </div>
+                          </section>
+
+                          <!-- Tree Counts -->
+                          <section class="registration-detail-section">
+                            <h3>Tree Counts</h3>
+                            <div class="tree-counts-grid">
+                              <div class="tree-count-item">
+                                <label>Liberica (Kapeng Barako)<span>Number of Bearing</span></label>
+                                <span id="farmerProfileLibBearingText" class="bold-value">0</span>
+                              </div>
+                              <div class="tree-count-item">
+                                <label>Liberica (Kapeng Barako)<span>Number of Non Bearing</span></label>
+                                <span id="farmerProfileLibNonBearingText" class="bold-value">0</span>
+                              </div>
+                              <div class="tree-count-item">
+                                <label>Robusta<span>Number of Bearing</span></label>
+                                <span id="farmerProfileRobBearingText" class="bold-value">0</span>
+                              </div>
+                              <div class="tree-count-item">
+                                <label>Robusta<span>Number of Non Bearing</span></label>
+                                <span id="farmerProfileRobNonBearingText" class="bold-value">0</span>
+                              </div>
+                              <div class="tree-count-item">
+                                <label>Excelsa<span>Number of Bearing</span></label>
+                                <span id="farmerProfileExcBearingText" class="bold-value">0</span>
+                              </div>
+                              <div class="tree-count-item">
+                                <label>Excelsa<span>Number of Non Bearing</span></label>
+                                <span id="farmerProfileExcNonBearingText" class="bold-value">0</span>
+                              </div>
+                            </div>
+                          </section>
+
+                          <!-- Production -->
+                          <section class="registration-detail-section">
+                            <h3>Production <span class="year-label">(2026)</span></h3>
+                            <div class="registration-detail-grid">
+                              <div class="detail-field">
+                                <label>Liberica (Kapeng Barako)</label>
+                                <span id="farmerProfileLibProdText" class="bold-value">0</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Robusta</label>
+                                <span id="farmerProfileRobProdText" class="bold-value">0</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Excelsa</label>
+                                <span id="farmerProfileExcProdText" class="bold-value">0</span>
+                              </div>
+                            </div>
+                          </section>
                         </div>
+                        
+                        <div class="details-blur-overlay" id="detailsBlurOverlay"></div>
+                        <button class="btn-see-more" id="btnSeeMoreDetails">See more</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Right Column -->
+                  <div class="farmer-profile-column-right">
+                    <!-- Bean Summary Section -->
+                    <div class="farmer-bean-summary-container">
+                      <div class="bean-variety-tabs">
+                        <button class="bean-variety-btn active">All</button>
+                        <button class="bean-variety-btn">Liberica</button>
+                        <button class="bean-variety-btn">Excelsa</button>
+                        <button class="bean-variety-btn">Robusta</button>
                       </div>
 
-                      <div class="farmer-profile-pane" id="profilePaneFarm" hidden>
-                        <h3 class="pane-title">Farm Details</h3>
-                        <div class="farmer-profile-grid">
-                          <div class="form-group">
-                            <label>Status Ownership</label>
-                            <input id="farmerProfileOwnership" type="text" disabled />
+                      <div class="bean-stats-grid">
+                        <div class="bean-stat-card initial">
+                          <div class="bean-stat-header">
+                            <span class="bean-stat-title">Initial Beans</span>
+                            <span class="bean-stat-date" id="initialBeansDate">October 23, 2025</span>
                           </div>
-                          <div class="form-group">
-                            <label>Total Plant Area</label>
-                            <input id="farmerProfileTotalArea" type="text" disabled />
+                          <div class="bean-stat-value"><span id="initialBeansValue">50</span>KG</div>
+                        </div>
+                        <div class="bean-stat-card remaining">
+                          <div class="bean-stat-header">
+                            <span class="bean-stat-title">Beans Remaining</span>
+                            <span class="bean-stat-date" id="remainingBeansDate">May 7, 2026</span>
                           </div>
+                          <div class="bean-stat-value"><span id="remainingBeansValue">7</span>KG</div>
                         </div>
                       </div>
                     </div>
-                  </section>
+
+                    <div class="farmer-transactions-card">
+                      <div class="transactions-card-header">
+                        <div class="transactions-tabs">
+                          <button class="txn-tab active">Transactions</button>
+                        </div>
+                      </div>
+                      <div class="transactions-table-container">
+                        <table class="farmer-txn-table">
+                          <thead>
+                            <tr>
+                              <th>DATE</th>
+                              <th>TYPE</th>
+                              <th>DESCRIPTION</th>
+                              <th>RESULTS</th>
+                            </tr>
+                          </thead>
+                          <tbody id="farmerTransactionsBody">
+                            <!-- Populated by dashboard.js -->
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
+
             </section>
           </div>
 
@@ -727,10 +843,10 @@
                 <article class="maps-panel">
                   <h2>Map Layers</h2>
                   <ul class="map-layers-list">
-                    <li><span>Farmer Locations</span><span class="layer-toggle is-on" aria-hidden="true"></span></li>
-                    <li><span>Farm Boundaries</span><span class="layer-toggle is-on" aria-hidden="true"></span></li>
-                    <li><span>Density Heatmap</span><span class="layer-toggle" aria-hidden="true"></span></li>
-                    <li><span>Road Network</span><span class="layer-toggle" aria-hidden="true"></span></li>
+                    <li><span>Farmer Locations</span><span id="toggleFarmerLocations" class="layer-toggle is-on" aria-hidden="true"></span></li>
+                    <li><span>Farm Boundaries</span><span id="toggleFarmBoundaries" class="layer-toggle is-on" aria-hidden="true"></span></li>
+                    <li><span>Density Heatmap</span><span id="toggleDensityHeatmap" class="layer-toggle" aria-hidden="true"></span></li>
+                    <li><span>Road Network</span><span id="toggleRoadNetwork" class="layer-toggle" aria-hidden="true"></span></li>
                   </ul>
                 </article>
               </aside>
@@ -2506,7 +2622,7 @@
     };
   </script>
   {% if google_maps_api_key %}
-  <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initBeanthenticGoogleMaps"></script>
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=visualization&callback=initBeanthenticGoogleMaps"></script>
   {% endif %}
   <!-- JavaScript Files -->
   <script src="js/main.js"></script>

@@ -19,6 +19,13 @@ class DashboardApp {
     this.googleMapsReady = false;
     this.googleInfoWindow = null;
     this.lipaBoundaryOverlay = null;
+    this.googleHeatmap = null;
+    this.mapLayers = {
+      farmerLocations: true,
+      farmBoundaries: true,
+      densityHeatmap: false,
+      roadNetwork: false,
+    };
     this.activeSettingsTab = 'security';
     /** 'landing' = card hub; 'detail' = loaded fragment */
     this.settingsViewMode = 'landing';
@@ -500,6 +507,8 @@ class DashboardApp {
     this.initBeanthenticContributions();
     // Initialize Farmer Profile tabs
     this.initFarmerProfileTabs();
+    // Initialize Map Layer Toggles
+    this.initMapLayerToggles();
   }
 
   updateNotificationsToolbarState() {
@@ -2649,6 +2658,12 @@ class DashboardApp {
     const listView = document.getElementById('farmersListView');
     if (!profileView || !listView) return;
 
+    // Reset See More state
+    const detailsArea = document.getElementById('detailsScrollArea');
+    const seeMoreBtn = document.getElementById('btnSeeMoreDetails');
+    if (detailsArea) detailsArea.classList.remove('expanded');
+    if (seeMoreBtn) seeMoreBtn.textContent = 'See more';
+
     const farmer = (this.data || []).find((r) => Number(r['NO.']) === Number(farmerNo));
     if (!farmer) {
       this.showNotification('Farmer not found.', 'error');
@@ -2680,26 +2695,137 @@ class DashboardApp {
     setText('farmerProfilePhone', this.getValue(farmer, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']) || '—');
     setText('farmerProfileAddress', this.getValue(farmer, ['ADDRESS (BARANGAY)', 'address', 'BARANGAY']) || '—');
 
-    setInput('farmerProfileLastName', this.getValue(farmer, ['LAST NAME', 'last_name']) || nameParts.last);
-    setInput('farmerProfileFirstName', this.getValue(farmer, ['FIRST NAME', 'first_name']) || nameParts.first);
-    setInput('farmerProfileProvince', this.getValue(farmer, ['PROVINCE', 'province']) || '');
-    setInput('farmerProfileMunicipality', this.getValue(farmer, ['MUNICIPALITY', 'municipality', 'CITY']) || '');
-    setInput('farmerProfileBarangay', this.getValue(farmer, ['BARANGAY', 'ADDRESS (BARANGAY)', 'barangay']) || '');
-    setInput('farmerProfileFederation', this.getValue(farmer, ['FA OFFICER / MEMBER', 'FEDERATION', 'Federation Association']) || '');
-    setInput('farmerProfileRsbsa', this.getValue(farmer, ['REGISTERED (YES/NO)', 'RSBSA Registered']) || '');
-    setInput('farmerProfileRsbsaNumber', this.getValue(farmer, ['NCFRS', 'RSBSA Registered Number']) || '');
-    setInput('farmerProfileOwnership', this.getValue(farmer, ['STATUS OF OWNERSHIP', 'Status Ownership']) || '');
-    setInput(
-      'farmerProfileTotalArea',
+    setText('farmerProfileLastNameText', this.getValue(farmer, ['LAST NAME', 'last_name']) || nameParts.last);
+    setText('farmerProfileFirstNameText', this.getValue(farmer, ['FIRST NAME', 'first_name']) || nameParts.first);
+    setText('farmerProfileProvinceText', this.getValue(farmer, ['PROVINCE', 'province']) || '');
+    setText('farmerProfileMunicipalityText', this.getValue(farmer, ['MUNICIPALITY', 'municipality', 'CITY']) || '');
+    setText('farmerProfileBarangayText', this.getValue(farmer, ['BARANGAY', 'ADDRESS (BARANGAY)', 'barangay']) || '');
+    setText('farmerProfileFederationText', this.getValue(farmer, ['FA OFFICER / MEMBER', 'FEDERATION', 'Federation Association']) || '');
+    setText('farmerProfileRsbsaText', this.getValue(farmer, ['REGISTERED (YES/NO)', 'RSBSA Registered']) || '');
+    setText('farmerProfileRsbsaNumberText', this.getValue(farmer, ['NCFRS', 'RSBSA Registered Number']) || '');
+    setText('farmerProfileOwnershipText', this.getValue(farmer, ['STATUS OF OWNERSHIP', 'Status Ownership']) || '');
+    setText(
+      'farmerProfileTotalAreaText',
       this.formatValue(this.getValue(farmer, ['TOTAL AREA PLANTED (HA.)', 'Total Plant Area', 'TOTAL AREA']) || '')
     );
 
-    // Reset tabs to personal info when opening a new profile
-    const firstTab = profileView.querySelector('.farmer-profile-tab-btn[data-profile-tab="personal"]');
-    if (firstTab) firstTab.click();
+    // Populate Detailed Registration Fields
+    setText('farmerProfileLibBearingText', this.getValue(farmer, ['LIBERICA BEARING', 'Liberica_Bearing']) || '0');
+    setText('farmerProfileLibNonBearingText', this.getValue(farmer, ['LIBERICA NON-BEARING', 'Liberica_Non-bearing']) || '0');
+    setText('farmerProfileRobBearingText', this.getValue(farmer, ['ROBUSTA BEARING', 'Robusta_Bearing']) || '0');
+    setText('farmerProfileRobNonBearingText', this.getValue(farmer, ['ROBUSTA NON-BEARING', 'Robusta_Non-bearing']) || '0');
+    setText('farmerProfileExcBearingText', this.getValue(farmer, ['EXCELSA BEARING', 'Excelsa_Bearing']) || '0');
+    setText('farmerProfileExcNonBearingText', this.getValue(farmer, ['EXCELSA NON-BEARING', 'Excelsa_Non-bearing']) || '0');
+
+    setText('farmerProfileLibProdText', this.getValue(farmer, ['LIBERICA PRODUCTION', 'Liberica_Production']) || '0');
+    setText('farmerProfileRobProdText', this.getValue(farmer, ['ROBUSTA PRODUCTION', 'Robusta_Production']) || '0');
+    setText('farmerProfileExcProdText', this.getValue(farmer, ['EXCELSA PRODUCTION', 'Excelsa_Production']) || '0');
+
+    // Populate Bean Summary
+    this.initBeanVarietyFilters(farmer);
+
+    // Populate Transactions
+    this.populateFarmerTransactions(fullName);
+
+    // Init See More
+    this.initSeeMoreDetails();
+
+    const toolbar = document.getElementById('farmersListToolbar');
+    if (toolbar) toolbar.style.display = 'none';
 
     listView.hidden = true;
     profileView.hidden = false;
+  }
+
+  initBeanVarietyFilters(farmer) {
+    const filterBtns = document.querySelectorAll('.bean-variety-btn');
+    if (!filterBtns.length) return;
+
+    // Reset buttons state
+    filterBtns.forEach(btn => {
+      btn.classList.toggle('active', btn.textContent.trim() === 'All');
+    });
+
+    // Remove existing listeners by cloning
+    filterBtns.forEach(btn => {
+      const newBtn = btn.cloneNode(true);
+      btn.parentNode.replaceChild(newBtn, btn);
+    });
+
+    // Re-query new buttons
+    const newFilterBtns = document.querySelectorAll('.bean-variety-btn');
+    newFilterBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        newFilterBtns.forEach(b => b.classList.toggle('active', b === btn));
+        const variety = btn.textContent.trim();
+        this.populateBeanSummary(farmer, variety);
+      });
+    });
+
+    // Initial population
+    this.populateBeanSummary(farmer, 'All');
+  }
+
+  populateBeanSummary(farmer, variety = 'All') {
+    const initialValueEl = document.getElementById('initialBeansValue');
+    const remainingValueEl = document.getElementById('remainingBeansValue');
+    const remainingDateEl = document.getElementById('remainingBeansDate');
+
+    if (!initialValueEl || !remainingValueEl) return;
+
+    let initialBeans = 0;
+    
+    if (variety === 'All') {
+      initialBeans = this.getTotalProduction(farmer);
+    } else {
+      const key = `${variety.toUpperCase()} PRODUCTION`;
+      initialBeans = Number(this.getValue(farmer, [key, variety.toLowerCase() + '_production']) || 0);
+    }
+
+    // Fallback to placeholder if no data
+    if (initialBeans === 0) initialBeans = variety === 'All' ? 50 : 15;
+
+    // Example calculation for remaining: 85% of initial or fixed offset
+    const beansRemaining = Math.max(0, Math.floor(initialBeans * 0.14)); // Roughly 7KG if 50KG
+
+    initialValueEl.textContent = initialBeans;
+    remainingValueEl.textContent = beansRemaining;
+
+    // Use current date as example
+    const today = new Date();
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    if (remainingDateEl) remainingDateEl.textContent = today.toLocaleDateString('en-US', options);
+  }
+
+  populateFarmerTransactions(farmerName) {
+    const txnBody = document.getElementById('farmerTransactionsBody');
+    if (!txnBody) return;
+
+    // Filter transactions for this farmer (mocking some data for now if no global txn data)
+    // In a real app, you'd filter from this.transactionsData or fetch from API
+    const mockTxns = [
+      { date: '12/03/2026', type: 'Harvest', desc: 'Coffee cherries harvest from main lot', results: '47.9 kg' },
+      { date: '11/15/2025', type: 'Processing', desc: 'Drying and hulling of Liberica', results: '120.5 kg' },
+      { date: '08/22/2025', type: 'Sale', desc: 'Direct sale to local cooperative', results: '250.0 kg' },
+      { date: '05/10/2025', type: 'Planting', desc: 'New Robusta seedlings added', results: '50 units' },
+      { date: '03/04/2025', type: 'Harvest', desc: 'Late season Excelsa pick', results: '32.1 kg' },
+      { date: '01/15/2025', type: 'Maintenance', desc: 'Pruning and fertilization', results: 'N/A' },
+      { date: '12/20/2024', type: 'Sale', desc: 'Export quality Liberica batch', results: '150.0 kg' },
+      { date: '11/05/2024', type: 'Processing', desc: 'Wet processing method applied', results: '85.2 kg' },
+      { date: '10/12/2024', type: 'Harvest', desc: 'Early Robusta harvest', results: '65.0 kg' },
+      { date: '09/01/2024', type: 'Planting', desc: 'Seedling nursery expansion', results: '200 units' },
+      { date: '07/15/2024', type: 'Maintenance', desc: 'Pest control application', results: 'Success' },
+      { date: '06/20/2024', type: 'Sale', desc: 'Local roaster partnership', results: '45.0 kg' }
+    ];
+
+    txnBody.innerHTML = mockTxns.map(t => `
+      <tr>
+        <td class="txn-date">${t.date}</td>
+        <td><span class="txn-type-badge ${t.type.toLowerCase()}">${t.type}</span></td>
+        <td>${t.desc}</td>
+        <td style="font-weight:700">${t.results}</td>
+      </tr>
+    `).join('');
   }
 
   initFarmerProfileTabs() {
@@ -2726,10 +2852,38 @@ class DashboardApp {
     });
   }
 
+  initSeeMoreDetails() {
+    const btn = document.getElementById('btnSeeMoreDetails');
+    const area = document.getElementById('detailsScrollArea');
+    if (!btn || !area) return;
+
+    // Use a fresh listener to avoid multiple attaches
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+
+    newBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const isExpanded = area.classList.toggle('expanded');
+      newBtn.textContent = isExpanded ? 'Show less' : 'See more';
+      
+      // Update blur overlay visibility based on expansion
+      const overlay = document.getElementById('detailsBlurOverlay');
+      if (overlay) {
+        overlay.style.opacity = isExpanded ? '0' : '1';
+      }
+    });
+  }
+
   closeFarmerProfile() {
     const profileView = document.getElementById('farmerProfileView');
     const listView = document.getElementById('farmersListView');
     if (!profileView || !listView) return;
+
+    const toolbar = document.getElementById('farmersListToolbar');
+    if (toolbar) toolbar.style.display = 'flex';
+
     profileView.hidden = true;
     listView.hidden = false;
   }
@@ -2754,16 +2908,23 @@ class DashboardApp {
     setText('farmerProfilePhone', '+63 900 XXXX XXXX');
     setText('farmerProfileAddress', 'Barangay, Municipality (or City), Province');
 
-    setInput('farmerProfileLastName', 'Last Name');
-    setInput('farmerProfileFirstName', 'First Name');
-    setInput('farmerProfileProvince', 'Batangas');
-    setInput('farmerProfileMunicipality', 'Lipa City');
-    setInput('farmerProfileBarangay', 'Barangay');
-    setInput('farmerProfileFederation', 'Federation Association');
-    setInput('farmerProfileRsbsa', 'Yes/No');
-    setInput('farmerProfileRsbsaNumber', 'NCFRS-0000');
-    setInput('farmerProfileOwnership', 'Landowner / Lease / Others');
-    setInput('farmerProfileTotalArea', '0.00');
+    setText('farmerProfileLastNameText', 'Last Name');
+    setText('farmerProfileFirstNameText', 'First Name');
+    setText('farmerProfileProvinceText', 'Batangas');
+    setText('farmerProfileMunicipalityText', 'Lipa City');
+    setText('farmerProfileBarangayText', 'Barangay');
+    setText('farmerProfileFederationText', 'Federation Association');
+    setText('farmerProfileRsbsaText', 'Yes/No');
+    setText('farmerProfileRsbsaNumberText', 'NCFRS-0000');
+    setText('farmerProfileOwnershipText', 'Landowner / Lease / Others');
+    setText('farmerProfileTotalAreaText', '0.00');
+
+    this.initBeanVarietyFilters({});
+    this.initSeeMoreDetails();
+    this.populateFarmerTransactions('Full Name');
+
+    const toolbar = document.getElementById('farmersListToolbar');
+    if (toolbar) toolbar.style.display = 'none';
 
     listView.hidden = true;
     profileView.hidden = false;
@@ -4739,6 +4900,82 @@ class DashboardApp {
     this.renderMapsModule();
   }
 
+  initMapLayerToggles() {
+    const toggles = [
+      { id: 'toggleFarmerLocations', layer: 'farmerLocations' },
+      { id: 'toggleFarmBoundaries', layer: 'farmBoundaries' },
+      { id: 'toggleDensityHeatmap', layer: 'densityHeatmap' },
+      { id: 'toggleRoadNetwork', layer: 'roadNetwork' },
+    ];
+
+    toggles.forEach(({ id, layer }) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.mapLayers[layer] = !this.mapLayers[layer];
+          el.classList.toggle('is-on', this.mapLayers[layer]);
+          this.updateMapLayers();
+        });
+      }
+    });
+  }
+
+  updateMapLayers() {
+    if (!this.googleMap || !window.google?.maps) return;
+
+    // 1. Farmer Locations
+    this.googleMapMarkers.forEach((m) => m.setMap(this.mapLayers.farmerLocations ? this.googleMap : null));
+
+    // 2. Farm Boundaries
+    if (this.lipaBoundaryOverlay) {
+      this.lipaBoundaryOverlay.setMap(this.mapLayers.farmBoundaries ? this.googleMap : null);
+    }
+
+    // 3. Density Heatmap
+    if (this.mapLayers.densityHeatmap) {
+      this.showDensityHeatmap();
+    } else if (this.googleHeatmap) {
+      this.googleHeatmap.setMap(null);
+    }
+
+    // 4. Road Network
+    this.googleMap.setOptions({
+      styles: this.mapLayers.roadNetwork
+        ? []
+        : [{ featureType: 'road', elementType: 'all', stylers: [{ visibility: 'off' }] }],
+    });
+  }
+
+  showDensityHeatmap() {
+    if (!window.google?.maps?.visualization) {
+      console.warn('Google Maps Visualization library not loaded.');
+      return;
+    }
+
+    const rows = this.getFilteredMapRows();
+    const heatmapData = rows
+      .map((row) => {
+        const raw = this.getValue(row, ['ADDRESS (BARANGAY)', 'BARANGAY', 'barangay', 'address']);
+        const canonical = this.getCanonicalLipaBarangay(raw);
+        if (!canonical) return null;
+        const coords = this.getBarangayCoordinates()[canonical];
+        return coords ? new window.google.maps.LatLng(coords.lat, coords.lng) : null;
+      })
+      .filter(Boolean);
+
+    if (!this.googleHeatmap) {
+      this.googleHeatmap = new window.google.maps.visualization.HeatmapLayer({
+        data: heatmapData,
+        map: this.googleMap,
+        radius: 30,
+      });
+    } else {
+      this.googleHeatmap.setData(heatmapData);
+      this.googleHeatmap.setMap(this.googleMap);
+    }
+  }
+
   getLipaCityCenter() {
     return { lat: 13.9411, lng: 121.1648 };
   }
@@ -4990,7 +5227,7 @@ class DashboardApp {
   drawLipaCityBoundary() {
     if (!this.googleMap || !window.google?.maps) return;
     if (this.lipaBoundaryOverlay) {
-      this.lipaBoundaryOverlay.setMap(this.googleMap);
+      this.lipaBoundaryOverlay.setMap(this.mapLayers.farmBoundaries ? this.googleMap : null);
       return;
     }
     this.lipaBoundaryOverlay = new window.google.maps.Rectangle({
@@ -5001,7 +5238,7 @@ class DashboardApp {
       fillColor: '#2f855a',
       fillOpacity: 0.08,
       clickable: false,
-      map: this.googleMap,
+      map: this.mapLayers.farmBoundaries ? this.googleMap : null,
     });
   }
 
@@ -5186,6 +5423,9 @@ class DashboardApp {
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
+      styles: this.mapLayers.roadNetwork
+        ? []
+        : [{ featureType: 'road', elementType: 'all', stylers: [{ visibility: 'off' }] }],
     });
     this.googleInfoWindow = new window.google.maps.InfoWindow();
     this.drawLipaCityBoundary();
@@ -5205,7 +5445,7 @@ class DashboardApp {
       const pinIcon = this.getBarangayPinIcon(point);
       const marker = new window.google.maps.Marker({
         position: { lat: point.lat, lng: point.lng },
-        map: this.googleMap,
+        map: this.mapLayers.farmerLocations ? this.googleMap : null,
         title: `${point.barangay} (${point.count})`,
         icon: {
           url: pinIcon.url,
@@ -5285,6 +5525,11 @@ class DashboardApp {
       window.google.maps.event.trigger(this.googleMap, 'resize');
     }
     this.renderGoogleMapMarkers(points);
+    if (this.mapLayers.densityHeatmap) {
+      this.showDensityHeatmap();
+    } else if (this.googleHeatmap) {
+      this.googleHeatmap.setMap(null);
+    }
   }
 
   getRegisterDocuments() {

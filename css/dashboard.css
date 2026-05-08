@@ -10,7 +10,7 @@
 
 /* Modern Side Panel Styles */
 .side-panel {
-  background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+  background: linear-gradient(180deg, #276749 0%, #1e523a 100%);
   border-right: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
   transition: transform 0.3s ease, width 0.3s ease;
@@ -123,7 +123,7 @@
   transform: translateY(-50%);
   width: 3px;
   height: 0;
-  background: #3498db;
+  background: #ffffff;
   border-radius: 0 2px 2px 0;
   transition: height 0.2s ease;
 }
@@ -186,12 +186,12 @@
 }
 
 .btn-primary {
-  background: #2c7a3e;
+  background: #276749;
   color: #ffffff;
 }
 
 .btn-primary:hover {
-  background: #276749;
+  background: #1e523a;
 }
 
 .btn-secondary {
@@ -217,7 +217,7 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #2c7a3e 0%, #38a169 100%);
+  background: linear-gradient(135deg, #276749 0%, #2f855a 100%);
   border: none;
   color: #ffffff;
   font-size: 1rem;
@@ -226,13 +226,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(44, 122, 62, 0.3);
+  box-shadow: 0 2px 8px rgba(39, 103, 73, 0.3);
 }
 
 .icon-action-btn:hover {
   transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(44, 122, 62, 0.4);
-  background: linear-gradient(135deg, #276749 0%, #2f855a 100%);
+  box-shadow: 0 4px 12px rgba(39, 103, 73, 0.4);
+  background: linear-gradient(135deg, #1e523a 0%, #276749 100%);
 }
 
 .icon-action-btn:active {
@@ -482,19 +482,19 @@ body.dashboard-page {
 }
 
 .nav-link:hover {
-  background: rgba(44, 122, 62, 0.08);
-  color: #1b5e20;
+  background: rgba(39, 103, 73, 0.08);
+  color: #1e523a;
 }
 
 /* Active State - Green background with white text/icons */
 .nav-link.active {
-  background: linear-gradient(135deg, #2c7a3e 0%, #38a169 100%);
+  background: linear-gradient(135deg, #276749 0%, #2f855a 100%);
   color: #ffffff;
 }
 
 /* Keep selected item visibly selected (including Dashboard Overview) */
 .side-nav .nav-link[aria-current="page"] {
-  background: linear-gradient(135deg, #2c7a3e 0%, #38a169 100%);
+  background: linear-gradient(135deg, #276749 0%, #2f855a 100%);
   color: #ffffff;
 }
 
@@ -507,7 +507,7 @@ body.dashboard-page {
 
 /* Parent dropdown items active state */
 .nav-link.has-submenu.active {
-  background: linear-gradient(135deg, #2c7a3e 0%, #38a169 100%);
+  background: linear-gradient(135deg, #276749 0%, #2f855a 100%);
   color: #ffffff;
 }
 
@@ -520,7 +520,7 @@ body.dashboard-page {
 .nav-link.active:hover,
 .nav-link.has-submenu.active:hover,
 .side-nav .nav-link[aria-current="page"]:hover {
-  background: linear-gradient(135deg, #276749 0%, #2f855a 100%);
+  background: linear-gradient(135deg, #1e523a 0%, #276749 100%);
   color: #ffffff;
 }
 
@@ -536,7 +536,7 @@ body.dashboard-page {
 }
 
 .nav-link:hover .nav-icon {
-  color: #2c7a3e;
+  color: #276749;
 }
 
 /* Submenu Arrow */
@@ -552,7 +552,7 @@ body.dashboard-page {
 }
 
 .nav-link:hover .submenu-arrow {
-  color: #2c7a3e;
+  color: #276749;
 }
 
 .nav-link.active .submenu-arrow {
@@ -5180,7 +5180,7 @@ body.dashboard-page #farmers-list-module .farmer-card {
   display: flex;
   flex-direction: column;
   padding: 1.25rem;
-  border-bottom: 3px solid #b2c9a9;
+  border-bottom: 3px solid #276749;
 }
 
 body.dashboard-page #farmers-list-module .farmer-card:hover {
@@ -5196,7 +5196,7 @@ body.dashboard-page #farmers-list-module .farmer-card__header {
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__status-badge {
-  background: #a8c691;
+  background: #276749;
   color: #ffffff;
   padding: 4px 12px;
   border-radius: 20px;
@@ -5298,7 +5298,7 @@ body.dashboard-page #farmers-list-module .farmer-card__pill {
   border: 1px solid #e2e8f0;
   padding: 2px 10px;
   border-radius: 12px;
-  color: #0284c7;
+  color: #276749;
   font-size: 0.8rem;
   display: inline-block;
 }
@@ -5320,12 +5320,12 @@ body.dashboard-page #farmers-list-module .farmer-card__joined {
 body.dashboard-page #farmers-list-module .farmer-card__details-link {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #1e293b;
+  color: #276749;
   text-decoration: none;
   display: flex;
   align-items: center;
   gap: 4px;
-  border-bottom: 2px solid #1e293b;
+  border-bottom: 2px solid #276749;
   padding-bottom: 2px;
   transition: opacity 0.2s;
   cursor: pointer;
@@ -5351,7 +5351,7 @@ body.dashboard-page #farmers-list-module .farmers-list-footer {
   gap: 1rem;
   margin-top: 0.75rem;
   padding-top: 0.75rem;
-  border-top: 1px solid rgba(44, 122, 62, 0.14);
+  border-top: 1px solid rgba(39, 103, 73, 0.14);
 }
 
 body.dashboard-page #farmers-list-module .farmers-list-footer .table-info {
@@ -5376,6 +5376,612 @@ body.dashboard-page #farmers-list-module .farmer-profile-back:hover {
   transform: translateY(-1px);
   border-color: rgba(44, 122, 62, 0.28);
   color: #166534;
+}
+
+/* Unified Profile & Details Card */
+body.dashboard-page #farmers-list-module .farmer-unified-profile-card {
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%; /* Stretch to match right column height */
+}
+
+body.dashboard-page #farmers-list-module .profile-card-top-section {
+  padding: 2rem 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+body.dashboard-page #farmers-list-module .profile-card-details-section {
+  border-top: 1px solid #edf2f7;
+  padding: 1.5rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  overflow: hidden;
+}
+
+body.dashboard-page #farmers-list-module .details-collapsible-content {
+  max-height: 100px; /* Partial view when collapsed */
+  width: 100%;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0, 1, 0, 1), opacity 0.3s ease;
+  padding-right: 0.5rem;
+  opacity: 1;
+}
+
+body.dashboard-page #farmers-list-module .details-collapsible-content.expanded {
+  max-height: 2000px;
+  opacity: 1;
+  transition: max-height 0.4s ease-in, opacity 0.3s ease-in;
+  overflow-y: auto;
+}
+
+body.dashboard-page #farmers-list-module .details-blur-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 120px;
+  background: linear-gradient(to top, #fff 40%, transparent);
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 0.3s ease;
+}
+
+body.dashboard-page #farmers-list-module .details-collapsible-content.expanded + .details-blur-overlay {
+  opacity: 0;
+}
+
+body.dashboard-page #farmers-list-module .registration-detail-section {
+  margin-bottom: 2rem;
+  width: 100%;
+}
+
+body.dashboard-page #farmers-list-module .registration-detail-section h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #edf2f7;
+  padding-bottom: 0.5rem;
+}
+
+body.dashboard-page #farmers-list-module .registration-detail-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+body.dashboard-page #farmers-list-module .detail-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+body.dashboard-page #farmers-list-module .detail-field label {
+  font-size: 0.9rem;
+  color: #718096;
+  font-weight: 500;
+}
+
+body.dashboard-page #farmers-list-module .bold-value {
+  font-size: 0.95rem;
+  font-weight: 800; /* Extra bold as requested */
+  color: #2d3748;
+}
+
+body.dashboard-page #farmers-list-module .tree-counts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+body.dashboard-page #farmers-list-module .tree-count-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+body.dashboard-page #farmers-list-module .tree-count-item label {
+  font-size: 0.85rem;
+  color: #718096;
+  line-height: 1.2;
+}
+
+body.dashboard-page #farmers-list-module .tree-count-item label span {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+body.dashboard-page #farmers-list-module .btn-see-more {
+  background: #276749; /* Green like initial beans */
+  border: none;
+  padding: 0.8rem 2.2rem;
+  border-radius: 999px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(39, 103, 73, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  position: relative;
+  z-index: 2;
+  margin-top: -1rem;
+}
+
+body.dashboard-page #farmers-list-module .btn-see-more:hover {
+  background: #1e523a;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(39, 103, 73, 0.4);
+}
+
+/* Hide registration modal styles as they are no longer used */
+.registration-modal { display: none !important; }
+
+body.dashboard-page #farmers-list-module .farmer-profile-card-top {
+  display: none; /* Removed in favor of unified card */
+}
+
+body.dashboard-page #farmers-list-module .farmer-registration-details-card {
+  display: none; /* Removed in favor of unified card */
+}
+
+/* Bean Summary Styles */
+body.dashboard-page #farmers-list-module .farmer-bean-summary-container {
+  margin-bottom: 1.5rem;
+}
+
+body.dashboard-page #farmers-list-module .bean-variety-tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+body.dashboard-page #farmers-list-module .bean-variety-btn {
+  flex: 1; /* Stretch each button to fill the container width */
+  padding: 0.6rem 0;
+  border-radius: 999px;
+  border: none;
+  background: #e2e8f0;
+  color: #2d3748;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+body.dashboard-page #farmers-list-module .bean-variety-btn.active {
+  background: #276749;
+  color: #fff;
+}
+
+body.dashboard-page #farmers-list-module .bean-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+body.dashboard-page #farmers-list-module .bean-stat-card {
+  border-radius: 24px;
+  padding: 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 180px;
+  justify-content: center;
+}
+
+body.dashboard-page #farmers-list-module .bean-stat-card.initial {
+  background: #276749;
+  color: #fff;
+}
+
+body.dashboard-page #farmers-list-module .bean-stat-card.remaining {
+  background: #edf2f7;
+  color: #276749;
+}
+
+body.dashboard-page #farmers-list-module .bean-stat-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+body.dashboard-page #farmers-list-module .bean-stat-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+body.dashboard-page #farmers-list-module .bean-stat-date {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+body.dashboard-page #farmers-list-module .bean-stat-value {
+  font-size: 5rem;
+  font-weight: 900;
+  line-height: 1;
+  display: flex;
+  align-items: baseline;
+}
+
+body.dashboard-page #farmers-list-module .bean-stat-value span {
+  letter-spacing: -0.05em;
+}
+
+@media (max-width: 640px) {
+  body.dashboard-page #farmers-list-module .bean-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* New Farmer Profile Layout */
+body.dashboard-page #farmers-list-module .farmer-profile-layout-new {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 1.5rem;
+  padding: 0.5rem;
+}
+
+body.dashboard-page #farmers-list-module .farmer-profile-column-left {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+body.dashboard-page #farmers-list-module .farmer-profile-card-top {
+  background: #fff;
+  border-radius: 20px;
+  padding: 2rem 1.5rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+body.dashboard-page #farmers-list-module .farmer-profile-avatar-large {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: #f0f4f8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  color: #a0aec0;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 4px rgba(66, 153, 225, 0.1);
+  margin-bottom: 1rem;
+}
+
+body.dashboard-page #farmers-list-module .farmer-profile-name {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0.5rem 0 0.25rem;
+}
+
+body.dashboard-page #farmers-list-module .farmer-profile-id {
+  font-size: 0.9rem;
+  color: #718096;
+  margin-bottom: 1.25rem;
+}
+
+body.dashboard-page #farmers-list-module .farmer-profile-actions-btns {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+body.dashboard-page #farmers-list-module .btn-profile-action {
+  flex: 1;
+  padding: 0.65rem;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #4a5568;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+
+body.dashboard-page #farmers-list-module .btn-profile-action:hover {
+  background: #f7fafc;
+  border-color: #cbd5e0;
+}
+
+body.dashboard-page #farmers-list-module .farmer-profile-demographics {
+  width: 100%;
+  border-top: 1px solid #edf2f7;
+  padding-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+body.dashboard-page #farmers-list-module .demo-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+body.dashboard-page #farmers-list-module .demo-label {
+  font-size: 0.75rem;
+  color: #a0aec0;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+body.dashboard-page #farmers-list-module .demo-value {
+  font-size: 0.95rem;
+  color: #4a5568;
+  font-weight: 600;
+}
+
+/* Registration Modal Styles */
+.registration-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+}
+
+.registration-modal[hidden] {
+  display: none;
+}
+
+.registration-modal .modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.registration-modal__container {
+  position: relative;
+  max-width: 1200px;
+  width: 100%;
+  max-height: 90vh;
+  background: #ffffff;
+  border-radius: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.registration-modal__header {
+  border-bottom: 1px solid #edf2f7;
+  padding: 1.5rem 2rem;
+}
+
+.registration-modal__body {
+  padding: 2rem;
+}
+
+.registration-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 3rem;
+}
+
+.registration-column {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.registration-section h3 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 1.5rem;
+}
+
+.registration-section .year-label {
+  font-weight: 400;
+  color: #718096;
+  font-size: 1.1rem;
+}
+
+.registration-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.field-group label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+.field-group label span {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #718096;
+}
+
+.field-group input {
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  font-size: 0.95rem;
+  color: #2d3748;
+  width: 100%;
+}
+
+.select-wrapper {
+  position: relative;
+}
+
+.select-wrapper::after {
+  content: '\f0d7';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #a0aec0;
+  pointer-events: none;
+}
+
+.input-with-unit {
+  display: grid;
+  grid-template-columns: 1fr 50px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.input-with-unit input {
+  border: none;
+}
+
+.unit-select {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border-left: 1px solid #e2e8f0;
+  color: #a0aec0;
+}
+
+.tree-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 1024px) {
+  .registration-layout {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+}
+
+/* Transactions Card */
+body.dashboard-page #farmers-list-module .farmer-transactions-card {
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+body.dashboard-page #farmers-list-module .transactions-card-header {
+  padding: 0 1.5rem;
+  border-bottom: 1px solid #edf2f7;
+}
+
+body.dashboard-page #farmers-list-module .transactions-tabs {
+  display: flex;
+  gap: 1.5rem;
+}
+
+body.dashboard-page #farmers-list-module .txn-tab {
+  padding: 1.25rem 0;
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #a0aec0;
+  cursor: pointer;
+  position: relative;
+}
+
+body.dashboard-page #farmers-list-module .txn-tab.active {
+  color: #4299e1;
+}
+
+body.dashboard-page #farmers-list-module .txn-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #4299e1;
+}
+
+body.dashboard-page #farmers-list-module .transactions-table-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  max-height: 400px;
+}
+
+body.dashboard-page #farmers-list-module .farmer-txn-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+body.dashboard-page #farmers-list-module .farmer-txn-table th {
+  text-align: left;
+  font-size: 0.75rem;
+  color: #a0aec0;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #edf2f7;
+}
+
+body.dashboard-page #farmers-list-module .farmer-txn-table td {
+  padding: 1rem;
+  font-size: 0.9rem;
+  color: #4a5568;
+  border-bottom: 1px solid #edf2f7;
+}
+
+body.dashboard-page #farmers-list-module .txn-date {
+  font-weight: 500;
+}
+
+body.dashboard-page #farmers-list-module .txn-type-badge {
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+@media (max-width: 1024px) {
+  body.dashboard-page #farmers-list-module .farmer-profile-layout-new {
+    grid-template-columns: 1fr;
+  }
 }
 
 body.dashboard-page #farmers-list-module .farmer-profile-card {
