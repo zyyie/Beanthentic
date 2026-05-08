@@ -18,6 +18,7 @@ from api.farmer_api import register_farmer_routes
 from api.ipophl_api import register_ipophl_routes
 from api.messaging_api import register_messaging_routes
 from routes.dashboard import register_dashboard_routes
+from routes.farmer_portal import register_farmer_portal_routes
 
 app = Flask(__name__, template_folder=".", static_folder=".", static_url_path="")
 app.secret_key = "beanthentic-dev-secret-change-this"
@@ -62,6 +63,7 @@ register_farmer_routes(app)
 register_export_routes(app)
 register_ipophl_routes(app)
 register_messaging_routes(app)
+register_farmer_portal_routes(app)
 
 # Health check endpoint
 @app.route("/health")

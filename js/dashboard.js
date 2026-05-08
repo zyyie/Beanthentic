@@ -494,10 +494,12 @@ class DashboardApp {
     this.renderNotificationsList();
     // Initialize new dashboard features
     this.initNewDashboardFeatures();
-    // Initialize account module
+    // Initialize Account module
     this.initAccountModule();
     // Initialize Farmer's Contribution module
     this.initBeanthenticContributions();
+    // Initialize Farmer Profile tabs
+    this.initFarmerProfileTabs();
   }
 
   updateNotificationsToolbarState() {
@@ -1182,9 +1184,9 @@ class DashboardApp {
     }
 
     // Farmer CRUD actions
-    const addFarmerBtn = document.getElementById('addFarmerBtn');
+    const addFarmerBtn = document.getElementById('addFarmerBtn') || document.querySelector('.add-farmer-btn');
     if (addFarmerBtn) {
-      addFarmerBtn.addEventListener('click', () => this.addFarmer());
+      addFarmerBtn.addEventListener('click', () => this.openAddFarmerModal());
     }
 
     const loadSampleBtn = document.getElementById('loadSampleBtn');
@@ -1195,10 +1197,12 @@ class DashboardApp {
       });
     }
 
-    const saveFarmersBtn = document.getElementById('saveFarmersBtn');
+    const saveFarmersBtn = document.getElementById('saveFarmersBtn') || document.querySelector('.save-btn');
     if (saveFarmersBtn) {
       saveFarmersBtn.addEventListener('click', () => this.saveFarmers());
     }
+
+    this.initAddFarmerModal();
 
     const farmerLimitDismiss = document.getElementById('farmerLimitBannerDismiss');
     if (farmerLimitDismiss) {
@@ -2296,45 +2300,58 @@ class DashboardApp {
     const endIndex = Math.min(startIndex + this.pageSize, this.filteredData.length);
     const pageData = this.filteredData.slice(startIndex, endIndex);
 
-    if (!pageData.length) {
-      grid.innerHTML = Array.from({ length: 6 }, (_, idx) => {
-        const n = idx + 1;
-        return `<article class="farmer-card farmer-card--placeholder" aria-label="Placeholder farmer card ${n}">
-  <div class="farmer-card__media">
-    <div class="farmer-card__avatar farmer-card__avatar--media" aria-hidden="true"><i class="fa-solid fa-user"></i></div>
-  </div>
-  <div class="farmer-card__top">
-    <div class="farmer-card__name-row">
-      <h3 class="farmer-card__name">Name</h3>
-      <span class="farmer-card__badge" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
-    </div>
-    <p class="farmer-card__bio">Coffee farmer profile preview card.</p>
-  </div>
-  <div class="farmer-card__body">
-    <dl class="farmer-card__kv">
-      <dt>No.</dt><dd>#${n}</dd>
-      <dt>Birth</dt><dd>Month/Date/Year</dd>
-      <dt>Phone</dt><dd>+63 900 XXXX XXXX</dd>
-      <dt>Address</dt><dd>Barangay, Municipality, Province</dd>
-    </dl>
-    <div class="farmer-card__actions">
-      <button type="button" class="farmer-card__details" data-action="open-farmer-placeholder-profile" data-farmer-no="${n}">
-        <span>View Details</span>
-        <i class="fa-solid fa-arrow-right"></i>
-      </button>
-    </div>
-  </div>
-</article>`;
-      }).join('');
-      return;
-    }
-
     const esc = (s) =>
       String(s ?? '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+
+    if (!pageData.length) {
+      grid.innerHTML = Array.from({ length: 6 }, (_, idx) => {
+        const n = idx + 1;
+        return `<article class="farmer-card" aria-label="Placeholder farmer card ${n}">
+  <div class="farmer-card__header">
+    <div class="farmer-card__status-badge">Active</div>
+    <div class="farmer-card__menu-dots"><i class="fa-solid fa-ellipsis"></i></div>
+  </div>
+  <div class="farmer-card__media">
+    <div class="farmer-card__avatar-circle">
+      <i class="fa-solid fa-user" style="font-size: 2rem; color: #cbd5e1;"></i>
+    </div>
+  </div>
+  <div class="farmer-card__identity">
+    <h3 class="farmer-card__name">Name</h3>
+    <p class="farmer-card__remarks">Coffee farmer profile preview card.</p>
+  </div>
+  <div class="farmer-card__inner-box">
+    <div class="farmer-card__detail-row">
+      <i class="fa-solid fa-hashtag"></i>
+      <span>#${n}</span>
+    </div>
+    <div class="farmer-card__detail-row">
+      <i class="fa-solid fa-cake-candles"></i>
+      <span>Month/Date/Year</span>
+    </div>
+    <div class="farmer-card__detail-row">
+      <i class="fa-solid fa-location-dot"></i>
+      <span>Barangay, Municipality, Province</span>
+    </div>
+    <div class="farmer-card__detail-row">
+      <i class="fa-solid fa-phone"></i>
+      <span class="farmer-card__pill">+63 900 XXXX XXXX</span>
+    </div>
+  </div>
+  <div class="farmer-card__footer">
+    <span class="farmer-card__joined">Joined at 2024</span>
+    <button type="button" class="farmer-card__details-link" data-action="open-farmer-placeholder-profile" data-farmer-no="${n}">
+      View details <i class="fa-solid fa-chevron-right"></i>
+    </button>
+  </div>
+</article>`;
+      }).join('');
+      return;
+    }
 
     const formatNo = (row) => Number(row?.['NO.'] ?? row?.no ?? 0) || 0;
     const buildName = (row) =>
@@ -2351,36 +2368,46 @@ class DashboardApp {
         const dob = this.getValue(row, ['BIRTHDAY', 'birthday', 'Date of Birth']);
         const phone = this.getValue(row, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']);
         const address = this.getValue(row, ['ADDRESS (BARANGAY)', 'barangay', 'BARANGAY', 'address']) || 'Address not set';
-        const remarks = this.getValue(row, ['REMARKS', 'remarks']) || 'Coffee farmer profile.';
+        const remarks = this.getValue(row, ['REMARKS', 'remarks']) || 'Coffee farmer profile preview card.';
         const photo = this.getValue(row, ['PHOTO', 'photo', 'photo_url', 'image']);
-        const mediaMarkup = photo
-          ? `<img class="farmer-card__image" src="${esc(photo)}" alt="${esc(fullName)}" loading="lazy" />`
-          : `<div class="farmer-card__avatar farmer-card__avatar--media" aria-hidden="true"><i class="fa-solid fa-user"></i></div>`;
-
+        
         return `<article class="farmer-card" aria-label="${esc(fullName)}">
+  <div class="farmer-card__header">
+    <div class="farmer-card__status-badge">Active</div>
+    <div class="farmer-card__menu-dots"><i class="fa-solid fa-ellipsis"></i></div>
+  </div>
   <div class="farmer-card__media">
-    ${mediaMarkup}
-  </div>
-  <div class="farmer-card__top">
-    <div class="farmer-card__name-row">
-      <h3 class="farmer-card__name">${esc(fullName)}</h3>
-      <span class="farmer-card__badge" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
+    <div class="farmer-card__avatar-circle">
+      ${photo ? `<img class="farmer-card__image" src="${esc(photo)}" alt="${esc(fullName)}" loading="lazy" />` : `<i class="fa-solid fa-user" style="font-size: 2rem; color: #cbd5e1;"></i>`}
     </div>
-    <p class="farmer-card__bio">${esc(String(remarks).slice(0, 70))}</p>
   </div>
-  <div class="farmer-card__body">
-    <dl class="farmer-card__kv">
-      <dt>No.</dt><dd>#${esc(n)}</dd>
-      <dt>Birth</dt><dd>${esc(dob || '—')}</dd>
-      <dt>Phone</dt><dd>${esc(phone || '—')}</dd>
-      <dt>Address</dt><dd>${esc(address || '—')}</dd>
-    </dl>
-    <div class="farmer-card__actions">
-      <button type="button" class="farmer-card__details" data-action="open-farmer-profile" data-farmer-no="${esc(n)}">
-        <span>View Details</span>
-        <i class="fa-solid fa-arrow-right"></i>
-      </button>
+  <div class="farmer-card__identity">
+    <h3 class="farmer-card__name">${esc(fullName)}</h3>
+    <p class="farmer-card__remarks">${esc(remarks)}</p>
+  </div>
+  <div class="farmer-card__inner-box">
+    <div class="farmer-card__detail-row">
+      <i class="fa-solid fa-hashtag"></i>
+      <span>#${esc(n)}</span>
     </div>
+    <div class="farmer-card__detail-row">
+      <i class="fa-solid fa-cake-candles"></i>
+      <span>${esc(dob || '—')}</span>
+    </div>
+    <div class="farmer-card__detail-row">
+      <i class="fa-solid fa-location-dot"></i>
+      <span>${esc(address || '—')}</span>
+    </div>
+    <div class="farmer-card__detail-row">
+      <i class="fa-solid fa-phone"></i>
+      <span class="farmer-card__pill">${esc(phone || '—')}</span>
+    </div>
+  </div>
+  <div class="farmer-card__footer">
+    <span class="farmer-card__joined">Joined at 2024</span>
+    <button type="button" class="farmer-card__details-link" data-action="open-farmer-profile" data-farmer-no="${esc(n)}">
+      View details <i class="fa-solid fa-chevron-right"></i>
+    </button>
   </div>
 </article>`;
       })
@@ -2437,8 +2464,36 @@ class DashboardApp {
       this.formatValue(this.getValue(farmer, ['TOTAL AREA PLANTED (HA.)', 'Total Plant Area', 'TOTAL AREA']) || '')
     );
 
+    // Reset tabs to personal info when opening a new profile
+    const firstTab = profileView.querySelector('.farmer-profile-tab-btn[data-profile-tab="personal"]');
+    if (firstTab) firstTab.click();
+
     listView.hidden = true;
     profileView.hidden = false;
+  }
+
+  initFarmerProfileTabs() {
+    const tabs = document.querySelectorAll('.farmer-profile-tab-btn');
+    const panes = document.querySelectorAll('.farmer-profile-pane');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const targetTab = tab.dataset.profileTab;
+
+        // Update buttons
+        tabs.forEach(t => {
+          t.classList.toggle('active', t === tab);
+          t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+        });
+
+        // Update panes
+        panes.forEach(pane => {
+          const isTarget = pane.id === `profilePane${targetTab.charAt(0).toUpperCase() + targetTab.slice(1)}`;
+          pane.classList.toggle('active', isTarget);
+          pane.hidden = !isTarget;
+        });
+      });
+    });
   }
 
   closeFarmerProfile() {
@@ -2800,7 +2855,100 @@ class DashboardApp {
     }
   }
 
-  addFarmer() {
+  initAddFarmerModal() {
+    const modal = document.getElementById('addFarmerModal');
+    const closeBtn = document.getElementById('addFarmerModalClose');
+    const cancelBtn = document.getElementById('addFarmerCancel');
+    const form = document.getElementById('addFarmerForm');
+    const backdrop = modal ? modal.querySelector('.add-farmer-modal__backdrop') : null;
+    if (!modal || !form) return;
+
+    if (closeBtn) closeBtn.addEventListener('click', () => this.closeAddFarmerModal());
+    if (cancelBtn) cancelBtn.addEventListener('click', () => this.closeAddFarmerModal());
+    if (backdrop) backdrop.addEventListener('click', () => this.closeAddFarmerModal());
+    const rsbsaSelect = document.getElementById('newFarmerRsbsa');
+    const ncfrsInput = document.getElementById('newFarmerNcfrs');
+    if (rsbsaSelect && ncfrsInput) {
+      rsbsaSelect.addEventListener('change', () => {
+        const requiresNcfrs = rsbsaSelect.value === 'YES';
+        ncfrsInput.required = requiresNcfrs;
+        if (!requiresNcfrs) {
+          ncfrsInput.setCustomValidity('');
+        }
+      });
+    }
+    this.setupAddFarmerInputGuards();
+    form.addEventListener('input', () => this.clearAddFarmerValidation());
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.addFarmer();
+    });
+  }
+
+  setupAddFarmerInputGuards() {
+    const textOnlyIds = [
+      'newFarmerLastName',
+      'newFarmerFirstName',
+      'newFarmerBarangay',
+      'newFarmerAssociation',
+      'newFarmerOwnership',
+    ];
+    const alphaPattern = /[^A-Za-z .'-]/g;
+
+    textOnlyIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'Escape', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
+        if (allowedKeys.includes(e.key)) return;
+        if (/^[A-Za-z .'-]$/.test(e.key)) return;
+        e.preventDefault();
+      });
+      el.addEventListener('input', () => {
+        const clean = (el.value || '').replace(alphaPattern, '');
+        if (clean !== el.value) el.value = clean;
+      });
+    });
+
+    const integerOnlyIds = [
+      'newLibBearing',
+      'newLibNonBearing',
+      'newExcBearing',
+      'newExcNonBearing',
+      'newRobBearing',
+      'newRobNonBearing',
+    ];
+    const decimalIds = ['newFarmerArea', 'newLibProduction', 'newExcProduction', 'newRobProduction'];
+
+    const bindNumericGuard = (id, allowDecimal) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'Escape', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
+        if (allowedKeys.includes(e.key)) return;
+        if (/^\d$/.test(e.key)) return;
+        if (allowDecimal && e.key === '.' && !el.value.includes('.')) return;
+        e.preventDefault();
+      });
+      el.addEventListener('input', () => {
+        let clean = (el.value || '').replace(allowDecimal ? /[^0-9.]/g : /[^0-9]/g, '');
+        if (allowDecimal) {
+          const firstDot = clean.indexOf('.');
+          if (firstDot !== -1) {
+            clean = clean.slice(0, firstDot + 1) + clean.slice(firstDot + 1).replace(/\./g, '');
+          }
+        }
+        if (clean !== el.value) el.value = clean;
+      });
+    };
+
+    integerOnlyIds.forEach((id) => bindNumericGuard(id, false));
+    decimalIds.forEach((id) => bindNumericGuard(id, true));
+  }
+
+  openAddFarmerModal() {
     if (this.data.length >= this.maxFarmers) {
       this.showNotification(
         `Maximum of ${this.maxFarmers} farmers reached. Remove a row or export data before adding another.`,
@@ -2809,28 +2957,166 @@ class DashboardApp {
       );
       return;
     }
+
+    const modal = document.getElementById('addFarmerModal');
+    if (!modal) return;
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('confirm-dialog-active');
+    this.clearAddFarmerValidation();
+    const firstInput = document.getElementById('newFarmerLastName');
+    if (firstInput) setTimeout(() => firstInput.focus(), 50);
+  }
+
+  closeAddFarmerModal() {
+    const modal = document.getElementById('addFarmerModal');
+    if (!modal) return;
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('confirm-dialog-active');
+    this.clearAddFarmerValidation();
+    const form = document.getElementById('addFarmerForm');
+    if (form) form.reset();
+  }
+
+  clearAddFarmerValidation() {
+    const errorEl = document.getElementById('addFarmerFormError');
+    if (errorEl) {
+      errorEl.hidden = true;
+      errorEl.textContent = '';
+    }
+  }
+
+  showAddFarmerValidationError(message, focusId = '') {
+    const errorEl = document.getElementById('addFarmerFormError');
+    if (errorEl) {
+      errorEl.textContent = message;
+      errorEl.hidden = false;
+    }
+    if (focusId) {
+      const el = document.getElementById(focusId);
+      if (el) el.focus();
+    }
+  }
+
+  getNumberInputValue(id, { integer = false } = {}) {
+    const raw = (document.getElementById(id)?.value || '').toString().trim();
+    if (!raw) return 0;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return 0;
+    return integer ? Math.trunc(n) : n;
+  }
+
+  validateAddFarmerForm() {
+    const form = document.getElementById('addFarmerForm');
+    const rsbsa = (document.getElementById('newFarmerRsbsa')?.value || '').trim();
+    const ncfrsInput = document.getElementById('newFarmerNcfrs');
+    if (!form) return null;
+
+    if (ncfrsInput) {
+      ncfrsInput.setCustomValidity('');
+      if (rsbsa === 'YES' && !ncfrsInput.value.trim()) {
+        ncfrsInput.setCustomValidity('NCFRS is required when RSBSA is YES.');
+      }
+    }
+
+    const birthdayInput = document.getElementById('newFarmerBirthday');
+    if (birthdayInput) {
+      birthdayInput.setCustomValidity('');
+      if (birthdayInput.value) {
+        const date = new Date(`${birthdayInput.value}T00:00:00`);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (date > today) {
+          birthdayInput.setCustomValidity('Birthday cannot be in the future.');
+        }
+      }
+    }
+
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      this.showAddFarmerValidationError('Please correct the highlighted fields before submitting.');
+      return null;
+    }
+
+    const numberRanges = [
+      ['newFarmerArea', 0, 10000, false],
+      ['newLibBearing', 0, 50000, true],
+      ['newLibNonBearing', 0, 50000, true],
+      ['newExcBearing', 0, 50000, true],
+      ['newExcNonBearing', 0, 50000, true],
+      ['newRobBearing', 0, 50000, true],
+      ['newRobNonBearing', 0, 50000, true],
+      ['newLibProduction', 0, 1000000, false],
+      ['newExcProduction', 0, 1000000, false],
+      ['newRobProduction', 0, 1000000, false],
+    ];
+
+    for (const [id, min, max, integer] of numberRanges) {
+      const value = this.getNumberInputValue(id, { integer });
+      if (!Number.isFinite(value) || value < min || value > max) {
+        this.showAddFarmerValidationError(`Value out of range for ${id.replace('new', '')}.`, id);
+        return null;
+      }
+    }
+
+    const lastName = (document.getElementById('newFarmerLastName')?.value || '').trim();
+    const firstName = (document.getElementById('newFarmerFirstName')?.value || '').trim();
+    const payload = {
+      name: `${firstName} ${lastName}`.trim(),
+      barangay: (document.getElementById('newFarmerBarangay')?.value || '').trim(),
+      birthday: (document.getElementById('newFarmerBirthday')?.value || '').trim(),
+      association: (document.getElementById('newFarmerAssociation')?.value || '').trim(),
+      rsbsa,
+      ncfrs: (document.getElementById('newFarmerNcfrs')?.value || '').trim(),
+      ownership: (document.getElementById('newFarmerOwnership')?.value || '').trim(),
+      area: this.getNumberInputValue('newFarmerArea'),
+      remarks: (document.getElementById('newFarmerRemarks')?.value || '').trim(),
+      libBearing: this.getNumberInputValue('newLibBearing', { integer: true }),
+      libNonBearing: this.getNumberInputValue('newLibNonBearing', { integer: true }),
+      excBearing: this.getNumberInputValue('newExcBearing', { integer: true }),
+      excNonBearing: this.getNumberInputValue('newExcNonBearing', { integer: true }),
+      robBearing: this.getNumberInputValue('newRobBearing', { integer: true }),
+      robNonBearing: this.getNumberInputValue('newRobNonBearing', { integer: true }),
+      libProd: this.getNumberInputValue('newLibProduction'),
+      excProd: this.getNumberInputValue('newExcProduction'),
+      robProd: this.getNumberInputValue('newRobProduction'),
+    };
+
+    return payload;
+  }
+
+  addFarmer() {
+    if (this.data.length >= this.maxFarmers) return;
+    const payload = this.validateAddFarmerForm();
+    if (!payload) return;
+
+    const totalBearing = payload.libBearing + payload.excBearing + payload.robBearing;
+    const totalNonBearing = payload.libNonBearing + payload.excNonBearing + payload.robNonBearing;
+    const totalTrees = totalBearing + totalNonBearing;
+
     const newRow = {
-      'NAME OF FARMER': '',
-      'ADDRESS (BARANGAY)': '',
-      'FA OFFICER / MEMBER': '',
-      'BIRTHDAY': '',
-      'RSBSA Registered (Yes/No)': '',
-      'STATUS OF OWNERSHIP': '',
-      'Total Area Planted (HA.)': 0,
-      'LIBERICA BEARING': 0,
-      'LIBERICA NON-BEARING': 0,
-      'EXCELSA BEARING': 0,
-      'EXCELSA NON-BEARING': 0,
-      'ROBUSTA BEARING': 0,
-      'ROBUSTA NON-BEARING': 0,
-      'TOTAL BEARING': 0,
-      'TOTAL NON-BEARING': 0,
-      'TOTAL TREES': 0,
-      'LIBERICA PRODUCTION': 0,
-      'EXCELSA PRODUCTION': 0,
-      'ROBUSTA PRODUCTION': 0,
-      'NCFRS': '',
-      'REMARKS': ''
+      'NAME OF FARMER': payload.name,
+      'ADDRESS (BARANGAY)': payload.barangay,
+      'FA OFFICER / MEMBER': payload.association,
+      'BIRTHDAY': payload.birthday,
+      'RSBSA Registered (Yes/No)': payload.rsbsa,
+      'STATUS OF OWNERSHIP': payload.ownership,
+      'Total Area Planted (HA.)': payload.area,
+      'LIBERICA BEARING': payload.libBearing,
+      'LIBERICA NON-BEARING': payload.libNonBearing,
+      'EXCELSA BEARING': payload.excBearing,
+      'EXCELSA NON-BEARING': payload.excNonBearing,
+      'ROBUSTA BEARING': payload.robBearing,
+      'ROBUSTA NON-BEARING': payload.robNonBearing,
+      'TOTAL BEARING': totalBearing,
+      'TOTAL NON-BEARING': totalNonBearing,
+      'TOTAL TREES': totalTrees,
+      'LIBERICA PRODUCTION': payload.libProd,
+      'EXCELSA PRODUCTION': payload.excProd,
+      'ROBUSTA PRODUCTION': payload.robProd,
+      'NCFRS': payload.ncfrs,
+      'REMARKS': payload.remarks
     };
 
     this.data.push(newRow);
@@ -2839,6 +3125,8 @@ class DashboardApp {
     this.currentPage = Math.max(1, Math.ceil(this.filteredData.length / this.pageSize));
     this.updateTable();
     this.updateStats();
+    this.closeAddFarmerModal();
+    this.showNotification('New farmer row added!', 'success');
   }
 
   deleteFarmer(rowIndex) {
@@ -2888,8 +3176,10 @@ class DashboardApp {
     if (!raw) return { first: '', last: '' };
 
     const parts = raw.split(' ');
-    const first = parts.shift() || '';
-    const last = parts.join(' ');
+    // Treat the last token as surname so "Nyco Alec Balaogan"
+    // maps to first="Nyco Alec", last="Balaogan".
+    const last = parts.pop() || '';
+    const first = parts.join(' ');
     return { first, last };
   }
 
@@ -2995,19 +3285,7 @@ class DashboardApp {
   renderPagination() {
     const pagination = document.getElementById('pagination');
     const listPagination = document.getElementById('farmersListPagination');
-    const totalPages = Math.ceil(this.filteredData.length / this.pageSize);
-    
-    if (totalPages <= 1) {
-      if (pagination) {
-        pagination.innerHTML = '';
-        pagination.setAttribute('hidden', 'hidden');
-      }
-      if (listPagination) {
-        listPagination.innerHTML = '';
-        listPagination.setAttribute('hidden', 'hidden');
-      }
-      return;
-    }
+    const totalPages = Math.max(1, Math.ceil(this.filteredData.length / this.pageSize));
 
     let paginationHTML = '';
     
@@ -3059,7 +3337,7 @@ class DashboardApp {
   }
 
   goToPage(page) {
-    const totalPages = Math.ceil(this.filteredData.length / this.pageSize);
+    const totalPages = Math.max(1, Math.ceil(this.filteredData.length / this.pageSize));
     if (page >= 1 && page <= totalPages) {
       this.currentPage = page;
       this.updateTable();
@@ -5104,28 +5382,39 @@ class DashboardApp {
       const phoneEl = document.getElementById('accountPhone');
       const heroNameEl = document.getElementById('accountHeroName');
       const heroPhoneEl = document.getElementById('accountHeroPhone');
+      const quickNameEl = document.getElementById('accountQuickFullName');
+      const quickPhoneEl = document.getElementById('accountQuickPhone');
       
       if (displayNameEl) displayNameEl.textContent = displayName;
       if (phoneEl) phoneEl.textContent = phone;
       if (heroNameEl) heroNameEl.textContent = displayName;
       if (heroPhoneEl) heroPhoneEl.textContent = phone;
+      if (quickNameEl) quickNameEl.value = displayName;
+      if (quickPhoneEl) quickPhoneEl.value = phone;
     } catch (error) {
       console.error('Failed to load account data:', error);
       const displayNameEl = document.getElementById('accountDisplayName');
       const phoneEl = document.getElementById('accountPhone');
       const heroNameEl = document.getElementById('accountHeroName');
       const heroPhoneEl = document.getElementById('accountHeroPhone');
+      const quickNameEl = document.getElementById('accountQuickFullName');
+      const quickPhoneEl = document.getElementById('accountQuickPhone');
       
       if (displayNameEl) displayNameEl.textContent = 'Admin';
       if (phoneEl) phoneEl.textContent = '—';
       if (heroNameEl) heroNameEl.textContent = 'Admin';
       if (heroPhoneEl) heroPhoneEl.textContent = '—';
+      if (quickNameEl) quickNameEl.value = 'Admin';
+      if (quickPhoneEl) quickPhoneEl.value = '—';
     }
   }
 
   initAccountModule() {
     const manageSettingsBtn = document.getElementById('manageSettingsBtn');
     const logoutBtn = document.getElementById('logoutBtn');
+    const quickProfileForm = document.getElementById('accountQuickProfileForm');
+    const quickPasswordForm = document.getElementById('accountQuickPasswordForm');
+    const passwordToggles = document.querySelectorAll('.account-password-toggle[data-target]');
     
     if (manageSettingsBtn) {
       manageSettingsBtn.addEventListener('click', () => {
@@ -5140,6 +5429,78 @@ class DashboardApp {
       logoutBtn.addEventListener('click', () => {
         if (confirm('Are you sure you want to log out?')) {
           window.location.href = '/logout';
+        }
+      });
+    }
+
+    passwordToggles.forEach((toggleBtn) => {
+      toggleBtn.addEventListener('click', () => {
+        const targetId = toggleBtn.getAttribute('data-target');
+        if (!targetId) return;
+        const input = document.getElementById(targetId);
+        if (!input) return;
+        const isPassword = input.type === 'password';
+        input.type = isPassword ? 'text' : 'password';
+        const icon = toggleBtn.querySelector('i');
+        if (icon) {
+          icon.className = isPassword ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye';
+        }
+      });
+    });
+
+    if (quickProfileForm) {
+      quickProfileForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fullName = (document.getElementById('accountQuickFullName')?.value || '').trim();
+        if (!fullName) {
+          this.showNotification('Full name is required.', 'error');
+          return;
+        }
+        const fd = new FormData();
+        fd.append('full_name', fullName);
+        try {
+          const res = await fetch('/settings/profile', { method: 'POST', body: fd });
+          const result = await res.json();
+          if (!res.ok || result.error) throw new Error(result.error || 'Could not update profile.');
+          this.showNotification(result.success || 'Profile updated successfully.', 'success');
+          this.loadAccountData();
+        } catch (err) {
+          this.showNotification(err.message || 'Could not update profile.', 'error');
+        }
+      });
+    }
+
+    if (quickPasswordForm) {
+      quickPasswordForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const currentPassword = (document.getElementById('accountCurrentPassword')?.value || '').trim();
+        const newPassword = (document.getElementById('accountNewPassword')?.value || '').trim();
+        const confirmPassword = (document.getElementById('accountConfirmPassword')?.value || '').trim();
+        if (!currentPassword || !newPassword || !confirmPassword) {
+          this.showNotification('All password fields are required.', 'error');
+          return;
+        }
+        if (newPassword.length < 8) {
+          this.showNotification('New password must be at least 8 characters.', 'error');
+          return;
+        }
+        if (newPassword !== confirmPassword) {
+          this.showNotification('New passwords do not match.', 'error');
+          return;
+        }
+        const fd = new FormData();
+        fd.append('action', 'change_password');
+        fd.append('current_password', currentPassword);
+        fd.append('new_password', newPassword);
+        fd.append('confirm_password', confirmPassword);
+        try {
+          const res = await fetch('/settings/security', { method: 'POST', body: fd });
+          const result = await res.json();
+          if (!res.ok || result.error) throw new Error(result.error || 'Could not update password.');
+          this.showNotification(result.success || 'Password updated successfully.', 'success');
+          quickPasswordForm.reset();
+        } catch (err) {
+          this.showNotification(err.message || 'Could not update password.', 'error');
         }
       });
     }
@@ -5297,14 +5658,6 @@ class DashboardApp {
       // Auto-resize textarea and typing indicators
       inlineReplyInput.addEventListener('input', () => {
         this.autoResizeTextarea(inlineReplyInput);
-        this.handleTypingIndicator(inlineReplyInput);
-      });
-      // Focus/blur events for typing status
-      inlineReplyInput.addEventListener('focus', () => {
-        this.handleTypingStart();
-      });
-      inlineReplyInput.addEventListener('blur', () => {
-        this.handleTypingStop();
       });
     }
 
@@ -5412,7 +5765,6 @@ class DashboardApp {
       const activeClass = m.id === this.messagingSelectedId ? ' is-active' : '';
       const initials = this.getInitials(m.sender_name);
       const avatarClass = this.getAvatarClass(m.category);
-      const categoryTag = this.getCategoryTag(m.category);
       const timeStr = this.formatMessageTime(m.created_at);
       const starClass = m.is_starred ? ' is-starred' : '';
       const starIcon = m.is_starred ? 'fa-solid fa-star' : 'fa-regular fa-star';
@@ -5428,7 +5780,6 @@ class DashboardApp {
           <div class="messaging-item__subject">${esc(m.subject)}</div>
           <div class="messaging-item__preview">${esc(preview)}</div>
           <div class="messaging-item__meta">
-            ${categoryTag}
             <button type="button" class="messaging-item__star${starClass}" data-msg-id="${m.id}" title="Star">
               <i class="${starIcon}"></i>
             </button>
@@ -5479,7 +5830,7 @@ class DashboardApp {
     `;
   }
 
-  sendInlineReply() {
+  async sendInlineReply() {
     console.log('sendInlineReply called, selectedId:', this.messagingSelectedId);
     
     if (!this.messagingSelectedId) {
@@ -5508,43 +5859,42 @@ class DashboardApp {
       // Get the original message to extract recipient info
       const originalMessage = this.messagingMessages.find(m => m.id === this.messagingSelectedId);
       if (!originalMessage) throw new Error('Original message not found');
+      if (!originalMessage.sender_phone) throw new Error('Open a farmer message to reply.');
 
-      // For demo purposes, append the reply to the conversation immediately
+      const subject = originalMessage.subject && originalMessage.subject.toLowerCase().startsWith('re:')
+        ? originalMessage.subject
+        : `Re: ${originalMessage.subject || 'Message'}`;
+
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          subject,
+          body: message,
+          category: 'farmers',
+          recipient_phone: originalMessage.sender_phone,
+          farmer_id: originalMessage.farmer_id ?? null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      // Update UI immediately (append to conversation)
+      const saved = data.message || {};
       const replyData = {
-        body: message,
-        sender_name: "Admin User",
-        sender_type: "admin",
-        created_at: new Date().toISOString()
+        body: saved.body || message,
+        sender_name: saved.sender_name || 'Admin',
+        sender_type: 'admin',
+        created_at: saved.created_at || new Date().toISOString(),
       };
 
-      // Initialize conversation array if it doesn't exist
-      if (!originalMessage.conversation) {
-        originalMessage.conversation = [];
-      }
-
-      // Add the reply to the conversation
+      if (!originalMessage.conversation) originalMessage.conversation = [];
       originalMessage.conversation.push(replyData);
 
       // Update the conversation view
       const bodyEl = document.getElementById('messagingDetailBody');
       if (bodyEl) {
-        // Only update the conversation part, keep reply section intact
-        const replySection = document.getElementById('messagingConversationReply');
-        
-        // Temporarily remove reply section
-        if (replySection) {
-          replySection.remove();
-        }
-        
-        // Update conversation content
         bodyEl.innerHTML = this.renderConversation(originalMessage);
-        
-        // Re-add reply section
-        if (replySection) {
-          bodyEl.appendChild(replySection);
-        }
-        
-        // Scroll to bottom to show the new message
         bodyEl.scrollTop = bodyEl.scrollHeight;
       }
 
@@ -5554,7 +5904,7 @@ class DashboardApp {
         inlineReplyInput.style.height = 'auto'; // Reset height
       }
 
-      this.showNotification('Reply sent successfully!', 'success');
+      this.showNotification('Reply sent!', 'success');
       this.loadMessagingFolder();
     } catch (err) {
       console.warn('Send reply failed:', err);
@@ -5570,42 +5920,6 @@ class DashboardApp {
   autoResizeTextarea(textarea) {
     textarea.style.height = 'auto';
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
-  }
-
-  handleTypingIndicator(textarea) {
-    const hasContent = textarea.value.trim().length > 0;
-    const replySection = document.getElementById('messagingConversationReply');
-    
-    if (replySection) {
-      if (hasContent) {
-        replySection.setAttribute('data-typing', 'true');
-        textarea.setAttribute('data-typing', 'true');
-      } else {
-        replySection.removeAttribute('data-typing');
-        textarea.removeAttribute('data-typing');
-      }
-    }
-  }
-
-  handleTypingStart() {
-    const replySection = document.getElementById('messagingConversationReply');
-    if (replySection && this.messagingSelectedId) {
-      const inlineReplyInput = document.getElementById('msgInlineReplyInput');
-      if (inlineReplyInput && inlineReplyInput.value.trim().length > 0) {
-        replySection.setAttribute('data-typing', 'true');
-      }
-    }
-  }
-
-  handleTypingStop() {
-    const replySection = document.getElementById('messagingConversationReply');
-    if (replySection) {
-      replySection.removeAttribute('data-typing');
-    }
-    const inlineReplyInput = document.getElementById('msgInlineReplyInput');
-    if (inlineReplyInput) {
-      inlineReplyInput.removeAttribute('data-typing');
-    }
   }
 
   getSampleFarmerMessages() {
@@ -5909,26 +6223,31 @@ class DashboardApp {
       }
       if (bodyEl) bodyEl.innerHTML = this.renderConversation(m);
 
-      // Show/hide inline reply input based on message category
+      // Inline reply is always visible; enable only when replyable
       const inlineReplySection = document.getElementById('messagingConversationReply');
       if (inlineReplySection) {
-        const isFarmerMessage = m.category === 'farmers' || m.sender_type === 'farmer';
-        console.log('Inline reply visibility check:', {
-          messageId: m.id,
-          category: m.category,
-          sender_type: m.sender_type,
-          isFarmerMessage: isFarmerMessage
-        });
-        // Show inline reply for farmer messages
-        if (isFarmerMessage) {
-          inlineReplySection.classList.add('messaging-conversation__reply--visible');
-          // Focus on the inline reply input
-          const inlineReplyInput = document.getElementById('msgInlineReplyInput');
-          if (inlineReplyInput) {
-            inlineReplyInput.focus();
-          }
-        } else {
-          inlineReplySection.classList.remove('messaging-conversation__reply--visible');
+        const currentPhone =
+          (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.phone) ||
+          '';
+        const replyable =
+          !!m.sender_phone &&
+          (!currentPhone || String(m.sender_phone) !== String(currentPhone));
+
+        inlineReplySection.classList.add('messaging-conversation__reply--visible');
+
+        const inlineReplyInput = document.getElementById('msgInlineReplyInput');
+        const inlineReplySendBtn = document.getElementById('msgInlineReplySendBtn');
+
+        if (inlineReplyInput) {
+          inlineReplyInput.disabled = !replyable;
+          inlineReplyInput.placeholder = replyable
+            ? 'Type your message here...'
+            : 'Open a farmer message to reply...';
+          if (replyable) inlineReplyInput.focus();
+        }
+        if (inlineReplySendBtn) {
+          inlineReplySendBtn.disabled = !replyable;
+          inlineReplySendBtn.title = replyable ? 'Send message' : 'Cannot reply to this message';
         }
       }
 

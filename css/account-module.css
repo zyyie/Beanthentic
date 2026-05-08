@@ -209,6 +209,112 @@ body.dashboard-page #account-module .account-card {
   background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
 }
 
+.account-tools {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.account-tool-card {
+  border: 1px solid rgba(44, 122, 62, 0.16);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfefc 100%);
+  padding: 16px;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);
+}
+
+.account-tool-card h3 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  color: #14532d;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-tool-form {
+  display: grid;
+  gap: 8px;
+}
+
+.account-tool-form label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #4b5563;
+}
+
+.account-tool-form input {
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid rgba(44, 122, 62, 0.22);
+  padding: 0 0.75rem;
+  font-size: 0.9rem;
+  background: #ffffff;
+}
+
+.account-tool-form input:focus {
+  outline: none;
+  border-color: #2c7a3e;
+  box-shadow: 0 0 0 3px rgba(44, 122, 62, 0.14);
+}
+
+.account-tool-hint {
+  margin: 0;
+  font-size: 0.73rem;
+  color: #6b7280;
+}
+
+.account-tool-form .btn {
+  margin-top: 4px;
+  width: 100%;
+  justify-content: center;
+}
+
+.account-tool-btn {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  height: 44px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #2c7a3e 0%, #38a169 100%);
+  box-shadow: 0 8px 18px rgba(44, 122, 62, 0.24);
+}
+
+.account-tool-btn:hover {
+  background: linear-gradient(135deg, #276749 0%, #2f855a 100%);
+  transform: translateY(-1px);
+}
+
+.account-password-wrap {
+  position: relative;
+}
+
+.account-password-wrap input {
+  width: 100%;
+  padding-right: 2.5rem;
+}
+
+.account-password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.account-password-toggle:hover {
+  background: rgba(44, 122, 62, 0.10);
+  color: #14532d;
+}
+
 @media (max-width: 640px) {
   .account-card {
     padding: 24px 18px 20px;
@@ -227,6 +333,10 @@ body.dashboard-page #account-module .account-card {
 
 @media (max-width: 1024px) {
   .account-card {
+    grid-template-columns: 1fr;
+  }
+
+  .account-tools {
     grid-template-columns: 1fr;
   }
 }

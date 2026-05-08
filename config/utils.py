@@ -140,6 +140,16 @@ def get_current_user_phone() -> str | None:
     return session.get("user_phone")
 
 
+def get_current_farmer_phone() -> str | None:
+    """Get current logged-in farmer's phone number."""
+    return session.get("farmer_phone")
+
+
+def is_farmer_authenticated() -> bool:
+    """Check if farmer is authenticated."""
+    return session.get("farmer_phone") is not None
+
+
 def is_authenticated() -> bool:
     """Check if user is authenticated."""
     return session.get("user_phone") is not None

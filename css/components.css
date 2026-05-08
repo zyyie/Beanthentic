@@ -14,8 +14,8 @@
   gap: 0.45rem;
   padding: 0.2rem 0.6rem 0.2rem 0.2rem;
   border-radius: 999px;
-  background: rgba(192, 133, 82, 0.08);
-  color: #3d2813;
+  background: rgba(34, 197, 94, 0.10);
+  color: var(--accent-ink);
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -27,8 +27,8 @@
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  background: radial-gradient(circle at 30% 30%, #e7f5df, #5e2d0d);
-  border: 1px solid rgba(101, 48, 13, 0.45);
+  background: radial-gradient(circle at 30% 30%, rgba(187, 247, 208, 0.95), var(--accent-1-dark));
+  border: 1px solid rgba(34, 197, 94, 0.45);
 }
 
 .hero-title {
@@ -39,7 +39,7 @@
 }
 
 .hero-title span {
-  color: #4e3017;
+  color: var(--accent-1-dark);
 }
 
 .hero-subtitle {
@@ -156,7 +156,7 @@
 
 .hero-slider-dot[aria-selected="true"] {
   width: 22px;
-  background: linear-gradient(135deg, rgba(48, 23, 7, 0.95), rgba(166, 105, 62, 0.95));
+  background: linear-gradient(135deg, var(--accent-1-dark), var(--accent-2));
   border-color: transparent;
 }
 
@@ -344,7 +344,7 @@
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: #81522b;
+  color: var(--accent-1-dark);
 }
 
 .hero-float-tag span {
@@ -414,7 +414,7 @@
   width: 9px;
   height: 9px;
   border-radius: 999px;
-  background: radial-gradient(circle at 30% 30%, #ffe7c2, #f3a456);
+  background: radial-gradient(circle at 30% 30%, rgba(187, 247, 208, 0.95), var(--accent-2));
 }
 
 .about-card h3 {
@@ -446,7 +446,7 @@
 .about-list span {
   font-size: 1rem;
   line-height: 1.2;
-  color: #c08552;
+  color: var(--accent-1);
 }
 
 .about-meta {

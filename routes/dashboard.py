@@ -10,8 +10,10 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from config.models import ActivityLogEntry
 from config.utils import (
+    get_current_farmer_phone,
     get_current_user_phone,
     is_authenticated,
+    is_farmer_authenticated,
     load_settings,
     load_users,
     log_activity,
@@ -27,12 +29,18 @@ def register_dashboard_routes(app):
     @app.route("/dashboard")
     def dashboard():
         """Main dashboard page."""
-        if not is_authenticated():
+        if not (is_authenticated() or is_farmer_authenticated()):
             return redirect(url_for("login"))
-        phone = get_current_user_phone() or ""
+
+        phone = (get_current_user_phone() or get_current_farmer_phone() or "")
         users = load_users()
         user = users.get(phone, {})
-        full_name = user.get("full_name") or session.get("user_name") or phone
+        full_name = (
+            user.get("full_name")
+            or session.get("user_name")
+            or session.get("farmer_name")
+            or phone
+        )
         google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY", "").strip() or demo_google_maps_api_key
         return render_template(
             "templates/dashboard.html",

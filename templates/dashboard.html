@@ -36,7 +36,6 @@
         <div class="side-panel-header">
           <a href="#" class="side-brand">
             <img class="side-brand-img" src="assets/images/logo.png" alt="Beanthentic logo" />
-            <span class="side-brand-text">Beanthentic</span>
           </a>
         </div>
 
@@ -310,9 +309,7 @@
                 </div>
                 <div class="toolbar-right farmer-toolbar-actions" role="group" aria-label="Farmer records actions">
                   <div class="action-buttons">
-                    <button class="add-farmer-btn">Add Farmer</button>
-                    <button id="loadSampleBtn" class="load-sample-btn">Load Sample Data</button>
-                    <button class="save-btn">Save</button>
+                    <button class="add-farmer-btn" id="addFarmerBtn">Add Farmer</button>
                   </div>
                   <label class="select-field farmer-rows-field" for="pageSizeSelect">
                     <span class="field-label">Rows</span>
@@ -560,46 +557,69 @@
                   </aside>
 
                   <section class="farmer-profile-right">
-                    <div class="farmer-profile-grid">
-                      <div class="form-group">
-                        <label>Last Name</label>
-                        <input id="farmerProfileLastName" type="text" disabled />
+                    <div class="farmer-profile-tabs" role="tablist">
+                      <button class="farmer-profile-tab-btn active" data-profile-tab="personal" role="tab" aria-selected="true">Personal Info</button>
+                      <button class="farmer-profile-tab-btn" data-profile-tab="affiliation" role="tab" aria-selected="false">Affiliation & Status</button>
+                      <button class="farmer-profile-tab-btn" data-profile-tab="farm" role="tab" aria-selected="false">Farm Details</button>
+                    </div>
+
+                    <div class="farmer-profile-content">
+                      <div class="farmer-profile-pane active" id="profilePanePersonal">
+                        <h3 class="pane-title">Personal Information</h3>
+                        <div class="farmer-profile-grid">
+                          <div class="form-group">
+                            <label>Last Name</label>
+                            <input id="farmerProfileLastName" type="text" disabled />
+                          </div>
+                          <div class="form-group">
+                            <label>First Name</label>
+                            <input id="farmerProfileFirstName" type="text" disabled />
+                          </div>
+                          <div class="form-group">
+                            <label>Province</label>
+                            <input id="farmerProfileProvince" type="text" disabled />
+                          </div>
+                          <div class="form-group">
+                            <label>Municipality</label>
+                            <input id="farmerProfileMunicipality" type="text" disabled />
+                          </div>
+                          <div class="form-group">
+                            <label>Barangay</label>
+                            <input id="farmerProfileBarangay" type="text" disabled />
+                          </div>
+                        </div>
                       </div>
-                      <div class="form-group">
-                        <label>First Name</label>
-                        <input id="farmerProfileFirstName" type="text" disabled />
+
+                      <div class="farmer-profile-pane" id="profilePaneAffiliation" hidden>
+                        <h3 class="pane-title">Affiliation & Status</h3>
+                        <div class="farmer-profile-grid">
+                          <div class="form-group">
+                            <label>Federation Association</label>
+                            <input id="farmerProfileFederation" type="text" disabled />
+                          </div>
+                          <div class="form-group">
+                            <label>RSBSA Registered</label>
+                            <input id="farmerProfileRsbsa" type="text" disabled />
+                          </div>
+                          <div class="form-group">
+                            <label>RSBSA Registered Number</label>
+                            <input id="farmerProfileRsbsaNumber" type="text" disabled />
+                          </div>
+                        </div>
                       </div>
-                      <div class="form-group">
-                        <label>Province</label>
-                        <input id="farmerProfileProvince" type="text" disabled />
-                      </div>
-                      <div class="form-group">
-                        <label>Municipality</label>
-                        <input id="farmerProfileMunicipality" type="text" disabled />
-                      </div>
-                      <div class="form-group">
-                        <label>Barangay</label>
-                        <input id="farmerProfileBarangay" type="text" disabled />
-                      </div>
-                      <div class="form-group">
-                        <label>Federation Association</label>
-                        <input id="farmerProfileFederation" type="text" disabled />
-                      </div>
-                      <div class="form-group">
-                        <label>RSBSA Registered</label>
-                        <input id="farmerProfileRsbsa" type="text" disabled />
-                      </div>
-                      <div class="form-group">
-                        <label>RSBSA Registered Number</label>
-                        <input id="farmerProfileRsbsaNumber" type="text" disabled />
-                      </div>
-                      <div class="form-group">
-                        <label>Status Ownership</label>
-                        <input id="farmerProfileOwnership" type="text" disabled />
-                      </div>
-                      <div class="form-group">
-                        <label>Total Plant Area</label>
-                        <input id="farmerProfileTotalArea" type="text" disabled />
+
+                      <div class="farmer-profile-pane" id="profilePaneFarm" hidden>
+                        <h3 class="pane-title">Farm Details</h3>
+                        <div class="farmer-profile-grid">
+                          <div class="form-group">
+                            <label>Status Ownership</label>
+                            <input id="farmerProfileOwnership" type="text" disabled />
+                          </div>
+                          <div class="form-group">
+                            <label>Total Plant Area</label>
+                            <input id="farmerProfileTotalArea" type="text" disabled />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </section>
@@ -715,67 +735,212 @@
 
           <!-- Transactions Module -->
           <div class="module hidden" id="transactions-module" data-module="transactions">
-            <section class="module-header">
-              <h1>Transactions</h1>
-              <p>Review coffee bean movement records from farmer-side submissions.</p>
-            </section>
+            <div class="txn-container">
+              <div class="txn-header">
+                <h2>All transactions</h2>
+              </div>
 
-            <section class="transactions-shell" aria-label="Transactions management">
-              <div class="transactions-topbar settings-card">
-                <div class="transactions-topbar-row">
-                  <label class="transactions-control" for="transactionsSearchInput">
-                    <span class="field-label">Search</span>
-                    <input id="transactionsSearchInput" type="search" placeholder="Search farmer, buyer, notes..." autocomplete="off" />
-                  </label>
+              <div class="txn-toolbar">
+                <div class="txn-search">
+                  <i class="fa-solid fa-search"></i>
+                  <input id="transactionsSearchInput" type="search" placeholder="Search transaction ..." autocomplete="off" />
+                </div>
+                <div class="txn-filters">
+                  <select id="transactionsSortFilter" class="txn-select">
+                    <option value="newest">Newest</option>
+                  </select>
+                  <select id="transactionsMonthFilter" class="txn-select">
+                    <option value="">All Months</option>
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                  </select>
+                  <select id="transactionsYearFilter" class="txn-select">
+                    <option value="">All Years</option>
+                    <option value="2026">2026</option>
+                    <option value="2025">2025</option>
+                    <option value="2024">2024</option>
+                    <option value="2023">2023</option>
+                    <option value="2022">2022</option>
+                    <option value="2021">2021</option>
+                    <option value="2020">2020</option>
+                    <option value="2019">2019</option>
+                  </select>
+                  <select id="transactionsProductFilter" class="txn-select">
+                    <option value="">All Products</option>
+                    <option value="liberica">Liberica</option>
+                    <option value="excelsa">Excelsa</option>
+                    <option value="robusta">Robusta</option>
+                  </select>
+                </div>
 
-                  <label class="transactions-control" for="transactionsVarietyFilter">
-                    <span class="field-label">Variety</span>
-                    <select id="transactionsVarietyFilter">
-                      <option value="">All varieties</option>
-                      <option value="liberica">Liberica</option>
-                      <option value="robusta">Robusta</option>
-                      <option value="excelsa">Excelsa</option>
-                    </select>
-                  </label>
+              </div>
 
-                  <label class="transactions-control" for="transactionsFarmerFilter">
-                    <span class="field-label">Farmer</span>
-                    <select id="transactionsFarmerFilter">
-                      <option value="">All farmers</option>
-                    </select>
-                  </label>
+              <div class="txn-table-wrapper">
+                <table class="txn-table">
+                  <thead>
+                    <tr>
+                      <th class="txn-col-farmer">Farmer</th>
+                      <th class="txn-col-date">Date <i class="fa-solid fa-arrow-down" style="font-size:0.7em; margin-left: 2px;"></i></th>
+                      <th class="txn-col-customer">Customer Name</th>
+                      <th class="txn-col-product">Product</th>
+                      <th class="txn-col-scale">Product Scale</th>
+                      <th class="txn-col-status"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="transactionsTableBody">
+                    <tr>
+                      <td class="txn-col-farmer">Juan Dela Cruz</td>
+                      <td class="txn-col-date">
+                        <div class="txn-time-wrapper">
+                          <div class="txn-icon txn-icon-green"><i class="fa-solid fa-arrow-trend-down"></i></div>
+                          <div class="txn-time-text">
+                            <span class="txn-date">Aug 6, 2019</span>
+                            <span class="txn-type">Harvest</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="txn-col-customer">Davy Jones</td>
+                      <td class="txn-col-product">Liberica</td>
+                      <td class="txn-col-scale">50 kg</td>
+                      <td class="txn-col-status"><i class="fa-regular fa-circle-check txn-status-success"></i></td>
+                    </tr>
+                    <tr>
+                      <td class="txn-col-farmer">Maria Santos</td>
+                      <td class="txn-col-date">
+                        <div class="txn-time-wrapper">
+                          <div class="txn-icon txn-icon-gray"></div>
+                          <div class="txn-time-text">
+                            <span class="txn-date">Aug 6, 2019</span>
+                            <span class="txn-type">Processing</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="txn-col-customer">Davy Jones</td>
+                      <td class="txn-col-product">Excelsa</td>
+                      <td class="txn-col-scale">100 kg</td>
+                      <td class="txn-col-status"><i class="fa-regular fa-circle-check txn-status-success"></i></td>
+                    </tr>
+                    <tr>
+                      <td class="txn-col-farmer">Roberto Reyes</td>
+                      <td class="txn-col-date">
+                        <div class="txn-time-wrapper">
+                          <div class="txn-icon txn-icon-red"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                          <div class="txn-time-text">
+                            <span class="txn-date">Aug 6, 2019</span>
+                            <span class="txn-type">Sale</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="txn-col-customer">Anthony Williams</td>
+                      <td class="txn-col-product">Robusta</td>
+                      <td class="txn-col-scale">250 kg</td>
+                      <td class="txn-col-status"><i class="fa-regular fa-clock txn-status-pending"></i></td>
+                    </tr>
+                    <tr>
+                      <td class="txn-col-farmer">Carmela Lopez</td>
+                      <td class="txn-col-date">
+                        <div class="txn-time-wrapper">
+                          <div class="txn-icon txn-icon-red"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                          <div class="txn-time-text">
+                            <span class="txn-date">Aug 6, 2019</span>
+                            <span class="txn-type">Sale</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="txn-col-customer">Jennie Edwards</td>
+                      <td class="txn-col-product">Liberica</td>
+                      <td class="txn-col-scale">15 kg</td>
+                      <td class="txn-col-status"><i class="fa-regular fa-circle-xmark txn-status-failed"></i></td>
+                    </tr>
+                    <tr>
+                      <td class="txn-col-farmer">Antonio Luna</td>
+                      <td class="txn-col-date">
+                        <div class="txn-time-wrapper">
+                          <div class="txn-icon txn-icon-green"><i class="fa-solid fa-arrow-trend-down"></i></div>
+                          <div class="txn-time-text">
+                            <span class="txn-date">Aug 6, 2019</span>
+                            <span class="txn-type">Harvest</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="txn-col-customer">Stella Howard</td>
+                      <td class="txn-col-product">Arabica</td>
+                      <td class="txn-col-scale">120 kg</td>
+                      <td class="txn-col-status"><i class="fa-regular fa-circle-check txn-status-success"></i></td>
+                    </tr>
+                    <tr>
+                      <td class="txn-col-farmer">Jose Rizal</td>
+                      <td class="txn-col-date">
+                        <div class="txn-time-wrapper">
+                          <div class="txn-icon txn-icon-green"><i class="fa-solid fa-arrow-trend-down"></i></div>
+                          <div class="txn-time-text">
+                            <span class="txn-date">Aug 6, 2019</span>
+                            <span class="txn-type">Harvest</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="txn-col-customer">Annette Lane</td>
+                      <td class="txn-col-product">Robusta</td>
+                      <td class="txn-col-scale">85 kg</td>
+                      <td class="txn-col-status"><i class="fa-regular fa-circle-check txn-status-success"></i></td>
+                    </tr>
+                    <tr>
+                      <td class="txn-col-farmer">Andres Bonifacio</td>
+                      <td class="txn-col-date">
+                        <div class="txn-time-wrapper">
+                          <div class="txn-icon txn-icon-red"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                          <div class="txn-time-text">
+                            <span class="txn-date">Aug 6, 2019</span>
+                            <span class="txn-type">Sale</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="txn-col-customer">Irma Simmmons</td>
+                      <td class="txn-col-product">Liberica</td>
+                      <td class="txn-col-scale">400 kg</td>
+                      <td class="txn-col-status"><i class="fa-regular fa-circle-check txn-status-success"></i></td>
+                    </tr>
+                    <tr>
+                      <td class="txn-col-farmer">Emilio Aguinaldo</td>
+                      <td class="txn-col-date">
+                        <div class="txn-time-wrapper">
+                          <div class="txn-icon txn-icon-red"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                          <div class="txn-time-text">
+                            <span class="txn-date">Aug 6, 2019</span>
+                            <span class="txn-type">Sale</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="txn-col-customer">Stella Howard</td>
+                      <td class="txn-col-product">Excelsa</td>
+                      <td class="txn-col-scale">220 kg</td>
+                      <td class="txn-col-status"><i class="fa-regular fa-circle-check txn-status-success"></i></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
 
-                  <button type="button" class="btn btn-secondary transactions-refresh-btn" id="transactionsRefreshBtn">
-                    <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
-                    <span>Refresh</span>
-                  </button>
+              <div class="txn-pagination">
+                <div class="txn-page-nav">
+                  <span class="txn-page-info">Page <input type="number" value="1" min="1" max="10" class="txn-page-input" /> of 10</span>
+                  <div class="txn-page-arrows">
+                    <button type="button" class="txn-arrow-btn"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button type="button" class="txn-arrow-btn"><i class="fa-solid fa-chevron-right"></i></button>
+                  </div>
                 </div>
               </div>
 
-              <div class="transactions-table-wrap settings-card">
-                <div class="table-wrapper">
-                  <table class="data-table transactions-table" aria-describedby="transactionsTableCaption">
-                    <caption id="transactionsTableCaption" class="sr-only">Farmer coffee bean transactions</caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">Farmer</th>
-                        <th scope="col">Variety</th>
-                        <th scope="col">Delta kg</th>
-                        <th scope="col">Balance</th>
-                        <th scope="col">Buyer</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Recorded</th>
-                        <th scope="col">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody id="transactionsTableBody">
-                      <tr><td colspan="8" class="transactions-loading-cell">Loading...</td></tr>
-                    </tbody>
-                  </table>
-                </div>
-                <p class="transactions-empty" id="transactionsEmptyState" hidden>No matching transactions.</p>
-              </div>
-            </section>
+            </div>
           </div>
 
           <!-- Farmer's Contribution Module -->
@@ -1618,22 +1783,21 @@
                         </button>
                       </div>
                     </div>
-                    <div class="messaging-conversation" id="messagingDetailBody">
-                  <!-- Chat Box Interface (shown only for farmer messages) -->
-                  <div class="messaging-conversation__reply" id="messagingConversationReply">
-                    <div class="messaging-reply-input-wrapper">
-                      <textarea 
-                        class="messaging-reply-input" 
-                        id="msgInlineReplyInput"
-                        placeholder="Type your message here..."
-                        rows="1"
-                      ></textarea>
-                      <button type="button" class="messaging-reply-send" id="msgInlineReplySendBtn" title="Send message">
-                        <i class="fa-solid fa-paper-plane"></i>
-                      </button>
+                    <div class="messaging-conversation" id="messagingDetailBody"></div>
+                    <!-- Chat Box Interface (shown/enabled only when replyable) -->
+                    <div class="messaging-conversation__reply" id="messagingConversationReply">
+                      <div class="messaging-reply-input-wrapper">
+                        <textarea
+                          class="messaging-reply-input"
+                          id="msgInlineReplyInput"
+                          placeholder="Type your message here..."
+                          rows="1"
+                        ></textarea>
+                        <button type="button" class="messaging-reply-send" id="msgInlineReplySendBtn" title="Send message">
+                          <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </div>
                   
                                     </div>
                 </div>
@@ -1761,6 +1925,49 @@
                       <span>Log out</span>
                     </button>
                   </div>
+
+                  <div class="account-tools">
+                    <section class="account-tool-card" aria-label="Quick profile update">
+                      <h3><i class="fa-solid fa-user-pen" aria-hidden="true"></i> Quick Profile Update</h3>
+                      <form id="accountQuickProfileForm" class="account-tool-form">
+                        <label for="accountQuickFullName">Full Name</label>
+                        <input id="accountQuickFullName" type="text" maxlength="80" placeholder="Enter full name" required />
+                        <label for="accountQuickPhone">Mobile Number</label>
+                        <input id="accountQuickPhone" type="text" readonly />
+                        <p class="account-tool-hint">Mobile number is managed by the administrator account registry.</p>
+                        <button type="submit" class="btn account-tool-btn">Save Profile</button>
+                      </form>
+                    </section>
+
+                    <section class="account-tool-card" aria-label="Change password">
+                      <h3><i class="fa-solid fa-lock" aria-hidden="true"></i> Change Password</h3>
+                      <form id="accountQuickPasswordForm" class="account-tool-form">
+                        <label for="accountCurrentPassword">Current Password</label>
+                        <div class="account-password-wrap">
+                          <input id="accountCurrentPassword" type="password" autocomplete="current-password" required />
+                          <button type="button" class="account-password-toggle" data-target="accountCurrentPassword" aria-label="Show current password">
+                            <i class="fa-regular fa-eye"></i>
+                          </button>
+                        </div>
+                        <label for="accountNewPassword">New Password</label>
+                        <div class="account-password-wrap">
+                          <input id="accountNewPassword" type="password" autocomplete="new-password" minlength="8" required />
+                          <button type="button" class="account-password-toggle" data-target="accountNewPassword" aria-label="Show new password">
+                            <i class="fa-regular fa-eye"></i>
+                          </button>
+                        </div>
+                        <label for="accountConfirmPassword">Confirm New Password</label>
+                        <div class="account-password-wrap">
+                          <input id="accountConfirmPassword" type="password" autocomplete="new-password" minlength="8" required />
+                          <button type="button" class="account-password-toggle" data-target="accountConfirmPassword" aria-label="Show confirm new password">
+                            <i class="fa-regular fa-eye"></i>
+                          </button>
+                        </div>
+                        <p class="account-tool-hint">Use at least 8 characters.</p>
+                        <button type="submit" class="btn account-tool-btn">Update Password</button>
+                      </form>
+                    </section>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1884,6 +2091,150 @@
           Log out
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- Add farmer modal -->
+  <div id="addFarmerModal" class="add-farmer-modal" hidden aria-hidden="true">
+    <div class="add-farmer-modal__backdrop" tabindex="-1"></div>
+    <div class="add-farmer-modal__card" role="dialog" aria-modal="true" aria-labelledby="addFarmerModalTitle">
+      <div class="add-farmer-modal__header">
+        <div>
+          <h2 id="addFarmerModalTitle" class="add-farmer-modal__title">Add Farmer</h2>
+          <p class="add-farmer-modal__subtitle">Fill in farmer registration details</p>
+        </div>
+        <button type="button" class="add-farmer-modal__close" id="addFarmerModalClose" aria-label="Close">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <form id="addFarmerForm" class="add-farmer-form" novalidate>
+        <p class="add-farmer-form__error" id="addFarmerFormError" role="alert" hidden></p>
+        <div class="add-farmer-form__grid">
+          <section class="add-farmer-form__section">
+            <h3>Personal Information</h3>
+            <div class="add-farmer-form__row">
+              <label>Last Name
+                <input type="text" id="newFarmerLastName" required maxlength="60" pattern="^[A-Za-z][A-Za-z .'-]{0,59}$" />
+                <span class="add-farmer-form__hint">Letters only, max 60 chars.</span>
+              </label>
+              <label>First Name
+                <input type="text" id="newFarmerFirstName" required maxlength="80" pattern="^[A-Za-z][A-Za-z .'-]{0,79}$" />
+                <span class="add-farmer-form__hint">Letters only, max 80 chars.</span>
+              </label>
+            </div>
+            <div class="add-farmer-form__row">
+              <label>Barangay
+                <input type="text" id="newFarmerBarangay" required maxlength="80" />
+                <span class="add-farmer-form__hint">Required, max 80 chars.</span>
+              </label>
+              <label>Birthday
+                <input type="date" id="newFarmerBirthday" min="1900-01-01" />
+                <span class="add-farmer-form__hint">Must not be in the future.</span>
+              </label>
+            </div>
+            <label>Remarks
+              <input type="text" id="newFarmerRemarks" maxlength="200" />
+              <span class="add-farmer-form__hint">Optional, max 200 chars.</span>
+            </label>
+          </section>
+
+          <section class="add-farmer-form__section">
+            <h3>Affiliation</h3>
+            <div class="add-farmer-form__row">
+              <label>Federation Association
+                <input type="text" id="newFarmerAssociation" maxlength="100" />
+                <span class="add-farmer-form__hint">Optional, max 100 chars.</span>
+              </label>
+              <label>RSBSA Registered
+                <select id="newFarmerRsbsa">
+                  <option value="">Select</option>
+                  <option value="YES">YES</option>
+                  <option value="NO">NO</option>
+                </select>
+                <span class="add-farmer-form__hint">If YES, NCFRS is required.</span>
+              </label>
+            </div>
+            <label>RSBSA Registered Number (NCFRS)
+              <input type="text" id="newFarmerNcfrs" maxlength="40" pattern="^[A-Za-z0-9-]*$" />
+              <span class="add-farmer-form__hint">Letters, numbers, dashes only (max 40).</span>
+            </label>
+          </section>
+
+          <section class="add-farmer-form__section">
+            <h3>Farm Information</h3>
+            <div class="add-farmer-form__row">
+              <label>Status of Ownership
+                <input type="text" id="newFarmerOwnership" placeholder="Landowner / CLOA / Lease / Seasonal / Others" maxlength="60" />
+                <span class="add-farmer-form__hint">Optional, max 60 chars.</span>
+              </label>
+              <label>Total Plant Area (HA.)
+                <input type="number" id="newFarmerArea" min="0" max="10000" step="0.01" value="0" inputmode="decimal" />
+                <span class="add-farmer-form__hint">Number only, range 0 to 10,000.</span>
+              </label>
+            </div>
+          </section>
+
+          <section class="add-farmer-form__section">
+            <h3>Tree Counts</h3>
+            <div class="add-farmer-form__row">
+              <label>Liberica Bearing
+                <input type="number" id="newLibBearing" min="0" max="50000" step="1" value="0" inputmode="numeric" />
+                <span class="add-farmer-form__hint">Whole numbers only (0 to 50,000).</span>
+              </label>
+              <label>Liberica Non-bearing
+                <input type="number" id="newLibNonBearing" min="0" max="50000" step="1" value="0" inputmode="numeric" />
+                <span class="add-farmer-form__hint">Whole numbers only (0 to 50,000).</span>
+              </label>
+            </div>
+            <div class="add-farmer-form__row">
+              <label>Robusta Bearing
+                <input type="number" id="newRobBearing" min="0" max="50000" step="1" value="0" inputmode="numeric" />
+                <span class="add-farmer-form__hint">Whole numbers only (0 to 50,000).</span>
+              </label>
+              <label>Robusta Non-bearing
+                <input type="number" id="newRobNonBearing" min="0" max="50000" step="1" value="0" inputmode="numeric" />
+                <span class="add-farmer-form__hint">Whole numbers only (0 to 50,000).</span>
+              </label>
+            </div>
+            <div class="add-farmer-form__row">
+              <label>Excelsa Bearing
+                <input type="number" id="newExcBearing" min="0" max="50000" step="1" value="0" inputmode="numeric" />
+                <span class="add-farmer-form__hint">Whole numbers only (0 to 50,000).</span>
+              </label>
+              <label>Excelsa Non-bearing
+                <input type="number" id="newExcNonBearing" min="0" max="50000" step="1" value="0" inputmode="numeric" />
+                <span class="add-farmer-form__hint">Whole numbers only (0 to 50,000).</span>
+              </label>
+            </div>
+          </section>
+
+          <section class="add-farmer-form__section">
+            <h3>Production</h3>
+            <div class="add-farmer-form__row">
+              <label>Liberica Production
+                <input type="number" id="newLibProduction" min="0" max="1000000" step="0.01" value="0" inputmode="decimal" />
+                <span class="add-farmer-form__hint">Number only, range 0 to 1,000,000.</span>
+              </label>
+              <label>Robusta Production
+                <input type="number" id="newRobProduction" min="0" max="1000000" step="0.01" value="0" inputmode="decimal" />
+                <span class="add-farmer-form__hint">Number only, range 0 to 1,000,000.</span>
+              </label>
+            </div>
+            <div class="add-farmer-form__row">
+              <label>Excelsa Production
+                <input type="number" id="newExcProduction" min="0" max="1000000" step="0.01" value="0" inputmode="decimal" />
+                <span class="add-farmer-form__hint">Number only, range 0 to 1,000,000.</span>
+              </label>
+            </div>
+          </section>
+        </div>
+
+        <div class="add-farmer-form__actions">
+          <button type="button" class="confirm-dialog__btn confirm-dialog__btn--secondary" id="addFarmerCancel">Cancel</button>
+          <button type="submit" class="confirm-dialog__btn confirm-dialog__btn--primary">Add Farmer</button>
+        </div>
+      </form>
     </div>
   </div>
 

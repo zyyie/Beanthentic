@@ -10,7 +10,14 @@ from datetime import datetime
 from flask import jsonify, request, session
 
 from config.models import Message, db
-from config.utils import get_current_user_phone, is_authenticated, load_users, log_activity
+from config.utils import (
+    get_current_farmer_phone,
+    get_current_user_phone,
+    is_authenticated,
+    is_farmer_authenticated,
+    load_users,
+    log_activity,
+)
 
 
 def register_messaging_routes(app):
@@ -19,10 +26,10 @@ def register_messaging_routes(app):
     @app.route("/api/messages", methods=["GET"])
     def api_messages_list():
         """List messages for the current user (inbox view)."""
-        if not is_authenticated():
+        if not (is_authenticated() or is_farmer_authenticated()):
             return jsonify({"error": "Unauthorized"}), 401
 
-        user_phone = get_current_user_phone() or ""
+        user_phone = (get_current_user_phone() or get_current_farmer_phone() or "")
         folder = request.args.get("folder", "inbox")  # inbox | sent | starred | archived
         search = (request.args.get("search", "") or "").strip().lower()
         category = request.args.get("category", "").strip().lower()
@@ -82,13 +89,18 @@ def register_messaging_routes(app):
     @app.route("/api/messages", methods=["POST"])
     def api_messages_create():
         """Compose and send a new message."""
-        if not is_authenticated():
+        if not (is_authenticated() or is_farmer_authenticated()):
             return jsonify({"error": "Unauthorized"}), 401
 
-        user_phone = get_current_user_phone() or ""
+        user_phone = (get_current_user_phone() or get_current_farmer_phone() or "")
         users = load_users()
         sender = users.get(user_phone, {})
-        sender_name = sender.get("full_name") or session.get("user_name") or user_phone
+        sender_name = (
+            sender.get("full_name")
+            or session.get("user_name")
+            or session.get("farmer_name")
+            or user_phone
+        )
 
         data = request.get_json(silent=True) or {}
         subject = (data.get("subject") or "").strip()
@@ -101,10 +113,10 @@ def register_messaging_routes(app):
             return jsonify({"error": "Subject is required."}), 400
         if not body:
             return jsonify({"error": "Message body is required."}), 400
-        if category not in ("general", "farmer-update", "announcement", "reminder"):
+        if category not in ("general", "farmer-update", "farmers", "announcement", "reminder"):
             category = "general"
 
-        # Resolve recipient name
+        # Resolve recipient name (admin users live in JSON; farmers may be unknown here)
         recipient_name = ""
         if recipient_phone:
             recipient = users.get(recipient_phone, {})
