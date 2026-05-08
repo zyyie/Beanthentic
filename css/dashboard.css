@@ -6687,13 +6687,13 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
-  background: #4CAF50;
-  border-bottom: 1px solid #45a049;
+  padding: 16px 32px;
+  background: #ffffff;
+  border-bottom: 1px solid #f1f5f9;
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .beanthentic-header-left {
@@ -6703,7 +6703,7 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 }
 
 .beanthentic-menu-btn {
-  background: rgba(255, 255, 255, 0.2);
+  background: #f1f5f9;
   border: none;
   padding: 8px;
   border-radius: 50%;
@@ -6711,12 +6711,13 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  transition: background-color 0.2s;
+  color: #64748b;
+  transition: all 0.2s;
 }
 
 .beanthentic-menu-btn:hover {
-  background-color: rgba(255, 255, 255, 0.3);
+  background-color: #e2e8f0;
+  color: #1a202c;
 }
 
 /* Remove header menu icon in Farmer's Contribution */
@@ -6725,10 +6726,11 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 }
 
 .beanthentic-title {
-  font-size: 22px;
-  font-weight: 400;
-  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a202c;
   margin: 0;
+  letter-spacing: -0.02em;
 }
 
 .beanthentic-header-right {
@@ -6740,17 +6742,29 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 .beanthentic-search {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
   padding: 0 16px;
-  min-width: 272px;
-  height: 48px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-width: 320px;
+  height: 42px;
+  transition: all 0.2s ease;
+}
+
+.beanthentic-search:focus-within {
+  background: #ffffff;
+  border-color: #276749;
+  box-shadow: 0 0 0 3px rgba(39, 103, 73, 0.1);
 }
 
 .beanthentic-search i {
-  color: #4CAF50;
+  color: #94a3b8;
   margin-right: 12px;
+  font-size: 14px;
+}
+
+.beanthentic-search:focus-within i {
+  color: #276749;
 }
 
 .beanthentic-search input {
@@ -6759,32 +6773,34 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   outline: none;
   flex: 1;
   font-size: 14px;
-  color: #333;
+  color: #1a202c;
 }
 
 .beanthentic-search input::placeholder {
-  color: #666;
+  color: #94a3b8;
 }
 
 .beanthentic-add-btn {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #4CAF50;
+  background: #276749;
   color: white;
   border: none;
-  padding: 12px 24px;
-  border-radius: 24px;
+  padding: 0 20px;
+  height: 42px;
+  border-radius: 10px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s, box-shadow 0.2s;
-  box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(39, 103, 73, 0.2);
 }
 
 .beanthentic-add-btn:hover {
-  background: #45a049;
-  box-shadow: 0 4px 8px rgba(76, 175, 80, 0.4);
+  background: #1e523a;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(39, 103, 73, 0.3);
 }
 
 /* Beanthentic Layout */
@@ -6797,10 +6813,10 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 
 /* Beanthentic Sidebar */
 .beanthentic-sidebar {
-  width: 220px;
+  width: 240px;
   background: #ffffff;
-  border-right: none;
-  padding: 6px 0;
+  border-right: 1px solid #f1f5f9;
+  padding: 12px 8px;
   overflow-y: auto;
   box-shadow: none;
   min-height: 100%;
@@ -6808,23 +6824,16 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 }
 
 .beanthentic-sidebar-section {
-  margin-bottom: 14px;
-  border-bottom: none;
-  padding-bottom: 10px;
-}
-
-.beanthentic-sidebar-section:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
+  margin-bottom: 24px;
 }
 
 .beanthentic-sidebar-section h3 {
-  font-size: 9px;
-  font-weight: 600;
-  color: #9e9e9e;
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  margin: 0 0 10px 0;
+  letter-spacing: 0.1em;
+  margin: 0 0 12px 0;
   padding: 0 12px;
 }
 
@@ -6832,32 +6841,32 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 6px 10px;
+  padding: 10px 12px;
   border: none;
-  background: #ffffff;
+  background: transparent;
   cursor: pointer;
-  font-size: 12px;
-  color: #333333;
+  font-size: 13px;
+  color: #475569;
   text-align: left;
-  border-radius: 5px;
+  border-radius: 8px;
   transition: all 0.2s ease;
   position: relative;
-  box-sizing: border-box;
-  margin-bottom: 3px;
-  box-shadow: none;
+  margin-bottom: 4px;
 }
 
 .beanthentic-sidebar-item:hover {
-  background-color: #f8f9fa;
-  box-shadow: none;
-  transform: translateY(-1px);
+  background-color: #f8fafc;
+  color: #1a202c;
 }
 
 .beanthentic-sidebar-item.active {
-  background-color: #4CAF50;
-  color: #fff;
+  background: #f0fdf4;
+  color: #166534;
   font-weight: 600;
-  box-shadow: none;
+}
+
+.beanthentic-sidebar-item.active i {
+  color: #166534;
 }
 
 .beanthentic-sidebar-item.active::before {
@@ -6867,24 +6876,24 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   top: 50%;
   transform: translateY(-50%);
   width: 3px;
-  height: 20px;
-  background: #4CAF50;
-  border-radius: 0 3px 3px 0;
+  height: 18px;
+  background: #276749;
+  border-radius: 0 4px 4px 0;
 }
 
 .beanthentic-item-content {
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 2px 0;
 }
 
 .beanthentic-sidebar-item i {
-  margin-right: 8px;
-  font-size: 12px;
-  width: 14px;
+  margin-right: 12px;
+  font-size: 14px;
+  width: 16px;
   text-align: center;
   flex-shrink: 0;
+  color: #64748b;
 }
 
 .beanthentic-item-text {
@@ -6896,30 +6905,33 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 }
 
 .beanthentic-item-title {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   color: inherit;
-  line-height: 1.1;
+  line-height: 1.2;
 }
 
 .beanthentic-item-count {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
-  color: #757575;
-  background: transparent;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 12px;
 }
 
 .beanthentic-sidebar-item.active .beanthentic-item-title {
-  color: #fff;
+  color: #166534;
 }
 
 .beanthentic-sidebar-item.active .beanthentic-item-count {
-  color: rgba(255, 255, 255, 0.8);
+  background: #dcfce7;
+  color: #166534;
 }
 
 .beanthentic-number-indicator {
   background: transparent;
-  color: #4CAF50;
+  color: #276749;
   font-size: 14px;
   font-weight: 600;
   margin-left: auto;
@@ -6930,12 +6942,12 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 }
 
 .beanthentic-sidebar-item.active .beanthentic-number-indicator {
-  color: #ffffff;
+  color: #166534;
   font-weight: 700;
 }
 
 .beanthentic-sidebar-item:not(.active) .beanthentic-number-indicator {
-  color: #757575;
+  color: #64748b;
 }
 
 /* Beanthentic Main Content */
@@ -6954,47 +6966,53 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 9px 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  padding: 12px 24px;
   background: #ffffff;
-  margin-bottom: 10px;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .beanthentic-toolbar-left,
 .beanthentic-toolbar-right {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
 }
 
 .beanthentic-select-all {
-  margin-right: 8px;
+  margin-right: 12px;
+  width: 16px;
+  height: 16px;
+  accent-color: #276749;
 }
 
 .beanthentic-toolbar-btn {
-  background: none;
+  background: transparent;
   border: none;
-  padding: 8px;
-  border-radius: 4px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   cursor: pointer;
-  color: #757575;
+  color: #64748b;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
 }
 
 .beanthentic-toolbar-btn:hover {
-  background-color: #e0e0e0;
-  color: #4CAF50;
+  background-color: #f1f5f9;
+  color: #276749;
+}
+
+.beanthentic-toolbar-btn i {
+  font-size: 16px;
 }
 
 .beanthentic-divider {
   width: 1px;
-  height: 24px;
-  background: #e0e0e0;
-  margin: 0 4px;
+  height: 20px;
+  background: #e2e8f0;
+  margin: 0 8px;
 }
 
 /* Beanthentic Contribution List */
@@ -7003,34 +7021,43 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   overflow-y: auto;
   width: 100%;
   background: #ffffff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #f1f5f9;
   border-radius: 12px;
-  padding: 8px;
+  padding: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
 }
 
 .beanthentic-contribution-item {
   display: grid;
-  grid-template-columns: 24px 24px 190px minmax(0, 1fr);
+  grid-template-columns: 24px 32px 180px minmax(0, 1fr);
   align-items: center;
-  column-gap: 10px;
-  padding: 10px 12px;
-  min-height: 48px;
-  border: 1px solid transparent;
-  border-radius: 10px;
+  column-gap: 16px;
+  padding: 12px 24px;
+  min-height: 64px;
+  border-bottom: 1px solid #f1f5f9;
   cursor: pointer;
-  transition: background-color 0.2s, border-color 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
-  margin-bottom: 6px;
+  background: #ffffff;
+}
+
+.beanthentic-contribution-item:last-child {
+  border-bottom: none;
 }
 
 .beanthentic-contribution-item:hover {
   background-color: #f8fafc;
-  border-color: #e5e7eb;
+  transform: translateX(4px);
+  z-index: 2;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 
 .beanthentic-contribution-item.unread {
-  background: #fafafa;
-  font-weight: 500;
+  background: #ffffff;
+}
+
+.beanthentic-contribution-item.unread::after {
+  display: none;
 }
 
 .beanthentic-contribution-checkbox {
@@ -7044,53 +7071,60 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: #4CAF50;
+  accent-color: #276749;
   cursor: pointer;
 }
 
 .beanthentic-contribution-star {
   margin-right: 0;
-  color: #757575;
+  color: #cbd5e1;
   cursor: pointer;
-  padding: 4px;
+  padding: 6px;
   border-radius: 50%;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 20px;
+  width: 32px;
+  height: 32px;
 }
 
 .beanthentic-contribution-star:hover {
-  background-color: #e0e0e0;
+  background-color: #f1f5f9;
+  color: #94a3b8;
 }
 
 .beanthentic-contribution-star.starred {
-  color: #4CAF50;
+  color: #eab308;
+}
+
+.beanthentic-contribution-star.starred i {
+  font-weight: 900;
 }
 
 .beanthentic-contribution-farmer {
-  width: auto;
   font-size: 14px;
-  color: #333333;
+  color: #1a202c;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: -0.01em;
 }
 
 .beanthentic-contribution-item.unread .beanthentic-contribution-farmer {
-  font-weight: 600;
+  color: #1a202c;
+  font-weight: 500;
 }
 
 .beanthentic-contribution-subject {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   min-width: 0;
   overflow: hidden;
-  flex-wrap: nowrap;
 }
 
 .beanthentic-contribution-subject-text {
@@ -7099,63 +7133,67 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 14px;
-  color: #333333;
+  color: #2d3748;
+  font-weight: 500;
 }
 
-.beanthentic-contribution-item.unread .beanthentic-contribution-subject {
-  font-weight: 600;
+.beanthentic-contribution-item.unread .beanthentic-contribution-subject-text {
+  color: #2d3748;
+  font-weight: 500;
 }
 
 .beanthentic-contribution-tags {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
 .beanthentic-tag {
-  padding: 2px 6px;
-  border-radius: 12px;
+  padding: 3px 10px;
+  border-radius: 6px;
   font-size: 11px;
-  font-weight: 500;
-  text-transform: none;
-  letter-spacing: 0.5px;
-}
-
-.beanthentic-tag--pending,
-.beanthentic-tag--approved,
-.beanthentic-tag--rejected,
-.beanthentic-tag--archived {
+  font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
 }
 
 .beanthentic-tag--pending {
-  background: #fff3cd;
-  color: #856404;
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fef3c7;
 }
 
 .beanthentic-tag--approved {
-  background: #d4edda;
-  color: #155724;
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #dcfce7;
 }
 
 .beanthentic-tag--rejected {
-  background: #f8d7da;
-  color: #721c24;
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fee2e2;
 }
 
 .beanthentic-tag--archived {
-  background: #e5e7eb;
-  color: #374151;
+  background: #f8fafc;
+  color: #475569;
+  border-color: #f1f5f9;
 }
 
 .beanthentic-tag--documents {
-  background: #cce5ff;
-  color: #004085;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #dbeafe;
+  text-transform: none;
 }
 
 .beanthentic-tag--images {
-  background: #f8d7da;
-  color: #721c24;
+  background: #fff1f2;
+  color: #be123c;
+  border-color: #ffe4e6;
+  text-transform: none;
 }
 
 .beanthentic-contribution-preview,
@@ -7270,10 +7308,198 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 }
 
 .beanthentic-detail-dialog__card h2 {
-  margin: 0 36px 10px 0;
+  display: none; /* Replaced by gmail-subject */
+}
+
+/* Gmail-style Detail View */
+.gmail-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+}
+
+.gmail-header-left {
+  display: flex;
+  gap: 12px;
+}
+
+.gmail-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #a38b7a;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 18px;
-  font-weight: 800;
-  color: #14532d;
+  font-weight: 500;
+}
+
+.gmail-sender-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.gmail-sender-line {
+  font-size: 14px;
+  color: #202124;
+}
+
+.gmail-email {
+  color: #5f6368;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+.gmail-to-me {
+  font-size: 12px;
+  color: #5f6368;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.gmail-header-right {
+  display: flex;
+  align-items: center;
+}
+
+.gmail-action-icons {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: #5f6368;
+}
+
+.gmail-action-icons i {
+  cursor: pointer;
+  font-size: 16px;
+  padding: 8px;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+
+.gmail-action-icons i:hover {
+  background: #f1f3f4;
+  color: #202124;
+}
+
+.gmail-timestamp {
+  font-size: 12px;
+  color: #5f6368;
+}
+
+.gmail-detail-content {
+  margin-bottom: 32px;
+}
+
+.gmail-subject {
+  font-size: 22px;
+  font-weight: 400;
+  color: #202124;
+  margin: 0 0 16px 0;
+}
+
+.gmail-body-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #3c4043;
+  white-space: pre-wrap;
+}
+
+.gmail-attachments-section {
+  border-top: 1px solid #e0e0e0;
+  padding-top: 16px;
+}
+
+.gmail-attachments-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #5f6368;
+  margin-bottom: 16px;
+}
+
+.gmail-dot {
+  font-size: 10px;
+}
+
+.gmail-info-icon {
+  font-size: 14px;
+}
+
+.gmail-attachments-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.gmail-attachments-actions:hover span {
+  text-decoration: underline;
+}
+
+.gmail-attachments-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.gmail-attachment-card {
+  width: 180px;
+  height: 130px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: box-shadow 0.2s;
+}
+
+.gmail-attachment-card:hover {
+  box-shadow: 0 1px 3px rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
+}
+
+.gmail-attachment-preview {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: #f8f9fa;
+}
+
+.gmail-attachment-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gmail-dog-ear {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, transparent 50%, #e0e0e0 50%);
+  pointer-events: none;
+}
+
+.gmail-dog-ear::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, transparent 50%, #fff 50%);
+  transform: scale(0.7);
+  transform-origin: bottom right;
 }
 
 .beanthentic-detail-dialog__meta {
@@ -7374,10 +7600,10 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 }
 
 .beanthentic-confirm-header {
-  background: #4CAF50;
+  background: #276749;
   color: white;
   padding: 16px 20px;
-  border-bottom: 1px solid #45a049;
+  border-bottom: 1px solid #1e523a;
 }
 
 .beanthentic-confirm-title {
@@ -7429,19 +7655,19 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 }
 
 .beanthentic-confirm-btn--ok {
-  background: #4CAF50;
+  background: #276749;
   color: white;
-  border: 1px solid #4CAF50;
+  border: 1px solid #276749;
 }
 
 .beanthentic-confirm-btn--ok:hover {
-  background: #45a049;
-  border-color: #45a049;
-  box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+  background: #1e523a;
+  border-color: #1e523a;
+  box-shadow: 0 2px 4px rgba(39, 103, 73, 0.3);
 }
 
 .beanthentic-confirm-btn:focus {
-  outline: 2px solid #4CAF50;
+  outline: 2px solid #276749;
   outline-offset: 2px;
 }
 

@@ -962,10 +962,6 @@
                   <i class="fa-solid fa-search"></i>
                   <input type="text" placeholder="Search farmer contributions..." id="beanthenticSearchInput">
                 </div>
-                <button class="beanthentic-add-btn" id="beanthenticAddBtn">
-                  <i class="fa-solid fa-plus"></i>
-                  Add Contribution
-                </button>
               </div>
             </div>
 
@@ -979,37 +975,6 @@
                     <div class="beanthentic-item-text">
                       <span class="beanthentic-item-title">All Contributions</span>
                       <span class="beanthentic-item-count">12</span>
-                    </div>
-                  </div>
-                </div>
-                <div class="beanthentic-sidebar-item" data-filter="pending">
-                  <div class="beanthentic-item-content">
-                    <i class="fa-solid fa-hourglass-half"></i>
-                    <div class="beanthentic-item-text">
-                      <span class="beanthentic-item-title">Pending Review</span>
-                      <span class="beanthentic-item-count">3</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div class="beanthentic-sidebar-section">
-                  <h3>View Status</h3>
-                  <div class="beanthentic-sidebar-item" data-filter="seen">
-                    <div class="beanthentic-item-content">
-                      <i class="fa-solid fa-eye"></i>
-                      <div class="beanthentic-item-text">
-                        <span class="beanthentic-item-title">Seen</span>
-                        <span class="beanthentic-item-count">2</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="beanthentic-sidebar-item" data-filter="unseen">
-                    <div class="beanthentic-item-content">
-                      <i class="fa-solid fa-eye-slash"></i>
-                      <div class="beanthentic-item-text">
-                        <span class="beanthentic-item-title">Unseen</span>
-                        <span class="beanthentic-item-count">2</span>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1046,22 +1011,12 @@
                     <button class="beanthentic-toolbar-btn" title="Archive">
                       <i class="fa-solid fa-archive"></i>
                     </button>
-                    <button class="beanthentic-toolbar-btn" title="Report Issue">
-                      <i class="fa-solid fa-exclamation-triangle"></i>
-                    </button>
                     <button class="beanthentic-toolbar-btn" title="Delete">
                       <i class="fa-solid fa-trash"></i>
                     </button>
                     <div class="beanthentic-divider"></div>
                     <button class="beanthentic-toolbar-btn" title="Mark as Reviewed">
                       <i class="fa-solid fa-eye"></i>
-                    </button>
-                    <button class="beanthentic-toolbar-btn" title="Mark as New">
-                      <i class="fa-solid fa-envelope"></i>
-                    </button>
-                    <div class="beanthentic-divider"></div>
-                    <button class="beanthentic-toolbar-btn" title="Snooze">
-                      <i class="fa-solid fa-clock"></i>
                     </button>
                   </div>
                   <div class="beanthentic-toolbar-right">
@@ -1087,11 +1042,6 @@
                     <div class="beanthentic-contribution-farmer">Juan Dela Cruz</div>
                     <div class="beanthentic-contribution-subject">
                       <span class="beanthentic-contribution-subject-text">GI Certification Application - Farm ID #1234</span>
-                      <span class="beanthentic-contribution-tags">
-                        <span class="beanthentic-tag beanthentic-tag--pending">pending</span>
-                        <span class="beanthentic-tag beanthentic-tag--documents">Document</span>
-                      </span>
-                      <span class="beanthentic-contribution-preview-inline">Submitted complete documentation for geographical indication certification including farm ownership papers and coffee variety verification...</span>
                     </div>
                   </div>
 
@@ -1105,11 +1055,6 @@
                     <div class="beanthentic-contribution-farmer">Maria Santos</div>
                     <div class="beanthentic-contribution-subject">
                       <span class="beanthentic-contribution-subject-text">Farm Photos - Harvest Season 2026</span>
-                      <span class="beanthentic-contribution-tags">
-                        <span class="beanthentic-tag beanthentic-tag--approved">approved</span>
-                        <span class="beanthentic-tag beanthentic-tag--images">Image</span>
-                      </span>
-                      <span class="beanthentic-contribution-preview-inline">High-resolution images of coffee farm during harvest season showing ripe cherries and processing facilities...</span>
                     </div>
                   </div>
 
@@ -1123,11 +1068,6 @@
                     <div class="beanthentic-contribution-farmer">Roberto Reyes</div>
                     <div class="beanthentic-contribution-subject">
                       <span class="beanthentic-contribution-subject-text">Land Title Documents</span>
-                      <span class="beanthentic-contribution-tags">
-                        <span class="beanthentic-tag beanthentic-tag--pending">pending</span>
-                        <span class="beanthentic-tag beanthentic-tag--documents">Document</span>
-                      </span>
-                      <span class="beanthentic-contribution-preview-inline">Scanned copies of land ownership certificates and property tax receipts for farm verification...</span>
                     </div>
                   </div>
 
@@ -1141,11 +1081,6 @@
                     <div class="beanthentic-contribution-farmer">Carmela Lopez</div>
                     <div class="beanthentic-contribution-subject">
                       <span class="beanthentic-contribution-subject-text">Coffee Processing Equipment Images</span>
-                      <span class="beanthentic-contribution-tags">
-                        <span class="beanthentic-tag beanthentic-tag--approved">approved</span>
-                        <span class="beanthentic-tag beanthentic-tag--images">Image</span>
-                      </span>
-                      <span class="beanthentic-contribution-preview-inline">Professional photographs of coffee processing equipment including drying beds and milling machines...</span>
                     </div>
                   </div>
                 </div>
@@ -1176,33 +1111,61 @@
                 <i class="fa-solid fa-xmark" aria-hidden="true"></i>
               </button>
 
-              <h2 id="beanthenticContributionDetailTitle">Contribution Details</h2>
-
-              <div class="beanthentic-detail-dialog__meta">
-                <div>
-                  <div class="beanthentic-detail-dialog__meta-label">Farmer</div>
-                  <div class="beanthentic-detail-dialog__meta-value" id="beanthenticContributionDetailFarmer">—</div>
+              <div class="gmail-detail-header">
+                <div class="gmail-header-left">
+                  <div class="gmail-avatar" id="gmailAvatar">S</div>
+                  <div class="gmail-sender-info">
+                    <div class="gmail-sender-line">
+                      <strong id="beanthenticContributionDetailFarmer">Softy Luna</strong>
+                      <span class="gmail-email" id="beanthenticContributionDetailEmail">&lt;softyluna001@gmail.com&gt;</span>
+                    </div>
+                    <div class="gmail-to-me">
+                      to me <i class="fa-solid fa-caret-down"></i>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div class="beanthentic-detail-dialog__meta-label">Date</div>
-                  <div class="beanthentic-detail-dialog__meta-value" id="beanthenticContributionDetailDate">—</div>
+                <div class="gmail-header-right">
+                  <div class="gmail-action-icons">
+                    <i class="fa-regular fa-star" title="Star"></i>
+                  </div>
                 </div>
               </div>
 
-              <div class="beanthentic-detail-dialog__subject" id="beanthenticContributionDetailSubject"></div>
-
-              <div class="beanthentic-detail-dialog__tags">
-                <span
-                  id="beanthenticContributionDetailStatus"
-                  class="beanthentic-tag beanthentic-tag--pending"
-                >Pending</span>
-                <span
-                  id="beanthenticContributionDetailCategory"
-                  class="beanthentic-tag beanthentic-tag--documents"
-                >Document</span>
+              <div class="gmail-detail-content">
+                <h2 id="beanthenticContributionDetailSubject" class="gmail-subject">Contribution Details</h2>
+                <div class="gmail-body-text" id="beanthenticContributionDetailPreview">
+                  Submitted complete documentation for geographical indication certification including farm ownership papers and coffee variety verification...
+                </div>
               </div>
 
-              <div class="beanthentic-detail-dialog__preview" id="beanthenticContributionDetailPreview"></div>
+              <div class="gmail-attachments-section">
+                <div class="gmail-attachments-header">
+                  <span id="gmailAttachmentCount">4 Attachments</span>
+                  <span class="gmail-dot">•</span>
+                  <span>Scanned by Gmail</span>
+                  <i class="fa-solid fa-circle-info gmail-info-icon"></i>
+                  <div class="gmail-attachments-actions">
+                    <i class="fa-solid fa-download" title="Download all"></i>
+                    <i class="fa-solid fa-folder-plus" title="Add all to Drive"></i>
+                    <span>Add all to Drive</span>
+                  </div>
+                </div>
+                <div class="gmail-attachments-grid" id="gmailAttachmentsGrid">
+                  <!-- Attachment cards will be populated here -->
+                  <div class="gmail-attachment-card">
+                    <div class="gmail-attachment-preview">
+                      <img src="/static/img/doc-preview-1.png" alt="Document 1">
+                      <div class="gmail-dog-ear"></div>
+                    </div>
+                  </div>
+                  <div class="gmail-attachment-card">
+                    <div class="gmail-attachment-preview">
+                      <img src="/static/img/doc-preview-2.png" alt="Document 2">
+                      <div class="gmail-dog-ear"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1935,6 +1898,7 @@
 
           <!-- Account Module -->
           <div class="module hidden" id="account-module" data-module="account">
+<<<<<<< Updated upstream
             <section class="module-header">
               <h1>Account</h1>
               <p>Manage your administrator account</p>
@@ -1983,6 +1947,148 @@
                       <span>Log out</span>
                     </button>
                   </div>
+=======
+            <header class="system-module-header">
+              <div class="header-left">
+                <h1>My Profile</h1>
+              </div>
+              <div class="header-right">
+                <div class="header-search-container">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" placeholder="Search profile settings..." readonly />
+                </div>
+                <button type="button" class="header-btn-primary" id="openEditProfileModalBtn">
+                  <i class="fa-solid fa-plus"></i>
+                  <span>Update Profile</span>
+                </button>
+              </div>
+            </header>
+            
+            <div class="account-profile-container">
+              <!-- Sidebar and Content Layout -->
+              <div class="profile-system-layout">
+                <aside class="profile-system-sidebar">
+                  <div class="sidebar-group">
+                    <button class="sidebar-item active">
+                      <i class="fa-solid fa-user"></i>
+                      <span>Personal Info</span>
+                    </button>
+                    <button class="sidebar-item">
+                      <i class="fa-solid fa-shield-halved"></i>
+                      <span>Security</span>
+                    </button>
+                  </div>
+                  
+                  <div class="sidebar-label">ACCOUNT STATUS</div>
+                  <div class="sidebar-group">
+                    <div class="sidebar-status-item">
+                      <i class="fa-solid fa-circle-check"></i>
+                      <span>Active Account</span>
+                    </div>
+                  </div>
+                </aside>
+
+                <main class="profile-system-main">
+                  <!-- Header Card -->
+                  <div class="profile-header-card-alt">
+                    <div class="profile-avatar-wrapper">
+                      <div class="profile-avatar-main">
+                        <i class="fa-solid fa-user"></i>
+                      </div>
+                      <button class="avatar-camera-btn">
+                        <i class="fa-solid fa-camera"></i>
+                      </button>
+                    </div>
+                    <div class="profile-hero-info">
+                      <h2 id="accountHeroName">Loading...</h2>
+                      <p class="hero-role">Administrator</p>
+                      <p class="hero-subtext">Leeds, United Kingdom</p>
+                    </div>
+                  </div>
+
+                  <!-- Personal Information Card -->
+                  <div class="profile-content-card">
+                    <div class="content-card-header">
+                      <h3>Personal Information</h3>
+                      <button type="button" class="btn-system-edit" id="openEditProfileModalBtnAlt">
+                        <span>Edit</span>
+                        <i class="fa-solid fa-pen"></i>
+                      </button>
+                    </div>
+                    <div class="content-card-grid">
+                      <div class="data-item">
+                        <label>First Name</label>
+                        <p id="accountFirstName">Loading...</p>
+                      </div>
+                      <div class="data-item">
+                        <label>Last Name</label>
+                        <p id="accountLastName">Loading...</p>
+                      </div>
+                      <div class="data-item">
+                        <label>Date of Birth</label>
+                        <p>12-10-1990</p>
+                      </div>
+                      <div class="data-item">
+                        <label>Email Address</label>
+                        <p>info@binary-fusion.com</p>
+                      </div>
+                      <div class="data-item">
+                        <label>Phone Number</label>
+                        <p id="accountPhone">Loading...</p>
+                      </div>
+                      <div class="data-item">
+                        <label>User Role</label>
+                        <p><span class="badge-system badge-green">ADMIN</span></p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Address Card -->
+                  <div class="profile-content-card">
+                    <div class="content-card-header">
+                      <h3>Address</h3>
+                      <button type="button" class="btn-system-edit-secondary">
+                        <span>Edit</span>
+                        <i class="fa-solid fa-pen"></i>
+                      </button>
+                    </div>
+                    <div class="content-card-grid">
+                      <div class="data-item">
+                        <label>Country</label>
+                        <p>United Kingdom</p>
+                      </div>
+                      <div class="data-item">
+                        <label>City</label>
+                        <p>Leeds, East London</p>
+                      </div>
+                      <div class="data-item">
+                        <label>Postal Code</label>
+                        <p>ERT 1254</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Security Actions -->
+                  <div class="profile-content-card">
+                    <div class="security-flex-header">
+                      <h3>Security & Access</h3>
+                      <div class="security-actions-group">
+                        <button type="button" class="btn-system-secondary" id="manageSettingsBtn">
+                          <i class="fa-solid fa-sliders"></i>
+                          <span>Advanced Settings</span>
+                        </button>
+                        <button type="button" class="btn-system-danger" id="logoutBtn">
+                          <i class="fa-solid fa-right-from-bracket"></i>
+                          <span>Log out</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </main>
+              </div>
+            </div>
+          </div>
+>>>>>>> Stashed changes
 
                   <div class="account-tools">
                     <section class="account-tool-card" aria-label="Quick profile update">

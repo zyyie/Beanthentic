@@ -6811,12 +6811,6 @@ class DashboardApp {
       });
     }
 
-    // Add Contribution button
-    const addBtn = document.getElementById('beanthenticAddBtn');
-    if (addBtn) {
-      addBtn.addEventListener('click', () => this.showAddContributionModal());
-    }
-
     // Sidebar navigation
     const sidebarItems = document.querySelectorAll('.beanthentic-sidebar-item');
     console.log('Found sidebar items:', sidebarItems.length);
@@ -6990,11 +6984,6 @@ class DashboardApp {
         <div class="beanthentic-contribution-farmer">${contribution.farmer}</div>
         <div class="beanthentic-contribution-subject">
           <span class="beanthentic-contribution-subject-text">${contribution.subject}</span>
-          <span class="beanthentic-contribution-tags">
-            <span class="beanthentic-tag beanthentic-tag--${contribution.status}">${contribution.status}</span>
-            <span class="beanthentic-tag beanthentic-tag--${contribution.category}">${this.getContributionCategoryLabel(contribution.category)}</span>
-          </span>
-          <span class="beanthentic-contribution-preview-inline">${contribution.preview}</span>
         </div>
       </div>
     `).join('');
@@ -7048,20 +7037,11 @@ class DashboardApp {
       case 'Archive':
         this.archiveContributions();
         break;
-      case 'Report Issue':
-        this.reportIssues();
-        break;
       case 'Delete':
         this.deleteContributions();
         break;
       case 'Mark as Reviewed':
         this.markAsReviewed();
-        break;
-      case 'Mark as New':
-        this.markAsNew();
-        break;
-      case 'Snooze':
-        this.snoozeContributions();
         break;
       case 'Refresh':
         this.refreshContributions();
@@ -7113,32 +7093,9 @@ class DashboardApp {
     this.showNotification(`${selected.length} contribution(s) marked as reviewed`, 'success');
   }
 
-  markAsNew() {
-    const selected = Array.from(this.selectedContributions);
-    selected.forEach(id => {
-      const contribution = this.contributions.find(c => c.id === id);
-      if (contribution) {
-        contribution.unread = true;
-      }
-    });
-    this.selectedContributions.clear();
-    this.renderContributions();
-    this.showNotification(`${selected.length} contribution(s) marked as new`, 'success');
-  }
-
-  snoozeContributions() {
-    this.showNotification('Contributions snoozed for 1 week', 'success');
-    this.selectedContributions.clear();
-    this.renderContributions();
-  }
-
   refreshContributions() {
     this.showNotification('Contributions refreshed', 'success');
     this.renderContributions();
-  }
-
-  reportIssues() {
-    this.showNotification('Issue reported to admin', 'success');
   }
 
   showMoreOptions() {
@@ -7160,26 +7117,42 @@ class DashboardApp {
     if (!modal || !contribution) return;
 
     const farmerEl = document.getElementById('beanthenticContributionDetailFarmer');
-    const dateEl = document.getElementById('beanthenticContributionDetailDate');
+    const emailEl = document.getElementById('beanthenticContributionDetailEmail');
+    const avatarEl = document.getElementById('gmailAvatar');
     const subjectEl = document.getElementById('beanthenticContributionDetailSubject');
-    const statusEl = document.getElementById('beanthenticContributionDetailStatus');
-    const categoryEl = document.getElementById('beanthenticContributionDetailCategory');
     const previewEl = document.getElementById('beanthenticContributionDetailPreview');
+    const attachmentGrid = document.getElementById('gmailAttachmentsGrid');
+    const attachmentCount = document.getElementById('gmailAttachmentCount');
 
     if (farmerEl) farmerEl.textContent = contribution.farmer || '—';
-    if (dateEl) dateEl.textContent = contribution.date || '—';
+    if (emailEl) emailEl.textContent = `<${(contribution.farmer || '').toLowerCase().replace(/\s+/g, '')}@gmail.com>`;
+    if (avatarEl) avatarEl.textContent = (contribution.farmer || 'F').charAt(0).toUpperCase();
     if (subjectEl) subjectEl.textContent = contribution.subject || '—';
     if (previewEl) previewEl.textContent = contribution.preview || 'No details available.';
 
-    if (statusEl) {
-      statusEl.textContent = contribution.status || 'pending';
-      statusEl.className = `beanthentic-tag beanthentic-tag--${contribution.status || 'pending'}`;
-    }
+    // Clear and populate attachments
+    if (attachmentGrid) {
+      attachmentGrid.innerHTML = '';
+      const attachments = contribution.attachments || [
+        { id: 1, type: 'image', src: '/static/img/doc-preview-1.png' },
+        { id: 2, type: 'image', src: '/static/img/doc-preview-2.png' }
+      ];
 
-    if (categoryEl) {
-      const category = contribution.category || 'documents';
-      categoryEl.textContent = this.getContributionCategoryLabel(category);
-      categoryEl.className = `beanthentic-tag beanthentic-tag--${category}`;
+      if (attachmentCount) {
+        attachmentCount.textContent = `${attachments.length} Attachment${attachments.length !== 1 ? 's' : ''}`;
+      }
+
+      attachments.forEach(att => {
+        const card = document.createElement('div');
+        card.className = 'gmail-attachment-card';
+        card.innerHTML = `
+          <div class="gmail-attachment-preview">
+            <img src="${att.src}" alt="Attachment ${att.id}">
+            <div class="gmail-dog-ear"></div>
+          </div>
+        `;
+        attachmentGrid.appendChild(card);
+      });
     }
 
     modal.removeAttribute('hidden');
@@ -7196,10 +7169,6 @@ class DashboardApp {
     document.body.classList.remove('beanthentic-dialog-open');
   }
 
-  showAddContributionModal() {
-    this.showNotification('Add Contribution modal - Feature coming soon!', 'info');
-  }
-
   showNotification(message, type = 'info') {
     // Create notification element
     const notification = document.createElement('div');
@@ -7210,7 +7179,7 @@ class DashboardApp {
       top: 20px;
       right: 20px;
       padding: 12px 20px;
-      background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : type === 'warning' ? '#ff9800' : '#2196F3'};
+      background: ${type === 'success' ? '#276749' : type === 'error' ? '#f44336' : type === 'warning' ? '#ff9800' : '#2196F3'};
       color: white;
       border-radius: 4px;
       z-index: 9999;
