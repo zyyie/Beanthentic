@@ -1,0 +1,253 @@
+/* Modules Enhancement - Modern UI Overrides */
+
+/* 1. Global View Details Button */
+.view-details-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    background: #ffffff;
+    color: #8b4a2b;
+    border: 1px solid #e9dfd6;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.view-details-btn:hover {
+    background: #fdfaf7;
+    color: #7a3f24;
+    border-color: #dccbc0;
+    transform: translateX(2px);
+}
+
+.view-details-btn i {
+    font-size: 0.75rem;
+    transition: transform 0.2s ease;
+}
+
+/* 2. Transactions Module Enhancements */
+#transactions-module .txn-container {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    border: 1px solid #f0f0f0;
+}
+
+#transactions-module .txn-header h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1a4d33;
+    margin-bottom: 20px;
+}
+
+#transactions-module .txn-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    background: #f8fafc;
+    padding: 16px;
+    border-radius: 12px;
+}
+
+#transactions-module .txn-search {
+    position: relative;
+    flex: 1;
+    max-width: 400px;
+}
+
+#transactions-module .txn-search i {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+}
+
+#transactions-module .txn-search input {
+    width: 100%;
+    height: 42px;
+    padding: 0 16px 0 40px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    background: #ffffff;
+}
+
+#transactions-module .txn-filters {
+    display: flex;
+    gap: 12px;
+}
+
+#transactions-module .txn-select {
+    height: 42px;
+    padding: 0 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    background: #ffffff;
+    color: #475569;
+    font-weight: 500;
+}
+
+#transactions-module .txn-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+#transactions-module .txn-table th {
+    background: #f8fafc;
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid #f1f5f9;
+}
+
+#transactions-module .txn-table td {
+    padding: 16px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.95rem;
+    color: #334155;
+}
+
+#transactions-module .txn-table tr:hover td {
+    background: #fcfdfe;
+}
+
+#transactions-module .txn-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+}
+
+#transactions-module .txn-icon-green { background: #dcfce7; color: #166534; }
+#transactions-module .txn-icon-red { background: #fee2e2; color: #991b1b; }
+#transactions-module .txn-icon-gray { background: #f1f5f9; color: #475569; }
+
+#transactions-module .txn-date { font-weight: 600; display: block; }
+#transactions-module .txn-type { font-size: 0.8rem; color: #94a3b8; }
+
+#transactions-module .txn-pagination {
+    margin-top: 24px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* 3. Farmer's Contribution Module Enhancements */
+#register-module .beanthentic-header {
+    background: #ffffff;
+    padding: 20px 24px;
+    border-radius: 16px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+    margin-bottom: 24px;
+    border: 1px solid #f0f0f0;
+}
+
+#register-module .beanthentic-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #1a4d33;
+}
+
+#register-module .beanthentic-add-btn {
+    background: #2d6a4f;
+    color: #ffffff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#register-module .beanthentic-sidebar {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 16px;
+    border: 1px solid #f0f0f0;
+}
+
+#register-module .beanthentic-sidebar-item {
+    padding: 12px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: 4px;
+}
+
+#register-module .beanthentic-sidebar-item.active {
+    background: #ecfdf5;
+    color: #065f46;
+}
+
+#register-module .beanthentic-contribution-item {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    border: 1px solid #f0f0f0;
+    transition: all 0.2s ease;
+}
+
+#register-module .beanthentic-contribution-item:hover {
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+    transform: translateY(-2px);
+    border-color: #2d6a4f;
+}
+
+#register-module .beanthentic-contribution-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+#register-module .beanthentic-contribution-actions {
+    margin-left: auto;
+}
+
+#register-module .beanthentic-tag {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+#register-module .beanthentic-tag--pending { background: #fef3c7; color: #92400e; }
+#register-module .beanthentic-tag--approved { background: #dcfce7; color: #166534; }
+
+/* 4. Client Report Module Enhancements */
+#client-report-module .table-section {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    border: 1px solid #f0f0f0;
+}
+
+#client-report-module .client-report-controls {
+    display: flex;
+    gap: 12px;
+    background: #f8fafc;
+    padding: 12px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}

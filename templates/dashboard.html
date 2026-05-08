@@ -18,7 +18,9 @@
   <link rel="stylesheet" href="css/responsive.css">
   <link rel="stylesheet" href="css/ipophl-analyzer.css">
   <link rel="stylesheet" href="css/account-module.css">
+  <link rel="stylesheet" href="css/farmer-profile.css">
   <link rel="stylesheet" href="css/messaging-module.css">
+  <link rel="stylesheet" href="css/modules-enhancement.css">
   <!-- Icon library -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   
@@ -536,99 +538,214 @@
                   </button>
                 </div>
 
-                <div class="farmer-profile-card" aria-label="Farmer profile">
-                  <aside class="farmer-profile-left">
-                    <div class="farmer-profile-avatar" aria-hidden="true">
-                      <i class="fa-solid fa-user"></i>
-                    </div>
-                    <h2 class="farmer-profile-name" id="farmerProfileName">Full Name</h2>
-                    <p class="farmer-profile-no" id="farmerProfileNo">No. #</p>
-
-                    <div class="farmer-profile-meta">
-                      <div class="farmer-profile-meta-row">
-                        <span class="meta-label">Date of Birth</span>
-                        <span class="meta-value" id="farmerProfileDob">—</span>
-                      </div>
-                      <div class="farmer-profile-meta-row">
-                        <span class="meta-label">Phone No.</span>
-                        <span class="meta-value" id="farmerProfilePhone">—</span>
-                      </div>
-                      <div class="farmer-profile-meta-row">
-                        <span class="meta-label">Current Address</span>
-                        <span class="meta-value" id="farmerProfileAddress">—</span>
-                      </div>
-                    </div>
-                  </aside>
-
-                  <section class="farmer-profile-right">
-                    <div class="farmer-profile-tabs" role="tablist">
-                      <button class="farmer-profile-tab-btn active" data-profile-tab="personal" role="tab" aria-selected="true">Personal Info</button>
-                      <button class="farmer-profile-tab-btn" data-profile-tab="affiliation" role="tab" aria-selected="false">Affiliation & Status</button>
-                      <button class="farmer-profile-tab-btn" data-profile-tab="farm" role="tab" aria-selected="false">Farm Details</button>
-                    </div>
-
-                    <div class="farmer-profile-content">
-                      <div class="farmer-profile-pane active" id="profilePanePersonal">
-                        <h3 class="pane-title">Personal Information</h3>
-                        <div class="farmer-profile-grid">
-                          <div class="form-group">
-                            <label>Last Name</label>
-                            <input id="farmerProfileLastName" type="text" disabled />
+                <div class="farmer-profile-layout-new">
+                  <!-- Left Column -->
+                  <div class="farmer-profile-column-left">
+                    <!-- Unified Profile & Details Card -->
+                    <div class="farmer-unified-profile-card">
+                      <!-- Top Section: Basic Info -->
+                      <div class="profile-card-top-section">
+                        <div class="farmer-profile-avatar-large">
+                          <i class="fa-solid fa-user"></i>
+                        </div>
+                        <h2 class="farmer-profile-name" id="farmerProfileName">Full Name</h2>
+                        <p class="farmer-profile-id" id="farmerProfileNo">No. #</p>
+                        <div class="farmer-profile-actions-btns">
+                          <button class="btn-profile-action"><i class="fa-solid fa-comment-dots"></i> TEXT</button>
+                          <button class="btn-profile-action"><i class="fa-solid fa-envelope"></i> EMAIL</button>
+                        </div>
+                        
+                        <div class="farmer-profile-demographics">
+                          <div class="demo-item">
+                            <span class="demo-label">Date of Birth</span>
+                            <span class="demo-value" id="farmerProfileDob">—</span>
                           </div>
-                          <div class="form-group">
-                            <label>First Name</label>
-                            <input id="farmerProfileFirstName" type="text" disabled />
+                          <div class="demo-item">
+                            <span class="demo-label">Phone No.</span>
+                            <span class="demo-value" id="farmerProfilePhone">—</span>
                           </div>
-                          <div class="form-group">
-                            <label>Province</label>
-                            <input id="farmerProfileProvince" type="text" disabled />
-                          </div>
-                          <div class="form-group">
-                            <label>Municipality</label>
-                            <input id="farmerProfileMunicipality" type="text" disabled />
-                          </div>
-                          <div class="form-group">
-                            <label>Barangay</label>
-                            <input id="farmerProfileBarangay" type="text" disabled />
+                          <div class="demo-item">
+                            <span class="demo-label">Current Address</span>
+                            <span class="demo-value" id="farmerProfileAddress">—</span>
                           </div>
                         </div>
                       </div>
 
-                      <div class="farmer-profile-pane" id="profilePaneAffiliation" hidden>
-                        <h3 class="pane-title">Affiliation & Status</h3>
-                        <div class="farmer-profile-grid">
-                          <div class="form-group">
-                            <label>Federation Association</label>
-                            <input id="farmerProfileFederation" type="text" disabled />
-                          </div>
-                          <div class="form-group">
-                            <label>RSBSA Registered</label>
-                            <input id="farmerProfileRsbsa" type="text" disabled />
-                          </div>
-                          <div class="form-group">
-                            <label>RSBSA Registered Number</label>
-                            <input id="farmerProfileRsbsaNumber" type="text" disabled />
-                          </div>
+                      <!-- Bottom Section: Registration Details (Collapsible) -->
+                      <div class="profile-card-details-section">
+                        <div class="details-collapsible-content" id="detailsScrollArea">
+                          <!-- Personal Information -->
+                          <section class="registration-detail-section">
+                            <h3>Personal Information</h3>
+                            <div class="registration-detail-grid">
+                              <div class="detail-field">
+                                <label>Last Name</label>
+                                <span id="farmerProfileLastNameText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>First Name</label>
+                                <span id="farmerProfileFirstNameText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Province</label>
+                                <span id="farmerProfileProvinceText" class="bold-value">Batangas</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Municipality</label>
+                                <span id="farmerProfileMunicipalityText" class="bold-value">Lipa City</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Barangay</label>
+                                <span id="farmerProfileBarangayText" class="bold-value">—</span>
+                              </div>
+                            </div>
+                          </section>
+
+                          <!-- Affiliation -->
+                          <section class="registration-detail-section">
+                            <h3>Affiliation & Status</h3>
+                            <div class="registration-detail-grid">
+                              <div class="detail-field">
+                                <label>Federation Association</label>
+                                <span id="farmerProfileFederationText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>RSBSA Registered</label>
+                                <span id="farmerProfileRsbsaText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>RSBSA Registered Number</label>
+                                <span id="farmerProfileRsbsaNumberText" class="bold-value">—</span>
+                              </div>
+                            </div>
+                          </section>
+
+                          <!-- Farm Information -->
+                          <section class="registration-detail-section">
+                            <h3>Farm Information</h3>
+                            <div class="registration-detail-grid">
+                              <div class="detail-field">
+                                <label>Status of Ownership</label>
+                                <span id="farmerProfileOwnershipText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Total Plant Area</label>
+                                <span id="farmerProfileTotalAreaText" class="bold-value">—</span>
+                              </div>
+                            </div>
+                          </section>
+
+                          <!-- Tree Counts -->
+                          <section class="registration-detail-section">
+                            <h3>Tree Counts</h3>
+                            <div class="tree-counts-grid">
+                              <div class="tree-count-item">
+                                <label>Liberica (Kapeng Barako)<span>Number of Bearing</span></label>
+                                <span id="farmerProfileLibBearingText" class="bold-value">0</span>
+                              </div>
+                              <div class="tree-count-item">
+                                <label>Liberica (Kapeng Barako)<span>Number of Non Bearing</span></label>
+                                <span id="farmerProfileLibNonBearingText" class="bold-value">0</span>
+                              </div>
+                              <div class="tree-count-item">
+                                <label>Robusta<span>Number of Bearing</span></label>
+                                <span id="farmerProfileRobBearingText" class="bold-value">0</span>
+                              </div>
+                              <div class="tree-count-item">
+                                <label>Robusta<span>Number of Non Bearing</span></label>
+                                <span id="farmerProfileRobNonBearingText" class="bold-value">0</span>
+                              </div>
+                              <div class="tree-count-item">
+                                <label>Excelsa<span>Number of Bearing</span></label>
+                                <span id="farmerProfileExcBearingText" class="bold-value">0</span>
+                              </div>
+                              <div class="tree-count-item">
+                                <label>Excelsa<span>Number of Non Bearing</span></label>
+                                <span id="farmerProfileExcNonBearingText" class="bold-value">0</span>
+                              </div>
+                            </div>
+                          </section>
+
+                          <!-- Production -->
+                          <section class="registration-detail-section">
+                            <h3>Production <span class="year-label">(2026)</span></h3>
+                            <div class="registration-detail-grid">
+                              <div class="detail-field">
+                                <label>Liberica (Kapeng Barako)</label>
+                                <span id="farmerProfileLibProdText" class="bold-value">0</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Robusta</label>
+                                <span id="farmerProfileRobProdText" class="bold-value">0</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Excelsa</label>
+                                <span id="farmerProfileExcProdText" class="bold-value">0</span>
+                              </div>
+                            </div>
+                          </section>
                         </div>
+                        
+                        <div class="details-blur-overlay" id="detailsBlurOverlay"></div>
+                        <button class="btn-see-more" id="btnSeeMoreDetails">See more</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Right Column -->
+                  <div class="farmer-profile-column-right">
+                    <!-- Bean Summary Section -->
+                    <div class="farmer-bean-summary-container">
+                      <div class="bean-variety-tabs">
+                        <button class="bean-variety-btn active">All</button>
+                        <button class="bean-variety-btn">Liberica</button>
+                        <button class="bean-variety-btn">Excelsa</button>
+                        <button class="bean-variety-btn">Robusta</button>
                       </div>
 
-                      <div class="farmer-profile-pane" id="profilePaneFarm" hidden>
-                        <h3 class="pane-title">Farm Details</h3>
-                        <div class="farmer-profile-grid">
-                          <div class="form-group">
-                            <label>Status Ownership</label>
-                            <input id="farmerProfileOwnership" type="text" disabled />
+                      <div class="bean-stats-grid">
+                        <div class="bean-stat-card initial">
+                          <div class="bean-stat-header">
+                            <span class="bean-stat-title">Initial Beans</span>
+                            <span class="bean-stat-date" id="initialBeansDate">October 23, 2025</span>
                           </div>
-                          <div class="form-group">
-                            <label>Total Plant Area</label>
-                            <input id="farmerProfileTotalArea" type="text" disabled />
+                          <div class="bean-stat-value"><span id="initialBeansValue">50</span>KG</div>
+                        </div>
+                        <div class="bean-stat-card remaining">
+                          <div class="bean-stat-header">
+                            <span class="bean-stat-title">Beans Remaining</span>
+                            <span class="bean-stat-date" id="remainingBeansDate">May 7, 2026</span>
                           </div>
+                          <div class="bean-stat-value"><span id="remainingBeansValue">7</span>KG</div>
                         </div>
                       </div>
                     </div>
-                  </section>
+
+                    <div class="farmer-transactions-card">
+                      <div class="transactions-card-header">
+                        <div class="transactions-tabs">
+                          <button class="txn-tab active">Transactions</button>
+                        </div>
+                      </div>
+                      <div class="transactions-table-container">
+                        <table class="farmer-txn-table">
+                          <thead>
+                            <tr>
+                              <th>DATE</th>
+                              <th>DESCRIPTION</th>
+                              <th>RESULTS</th>
+                            </tr>
+                          </thead>
+                          <tbody id="farmerTransactionsBody">
+                            <!-- Populated by dashboard.js -->
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
+
             </section>
           </div>
 
@@ -727,10 +844,10 @@
                 <article class="maps-panel">
                   <h2>Map Layers</h2>
                   <ul class="map-layers-list">
-                    <li><span>Farmer Locations</span><span class="layer-toggle is-on" aria-hidden="true"></span></li>
-                    <li><span>Farm Boundaries</span><span class="layer-toggle is-on" aria-hidden="true"></span></li>
-                    <li><span>Density Heatmap</span><span class="layer-toggle" aria-hidden="true"></span></li>
-                    <li><span>Road Network</span><span class="layer-toggle" aria-hidden="true"></span></li>
+                    <li><span>Farmer Locations</span><span id="toggleFarmerLocations" class="layer-toggle is-on" aria-hidden="true"></span></li>
+                    <li><span>Farm Boundaries</span><span id="toggleFarmBoundaries" class="layer-toggle is-on" aria-hidden="true"></span></li>
+                    <li><span>Density Heatmap</span><span id="toggleDensityHeatmap" class="layer-toggle" aria-hidden="true"></span></li>
+                    <li><span>Road Network</span><span id="toggleRoadNetwork" class="layer-toggle" aria-hidden="true"></span></li>
                   </ul>
                 </article>
               </aside>
@@ -798,7 +915,8 @@
                       <th class="txn-col-customer">Customer Name</th>
                       <th class="txn-col-product">Product</th>
                       <th class="txn-col-scale">Product Scale</th>
-                      <th class="txn-col-status"></th>
+                      <th class="txn-col-status">Status</th>
+                      <th class="txn-col-action"></th>
                     </tr>
                   </thead>
                   <tbody id="transactionsTableBody">
@@ -817,6 +935,11 @@
                       <td class="txn-col-product">Liberica</td>
                       <td class="txn-col-scale">50 kg</td>
                       <td class="txn-col-status"><i class="fa-regular fa-circle-check txn-status-success"></i></td>
+                      <td class="txn-col-action">
+                        <button type="button" class="view-details-btn">
+                          View Details <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                      </td>
                     </tr>
                     <tr>
                       <td class="txn-col-farmer">Maria Santos</td>
@@ -833,6 +956,11 @@
                       <td class="txn-col-product">Excelsa</td>
                       <td class="txn-col-scale">100 kg</td>
                       <td class="txn-col-status"><i class="fa-regular fa-circle-check txn-status-success"></i></td>
+                      <td class="txn-col-action">
+                        <button type="button" class="view-details-btn">
+                          View Details <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                      </td>
                     </tr>
                     <tr>
                       <td class="txn-col-farmer">Roberto Reyes</td>
@@ -962,6 +1090,10 @@
                   <i class="fa-solid fa-search"></i>
                   <input type="text" placeholder="Search farmer contributions..." id="beanthenticSearchInput">
                 </div>
+                <button class="beanthentic-add-btn" id="beanthenticAddBtn">
+                  <i class="fa-solid fa-plus"></i>
+                  Add Contribution
+                </button>
               </div>
             </div>
 
@@ -975,6 +1107,37 @@
                     <div class="beanthentic-item-text">
                       <span class="beanthentic-item-title">All Contributions</span>
                       <span class="beanthentic-item-count">12</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="beanthentic-sidebar-item" data-filter="pending">
+                  <div class="beanthentic-item-content">
+                    <i class="fa-solid fa-hourglass-half"></i>
+                    <div class="beanthentic-item-text">
+                      <span class="beanthentic-item-title">Pending Review</span>
+                      <span class="beanthentic-item-count">3</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="beanthentic-sidebar-section">
+                  <h3>View Status</h3>
+                  <div class="beanthentic-sidebar-item" data-filter="seen">
+                    <div class="beanthentic-item-content">
+                      <i class="fa-solid fa-eye"></i>
+                      <div class="beanthentic-item-text">
+                        <span class="beanthentic-item-title">Seen</span>
+                        <span class="beanthentic-item-count">2</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="beanthentic-sidebar-item" data-filter="unseen">
+                    <div class="beanthentic-item-content">
+                      <i class="fa-solid fa-eye-slash"></i>
+                      <div class="beanthentic-item-text">
+                        <span class="beanthentic-item-title">Unseen</span>
+                        <span class="beanthentic-item-count">2</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1011,12 +1174,22 @@
                     <button class="beanthentic-toolbar-btn" title="Archive">
                       <i class="fa-solid fa-archive"></i>
                     </button>
+                    <button class="beanthentic-toolbar-btn" title="Report Issue">
+                      <i class="fa-solid fa-exclamation-triangle"></i>
+                    </button>
                     <button class="beanthentic-toolbar-btn" title="Delete">
                       <i class="fa-solid fa-trash"></i>
                     </button>
                     <div class="beanthentic-divider"></div>
                     <button class="beanthentic-toolbar-btn" title="Mark as Reviewed">
                       <i class="fa-solid fa-eye"></i>
+                    </button>
+                    <button class="beanthentic-toolbar-btn" title="Mark as New">
+                      <i class="fa-solid fa-envelope"></i>
+                    </button>
+                    <div class="beanthentic-divider"></div>
+                    <button class="beanthentic-toolbar-btn" title="Snooze">
+                      <i class="fa-solid fa-clock"></i>
                     </button>
                   </div>
                   <div class="beanthentic-toolbar-right">
@@ -1042,6 +1215,16 @@
                     <div class="beanthentic-contribution-farmer">Juan Dela Cruz</div>
                     <div class="beanthentic-contribution-subject">
                       <span class="beanthentic-contribution-subject-text">GI Certification Application - Farm ID #1234</span>
+                      <span class="beanthentic-contribution-tags">
+                        <span class="beanthentic-tag beanthentic-tag--pending">pending</span>
+                        <span class="beanthentic-tag beanthentic-tag--documents">Document</span>
+                      </span>
+                      <span class="beanthentic-contribution-preview-inline">Submitted complete documentation for geographical indication certification including farm ownership papers and coffee variety verification...</span>
+                    </div>
+                    <div class="beanthentic-contribution-actions">
+                      <button type="button" class="view-details-btn">
+                        View <i class="fa-solid fa-chevron-right"></i>
+                      </button>
                     </div>
                   </div>
 
@@ -1055,6 +1238,16 @@
                     <div class="beanthentic-contribution-farmer">Maria Santos</div>
                     <div class="beanthentic-contribution-subject">
                       <span class="beanthentic-contribution-subject-text">Farm Photos - Harvest Season 2026</span>
+                      <span class="beanthentic-contribution-tags">
+                        <span class="beanthentic-tag beanthentic-tag--approved">approved</span>
+                        <span class="beanthentic-tag beanthentic-tag--images">Image</span>
+                      </span>
+                      <span class="beanthentic-contribution-preview-inline">High-resolution images of coffee farm during harvest season showing ripe cherries and processing facilities...</span>
+                    </div>
+                    <div class="beanthentic-contribution-actions">
+                      <button type="button" class="view-details-btn">
+                        View <i class="fa-solid fa-chevron-right"></i>
+                      </button>
                     </div>
                   </div>
 
@@ -1068,6 +1261,16 @@
                     <div class="beanthentic-contribution-farmer">Roberto Reyes</div>
                     <div class="beanthentic-contribution-subject">
                       <span class="beanthentic-contribution-subject-text">Land Title Documents</span>
+                      <span class="beanthentic-contribution-tags">
+                        <span class="beanthentic-tag beanthentic-tag--pending">pending</span>
+                        <span class="beanthentic-tag beanthentic-tag--documents">Document</span>
+                      </span>
+                      <span class="beanthentic-contribution-preview-inline">Scanned copies of land ownership certificates and property tax receipts for farm verification...</span>
+                    </div>
+                    <div class="beanthentic-contribution-actions">
+                      <button type="button" class="view-details-btn">
+                        View <i class="fa-solid fa-chevron-right"></i>
+                      </button>
                     </div>
                   </div>
 
@@ -1081,6 +1284,16 @@
                     <div class="beanthentic-contribution-farmer">Carmela Lopez</div>
                     <div class="beanthentic-contribution-subject">
                       <span class="beanthentic-contribution-subject-text">Coffee Processing Equipment Images</span>
+                      <span class="beanthentic-contribution-tags">
+                        <span class="beanthentic-tag beanthentic-tag--approved">approved</span>
+                        <span class="beanthentic-tag beanthentic-tag--images">Image</span>
+                      </span>
+                      <span class="beanthentic-contribution-preview-inline">Professional photographs of coffee processing equipment including drying beds and milling machines...</span>
+                    </div>
+                    <div class="beanthentic-contribution-actions">
+                      <button type="button" class="view-details-btn">
+                        View <i class="fa-solid fa-chevron-right"></i>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1111,61 +1324,33 @@
                 <i class="fa-solid fa-xmark" aria-hidden="true"></i>
               </button>
 
-              <div class="gmail-detail-header">
-                <div class="gmail-header-left">
-                  <div class="gmail-avatar" id="gmailAvatar">S</div>
-                  <div class="gmail-sender-info">
-                    <div class="gmail-sender-line">
-                      <strong id="beanthenticContributionDetailFarmer">Softy Luna</strong>
-                      <span class="gmail-email" id="beanthenticContributionDetailEmail">&lt;softyluna001@gmail.com&gt;</span>
-                    </div>
-                    <div class="gmail-to-me">
-                      to me <i class="fa-solid fa-caret-down"></i>
-                    </div>
-                  </div>
+              <h2 id="beanthenticContributionDetailTitle">Contribution Details</h2>
+
+              <div class="beanthentic-detail-dialog__meta">
+                <div>
+                  <div class="beanthentic-detail-dialog__meta-label">Farmer</div>
+                  <div class="beanthentic-detail-dialog__meta-value" id="beanthenticContributionDetailFarmer">—</div>
                 </div>
-                <div class="gmail-header-right">
-                  <div class="gmail-action-icons">
-                    <i class="fa-regular fa-star" title="Star"></i>
-                  </div>
+                <div>
+                  <div class="beanthentic-detail-dialog__meta-label">Date</div>
+                  <div class="beanthentic-detail-dialog__meta-value" id="beanthenticContributionDetailDate">—</div>
                 </div>
               </div>
 
-              <div class="gmail-detail-content">
-                <h2 id="beanthenticContributionDetailSubject" class="gmail-subject">Contribution Details</h2>
-                <div class="gmail-body-text" id="beanthenticContributionDetailPreview">
-                  Submitted complete documentation for geographical indication certification including farm ownership papers and coffee variety verification...
-                </div>
+              <div class="beanthentic-detail-dialog__subject" id="beanthenticContributionDetailSubject"></div>
+
+              <div class="beanthentic-detail-dialog__tags">
+                <span
+                  id="beanthenticContributionDetailStatus"
+                  class="beanthentic-tag beanthentic-tag--pending"
+                >Pending</span>
+                <span
+                  id="beanthenticContributionDetailCategory"
+                  class="beanthentic-tag beanthentic-tag--documents"
+                >Document</span>
               </div>
 
-              <div class="gmail-attachments-section">
-                <div class="gmail-attachments-header">
-                  <span id="gmailAttachmentCount">4 Attachments</span>
-                  <span class="gmail-dot">•</span>
-                  <span>Scanned by Gmail</span>
-                  <i class="fa-solid fa-circle-info gmail-info-icon"></i>
-                  <div class="gmail-attachments-actions">
-                    <i class="fa-solid fa-download" title="Download all"></i>
-                    <i class="fa-solid fa-folder-plus" title="Add all to Drive"></i>
-                    <span>Add all to Drive</span>
-                  </div>
-                </div>
-                <div class="gmail-attachments-grid" id="gmailAttachmentsGrid">
-                  <!-- Attachment cards will be populated here -->
-                  <div class="gmail-attachment-card">
-                    <div class="gmail-attachment-preview">
-                      <img src="/static/img/doc-preview-1.png" alt="Document 1">
-                      <div class="gmail-dog-ear"></div>
-                    </div>
-                  </div>
-                  <div class="gmail-attachment-card">
-                    <div class="gmail-attachment-preview">
-                      <img src="/static/img/doc-preview-2.png" alt="Document 2">
-                      <div class="gmail-dog-ear"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <div class="beanthentic-detail-dialog__preview" id="beanthenticContributionDetailPreview"></div>
             </div>
           </div>
 
@@ -1231,45 +1416,48 @@
 
           <!-- Client Report Module -->
           <div class="module hidden" id="client-report-module" data-module="client-report">
-            <section class="module-header client-report-header-layout">
-              <div class="module-title-wrap">
-                <h1>Client Report</h1>
-                <p>Manage and view customer misconduct reports</p>
-              </div>
-              <div class="table-controls client-report-controls">
-                <div class="search-container client-report-search">
-                  <input id="clientReportSearchInput" type="text" placeholder="Search reports..." />
-                </div>
-                <select id="clientReportStatusFilter" class="client-report-select" aria-label="Filter by status">
-                  <option value="">All status</option>
-                  <option value="warning">Warning</option>
-                  <option value="suspend">Suspend</option>
-                  <option value="block">Block</option>
-                  <option value="resolved">Resolved</option>
-                </select>
-                <button type="button" class="action-btn client-report-refresh" id="clientReportRefreshBtn">
-                  <i class="fa-solid fa-rotate" aria-hidden="true"></i>
-                  Refresh
-                </button>
-              </div>
+            <section class="module-header">
+              <h1>Client Report</h1>
+              <p>Misconduct reports submitted by customers</p>
             </section>
 
             <section class="table-section" aria-label="Customer misconduct reports">
+              <div class="table-header client-report-header">
+                <h2>Customer Misconduct Reports</h2>
+                <div class="table-controls client-report-controls">
+                  <div class="search-container client-report-search">
+                    <input id="clientReportSearchInput" type="text" placeholder="Search reports..." />
+                  </div>
+                  <select id="clientReportStatusFilter" class="client-report-select" aria-label="Filter by status">
+                    <option value="">All status</option>
+                    <option value="open">Open</option>
+                    <option value="under_review">Under review</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="dismissed">Dismissed</option>
+                  </select>
+                  <button type="button" class="action-btn client-report-refresh" id="clientReportRefreshBtn">
+                    <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                    Refresh
+                  </button>
+                </div>
+              </div>
+
               <div class="table-container">
                 <div class="table-wrapper" role="region" aria-label="Misconduct report table">
                   <table class="data-table" id="clientReportTable">
                     <thead>
                       <tr>
-                        <th>Report ID</th>
-                        <th>Date</th>
-                        <th>Time</th>
-                        <th>Farmer Name</th>
+                        <th>Reported At</th>
+                        <th>Customer</th>
+                        <th>Contact</th>
+                        <th>Farmer</th>
                         <th>Allegation</th>
-                        <th>Status Action</th>
+                        <th>Status</th>
+                        <th></th>
                       </tr>
                     </thead>
                     <tbody id="clientReportTableBody">
-                      <tr><td colspan="6" class="transactions-loading-cell">Loading...</td></tr>
+                      <tr><td colspan="7" class="transactions-loading-cell">Loading...</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -1280,6 +1468,7 @@
                   </div>
                 </div>
               </div>
+
             </section>
           </div>
 
@@ -1898,242 +2087,160 @@
 
           <!-- Account Module -->
           <div class="module hidden" id="account-module" data-module="account">
-<<<<<<< Updated upstream
             <section class="module-header">
-              <h1>Account</h1>
-              <p>Manage your administrator account</p>
+              <h1>My Profile</h1>
             </section>
-            <div class="account-module-content">
-              <div class="account-card">
-                <div class="account-pane account-pane--summary">
-                  <div class="account-icon">
-                    <i class="fa-solid fa-circle-user"></i>
-                  </div>
-                  <h2 class="account-hero-name" id="accountHeroName">Loading...</h2>
-                  <p class="account-hero-phone" id="accountHeroPhone">—</p>
-                  <div class="account-hero-role">
-                    <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
-                    <span>Administrator</span>
+            
+            <div class="account-profile-container">
+              <!-- Header Card -->
+              <div class="profile-header-card">
+                <div class="profile-avatar-section">
+                  <div class="profile-avatar">
+                    <i class="fa-solid fa-user"></i>
+                    <button class="avatar-edit-btn" title="Change photo">
+                      <i class="fa-solid fa-camera"></i>
+                    </button>
                   </div>
                 </div>
+                <div class="profile-title-section">
+                  <h2 id="accountHeroName">Loading...</h2>
+                  <p class="profile-role">Admin</p>
+                  <p class="profile-location">Leeds, United Kingdom</p>
+                </div>
+              </div>
 
-                <div class="account-pane account-pane--details">
-                  <div class="account-info">
-                    <div class="account-info-row">
-                      <span class="account-info-label"><i class="fa-solid fa-user"></i> Full Name</span>
-                      <span class="account-info-value" id="accountDisplayName">Loading...</span>
-                    </div>
-                    <div class="account-info-row">
-                      <span class="account-info-label"><i class="fa-solid fa-phone"></i> Mobile Number</span>
-                      <span class="account-info-value" id="accountPhone">Loading...</span>
-                    </div>
-                    <div class="account-info-row">
-                      <span class="account-info-label"><i class="fa-solid fa-shield-halved"></i> Role</span>
-                      <span class="account-info-value">Administrator</span>
-                    </div>
-                    <div class="account-info-row">
-                      <span class="account-info-label"><i class="fa-solid fa-calendar"></i> Account Status</span>
-                      <span class="account-info-value" style="color: #059669; font-weight: 600;"><i class="fa-solid fa-circle-check" style="font-size: 12px; margin-right: 6px;"></i> Active</span>
-                    </div>
+              <!-- Personal Information Card -->
+              <div class="profile-info-card">
+                <div class="card-header">
+                  <h3>Personal Information</h3>
+                  <button type="button" class="btn-edit" id="openEditProfileModalBtn">
+                    <span>Edit</span>
+                    <i class="fa-solid fa-pen"></i>
+                  </button>
+                </div>
+                <div class="card-grid">
+                  <div class="info-group">
+                    <label>First Name</label>
+                    <p id="accountFirstName">Loading...</p>
                   </div>
+                  <div class="info-group">
+                    <label>Last Name</label>
+                    <p id="accountLastName">Loading...</p>
+                  </div>
+                  <div class="info-group">
+                    <label>Date of Birth</label>
+                    <p>12-10-1990</p>
+                  </div>
+                  <div class="info-group">
+                    <label>Email Address</label>
+                    <p>info@binary-fusion.com</p>
+                  </div>
+                  <div class="info-group">
+                    <label>Phone Number</label>
+                    <p id="accountPhone">Loading...</p>
+                  </div>
+                  <div class="info-group">
+                    <label>User Role</label>
+                    <p>Admin</p>
+                  </div>
+                </div>
+              </div>
 
-                  <div class="account-actions">
-                    <button type="button" class="btn btn-secondary" id="manageSettingsBtn">
-                      <i class="fa-solid fa-sliders" aria-hidden="true"></i>
-                      <span>Manage in Settings</span>
+              <!-- Address Card -->
+              <div class="profile-info-card">
+                <div class="card-header">
+                  <h3>Address</h3>
+                  <button type="button" class="btn-edit-secondary">
+                    <span>Edit</span>
+                    <i class="fa-solid fa-pen"></i>
+                  </button>
+                </div>
+                <div class="card-grid">
+                  <div class="info-group">
+                    <label>Country</label>
+                    <p>United Kingdom</p>
+                  </div>
+                  <div class="info-group">
+                    <label>City</label>
+                    <p>Leeds, East London</p>
+                  </div>
+                  <div class="info-group">
+                    <label>Postal Code</label>
+                    <p>ERT 1254</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Security Card -->
+              <div class="profile-info-card">
+                <div class="security-card-content">
+                  <h3>Security</h3>
+                  <div class="card-actions-vertical">
+                    <button type="button" class="btn-secondary" id="manageSettingsBtn">
+                      <i class="fa-solid fa-sliders"></i>
+                      <span>Advanced Settings</span>
                     </button>
-                    <button type="button" class="btn btn-danger" id="logoutBtn">
-                      <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+                    <button type="button" class="btn-logout-alt" id="logoutBtn">
+                      <i class="fa-solid fa-right-from-bracket"></i>
                       <span>Log out</span>
                     </button>
                   </div>
-=======
-            <header class="system-module-header">
-              <div class="header-left">
-                <h1>My Profile</h1>
-              </div>
-              <div class="header-right">
-                <div class="header-search-container">
-                  <i class="fa-solid fa-magnifying-glass"></i>
-                  <input type="text" placeholder="Search profile settings..." readonly />
                 </div>
-                <button type="button" class="header-btn-primary" id="openEditProfileModalBtn">
-                  <i class="fa-solid fa-plus"></i>
-                  <span>Update Profile</span>
-                </button>
-              </div>
-            </header>
-            
-            <div class="account-profile-container">
-              <!-- Sidebar and Content Layout -->
-              <div class="profile-system-layout">
-                <aside class="profile-system-sidebar">
-                  <div class="sidebar-group">
-                    <button class="sidebar-item active">
-                      <i class="fa-solid fa-user"></i>
-                      <span>Personal Info</span>
-                    </button>
-                    <button class="sidebar-item">
-                      <i class="fa-solid fa-shield-halved"></i>
-                      <span>Security</span>
-                    </button>
-                  </div>
-                  
-                  <div class="sidebar-label">ACCOUNT STATUS</div>
-                  <div class="sidebar-group">
-                    <div class="sidebar-status-item">
-                      <i class="fa-solid fa-circle-check"></i>
-                      <span>Active Account</span>
-                    </div>
-                  </div>
-                </aside>
-
-                <main class="profile-system-main">
-                  <!-- Header Card -->
-                  <div class="profile-header-card-alt">
-                    <div class="profile-avatar-wrapper">
-                      <div class="profile-avatar-main">
-                        <i class="fa-solid fa-user"></i>
-                      </div>
-                      <button class="avatar-camera-btn">
-                        <i class="fa-solid fa-camera"></i>
-                      </button>
-                    </div>
-                    <div class="profile-hero-info">
-                      <h2 id="accountHeroName">Loading...</h2>
-                      <p class="hero-role">Administrator</p>
-                      <p class="hero-subtext">Leeds, United Kingdom</p>
-                    </div>
-                  </div>
-
-                  <!-- Personal Information Card -->
-                  <div class="profile-content-card">
-                    <div class="content-card-header">
-                      <h3>Personal Information</h3>
-                      <button type="button" class="btn-system-edit" id="openEditProfileModalBtnAlt">
-                        <span>Edit</span>
-                        <i class="fa-solid fa-pen"></i>
-                      </button>
-                    </div>
-                    <div class="content-card-grid">
-                      <div class="data-item">
-                        <label>First Name</label>
-                        <p id="accountFirstName">Loading...</p>
-                      </div>
-                      <div class="data-item">
-                        <label>Last Name</label>
-                        <p id="accountLastName">Loading...</p>
-                      </div>
-                      <div class="data-item">
-                        <label>Date of Birth</label>
-                        <p>12-10-1990</p>
-                      </div>
-                      <div class="data-item">
-                        <label>Email Address</label>
-                        <p>info@binary-fusion.com</p>
-                      </div>
-                      <div class="data-item">
-                        <label>Phone Number</label>
-                        <p id="accountPhone">Loading...</p>
-                      </div>
-                      <div class="data-item">
-                        <label>User Role</label>
-                        <p><span class="badge-system badge-green">ADMIN</span></p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Address Card -->
-                  <div class="profile-content-card">
-                    <div class="content-card-header">
-                      <h3>Address</h3>
-                      <button type="button" class="btn-system-edit-secondary">
-                        <span>Edit</span>
-                        <i class="fa-solid fa-pen"></i>
-                      </button>
-                    </div>
-                    <div class="content-card-grid">
-                      <div class="data-item">
-                        <label>Country</label>
-                        <p>United Kingdom</p>
-                      </div>
-                      <div class="data-item">
-                        <label>City</label>
-                        <p>Leeds, East London</p>
-                      </div>
-                      <div class="data-item">
-                        <label>Postal Code</label>
-                        <p>ERT 1254</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Security Actions -->
-                  <div class="profile-content-card">
-                    <div class="security-flex-header">
-                      <h3>Security & Access</h3>
-                      <div class="security-actions-group">
-                        <button type="button" class="btn-system-secondary" id="manageSettingsBtn">
-                          <i class="fa-solid fa-sliders"></i>
-                          <span>Advanced Settings</span>
-                        </button>
-                        <button type="button" class="btn-system-danger" id="logoutBtn">
-                          <i class="fa-solid fa-right-from-bracket"></i>
-                          <span>Log out</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </main>
               </div>
             </div>
           </div>
->>>>>>> Stashed changes
 
-                  <div class="account-tools">
-                    <section class="account-tool-card" aria-label="Quick profile update">
-                      <h3><i class="fa-solid fa-user-pen" aria-hidden="true"></i> Quick Profile Update</h3>
-                      <form id="accountQuickProfileForm" class="account-tool-form">
-                        <label for="accountQuickFullName">Full Name</label>
-                        <input id="accountQuickFullName" type="text" maxlength="80" placeholder="Enter full name" required />
-                        <label for="accountQuickPhone">Mobile Number</label>
-                        <input id="accountQuickPhone" type="text" readonly />
-                        <p class="account-tool-hint">Mobile number is managed by the administrator account registry.</p>
-                        <button type="submit" class="btn account-tool-btn">Save Profile</button>
-                      </form>
-                    </section>
-
-                    <section class="account-tool-card" aria-label="Change password">
-                      <h3><i class="fa-solid fa-lock" aria-hidden="true"></i> Change Password</h3>
-                      <form id="accountQuickPasswordForm" class="account-tool-form">
-                        <label for="accountCurrentPassword">Current Password</label>
-                        <div class="account-password-wrap">
-                          <input id="accountCurrentPassword" type="password" autocomplete="current-password" required />
-                          <button type="button" class="account-password-toggle" data-target="accountCurrentPassword" aria-label="Show current password">
-                            <i class="fa-regular fa-eye"></i>
-                          </button>
-                        </div>
-                        <label for="accountNewPassword">New Password</label>
-                        <div class="account-password-wrap">
-                          <input id="accountNewPassword" type="password" autocomplete="new-password" minlength="8" required />
-                          <button type="button" class="account-password-toggle" data-target="accountNewPassword" aria-label="Show new password">
-                            <i class="fa-regular fa-eye"></i>
-                          </button>
-                        </div>
-                        <label for="accountConfirmPassword">Confirm New Password</label>
-                        <div class="account-password-wrap">
-                          <input id="accountConfirmPassword" type="password" autocomplete="new-password" minlength="8" required />
-                          <button type="button" class="account-password-toggle" data-target="accountConfirmPassword" aria-label="Show confirm new password">
-                            <i class="fa-regular fa-eye"></i>
-                          </button>
-                        </div>
-                        <p class="account-tool-hint">Use at least 8 characters.</p>
-                        <button type="submit" class="btn account-tool-btn">Update Password</button>
-                      </form>
-                    </section>
+          <!-- Edit Profile Modal -->
+          <div id="editProfileModal" class="profile-modal" hidden aria-hidden="true">
+            <div class="profile-modal-backdrop"></div>
+            <div class="profile-modal-card" role="dialog" aria-modal="true">
+              <div class="profile-modal-header">
+                <h2>Edit Personal Information</h2>
+                <button type="button" class="profile-modal-close" id="closeEditProfileModalBtn">
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+              <form id="accountQuickProfileForm" class="profile-modal-form">
+                <div class="modal-form-row">
+                  <div class="modal-form-group">
+                    <label for="accountEditFirstName">First Name</label>
+                    <input type="text" id="accountEditFirstName" value="Natashia" required />
+                  </div>
+                  <div class="modal-form-group">
+                    <label for="accountEditLastName">Last Name</label>
+                    <input type="text" id="accountEditLastName" value="Khaleira" required />
                   </div>
                 </div>
-              </div>
+                <div class="modal-form-group">
+                  <label for="accountEditEmail">Email Address</label>
+                  <input type="email" id="accountEditEmail" value="info@binary-fusion.com" />
+                </div>
+                <div class="modal-form-group">
+                  <label for="accountEditPhone">Phone Number</label>
+                  <input type="text" id="accountEditPhone" value="(+62) 821 2554-5846" />
+                </div>
+                <div class="modal-form-group">
+                  <label for="accountEditDob">Date of Birth</label>
+                  <div class="modal-input-icon-wrapper">
+                    <input type="text" id="accountEditDob" value="12/10/1990" />
+                    <i class="fa-solid fa-calendar-days"></i>
+                  </div>
+                </div>
+                <div class="modal-form-group">
+                  <label for="accountEditRole">User Role</label>
+                  <div class="modal-select-wrapper">
+                    <select id="accountEditRole">
+                      <option value="Admin" selected>Admin</option>
+                      <option value="Editor">Editor</option>
+                      <option value="Viewer">Viewer</option>
+                    </select>
+                    <i class="fa-solid fa-chevron-down"></i>
+                  </div>
+                </div>
+                <div class="modal-form-footer">
+                  <button type="submit" class="btn-save-changes">Save Changes</button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
@@ -2566,7 +2673,7 @@
     };
   </script>
   {% if google_maps_api_key %}
-  <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initBeanthenticGoogleMaps"></script>
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=visualization&callback=initBeanthenticGoogleMaps"></script>
   {% endif %}
   <!-- JavaScript Files -->
   <script src="js/main.js"></script>

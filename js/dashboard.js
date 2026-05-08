@@ -19,6 +19,13 @@ class DashboardApp {
     this.googleMapsReady = false;
     this.googleInfoWindow = null;
     this.lipaBoundaryOverlay = null;
+    this.googleHeatmap = null;
+    this.mapLayers = {
+      farmerLocations: true,
+      farmBoundaries: true,
+      densityHeatmap: false,
+      roadNetwork: false,
+    };
     this.activeSettingsTab = 'security';
     /** 'landing' = card hub; 'detail' = loaded fragment */
     this.settingsViewMode = 'landing';
@@ -30,9 +37,6 @@ class DashboardApp {
     this.transactionsSearchTerm = '';
     this.transactionsFarmerFilterId = null;
     this.transactionsVarietyFilter = '';
-    this.misconductReportRows = [];
-    this.clientReportSearchTerm = '';
-    this.clientReportStatusFilter = '';
     this.init();
   }
 
@@ -503,6 +507,8 @@ class DashboardApp {
     this.initBeanthenticContributions();
     // Initialize Farmer Profile tabs
     this.initFarmerProfileTabs();
+    // Initialize Map Layer Toggles
+    this.initMapLayerToggles();
   }
 
   updateNotificationsToolbarState() {
@@ -706,7 +712,7 @@ class DashboardApp {
           <td>${this.escapeHtml(row.buyer_name || '—')}</td>
           <td><span class="transactions-status-pill">${this.escapeHtml(this.movementLabel(row.delta_kg))}</span></td>
           <td>${this.escapeHtml(recordedAt)}</td>
-          <td><button type="button" class="transactions-action-btn transactions-action-btn--primary" disabled>View</button></td>
+          <td><button type="button" class="view-details-btn" disabled>View Details <i class="fa-solid fa-chevron-right"></i></button></td>
         </tr>`;
       })
       .join('');
@@ -799,63 +805,21 @@ class DashboardApp {
     }
   }
 
-  /** Dynamically populate status filter based on available data */
-  populateClientReportStatusFilter() {
-    const statusSelect = document.getElementById('clientReportStatusFilter');
-    if (!statusSelect) return;
-
-    // Keep the currently selected value if possible
-    const currentVal = statusSelect.value;
-
-    // Get unique statuses from the data
-    const statuses = new Set(['warning', 'suspend', 'block', 'resolved']);
-    this.misconductReportRows.forEach(r => {
-      if (r.status) statuses.add(String(r.status).toLowerCase());
-    });
-
-    const sortedStatuses = Array.from(statuses).sort();
-
-    let html = '<option value="">All status</option>';
-    sortedStatuses.forEach(s => {
-      const label = s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' ');
-      html += `<option value="${this.escapeHtml(s)}" ${s === currentVal ? 'selected' : ''}>${this.escapeHtml(label)}</option>`;
-    });
-
-    statusSelect.innerHTML = html;
-  }
-
   async loadMisconductReports() {
     const tbody = document.getElementById('clientReportTableBody');
     if (!tbody) return;
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="6" class="empty-state-cell">
-          <div class="empty-state-container">
-            <i class="fa-solid fa-circle-notch fa-spin empty-state-icon"></i>
-            <span class="empty-state-text">Loading reports...</span>
-          </div>
-        </td>
-      </tr>`;
+    tbody.innerHTML = '<tr><td colspan="7" class="transactions-loading-cell">Loading...</td></tr>';
 
     try {
       const res = await fetch('/api/misconduct-reports?limit=1000');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       this.misconductReportRows = Array.isArray(data.items) ? data.items : [];
-      
-      this.populateClientReportStatusFilter();
       this.applyClientReportFiltersAndRender();
     } catch (e) {
       console.warn('Misconduct reports load failed:', e);
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="6" class="empty-state-cell">
-            <div class="empty-state-container">
-              <i class="fa-solid fa-circle-exclamation empty-state-icon" style="color: #e53e3e;"></i>
-              <span class="empty-state-text">Could not load reports. Try refreshing.</span>
-            </div>
-          </td>
-        </tr>`;
+      tbody.innerHTML =
+        '<tr><td colspan="7" class="transactions-error-cell">Could not load reports. Try Refresh.</td></tr>';
       this.misconductReportRows = [];
       this.showNotification('Could not load misconduct reports.', 'error');
       this.updateClientReportCountLabel(0);
@@ -886,15 +850,7 @@ class DashboardApp {
     });
 
     if (!filtered.length) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="6" class="empty-state-cell">
-            <div class="empty-state-container">
-              <i class="fa-solid fa-inbox empty-state-icon"></i>
-              <span class="empty-state-text">No reports found matching your criteria.</span>
-            </div>
-          </td>
-        </tr>`;
+      tbody.innerHTML = '<tr><td colspan="7" class="transactions-error-cell">No reports found.</td></tr>';
       this.updateClientReportCountLabel(0);
       return;
     }
@@ -906,60 +862,34 @@ class DashboardApp {
   }
 
   renderClientReportRow(r) {
-    let dateStr = '—';
-    let timeStr = '—';
+    let createdAt = '—';
     if (r.created_at) {
       try {
         const d = new Date(r.created_at);
         if (!Number.isNaN(d.getTime())) {
-          dateStr = d.toLocaleDateString(undefined, { dateStyle: 'medium' });
-          timeStr = d.toLocaleTimeString(undefined, { timeStyle: 'short' });
+          createdAt = d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
         }
       } catch {
-        dateStr = String(r.created_at);
+        createdAt = String(r.created_at);
       }
     }
 
-    const farmerName = this.escapeHtml(r.farmer_name || '—');
+    const farmerLabel =
+      r.farmer_no != null && r.farmer_no !== ''
+        ? `#${this.escapeHtml(r.farmer_no)} — ${this.escapeHtml(r.farmer_name || '')}`
+        : this.escapeHtml(r.farmer_name || '—');
 
-    const statusValue = String(r.status || 'open').toLowerCase();
-    
+    const status = this.escapeHtml(this.clientReportStatusLabel(r.status));
+
     return `<tr>
-      <td style="font-family: monospace; font-weight: 600; color: #64748b;">#${r.id || '—'}</td>
-      <td>${this.escapeHtml(dateStr)}</td>
-      <td style="color: #718096;">${this.escapeHtml(timeStr)}</td>
-      <td>
-        <div style="font-weight: 600; color: #2d3748;">${farmerName}</div>
-      </td>
-      <td style="max-width: 300px; white-space: normal; line-height: 1.4;">${this.escapeHtml(r.allegation || '')}</td>
-      <td>
-        <div class="status-action-dropdown">
-          <select class="status-action-select" onchange="dashboardApp.updateMisconductStatus(${r.id}, this.value)">
-            <option value="warning" ${statusValue === 'warning' ? 'selected' : ''}>Warning</option>
-            <option value="suspend" ${statusValue === 'suspend' ? 'selected' : ''}>Suspend</option>
-            <option value="block" ${statusValue === 'block' ? 'selected' : ''}>Block</option>
-            <option value="resolved" ${statusValue === 'resolved' ? 'selected' : ''}>Resolved</option>
-          </select>
-        </div>
-      </td>
+      <td>${this.escapeHtml(createdAt)}</td>
+      <td>${this.escapeHtml(r.reporter_name || '—')}</td>
+      <td>${this.escapeHtml(r.reporter_contact || '—')}</td>
+      <td>${farmerLabel}</td>
+      <td>${this.escapeHtml(r.allegation || '')}</td>
+      <td>${status}</td>
+      <td><button type="button" class="view-details-btn" disabled>View Details <i class="fa-solid fa-chevron-right"></i></button></td>
     </tr>`;
-  }
-
-  async updateMisconductStatus(reportId, newStatus) {
-    try {
-      const res = await fetch(`/api/misconduct-reports/${reportId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      this.showNotification(`Report #${reportId} updated to ${newStatus}`, 'success');
-      await this.loadMisconductReports();
-    } catch (e) {
-      console.warn('Status update failed:', e);
-      this.showNotification('Could not update status.', 'error');
-      await this.loadMisconductReports(); // Refresh to revert UI
-    }
   }
 
   clientReportStatusLabel(value) {
@@ -2561,7 +2491,7 @@ class DashboardApp {
   </div>
   <div class="farmer-card__footer">
     <span class="farmer-card__joined">Joined at 2024</span>
-    <button type="button" class="farmer-card__details-link" data-action="open-farmer-placeholder-profile" data-farmer-no="${n}">
+    <button type="button" class="view-details-btn" data-action="open-farmer-placeholder-profile" data-farmer-no="${n}">
       View details <i class="fa-solid fa-chevron-right"></i>
     </button>
   </div>
@@ -2622,7 +2552,7 @@ class DashboardApp {
   </div>
   <div class="farmer-card__footer">
     <span class="farmer-card__joined">Joined at 2024</span>
-    <button type="button" class="farmer-card__details-link" data-action="open-farmer-profile" data-farmer-no="${esc(n)}">
+    <button type="button" class="view-details-btn" data-action="open-farmer-profile" data-farmer-no="${esc(n)}">
       View details <i class="fa-solid fa-chevron-right"></i>
     </button>
   </div>
@@ -2635,6 +2565,12 @@ class DashboardApp {
     const profileView = document.getElementById('farmerProfileView');
     const listView = document.getElementById('farmersListView');
     if (!profileView || !listView) return;
+
+    // Reset See More state
+    const detailsArea = document.getElementById('detailsScrollArea');
+    const seeMoreBtn = document.getElementById('btnSeeMoreDetails');
+    if (detailsArea) detailsArea.classList.remove('expanded');
+    if (seeMoreBtn) seeMoreBtn.textContent = 'See more';
 
     const farmer = (this.data || []).find((r) => Number(r['NO.']) === Number(farmerNo));
     if (!farmer) {
@@ -2667,26 +2603,136 @@ class DashboardApp {
     setText('farmerProfilePhone', this.getValue(farmer, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']) || '—');
     setText('farmerProfileAddress', this.getValue(farmer, ['ADDRESS (BARANGAY)', 'address', 'BARANGAY']) || '—');
 
-    setInput('farmerProfileLastName', this.getValue(farmer, ['LAST NAME', 'last_name']) || nameParts.last);
-    setInput('farmerProfileFirstName', this.getValue(farmer, ['FIRST NAME', 'first_name']) || nameParts.first);
-    setInput('farmerProfileProvince', this.getValue(farmer, ['PROVINCE', 'province']) || '');
-    setInput('farmerProfileMunicipality', this.getValue(farmer, ['MUNICIPALITY', 'municipality', 'CITY']) || '');
-    setInput('farmerProfileBarangay', this.getValue(farmer, ['BARANGAY', 'ADDRESS (BARANGAY)', 'barangay']) || '');
-    setInput('farmerProfileFederation', this.getValue(farmer, ['FA OFFICER / MEMBER', 'FEDERATION', 'Federation Association']) || '');
-    setInput('farmerProfileRsbsa', this.getValue(farmer, ['REGISTERED (YES/NO)', 'RSBSA Registered']) || '');
-    setInput('farmerProfileRsbsaNumber', this.getValue(farmer, ['NCFRS', 'RSBSA Registered Number']) || '');
-    setInput('farmerProfileOwnership', this.getValue(farmer, ['STATUS OF OWNERSHIP', 'Status Ownership']) || '');
-    setInput(
-      'farmerProfileTotalArea',
+    setText('farmerProfileLastNameText', this.getValue(farmer, ['LAST NAME', 'last_name']) || nameParts.last);
+    setText('farmerProfileFirstNameText', this.getValue(farmer, ['FIRST NAME', 'first_name']) || nameParts.first);
+    setText('farmerProfileProvinceText', this.getValue(farmer, ['PROVINCE', 'province']) || '');
+    setText('farmerProfileMunicipalityText', this.getValue(farmer, ['MUNICIPALITY', 'municipality', 'CITY']) || '');
+    setText('farmerProfileBarangayText', this.getValue(farmer, ['BARANGAY', 'ADDRESS (BARANGAY)', 'barangay']) || '');
+    setText('farmerProfileFederationText', this.getValue(farmer, ['FA OFFICER / MEMBER', 'FEDERATION', 'Federation Association']) || '');
+    setText('farmerProfileRsbsaText', this.getValue(farmer, ['REGISTERED (YES/NO)', 'RSBSA Registered']) || '');
+    setText('farmerProfileRsbsaNumberText', this.getValue(farmer, ['NCFRS', 'RSBSA Registered Number']) || '');
+    setText('farmerProfileOwnershipText', this.getValue(farmer, ['STATUS OF OWNERSHIP', 'Status Ownership']) || '');
+    setText(
+      'farmerProfileTotalAreaText',
       this.formatValue(this.getValue(farmer, ['TOTAL AREA PLANTED (HA.)', 'Total Plant Area', 'TOTAL AREA']) || '')
     );
 
-    // Reset tabs to personal info when opening a new profile
-    const firstTab = profileView.querySelector('.farmer-profile-tab-btn[data-profile-tab="personal"]');
-    if (firstTab) firstTab.click();
+    // Populate Detailed Registration Fields
+    setText('farmerProfileLibBearingText', this.getValue(farmer, ['LIBERICA BEARING', 'Liberica_Bearing']) || '0');
+    setText('farmerProfileLibNonBearingText', this.getValue(farmer, ['LIBERICA NON-BEARING', 'Liberica_Non-bearing']) || '0');
+    setText('farmerProfileRobBearingText', this.getValue(farmer, ['ROBUSTA BEARING', 'Robusta_Bearing']) || '0');
+    setText('farmerProfileRobNonBearingText', this.getValue(farmer, ['ROBUSTA NON-BEARING', 'Robusta_Non-bearing']) || '0');
+    setText('farmerProfileExcBearingText', this.getValue(farmer, ['EXCELSA BEARING', 'Excelsa_Bearing']) || '0');
+    setText('farmerProfileExcNonBearingText', this.getValue(farmer, ['EXCELSA NON-BEARING', 'Excelsa_Non-bearing']) || '0');
+
+    setText('farmerProfileLibProdText', this.getValue(farmer, ['LIBERICA PRODUCTION', 'Liberica_Production']) || '0');
+    setText('farmerProfileRobProdText', this.getValue(farmer, ['ROBUSTA PRODUCTION', 'Robusta_Production']) || '0');
+    setText('farmerProfileExcProdText', this.getValue(farmer, ['EXCELSA PRODUCTION', 'Excelsa_Production']) || '0');
+
+    // Populate Bean Summary
+    this.initBeanVarietyFilters(farmer);
+
+    // Populate Transactions
+    this.populateFarmerTransactions(fullName);
+
+    // Init See More
+    this.initSeeMoreDetails();
+
+    const toolbar = document.getElementById('farmersListToolbar');
+    if (toolbar) toolbar.style.display = 'none';
 
     listView.hidden = true;
     profileView.hidden = false;
+  }
+
+  initBeanVarietyFilters(farmer) {
+    const filterBtns = document.querySelectorAll('.bean-variety-btn');
+    if (!filterBtns.length) return;
+
+    // Reset buttons state
+    filterBtns.forEach(btn => {
+      btn.classList.toggle('active', btn.textContent.trim() === 'All');
+    });
+
+    // Remove existing listeners by cloning
+    filterBtns.forEach(btn => {
+      const newBtn = btn.cloneNode(true);
+      btn.parentNode.replaceChild(newBtn, btn);
+    });
+
+    // Re-query new buttons
+    const newFilterBtns = document.querySelectorAll('.bean-variety-btn');
+    newFilterBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        newFilterBtns.forEach(b => b.classList.toggle('active', b === btn));
+        const variety = btn.textContent.trim();
+        this.populateBeanSummary(farmer, variety);
+      });
+    });
+
+    // Initial population
+    this.populateBeanSummary(farmer, 'All');
+  }
+
+  populateBeanSummary(farmer, variety = 'All') {
+    const initialValueEl = document.getElementById('initialBeansValue');
+    const remainingValueEl = document.getElementById('remainingBeansValue');
+    const remainingDateEl = document.getElementById('remainingBeansDate');
+
+    if (!initialValueEl || !remainingValueEl) return;
+
+    let initialBeans = 0;
+    
+    if (variety === 'All') {
+      initialBeans = this.getTotalProduction(farmer);
+    } else {
+      const key = `${variety.toUpperCase()} PRODUCTION`;
+      initialBeans = Number(this.getValue(farmer, [key, variety.toLowerCase() + '_production']) || 0);
+    }
+
+    // Fallback to placeholder if no data
+    if (initialBeans === 0) initialBeans = variety === 'All' ? 50 : 15;
+
+    // Example calculation for remaining: 85% of initial or fixed offset
+    const beansRemaining = Math.max(0, Math.floor(initialBeans * 0.14)); // Roughly 7KG if 50KG
+
+    initialValueEl.textContent = initialBeans;
+    remainingValueEl.textContent = beansRemaining;
+
+    // Use current date as example
+    const today = new Date();
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    if (remainingDateEl) remainingDateEl.textContent = today.toLocaleDateString('en-US', options);
+  }
+
+  populateFarmerTransactions(farmerName) {
+    const txnBody = document.getElementById('farmerTransactionsBody');
+    if (!txnBody) return;
+
+    // Filter transactions for this farmer (mocking some data for now if no global txn data)
+    // In a real app, you'd filter from this.transactionsData or fetch from API
+    const mockTxns = [
+      { date: '12/03/2026', type: 'Harvest', desc: 'Coffee cherries harvest from main lot', results: '47.9 kg' },
+      { date: '11/15/2025', type: 'Processing', desc: 'Drying and hulling of Liberica', results: '120.5 kg' },
+      { date: '08/22/2025', type: 'Sale', desc: 'Direct sale to local cooperative', results: '250.0 kg' },
+      { date: '05/10/2025', type: 'Planting', desc: 'New Robusta seedlings added', results: '50 units' },
+      { date: '03/04/2025', type: 'Harvest', desc: 'Late season Excelsa pick', results: '32.1 kg' },
+      { date: '01/15/2025', type: 'Maintenance', desc: 'Pruning and fertilization', results: 'N/A' },
+      { date: '12/20/2024', type: 'Sale', desc: 'Export quality Liberica batch', results: '150.0 kg' },
+      { date: '11/05/2024', type: 'Processing', desc: 'Wet processing method applied', results: '85.2 kg' },
+      { date: '10/12/2024', type: 'Harvest', desc: 'Early Robusta harvest', results: '65.0 kg' },
+      { date: '09/01/2024', type: 'Planting', desc: 'Seedling nursery expansion', results: '200 units' },
+      { date: '07/15/2024', type: 'Maintenance', desc: 'Pest control application', results: 'Success' },
+      { date: '06/20/2024', type: 'Sale', desc: 'Local roaster partnership', results: '45.0 kg' }
+    ];
+
+    txnBody.innerHTML = mockTxns.map(t => `
+      <tr>
+        <td class="txn-date">${t.date}</td>
+        <td>${t.desc}</td>
+        <td style="font-weight:700">${t.results}</td>
+      </tr>
+    `).join('');
   }
 
   initFarmerProfileTabs() {
@@ -2713,10 +2759,38 @@ class DashboardApp {
     });
   }
 
+  initSeeMoreDetails() {
+    const btn = document.getElementById('btnSeeMoreDetails');
+    const area = document.getElementById('detailsScrollArea');
+    if (!btn || !area) return;
+
+    // Use a fresh listener to avoid multiple attaches
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+
+    newBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const isExpanded = area.classList.toggle('expanded');
+      newBtn.textContent = isExpanded ? 'Show less' : 'See more';
+      
+      // Update blur overlay visibility based on expansion
+      const overlay = document.getElementById('detailsBlurOverlay');
+      if (overlay) {
+        overlay.style.opacity = isExpanded ? '0' : '1';
+      }
+    });
+  }
+
   closeFarmerProfile() {
     const profileView = document.getElementById('farmerProfileView');
     const listView = document.getElementById('farmersListView');
     if (!profileView || !listView) return;
+
+    const toolbar = document.getElementById('farmersListToolbar');
+    if (toolbar) toolbar.style.display = 'flex';
+
     profileView.hidden = true;
     listView.hidden = false;
   }
@@ -2741,16 +2815,23 @@ class DashboardApp {
     setText('farmerProfilePhone', '+63 900 XXXX XXXX');
     setText('farmerProfileAddress', 'Barangay, Municipality (or City), Province');
 
-    setInput('farmerProfileLastName', 'Last Name');
-    setInput('farmerProfileFirstName', 'First Name');
-    setInput('farmerProfileProvince', 'Batangas');
-    setInput('farmerProfileMunicipality', 'Lipa City');
-    setInput('farmerProfileBarangay', 'Barangay');
-    setInput('farmerProfileFederation', 'Federation Association');
-    setInput('farmerProfileRsbsa', 'Yes/No');
-    setInput('farmerProfileRsbsaNumber', 'NCFRS-0000');
-    setInput('farmerProfileOwnership', 'Landowner / Lease / Others');
-    setInput('farmerProfileTotalArea', '0.00');
+    setText('farmerProfileLastNameText', 'Last Name');
+    setText('farmerProfileFirstNameText', 'First Name');
+    setText('farmerProfileProvinceText', 'Batangas');
+    setText('farmerProfileMunicipalityText', 'Lipa City');
+    setText('farmerProfileBarangayText', 'Barangay');
+    setText('farmerProfileFederationText', 'Federation Association');
+    setText('farmerProfileRsbsaText', 'Yes/No');
+    setText('farmerProfileRsbsaNumberText', 'NCFRS-0000');
+    setText('farmerProfileOwnershipText', 'Landowner / Lease / Others');
+    setText('farmerProfileTotalAreaText', '0.00');
+
+    this.initBeanVarietyFilters({});
+    this.initSeeMoreDetails();
+    this.populateFarmerTransactions('Full Name');
+
+    const toolbar = document.getElementById('farmersListToolbar');
+    if (toolbar) toolbar.style.display = 'none';
 
     listView.hidden = true;
     profileView.hidden = false;
@@ -4726,6 +4807,82 @@ class DashboardApp {
     this.renderMapsModule();
   }
 
+  initMapLayerToggles() {
+    const toggles = [
+      { id: 'toggleFarmerLocations', layer: 'farmerLocations' },
+      { id: 'toggleFarmBoundaries', layer: 'farmBoundaries' },
+      { id: 'toggleDensityHeatmap', layer: 'densityHeatmap' },
+      { id: 'toggleRoadNetwork', layer: 'roadNetwork' },
+    ];
+
+    toggles.forEach(({ id, layer }) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.mapLayers[layer] = !this.mapLayers[layer];
+          el.classList.toggle('is-on', this.mapLayers[layer]);
+          this.updateMapLayers();
+        });
+      }
+    });
+  }
+
+  updateMapLayers() {
+    if (!this.googleMap || !window.google?.maps) return;
+
+    // 1. Farmer Locations
+    this.googleMapMarkers.forEach((m) => m.setMap(this.mapLayers.farmerLocations ? this.googleMap : null));
+
+    // 2. Farm Boundaries
+    if (this.lipaBoundaryOverlay) {
+      this.lipaBoundaryOverlay.setMap(this.mapLayers.farmBoundaries ? this.googleMap : null);
+    }
+
+    // 3. Density Heatmap
+    if (this.mapLayers.densityHeatmap) {
+      this.showDensityHeatmap();
+    } else if (this.googleHeatmap) {
+      this.googleHeatmap.setMap(null);
+    }
+
+    // 4. Road Network
+    this.googleMap.setOptions({
+      styles: this.mapLayers.roadNetwork
+        ? []
+        : [{ featureType: 'road', elementType: 'all', stylers: [{ visibility: 'off' }] }],
+    });
+  }
+
+  showDensityHeatmap() {
+    if (!window.google?.maps?.visualization) {
+      console.warn('Google Maps Visualization library not loaded.');
+      return;
+    }
+
+    const rows = this.getFilteredMapRows();
+    const heatmapData = rows
+      .map((row) => {
+        const raw = this.getValue(row, ['ADDRESS (BARANGAY)', 'BARANGAY', 'barangay', 'address']);
+        const canonical = this.getCanonicalLipaBarangay(raw);
+        if (!canonical) return null;
+        const coords = this.getBarangayCoordinates()[canonical];
+        return coords ? new window.google.maps.LatLng(coords.lat, coords.lng) : null;
+      })
+      .filter(Boolean);
+
+    if (!this.googleHeatmap) {
+      this.googleHeatmap = new window.google.maps.visualization.HeatmapLayer({
+        data: heatmapData,
+        map: this.googleMap,
+        radius: 30,
+      });
+    } else {
+      this.googleHeatmap.setData(heatmapData);
+      this.googleHeatmap.setMap(this.googleMap);
+    }
+  }
+
   getLipaCityCenter() {
     return { lat: 13.9411, lng: 121.1648 };
   }
@@ -4977,7 +5134,7 @@ class DashboardApp {
   drawLipaCityBoundary() {
     if (!this.googleMap || !window.google?.maps) return;
     if (this.lipaBoundaryOverlay) {
-      this.lipaBoundaryOverlay.setMap(this.googleMap);
+      this.lipaBoundaryOverlay.setMap(this.mapLayers.farmBoundaries ? this.googleMap : null);
       return;
     }
     this.lipaBoundaryOverlay = new window.google.maps.Rectangle({
@@ -4988,7 +5145,7 @@ class DashboardApp {
       fillColor: '#2f855a',
       fillOpacity: 0.08,
       clickable: false,
-      map: this.googleMap,
+      map: this.mapLayers.farmBoundaries ? this.googleMap : null,
     });
   }
 
@@ -5173,6 +5330,9 @@ class DashboardApp {
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
+      styles: this.mapLayers.roadNetwork
+        ? []
+        : [{ featureType: 'road', elementType: 'all', stylers: [{ visibility: 'off' }] }],
     });
     this.googleInfoWindow = new window.google.maps.InfoWindow();
     this.drawLipaCityBoundary();
@@ -5192,7 +5352,7 @@ class DashboardApp {
       const pinIcon = this.getBarangayPinIcon(point);
       const marker = new window.google.maps.Marker({
         position: { lat: point.lat, lng: point.lng },
-        map: this.googleMap,
+        map: this.mapLayers.farmerLocations ? this.googleMap : null,
         title: `${point.barangay} (${point.count})`,
         icon: {
           url: pinIcon.url,
@@ -5272,6 +5432,11 @@ class DashboardApp {
       window.google.maps.event.trigger(this.googleMap, 'resize');
     }
     this.renderGoogleMapMarkers(points);
+    if (this.mapLayers.densityHeatmap) {
+      this.showDensityHeatmap();
+    } else if (this.googleHeatmap) {
+      this.googleHeatmap.setMap(null);
+    }
   }
 
   getRegisterDocuments() {
@@ -5595,34 +5760,38 @@ class DashboardApp {
       const displayName = data.user?.full_name || 'Admin';
       const phone = data.user?.phone || '—';
       
-      const displayNameEl = document.getElementById('accountDisplayName');
-      const phoneEl = document.getElementById('accountPhone');
       const heroNameEl = document.getElementById('accountHeroName');
-      const heroPhoneEl = document.getElementById('accountHeroPhone');
-      const quickNameEl = document.getElementById('accountQuickFullName');
-      const quickPhoneEl = document.getElementById('accountQuickPhone');
+      const firstNameEl = document.getElementById('accountFirstName');
+      const lastNameEl = document.getElementById('accountLastName');
+      const phoneEl = document.getElementById('accountPhone');
+
+      const editFirstNameEl = document.getElementById('accountEditFirstName');
+      const editLastNameEl = document.getElementById('accountEditLastName');
+      const editPhoneEl = document.getElementById('accountEditPhone');
       
-      if (displayNameEl) displayNameEl.textContent = displayName;
-      if (phoneEl) phoneEl.textContent = phone;
+      const nameParts = displayName.split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
       if (heroNameEl) heroNameEl.textContent = displayName;
-      if (heroPhoneEl) heroPhoneEl.textContent = phone;
-      if (quickNameEl) quickNameEl.value = displayName;
-      if (quickPhoneEl) quickPhoneEl.value = phone;
+      if (firstNameEl) firstNameEl.textContent = firstName;
+      if (lastNameEl) lastNameEl.textContent = lastName;
+      if (phoneEl) phoneEl.textContent = phone;
+
+      if (editFirstNameEl) editFirstNameEl.value = firstName;
+      if (editLastNameEl) editLastNameEl.value = lastName;
+      if (editPhoneEl) editPhoneEl.value = phone;
     } catch (error) {
       console.error('Failed to load account data:', error);
-      const displayNameEl = document.getElementById('accountDisplayName');
-      const phoneEl = document.getElementById('accountPhone');
       const heroNameEl = document.getElementById('accountHeroName');
-      const heroPhoneEl = document.getElementById('accountHeroPhone');
-      const quickNameEl = document.getElementById('accountQuickFullName');
-      const quickPhoneEl = document.getElementById('accountQuickPhone');
-      
-      if (displayNameEl) displayNameEl.textContent = 'Admin';
-      if (phoneEl) phoneEl.textContent = '—';
+      const firstNameEl = document.getElementById('accountFirstName');
+      const lastNameEl = document.getElementById('accountLastName');
+      const phoneEl = document.getElementById('accountPhone');
+
       if (heroNameEl) heroNameEl.textContent = 'Admin';
-      if (heroPhoneEl) heroPhoneEl.textContent = '—';
-      if (quickNameEl) quickNameEl.value = 'Admin';
-      if (quickPhoneEl) quickPhoneEl.value = '—';
+      if (firstNameEl) firstNameEl.textContent = 'Admin';
+      if (lastNameEl) lastNameEl.textContent = '';
+      if (phoneEl) phoneEl.textContent = '—';
     }
   }
 
@@ -5631,7 +5800,36 @@ class DashboardApp {
     const logoutBtn = document.getElementById('logoutBtn');
     const quickProfileForm = document.getElementById('accountQuickProfileForm');
     const quickPasswordForm = document.getElementById('accountQuickPasswordForm');
-    const passwordToggles = document.querySelectorAll('.account-password-toggle[data-target]');
+    const passwordToggles = document.querySelectorAll('.password-toggle[data-target]');
+    const openEditModalBtn = document.getElementById('openEditProfileModalBtn');
+    const closeEditModalBtn = document.getElementById('closeEditProfileModalBtn');
+    const editProfileModal = document.getElementById('editProfileModal');
+
+    if (openEditModalBtn && editProfileModal) {
+      openEditModalBtn.addEventListener('click', () => {
+        editProfileModal.removeAttribute('hidden');
+        editProfileModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('confirm-dialog-active');
+      });
+    }
+
+    if (closeEditModalBtn && editProfileModal) {
+      closeEditModalBtn.addEventListener('click', () => {
+        editProfileModal.setAttribute('hidden', '');
+        editProfileModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('confirm-dialog-active');
+      });
+    }
+
+    // Close modal on backdrop click
+    const modalBackdrop = editProfileModal?.querySelector('.profile-modal-backdrop');
+    if (modalBackdrop && editProfileModal) {
+      modalBackdrop.addEventListener('click', () => {
+        editProfileModal.setAttribute('hidden', '');
+        editProfileModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('confirm-dialog-active');
+      });
+    }
     
     if (manageSettingsBtn) {
       manageSettingsBtn.addEventListener('click', () => {
@@ -5644,9 +5842,7 @@ class DashboardApp {
     
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => {
-        if (confirm('Are you sure you want to log out?')) {
-          window.location.href = '/logout';
-        }
+        this.openLogoutConfirmModal();
       });
     }
 
@@ -5668,7 +5864,10 @@ class DashboardApp {
     if (quickProfileForm) {
       quickProfileForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const fullName = (document.getElementById('accountQuickFullName')?.value || '').trim();
+        const firstName = (document.getElementById('accountEditFirstName')?.value || '').trim();
+        const lastName = (document.getElementById('accountEditLastName')?.value || '').trim();
+        const fullName = `${firstName} ${lastName}`.trim();
+        
         if (!fullName) {
           this.showNotification('Full name is required.', 'error');
           return;
@@ -5679,7 +5878,17 @@ class DashboardApp {
           const res = await fetch('/settings/profile', { method: 'POST', body: fd });
           const result = await res.json();
           if (!res.ok || result.error) throw new Error(result.error || 'Could not update profile.');
+          
           this.showNotification(result.success || 'Profile updated successfully.', 'success');
+          
+          // Close modal
+          const editProfileModal = document.getElementById('editProfileModal');
+          if (editProfileModal) {
+            editProfileModal.setAttribute('hidden', '');
+            editProfileModal.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('confirm-dialog-active');
+          }
+          
           this.loadAccountData();
         } catch (err) {
           this.showNotification(err.message || 'Could not update profile.', 'error');
@@ -6811,6 +7020,12 @@ class DashboardApp {
       });
     }
 
+    // Add Contribution button
+    const addBtn = document.getElementById('beanthenticAddBtn');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => this.showAddContributionModal());
+    }
+
     // Sidebar navigation
     const sidebarItems = document.querySelectorAll('.beanthentic-sidebar-item');
     console.log('Found sidebar items:', sidebarItems.length);
@@ -6984,6 +7199,16 @@ class DashboardApp {
         <div class="beanthentic-contribution-farmer">${contribution.farmer}</div>
         <div class="beanthentic-contribution-subject">
           <span class="beanthentic-contribution-subject-text">${contribution.subject}</span>
+          <span class="beanthentic-contribution-tags">
+            <span class="beanthentic-tag beanthentic-tag--${contribution.status}">${contribution.status}</span>
+            <span class="beanthentic-tag beanthentic-tag--${contribution.category}">${this.getContributionCategoryLabel(contribution.category)}</span>
+          </span>
+          <span class="beanthentic-contribution-preview-inline">${contribution.preview}</span>
+        </div>
+        <div class="beanthentic-contribution-actions">
+          <button type="button" class="view-details-btn">
+            View <i class="fa-solid fa-chevron-right"></i>
+          </button>
         </div>
       </div>
     `).join('');
@@ -7037,11 +7262,20 @@ class DashboardApp {
       case 'Archive':
         this.archiveContributions();
         break;
+      case 'Report Issue':
+        this.reportIssues();
+        break;
       case 'Delete':
         this.deleteContributions();
         break;
       case 'Mark as Reviewed':
         this.markAsReviewed();
+        break;
+      case 'Mark as New':
+        this.markAsNew();
+        break;
+      case 'Snooze':
+        this.snoozeContributions();
         break;
       case 'Refresh':
         this.refreshContributions();
@@ -7093,9 +7327,32 @@ class DashboardApp {
     this.showNotification(`${selected.length} contribution(s) marked as reviewed`, 'success');
   }
 
+  markAsNew() {
+    const selected = Array.from(this.selectedContributions);
+    selected.forEach(id => {
+      const contribution = this.contributions.find(c => c.id === id);
+      if (contribution) {
+        contribution.unread = true;
+      }
+    });
+    this.selectedContributions.clear();
+    this.renderContributions();
+    this.showNotification(`${selected.length} contribution(s) marked as new`, 'success');
+  }
+
+  snoozeContributions() {
+    this.showNotification('Contributions snoozed for 1 week', 'success');
+    this.selectedContributions.clear();
+    this.renderContributions();
+  }
+
   refreshContributions() {
     this.showNotification('Contributions refreshed', 'success');
     this.renderContributions();
+  }
+
+  reportIssues() {
+    this.showNotification('Issue reported to admin', 'success');
   }
 
   showMoreOptions() {
@@ -7117,42 +7374,26 @@ class DashboardApp {
     if (!modal || !contribution) return;
 
     const farmerEl = document.getElementById('beanthenticContributionDetailFarmer');
-    const emailEl = document.getElementById('beanthenticContributionDetailEmail');
-    const avatarEl = document.getElementById('gmailAvatar');
+    const dateEl = document.getElementById('beanthenticContributionDetailDate');
     const subjectEl = document.getElementById('beanthenticContributionDetailSubject');
+    const statusEl = document.getElementById('beanthenticContributionDetailStatus');
+    const categoryEl = document.getElementById('beanthenticContributionDetailCategory');
     const previewEl = document.getElementById('beanthenticContributionDetailPreview');
-    const attachmentGrid = document.getElementById('gmailAttachmentsGrid');
-    const attachmentCount = document.getElementById('gmailAttachmentCount');
 
     if (farmerEl) farmerEl.textContent = contribution.farmer || '—';
-    if (emailEl) emailEl.textContent = `<${(contribution.farmer || '').toLowerCase().replace(/\s+/g, '')}@gmail.com>`;
-    if (avatarEl) avatarEl.textContent = (contribution.farmer || 'F').charAt(0).toUpperCase();
+    if (dateEl) dateEl.textContent = contribution.date || '—';
     if (subjectEl) subjectEl.textContent = contribution.subject || '—';
     if (previewEl) previewEl.textContent = contribution.preview || 'No details available.';
 
-    // Clear and populate attachments
-    if (attachmentGrid) {
-      attachmentGrid.innerHTML = '';
-      const attachments = contribution.attachments || [
-        { id: 1, type: 'image', src: '/static/img/doc-preview-1.png' },
-        { id: 2, type: 'image', src: '/static/img/doc-preview-2.png' }
-      ];
+    if (statusEl) {
+      statusEl.textContent = contribution.status || 'pending';
+      statusEl.className = `beanthentic-tag beanthentic-tag--${contribution.status || 'pending'}`;
+    }
 
-      if (attachmentCount) {
-        attachmentCount.textContent = `${attachments.length} Attachment${attachments.length !== 1 ? 's' : ''}`;
-      }
-
-      attachments.forEach(att => {
-        const card = document.createElement('div');
-        card.className = 'gmail-attachment-card';
-        card.innerHTML = `
-          <div class="gmail-attachment-preview">
-            <img src="${att.src}" alt="Attachment ${att.id}">
-            <div class="gmail-dog-ear"></div>
-          </div>
-        `;
-        attachmentGrid.appendChild(card);
-      });
+    if (categoryEl) {
+      const category = contribution.category || 'documents';
+      categoryEl.textContent = this.getContributionCategoryLabel(category);
+      categoryEl.className = `beanthentic-tag beanthentic-tag--${category}`;
     }
 
     modal.removeAttribute('hidden');
@@ -7169,6 +7410,10 @@ class DashboardApp {
     document.body.classList.remove('beanthentic-dialog-open');
   }
 
+  showAddContributionModal() {
+    this.showNotification('Add Contribution modal - Feature coming soon!', 'info');
+  }
+
   showNotification(message, type = 'info') {
     // Create notification element
     const notification = document.createElement('div');
@@ -7179,7 +7424,7 @@ class DashboardApp {
       top: 20px;
       right: 20px;
       padding: 12px 20px;
-      background: ${type === 'success' ? '#276749' : type === 'error' ? '#f44336' : type === 'warning' ? '#ff9800' : '#2196F3'};
+      background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : type === 'warning' ? '#ff9800' : '#2196F3'};
       color: white;
       border-radius: 4px;
       z-index: 9999;
