@@ -764,6 +764,232 @@ class DashboardApp {
 
   }
 
+  async renderClientReportModule() {
+    this.initClientReportModuleControls();
+    await this.loadFarmerOptionsForClientReportModule();
+    await this.loadMisconductReports();
+  }
+
+  initClientReportModuleControls() {
+    if (this.__clientReportControlsInitialized) return;
+    this.__clientReportControlsInitialized = true;
+
+    this.clientReportSearchTerm = this.clientReportSearchTerm || '';
+    this.clientReportStatusFilter = this.clientReportStatusFilter || '';
+
+    const refreshBtn = document.getElementById('clientReportRefreshBtn');
+    if (refreshBtn) refreshBtn.addEventListener('click', () => this.loadMisconductReports());
+
+    const search = document.getElementById('clientReportSearchInput');
+    if (search) {
+      search.addEventListener('input', (e) => {
+        this.clientReportSearchTerm = String((e.target && e.target.value) || '');
+        this.applyClientReportFiltersAndRender();
+      });
+    }
+
+    const status = document.getElementById('clientReportStatusFilter');
+    if (status) {
+      status.addEventListener('change', () => {
+        this.clientReportStatusFilter = String(status.value || '');
+        this.applyClientReportFiltersAndRender();
+      });
+    }
+
+    const form = document.getElementById('clientReportCreateForm');
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await this.submitClientReportCreateForm();
+      });
+    }
+  }
+
+  async loadFarmerOptionsForClientReportModule() {
+    const select = document.getElementById('clientReportFarmerSelect');
+    if (!select) return;
+    if (select.dataset.loaded === '1') return;
+
+    try {
+      const res = await fetch('/api/farmer-picker');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const items = Array.isArray(data.items) ? data.items : [];
+      const opts = ['<option value="">— Select farmer —</option>'].concat(
+        items.map((f) => {
+          const label = f.no != null
+            ? `#${this.escapeHtml(f.no)} — ${this.escapeHtml(f.name || '')}`
+            : this.escapeHtml(f.name || '');
+          return `<option value="${this.escapeHtml(String(f.id))}">${label}</option>`;
+        })
+      );
+      select.innerHTML = opts.join('');
+      select.dataset.loaded = '1';
+    } catch (e) {
+      console.warn('Client Report farmer picker failed:', e);
+      // keep default option
+    }
+  }
+
+  async loadMisconductReports() {
+    const tbody = document.getElementById('clientReportTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" class="transactions-loading-cell">Loading...</td></tr>';
+
+    try {
+      const res = await fetch('/api/misconduct-reports?limit=1000');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      this.misconductReportRows = Array.isArray(data.items) ? data.items : [];
+      this.applyClientReportFiltersAndRender();
+    } catch (e) {
+      console.warn('Misconduct reports load failed:', e);
+      tbody.innerHTML =
+        '<tr><td colspan="6" class="transactions-error-cell">Could not load reports. Try Refresh.</td></tr>';
+      this.misconductReportRows = [];
+      this.showNotification('Could not load misconduct reports.', 'error');
+      this.updateClientReportCountLabel(0);
+    }
+  }
+
+  applyClientReportFiltersAndRender() {
+    const tbody = document.getElementById('clientReportTableBody');
+    if (!tbody) return;
+
+    const term = String(this.clientReportSearchTerm || '').trim().toLowerCase();
+    const status = String(this.clientReportStatusFilter || '').trim().toLowerCase();
+    const rows = Array.isArray(this.misconductReportRows) ? this.misconductReportRows : [];
+
+    const filtered = rows.filter((r) => {
+      if (status && String(r.status || '').toLowerCase() !== status) return false;
+      if (!term) return true;
+      const hay = [
+        r.reporter_name,
+        r.reporter_contact,
+        r.farmer_name,
+        r.allegation,
+        r.status,
+      ]
+        .map((v) => String(v || '').toLowerCase())
+        .join(' ');
+      return hay.includes(term);
+    });
+
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="transactions-error-cell">No reports found.</td></tr>';
+      this.updateClientReportCountLabel(0);
+      return;
+    }
+
+    tbody.innerHTML = filtered
+      .map((r) => this.renderClientReportRow(r))
+      .join('');
+    this.updateClientReportCountLabel(filtered.length);
+  }
+
+  renderClientReportRow(r) {
+    let createdAt = '—';
+    if (r.created_at) {
+      try {
+        const d = new Date(r.created_at);
+        if (!Number.isNaN(d.getTime())) {
+          createdAt = d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+        }
+      } catch {
+        createdAt = String(r.created_at);
+      }
+    }
+
+    const farmerLabel =
+      r.farmer_no != null && r.farmer_no !== ''
+        ? `#${this.escapeHtml(r.farmer_no)} — ${this.escapeHtml(r.farmer_name || '')}`
+        : this.escapeHtml(r.farmer_name || '—');
+
+    const status = this.escapeHtml(this.clientReportStatusLabel(r.status));
+
+    return `<tr>
+      <td>${this.escapeHtml(createdAt)}</td>
+      <td>${this.escapeHtml(r.reporter_name || '—')}</td>
+      <td>${this.escapeHtml(r.reporter_contact || '—')}</td>
+      <td>${farmerLabel}</td>
+      <td>${this.escapeHtml(r.allegation || '')}</td>
+      <td>${status}</td>
+    </tr>`;
+  }
+
+  clientReportStatusLabel(value) {
+    const v = String(value || '').toLowerCase();
+    if (v === 'under_review') return 'Under review';
+    if (v === 'resolved') return 'Resolved';
+    if (v === 'dismissed') return 'Dismissed';
+    return 'Open';
+  }
+
+  updateClientReportCountLabel(count) {
+    const el = document.getElementById('clientReportCountLabel');
+    if (!el) return;
+    const n = Number(count) || 0;
+    el.textContent = `${n} report${n === 1 ? '' : 's'}`;
+  }
+
+  async submitClientReportCreateForm() {
+    const statusEl = document.getElementById('clientReportCreateStatus');
+    const nameEl = document.getElementById('clientReportReporterName');
+    const contactEl = document.getElementById('clientReportReporterContact');
+    const farmerEl = document.getElementById('clientReportFarmerSelect');
+    const statusSel = document.getElementById('clientReportStatusSelect');
+    const allegationEl = document.getElementById('clientReportAllegation');
+
+    if (!nameEl || !allegationEl) return;
+
+    const reporter_name = String(nameEl.value || '').trim();
+    const allegation = String(allegationEl.value || '').trim();
+    const reporter_contact = contactEl ? String(contactEl.value || '').trim() : '';
+    const farmer_id = farmerEl ? String(farmerEl.value || '').trim() : '';
+    const status = statusSel ? String(statusSel.value || 'open').trim() : 'open';
+
+    if (statusEl) statusEl.textContent = 'Saving...';
+
+    try {
+      const res = await fetch('/api/misconduct-reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reporter_name,
+          reporter_contact,
+          farmer_id: farmer_id || null,
+          allegation,
+          status,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = (data && data.error) ? String(data.error) : `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+
+      if (statusEl) statusEl.textContent = 'Saved.';
+      if (nameEl) nameEl.value = '';
+      if (contactEl) contactEl.value = '';
+      if (farmerEl) farmerEl.value = '';
+      if (statusSel) statusSel.value = 'open';
+      allegationEl.value = '';
+
+      await this.loadMisconductReports();
+      this.showNotification('Report added.', 'success');
+    } catch (e) {
+      console.warn('Create report failed:', e);
+      if (statusEl) statusEl.textContent = `Error: ${String(e && e.message ? e.message : e)}`;
+      this.showNotification('Could not save report.', 'error');
+    } finally {
+      if (statusEl) {
+        setTimeout(() => {
+          if (statusEl.textContent === 'Saved.') statusEl.textContent = '';
+        }, 1800);
+      }
+    }
+  }
+
   openAccountModuleFromHeader() {
     this.switchModule('account');
     // Keep URL state in sync when opening from the header icon.
@@ -1374,6 +1600,7 @@ class DashboardApp {
       'farmers-list': 'Farmers',
       'maps': 'Maps',
       'transactions': 'Transactions',
+      'client-report': 'Client Report',
       'register': 'IPOPHL Register',
       'security': 'Account Security',
       'activity': 'Activity Log',
@@ -1434,6 +1661,9 @@ class DashboardApp {
     }
     if (resolvedModuleName === 'transactions') {
       this.loadTransactionsPage();
+    }
+    if (resolvedModuleName === 'client-report') {
+      this.renderClientReportModule();
     }
     if (resolvedModuleName === 'ipophl') {
       this.renderIpophlModule();

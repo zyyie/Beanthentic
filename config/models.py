@@ -286,3 +286,38 @@ class Message(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "read_at": self.read_at.isoformat() if self.read_at else None,
         }
+
+
+class MisconductReport(db.Model):
+    """Customer reports about farmer misconduct (Client Report module)."""
+
+    __tablename__ = "misconduct_report"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    reporter_name = db.Column(db.String(255), nullable=False)
+    reporter_contact = db.Column(db.String(255), default="")
+
+    farmer_id = db.Column(db.Integer, db.ForeignKey("farmers.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Snapshot fields so the report still makes sense if the farmer record changes.
+    farmer_no = db.Column(db.Integer, nullable=True)
+    farmer_name = db.Column(db.String(255), default="")
+
+    allegation = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(30), default="open", index=True)  # open | under_review | resolved | dismissed
+
+    farmer = db.relationship("Farmer", backref=db.backref("misconduct_reports", lazy="dynamic"))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "reporter_name": self.reporter_name,
+            "reporter_contact": self.reporter_contact,
+            "farmer_id": self.farmer_id,
+            "farmer_no": self.farmer_no,
+            "farmer_name": self.farmer_name,
+            "allegation": self.allegation,
+            "status": self.status,
+        }

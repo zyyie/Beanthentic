@@ -69,6 +69,10 @@
                 <span>Transactions</span>
               </a>
             </div>
+            <a href="#client-report" class="nav-link" data-module="client-report" id="sidebarClientReportLink">
+              <i class="nav-icon fa-solid fa-file-lines" aria-hidden="true"></i>
+              <span>Client Report</span>
+            </a>
             <a href="#ipophl" class="nav-link has-submenu" data-module="ipophl" id="sidebarIpophlLink">
               <i class="nav-icon fa-solid fa-certificate" aria-hidden="true"></i>
               <span>IPOPHL</span>
@@ -1257,6 +1261,106 @@
                   <div class="chart-container">
                     <canvas id="verificationStatusChart"></canvas>
                   </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- Client Report Module -->
+          <div class="module hidden" id="client-report-module" data-module="client-report">
+            <section class="module-header">
+              <h1>Client Report</h1>
+              <p>Misconduct reports submitted by customers</p>
+            </section>
+
+            <section class="table-section" aria-label="Customer misconduct reports">
+              <div class="table-header client-report-header">
+                <h2>Customer Misconduct Reports</h2>
+                <div class="table-controls client-report-controls">
+                  <div class="search-container client-report-search">
+                    <input id="clientReportSearchInput" type="text" placeholder="Search reports..." />
+                  </div>
+                  <select id="clientReportStatusFilter" class="client-report-select" aria-label="Filter by status">
+                    <option value="">All status</option>
+                    <option value="open">Open</option>
+                    <option value="under_review">Under review</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="dismissed">Dismissed</option>
+                  </select>
+                  <button type="button" class="action-btn client-report-refresh" id="clientReportRefreshBtn">
+                    <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                    Refresh
+                  </button>
+                </div>
+              </div>
+
+              <div class="table-container">
+                <div class="table-wrapper" role="region" aria-label="Misconduct report table">
+                  <table class="data-table" id="clientReportTable">
+                    <thead>
+                      <tr>
+                        <th>Reported At</th>
+                        <th>Customer</th>
+                        <th>Contact</th>
+                        <th>Farmer</th>
+                        <th>Allegation</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="clientReportTableBody">
+                      <tr><td colspan="6" class="transactions-loading-cell">Loading...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="table-footer">
+                  <div class="footer-left">
+                    <span class="table-status" id="clientReportCountLabel">0 reports</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-container client-report-create">
+                <div class="table-header client-report-create-header">
+                  <h2>Add new report</h2>
+                </div>
+                <div class="table-wrapper client-report-create-body">
+                  <form id="clientReportCreateForm" class="farmer-profile-grid client-report-form">
+                    <div class="form-group">
+                      <label for="clientReportReporterName">Customer name</label>
+                      <input id="clientReportReporterName" type="text" required />
+                    </div>
+                    <div class="form-group">
+                      <label for="clientReportReporterContact">Contact (optional)</label>
+                      <input id="clientReportReporterContact" type="text" />
+                    </div>
+                    <div class="form-group">
+                      <label for="clientReportFarmerSelect">Farmer (optional)</label>
+                      <select id="clientReportFarmerSelect" class="client-report-select">
+                        <option value="">— Select farmer —</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label for="clientReportStatusSelect">Status</label>
+                      <select id="clientReportStatusSelect" class="client-report-select">
+                        <option value="open">Open</option>
+                        <option value="under_review">Under review</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="dismissed">Dismissed</option>
+                      </select>
+                    </div>
+                    <div class="form-group client-report-form-span">
+                      <label for="clientReportAllegation">Allegation / Misconduct details</label>
+                      <textarea id="clientReportAllegation" rows="4" required></textarea>
+                    </div>
+                    <div class="form-group client-report-form-actions">
+                      <button type="submit" class="action-btn">
+                        <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                        Add report
+                      </button>
+                      <span class="table-status" id="clientReportCreateStatus"></span>
+                    </div>
+                  </form>
                 </div>
               </div>
             </section>
