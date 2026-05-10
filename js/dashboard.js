@@ -2665,7 +2665,7 @@ class DashboardApp {
       this.updateStats();
       this.createCharts();
       this.updateTable();
-      this.updateStats();
+      this.populateRecipientDropdown();
       
     } catch (error) {
       console.error('Error loading farmer data:', error);
@@ -2691,6 +2691,7 @@ class DashboardApp {
       this.updateStats();
       this.createCharts();
       this.updateTable();
+      this.populateRecipientDropdown();
     }
   }
 
@@ -2721,7 +2722,8 @@ class DashboardApp {
         'LIBERICA PRODUCTION': 450,
         'EXCELSA PRODUCTION': 600,
         'ROBUSTA PRODUCTION': 900,
-        'NCFRS': 'NCF001'
+        'NCFRS': 'NCF001',
+        'PHONE': '+63 912 345 6789'
       },
       {
         'NO.': 2,
@@ -2746,7 +2748,8 @@ class DashboardApp {
         'LIBERICA PRODUCTION': 300,
         'EXCELSA PRODUCTION': 450,
         'ROBUSTA PRODUCTION': 750,
-        'NCFRS': 'NCF002'
+        'NCFRS': 'NCF002',
+        'PHONE': '+63 923 456 7890'
       },
       {
         'NO.': 3,
@@ -2771,7 +2774,8 @@ class DashboardApp {
         'LIBERICA PRODUCTION': 600,
         'EXCELSA PRODUCTION': 540,
         'ROBUSTA PRODUCTION': 1050,
-        'NCFRS': 'NCF003'
+        'NCFRS': 'NCF003',
+        'PHONE': '+63 934 567 8901'
       }
     ];
     
@@ -2783,6 +2787,7 @@ class DashboardApp {
     this.updateTable();
     this.updateStats();
     this.createCharts();
+    this.populateRecipientDropdown();
   }
 
   updateTable() {
@@ -6532,10 +6537,45 @@ class DashboardApp {
       });
     }
 
+    // Contact dropdown listeners
+    const recipientInput = document.getElementById('msgComposeRecipientInput');
+    if (recipientInput) {
+      recipientInput.addEventListener('focus', () => this.showContactDropdown());
+      recipientInput.addEventListener('input', (e) => this.filterContactDropdown(e.target.value));
+    }
+    
+    document.addEventListener('click', (e) => {
+      const dropdown = document.getElementById('messagingContactDropdown');
+      const input = document.getElementById('msgComposeRecipientInput');
+      if (dropdown && input && !dropdown.contains(e.target) && e.target !== input) {
+        this.hideContactDropdown();
+      }
+    });
+
+    const dropdownList = document.getElementById('messagingContactDropdownList');
+    if (dropdownList) {
+      dropdownList.addEventListener('click', (e) => {
+        const item = e.target.closest('.messaging-contact-dropdown__item');
+        if (item) {
+          const phone = item.getAttribute('data-phone');
+          const name = item.getAttribute('data-name');
+          this.selectContact(name, phone);
+        }
+      });
+    }
+
     // Message list clicks
     const listEl = document.getElementById('messagingList');
     if (listEl) {
       listEl.addEventListener('click', (e) => {
+        const contactBtn = e.target.closest('.messaging-contact-message-btn');
+        if (contactBtn) {
+          e.stopPropagation();
+          const phone = contactBtn.getAttribute('data-phone');
+          if (phone) this.openMessagingCompose(phone);
+          return;
+        }
+
         const starBtn = e.target.closest('.messaging-item__star');
         if (starBtn) {
           e.stopPropagation();
@@ -6545,6 +6585,7 @@ class DashboardApp {
         }
         const item = e.target.closest('.messaging-item');
         if (item) {
+          if (this.messagingFolder === 'contacts') return;
           const id = Number(item.getAttribute('data-msg-id'));
           if (id) this.openMessagingDetail(id);
         }
@@ -6614,6 +6655,11 @@ class DashboardApp {
   async loadMessagingFolder() {
     const listEl = document.getElementById('messagingList');
     if (!listEl) return;
+
+    if (this.messagingFolder === 'contacts') {
+      this.renderMessagingContacts();
+      return;
+    }
 
     listEl.innerHTML = '<li class="messaging-loading"><i class="fa-solid fa-spinner"></i><span>Loading messages…</span></li>';
 
@@ -6718,6 +6764,50 @@ class DashboardApp {
           <div class="messaging-item__meta">
             <button type="button" class="messaging-item__star${starClass}" data-msg-id="${m.id}" title="Star">
               <i class="${starIcon}"></i>
+            </button>
+          </div>
+        </div>
+      </li>`;
+    }).join('');
+  }
+
+  renderMessagingContacts() {
+    const listEl = document.getElementById('messagingList');
+    if (!listEl) return;
+
+    if (!this.data || !this.data.length) {
+      listEl.innerHTML = `<li class="messaging-list-empty">
+        <i class="fa-solid fa-users-slash"></i>
+        <p>No contacts found in the system.</p>
+      </li>`;
+      return;
+    }
+
+    const sortedFarmers = [...this.data].sort((a, b) => {
+      const nameA = this.getFarmerFullName(a).toLowerCase();
+      const nameB = this.getFarmerFullName(b).toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    const esc = (s) => this.escapeHtml(s);
+    listEl.innerHTML = sortedFarmers.map(f => {
+      const fullName = this.getFarmerFullName(f);
+      const phone = this.getValue(f, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']);
+      const barangay = this.getValue(f, ['ADDRESS (BARANGAY)', 'barangay', 'BARANGAY', 'address']) || 'Address not set';
+      const initials = this.getInitials(fullName);
+      
+      return `<li class="messaging-item messaging-contact-item" data-phone="${esc(phone)}">
+        <div class="messaging-item__avatar messaging-category-dot--farmer">${esc(initials)}</div>
+        <div class="messaging-item__content">
+          <div class="messaging-item__top">
+            <span class="messaging-item__sender">${esc(fullName)}</span>
+            <span class="messaging-item__time">${esc(phone)}</span>
+          </div>
+          <div class="messaging-item__subject">${esc(barangay)}</div>
+          <div class="messaging-item__preview">Farmer record from ${esc(barangay)}</div>
+          <div class="messaging-item__meta">
+            <button type="button" class="btn btn-sm btn-primary messaging-contact-message-btn" data-phone="${esc(phone)}">
+              <i class="fa-solid fa-paper-plane"></i> Message
             </button>
           </div>
         </div>
@@ -7277,11 +7367,176 @@ class DashboardApp {
     }
   }
 
-  openMessagingCompose() {
+  openMessagingCompose(recipientPhone = '') {
+    this.populateRecipientDropdown();
+    this.populateContactDropdown(); // Initial population
     const overlay = document.getElementById('messagingComposeOverlay');
     if (overlay) overlay.classList.add('is-visible');
+    
+    const hiddenRecipient = document.getElementById('msgComposeRecipient');
+    const visibleInput = document.getElementById('msgComposeRecipientInput');
+    
+    if (recipientPhone && hiddenRecipient && visibleInput) {
+      hiddenRecipient.value = recipientPhone;
+      // Try to find the name for this phone number
+      const farmer = (this.data || []).find(f => this.getValue(f, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']) === recipientPhone);
+      if (farmer) {
+        visibleInput.value = this.getFarmerFullName(farmer);
+      } else {
+        visibleInput.value = recipientPhone;
+      }
+      this.loadComposeConversationHistory(recipientPhone);
+    } else if (visibleInput) {
+      visibleInput.value = '';
+      if (hiddenRecipient) hiddenRecipient.value = '';
+      this.loadComposeConversationHistory('');
+    }
+
     const subjectInput = document.getElementById('msgComposeSubject');
     if (subjectInput) setTimeout(() => subjectInput.focus(), 100);
+  }
+
+  showContactDropdown() {
+    const dropdown = document.getElementById('messagingContactDropdown');
+    if (dropdown) dropdown.classList.add('is-visible');
+    this.filterContactDropdown(''); // Show all on focus
+  }
+
+  hideContactDropdown() {
+    const dropdown = document.getElementById('messagingContactDropdown');
+    if (dropdown) dropdown.classList.remove('is-visible');
+  }
+
+  populateContactDropdown() {
+    const list = document.getElementById('messagingContactDropdownList');
+    if (!list) return;
+
+    if (!this.data || !this.data.length) {
+      list.innerHTML = '<div class="messaging-contact-dropdown__item">No contacts found</div>';
+      return;
+    }
+
+    const sortedFarmers = [...this.data].sort((a, b) => {
+      const nameA = this.getFarmerFullName(a).toLowerCase();
+      const nameB = this.getFarmerFullName(b).toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    const esc = (s) => this.escapeHtml(s);
+    list.innerHTML = sortedFarmers.map(f => {
+      const fullName = this.getFarmerFullName(f);
+      const phone = this.getValue(f, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']);
+      const initials = this.getInitials(fullName);
+      
+      return `
+        <div class="messaging-contact-dropdown__item" data-phone="${esc(phone)}" data-name="${esc(fullName)}">
+          <div class="messaging-contact-dropdown__avatar">${esc(initials)}</div>
+          <div class="messaging-contact-dropdown__name">
+            ${esc(fullName)} 
+            <i class="fa-solid fa-circle-check messaging-contact-dropdown__verified"></i>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  filterContactDropdown(query) {
+    const items = document.querySelectorAll('.messaging-contact-dropdown__item');
+    const q = query.toLowerCase();
+    let hasResults = false;
+
+    items.forEach(item => {
+      const name = (item.getAttribute('data-name') || '').toLowerCase();
+      const phone = (item.getAttribute('data-phone') || '').toLowerCase();
+      if (name.includes(q) || phone.includes(q)) {
+        item.style.display = 'flex';
+        hasResults = true;
+      } else {
+        item.style.display = 'none';
+      }
+    });
+
+    const dropdown = document.getElementById('messagingContactDropdown');
+    if (dropdown) {
+      if (hasResults) dropdown.classList.add('is-visible');
+      else dropdown.classList.remove('is-visible');
+    }
+  }
+
+  selectContact(name, phone) {
+    const visibleInput = document.getElementById('msgComposeRecipientInput');
+    const hiddenInput = document.getElementById('msgComposeRecipient');
+    if (visibleInput) visibleInput.value = name;
+    if (hiddenInput) hiddenInput.value = phone;
+    this.hideContactDropdown();
+    
+    // Load conversation history for this contact
+    this.loadComposeConversationHistory(phone);
+    
+    const subjectInput = document.getElementById('msgComposeSubject');
+    if (subjectInput) subjectInput.focus();
+  }
+
+  loadComposeConversationHistory(phone) {
+    const historyEl = document.getElementById('msgComposeConversation');
+    if (!historyEl) return;
+
+    if (!phone) {
+      historyEl.hidden = true;
+      historyEl.innerHTML = '';
+      return;
+    }
+
+    // Search for existing messages with this phone number
+    const existingMsg = this.messagingMessages.find(m => String(m.sender_phone) === String(phone));
+    
+    if (existingMsg && existingMsg.conversation) {
+      historyEl.innerHTML = this.renderConversation(existingMsg);
+      historyEl.hidden = false;
+      // Scroll to bottom
+      setTimeout(() => historyEl.scrollTop = historyEl.scrollHeight, 50);
+    } else {
+      historyEl.hidden = true;
+      historyEl.innerHTML = '';
+    }
+  }
+
+  populateRecipientDropdown() {
+    const select = document.getElementById('msgComposeRecipient');
+    if (!select) return;
+
+    // Keep "All Farmers" as the first option
+    select.innerHTML = '<option value="">All Farmers</option>';
+
+    if (!this.data || !this.data.length) return;
+
+    // Sort farmers alphabetically by name
+    const sortedFarmers = [...this.data].sort((a, b) => {
+      const nameA = this.getFarmerFullName(a).toLowerCase();
+      const nameB = this.getFarmerFullName(b).toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    sortedFarmers.forEach(farmer => {
+      const fullName = this.getFarmerFullName(farmer);
+      const phone = this.getValue(farmer, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']);
+      if (fullName && phone) {
+        const option = document.createElement('option');
+        option.value = phone;
+        option.textContent = `${fullName} (${phone})`;
+        select.appendChild(option);
+      }
+    });
+  }
+
+  getFarmerFullName(row) {
+    return (
+      this.getValue(row, ['NAME OF FARMER', 'name', 'FULL NAME', 'full_name', 'Name']) ||
+      [this.getValue(row, ['FIRST NAME', 'first_name', 'firstName']), this.getValue(row, ['LAST NAME', 'last_name', 'lastName'])]
+        .filter(Boolean)
+        .join(' ')
+        .trim()
+    );
   }
 
   closeMessagingCompose() {

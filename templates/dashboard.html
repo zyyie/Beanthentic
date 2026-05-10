@@ -1866,35 +1866,11 @@
                     <i class="fa-solid fa-archive"></i>
                     <span>Archived</span>
                   </li>
+                  <li class="messaging-folder-item" data-folder="contacts">
+                    <i class="fa-solid fa-address-book"></i>
+                    <span>Contacts</span>
+                  </li>
                 </ul>
-
-                <div class="messaging-categories">
-                  <div class="messaging-categories__title">Categories</div>
-                  <div class="messaging-category-item" data-category="">
-                    <span class="messaging-category-dot" style="background:#374151"></span>
-                    <span>All Messages</span>
-                  </div>
-                  <div class="messaging-category-item" data-category="general">
-                    <span class="messaging-category-dot messaging-category-dot--general"></span>
-                    <span>General</span>
-                  </div>
-                  <div class="messaging-category-item" data-category="farmer-update">
-                    <span class="messaging-category-dot messaging-category-dot--farmer"></span>
-                    <span>Farmer Updates</span>
-                  </div>
-                  <div class="messaging-category-item" data-category="farmers">
-                    <span class="messaging-category-dot messaging-category-dot--farmers"></span>
-                    <span>Farmers</span>
-                  </div>
-                  <div class="messaging-category-item" data-category="announcement">
-                    <span class="messaging-category-dot messaging-category-dot--announcement"></span>
-                    <span>Announcements</span>
-                  </div>
-                  <div class="messaging-category-item" data-category="reminder">
-                    <span class="messaging-category-dot messaging-category-dot--reminder"></span>
-                    <span>Reminders</span>
-                  </div>
-                </div>
               </aside>
 
               <!-- Main: toolbar + list + detail -->
@@ -1987,52 +1963,52 @@
                                     </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <!-- Compose Message Overlay -->
-          <div class="messaging-compose-overlay" id="messagingComposeOverlay">
-            <div class="messaging-compose-card">
-              <div class="messaging-compose-header">
-                <h2><i class="fa-solid fa-pen-to-square"></i> New Message</h2>
-                <button type="button" class="messaging-compose-close" id="messagingComposeClose">
-                  <i class="fa-solid fa-xmark"></i>
-                </button>
-              </div>
-              <form id="messagingComposeForm">
-                <div class="messaging-compose-body">
-                  <div class="messaging-compose-field-row">
-                    <div class="messaging-compose-field">
-                      <label for="msgComposeRecipient">Recipient (optional)</label>
-                      <input type="text" id="msgComposeRecipient" placeholder="Phone number or leave blank for all" autocomplete="off" />
-                    </div>
-                    <div class="messaging-compose-field">
-                      <label for="msgComposeCategory">Category</label>
-                      <select id="msgComposeCategory">
-                        <option value="general">General</option>
-                        <option value="farmer-update">Farmer Update</option>
-                        <option value="announcement">Announcement</option>
-                        <option value="reminder">Reminder</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div class="messaging-compose-field">
-                    <label for="msgComposeSubject">Subject</label>
-                    <input type="text" id="msgComposeSubject" placeholder="Message subject" required autocomplete="off" />
-                  </div>
-                  <div class="messaging-compose-field">
-                    <label for="msgComposeBody">Message</label>
-                    <textarea id="msgComposeBody" placeholder="Type your message here…" required></textarea>
-                  </div>
-                </div>
-                <div class="messaging-compose-footer">
-                  <button type="button" class="messaging-compose-cancel" id="messagingComposeCancel">Cancel</button>
-                  <button type="submit" class="messaging-compose-send" id="messagingComposeSend">
-                    <i class="fa-solid fa-paper-plane"></i>
-                    <span>Send Message</span>
+              <!-- New Message Side Panel -->
+              <div class="messaging-compose-panel" id="messagingComposeOverlay">
+                <div class="messaging-compose-header">
+                  <h2><i class="fa-solid fa-pen-to-square"></i> New Message</h2>
+                  <button type="button" class="messaging-compose-close" id="messagingComposeClose">
+                    <i class="fa-solid fa-xmark"></i>
                   </button>
                 </div>
-              </form>
+                <form id="messagingComposeForm">
+                  <div class="messaging-compose-body">
+                    <div class="messaging-compose-field messaging-recipient-container">
+                      <label for="msgComposeRecipient">To:</label>
+                      <div class="messaging-recipient-input-wrapper">
+                        <input type="text" id="msgComposeRecipientInput" placeholder="Search contacts..." autocomplete="off" />
+                        <input type="hidden" id="msgComposeRecipient" />
+                        <div class="messaging-contact-dropdown" id="messagingContactDropdown">
+                          <div class="messaging-contact-dropdown__header">Your contacts</div>
+                          <div class="messaging-contact-dropdown__list" id="messagingContactDropdownList">
+                            <!-- Contacts populated here -->
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Chat History (visible when contact is selected) -->
+                    <div class="messaging-compose-conversation" id="msgComposeConversation" hidden></div>
+
+                    <div class="messaging-compose-field">
+                      <label for="msgComposeSubject">Subject</label>
+                      <input type="text" id="msgComposeSubject" placeholder="Message subject" required autocomplete="off" />
+                    </div>
+                    <div class="messaging-compose-field">
+                      <label for="msgComposeBody">Message</label>
+                      <textarea id="msgComposeBody" placeholder="Type your message here…" required></textarea>
+                    </div>
+                  </div>
+                  <div class="messaging-compose-footer">
+                    <button type="button" class="messaging-compose-cancel" id="messagingComposeCancel">Cancel</button>
+                    <button type="submit" class="messaging-compose-send" id="messagingComposeSend">
+                      <i class="fa-solid fa-paper-plane"></i>
+                      <span>Send Message</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
 
