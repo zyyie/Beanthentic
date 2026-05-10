@@ -518,6 +518,15 @@ class DashboardApp {
     this.initFarmerProfileTabs();
     // Initialize Map Layer Toggles
     this.initMapLayerToggles();
+
+    // Global click listener to close custom dropdowns
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.modern-dropdown')) {
+        document.querySelectorAll('.modern-dropdown.active').forEach((d) => {
+          d.classList.remove('active');
+        });
+      }
+    });
   }
 
   updateNotificationsToolbarState() {
@@ -1097,7 +1106,7 @@ class DashboardApp {
   async loadMisconductReports() {
     const tbody = document.getElementById('clientReportTableBody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="7" class="transactions-loading-cell">Loading...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="transactions-loading-cell">Loading...</td></tr>';
 
     try {
       const res = await fetch('/api/misconduct-reports?limit=1000');
@@ -1108,7 +1117,7 @@ class DashboardApp {
     } catch (e) {
       console.warn('Misconduct reports load failed:', e);
       tbody.innerHTML =
-        '<tr><td colspan="7" class="transactions-error-cell">Could not load reports. Try Refresh.</td></tr>';
+        '<tr><td colspan="5" class="transactions-error-cell">Could not load reports. Try Refresh.</td></tr>';
       this.misconductReportRows = [];
       this.showNotification('Could not load misconduct reports.', 'error');
       this.updateClientReportCountLabel(0);
@@ -1139,7 +1148,7 @@ class DashboardApp {
     });
 
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="transactions-error-cell">No reports found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="transactions-error-cell">No reports found.</td></tr>';
       this.updateClientReportCountLabel(0);
       return;
     }
@@ -1151,42 +1160,98 @@ class DashboardApp {
   }
 
   renderClientReportRow(r) {
-    let createdAt = '—';
+    let dateStr = '—';
+    let timeStr = '—';
     if (r.created_at) {
       try {
         const d = new Date(r.created_at);
         if (!Number.isNaN(d.getTime())) {
-          createdAt = d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+          dateStr = d.toLocaleDateString(undefined, { dateStyle: 'medium' });
+          timeStr = d.toLocaleTimeString(undefined, { timeStyle: 'short' });
         }
       } catch {
-        createdAt = String(r.created_at);
+        dateStr = String(r.created_at);
       }
     }
 
-    const farmerLabel =
-      r.farmer_no != null && r.farmer_no !== ''
-        ? `#${this.escapeHtml(r.farmer_no)} — ${this.escapeHtml(r.farmer_name || '')}`
-        : this.escapeHtml(r.farmer_name || '—');
-
-    const status = this.escapeHtml(this.clientReportStatusLabel(r.status));
+    const farmerLabel = this.escapeHtml(r.farmer_name || '—');
+    const statusValue = String(r.status || 'under review').toLowerCase();
+    const statusClass = statusValue.replace(/\s+/g, '-');
 
     return `<tr>
-      <td>${this.escapeHtml(createdAt)}</td>
-      <td>${this.escapeHtml(r.reporter_name || '—')}</td>
-      <td>${this.escapeHtml(r.reporter_contact || '—')}</td>
+      <td>${this.escapeHtml(dateStr)}</td>
+      <td>${this.escapeHtml(timeStr)}</td>
       <td>${farmerLabel}</td>
       <td>${this.escapeHtml(r.allegation || '')}</td>
-      <td>${status}</td>
-      <td><button type="button" class="view-details-btn" disabled>View Details <i class="fa-solid fa-chevron-right"></i></button></td>
+      <td>
+        <div class="modern-dropdown" id="clientReportDropdown-${r.id}">
+          <button class="modern-dropdown-trigger status-${statusClass}" onclick="dashboardApp.toggleModernDropdown(event, ${r.id})">
+            <span>${this.clientReportStatusLabel(statusValue)}</span>
+            <i class="fa-solid fa-chevron-down"></i>
+          </button>
+          <div class="modern-dropdown-menu">
+            <div class="modern-dropdown-item ${statusValue === 'under review' ? 'active' : ''}" onclick="dashboardApp.updateMisconductStatus(${r.id}, 'under review')">
+              <i class="fa-solid fa-magnifying-glass" style="color: #2b6cb0;"></i> Under review
+            </div>
+            <div class="modern-dropdown-item ${statusValue === 'blocked' ? 'active' : ''}" onclick="dashboardApp.updateMisconductStatus(${r.id}, 'blocked')">
+              <i class="fa-solid fa-ban" style="color: #c53030;"></i> Blocked
+            </div>
+            <div class="modern-dropdown-item ${statusValue === 'resolved' ? 'active' : ''}" onclick="dashboardApp.updateMisconductStatus(${r.id}, 'resolved')">
+              <i class="fa-solid fa-check" style="color: #2f855a;"></i> Resolved
+            </div>
+            <div class="modern-dropdown-item ${statusValue === 'dismissed' ? 'active' : ''}" onclick="dashboardApp.updateMisconductStatus(${r.id}, 'dismissed')">
+              <i class="fa-solid fa-xmark" style="color: #4a5568;"></i> Dismissed
+            </div>
+          </div>
+        </div>
+      </td>
     </tr>`;
+  }
+
+  async updateMisconductStatus(reportId, newStatus) {
+    try {
+      const res = await fetch(`/api/misconduct-reports/${reportId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      this.showNotification(`Report #${reportId} updated to ${newStatus}`, 'success');
+      await this.loadMisconductReports();
+    } catch (e) {
+      console.warn('Status update failed:', e);
+      this.showNotification('Could not update status.', 'error');
+      await this.loadMisconductReports(); // Refresh to revert UI
+    }
+  }
+
+  toggleModernDropdown(event, reportId) {
+    if (event) event.stopPropagation();
+    const dropdown = document.getElementById(`clientReportDropdown-${reportId}`);
+    if (!dropdown) return;
+
+    const isActive = dropdown.classList.contains('active');
+
+    // Close all other open dropdowns first
+    document.querySelectorAll('.modern-dropdown.active').forEach((d) => {
+      d.classList.remove('active');
+    });
+
+    if (!isActive) {
+      dropdown.classList.add('active');
+    }
   }
 
   clientReportStatusLabel(value) {
     const v = String(value || '').toLowerCase();
-    if (v === 'under_review') return 'Under review';
+    if (v === 'under review') return 'Under review';
+    if (v === 'blocked') return 'Blocked';
     if (v === 'resolved') return 'Resolved';
     if (v === 'dismissed') return 'Dismissed';
-    return 'Open';
+    return 'Under review';
   }
 
   updateClientReportCountLabel(count) {

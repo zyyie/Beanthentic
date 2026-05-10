@@ -12,7 +12,7 @@ from config.models import Farmer, MisconductReport, db
 from config.utils import get_current_user_phone, is_authenticated, log_activity
 
 
-ALLOWED_STATUSES = {"open", "under_review", "resolved", "dismissed", "warning", "suspend", "block"}
+ALLOWED_STATUSES = {"under review", "blocked", "resolved", "dismissed"}
 
 
 def _clean_text(value, limit=None):

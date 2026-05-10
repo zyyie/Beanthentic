@@ -1407,8 +1407,8 @@
                   </div>
                   <select id="clientReportStatusFilter" class="client-report-select" aria-label="Filter by status">
                     <option value="">All status</option>
-                    <option value="open">Open</option>
-                    <option value="under_review">Under review</option>
+                    <option value="under review">Under review</option>
+                    <option value="blocked">Blocked</option>
                     <option value="resolved">Resolved</option>
                     <option value="dismissed">Dismissed</option>
                   </select>
@@ -1424,13 +1424,11 @@
                   <table class="data-table" id="clientReportTable">
                     <thead>
                       <tr>
-                        <th>Reported At</th>
-                        <th>Customer</th>
-                        <th>Contact</th>
+                        <th>Date</th>
+                        <th>Time</th>
                         <th>Farmer</th>
                         <th>Allegation</th>
                         <th>Status</th>
-                        <th></th>
                       </tr>
                     </thead>
                     <tbody id="clientReportTableBody">

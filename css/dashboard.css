@@ -2903,8 +2903,11 @@ body.dashboard-page #client-report-module .action-btn:active {
 body.dashboard-page #client-report-module .table-container {
   border-radius: 12px;
   border: 1px solid #e2e8f0;
-  overflow: hidden;
   background: #ffffff;
+}
+
+body.dashboard-page #client-report-module .table-wrapper {
+  overflow: visible !important;
 }
 
 body.dashboard-page #client-report-module .data-table {
@@ -2914,17 +2917,17 @@ body.dashboard-page #client-report-module .data-table {
 }
 
 body.dashboard-page #client-report-module .data-table th:nth-child(1),
-body.dashboard-page #client-report-module .data-table td:nth-child(1) { width: 80px; text-align: center; }
+body.dashboard-page #client-report-module .data-table td:nth-child(1) { width: 120px; }
 
 body.dashboard-page #client-report-module .data-table th:nth-child(2),
-body.dashboard-page #client-report-module .data-table td:nth-child(2) { width: 110px; }
+body.dashboard-page #client-report-module .data-table td:nth-child(2) { width: 100px; }
 
 body.dashboard-page #client-report-module .data-table th:nth-child(3),
-body.dashboard-page #client-report-module .data-table td:nth-child(3) { width: 90px; }
+body.dashboard-page #client-report-module .data-table td:nth-child(3) { width: 180px; text-align: left; }
 
 body.dashboard-page #client-report-module .data-table th:nth-child(4),
 body.dashboard-page #client-report-module .data-table td:nth-child(4) { 
-  width: 160px; 
+  width: auto; 
   text-align: left; 
   white-space: normal;
   overflow: visible;
@@ -2932,15 +2935,9 @@ body.dashboard-page #client-report-module .data-table td:nth-child(4) {
 
 body.dashboard-page #client-report-module .data-table th:nth-child(5),
 body.dashboard-page #client-report-module .data-table td:nth-child(5) { 
-  width: 40%; 
-  text-align: left; 
-  white-space: normal; 
-  overflow: visible; 
-  text-overflow: clip; 
+  width: 150px; 
+  text-align: center;
 }
-
-body.dashboard-page #client-report-module .data-table th:nth-child(6),
-body.dashboard-page #client-report-module .data-table td:nth-child(6) { width: 140px; text-align: center; }
 
 body.dashboard-page #client-report-module .data-table td {
   padding: 8px 16px;
@@ -2948,9 +2945,10 @@ body.dashboard-page #client-report-module .data-table td {
   font-size: 0.85rem;
   border-bottom: 1px solid #edf2f7;
   vertical-align: middle;
+  overflow: visible !important;
 }
 
-body.dashboard-page #client-report-module .data-table td:nth-child(5) {
+body.dashboard-page #client-report-module .data-table td:nth-child(4) {
   padding-top: 12px;
   padding-bottom: 12px;
   line-height: 1.4;
@@ -2991,31 +2989,133 @@ body.dashboard-page #client-report-module .table-status {
   font-weight: 500;
 }
 
-/* Status Action Dropdown */
-.status-action-select {
-  padding: 4px 10px;
-  border-radius: 9999px;
-  font-size: 0.7rem;
-  font-weight: 700;
+/* Modern Custom Dropdown - Refined for Cohesion */
+.modern-dropdown {
+  position: relative;
+  display: inline-block;
+  text-align: left;
+}
+
+.modern-dropdown-trigger {
+  padding: 6px 16px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
   border: 1px solid #e2e8f0;
   cursor: pointer;
   transition: all 0.2s ease;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 6px center;
-  background-size: 10px;
-  padding-right: 24px;
-  min-width: 100px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 130px;
+  justify-content: space-between;
   text-transform: capitalize;
-  background-color: #f8fafc;
+  background-color: #ffffff;
   color: #1a202c;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.status-action-select:focus {
-  outline: none;
+.modern-dropdown-trigger i {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+}
+
+.modern-dropdown.active .modern-dropdown-trigger {
   border-color: #2c7a3e;
   box-shadow: 0 0 0 3px rgba(44, 122, 62, 0.1);
+}
+
+.modern-dropdown.active .modern-dropdown-trigger i {
+  transform: rotate(180deg);
+  color: #2c7a3e;
+}
+
+/* Status Specific Styles for Trigger */
+.modern-dropdown-trigger.status-under-review { color: #2b6cb0; background-color: #ebf8ff; border-color: #bee3f8; }
+.modern-dropdown-trigger.status-blocked { color: #c53030; background-color: #fff5f5; border-color: #feb2b2; }
+.modern-dropdown-trigger.status-resolved { color: #2f855a; background-color: #f0fff4; border-color: #c6f6d5; }
+.modern-dropdown-trigger.status-dismissed { color: #4a5568; background-color: #f7fafc; border-color: #edf2f7; }
+
+.modern-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  z-index: 9999;
+  min-width: 180px;
+  padding: 8px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.modern-dropdown.active .modern-dropdown-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.modern-dropdown-item {
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #4a5568;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modern-dropdown-item i {
+  width: 18px;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.modern-dropdown-item:hover {
+  background-color: #f8fafc;
+  color: #2c7a3e;
+}
+
+.modern-dropdown-item.active {
+  background-color: #f0fff4;
+  color: #2c7a3e;
+  font-weight: 700;
+}
+
+.modern-dropdown-trigger:hover {
+  border-color: #cbd5e0;
+}
+
+/* Ensure row doesn't clip dropdown */
+body.dashboard-page #client-report-module .table-container,
+body.dashboard-page #client-report-module .table-wrapper {
+  overflow: visible !important;
+}
+
+body.dashboard-page #client-report-module .data-table td {
+  overflow: visible !important;
+}
+
+body.dashboard-page #client-report-module .data-table tr {
+  position: relative;
+}
+
+body.dashboard-page #client-report-module .data-table tr:hover {
+  z-index: 5;
+}
+
+body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.active) {
+  z-index: 100;
 }
 
 /* Empty State / Loading */
