@@ -4890,8 +4890,32 @@ class DashboardApp {
         this.showImagePreview(e.target.result, file.name);
       };
       reader.readAsDataURL(file);
+    } else if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf') || 
+               file.type === 'text/csv' || file.name.toLowerCase().endsWith('.csv')) {
+      // Use the simple preview modal for PDFs and CSVs
+      const modal = document.getElementById('simpleFilePreviewModal');
+      if (modal) {
+        // Revoke previous URL if any to prevent memory leaks
+        if (this.currentPreviewUrl) {
+          URL.revokeObjectURL(this.currentPreviewUrl);
+        }
+        
+        this.currentPreviewUrl = URL.createObjectURL(file);
+        
+        document.getElementById('simplePreviewFileName').textContent = file.name;
+        
+        const frame = document.getElementById('simplePreviewFrame');
+        frame.src = this.currentPreviewUrl;
+        frame.style.display = 'block';
+        
+        modal.classList.add('active');
+      } else {
+        // Fallback: Open in new tab
+        const fileUrl = URL.createObjectURL(file);
+        window.open(fileUrl, '_blank');
+      }
     } else {
-      this.showIpophlNotification(`Preview not available for ${file.type} files`);
+      this.showIpophlNotification(`Preview not available for ${file.type || 'this'} files`);
     }
   }
 

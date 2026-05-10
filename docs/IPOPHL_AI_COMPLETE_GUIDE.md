@@ -97,20 +97,41 @@ CREATE TABLE document_analysis (
 
 ## 📋 GI Checklist
 
-The AI analyzes documents against this Lipa City Coffee GI checklist:
+The AI analyzes documents against the updated IPOPHL GI Seal application requirements:
+
+### 1. Primary Application Documents (Mandatory)
+- **Duly Accomplished Application Form**: Must be in English or Filipino.
+- **Manual of Specifications (MoP)**: Must include:
+  - Name to be protected as a GI.
+  - Description of the goods.
+  - Delimited geographical area of production (territorial boundaries).
+  - Causal link explanation between area and product quality/reputation.
+  - Production processes, quality control standards, and labeling rules.
+
+### 2. Certifications and Proofs (Mandatory)
+- **Government/Independent Certification**: Validates causal link and technical specifications.
+- **Proof of Payment**: Required application fees.
+- **Proof of Foreign Protection**: For foreign applicants only.
+
+### 3. Representation Documents (Optional/Contextual)
+- **Written Designation of Representative**: Required if applicant is not domiciled in the Philippines.
+
+### 4. Required Applicant Details (Mandatory)
+- Applicant’s name, address, and law of organization (for juridical entities).
+- State of domicile or real and effective industrial/commercial establishment.
 
 ### Mandatory Terms (70% weight)
-- "Lipa", "Batangas", "coffee", "Barako"
-- "altitude", "soil", "climate", "geographical"
-- "origin", "quality", "reputation", "traditional"
-- "cultivation", "harvesting", "processing", "notary"
-- "certification", "specifications", "standards"
+- "Application Form", "Manual of Specifications", "MoP"
+- "Geographical Area", "Causal Link", "Production Process"
+- "Quality Control", "Labeling Rules", "Government Certification"
+- "Proof of Payment", "Applicant Name", "Applicant Address"
+- "Legal Entity", "Domicile", "Geographical Origin"
 
 ### Optional Terms (30% weight)
-- "farmers", "cooperative", "association", "LGU"
-- "production", "yield", "variety", "arabica"
-- "robusta", "excelsa", "liberica", "organoleptic"
-- "characteristics", "distinctive", "method", "practice"
+- "Foreign Protection", "Representative Designation"
+- "Independent Certification", "Industrial Establishment"
+- "Commercial Establishment", "Stakeholders", "Governing Board"
+- "Territorial Boundaries", "Technical Specifications"
 
 ## 🎯 Scoring Algorithm
 

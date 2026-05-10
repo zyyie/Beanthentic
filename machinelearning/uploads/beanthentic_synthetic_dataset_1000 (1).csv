@@ -1,0 +1,1001 @@
+farmer_id,barangay,elevation_masl,soil_pH,annual_rainfall_mm,mean_temperature_C,coffee_species,planting_system,farm_ownership,rsbsa_registered,years_in_farming,bearing_trees,non_bearing_trees,annual_yield_kg,processing_method,moisture_content_pct,defect_count_per_300g,selective_picking_practiced,farm_records_maintained,sales_records_maintained,cooperative_member,geographic_compliance,traditional_method_compliance,quality_linkage_documented,gi_ready
+F0001,San Jose,432.6,6.05,1315.7,23.0,Robusta,Monocrop,Shared,No,8,310,64,366,Honey,10.25,0,Yes,No,No,Yes,No,No,No,0
+F0002,Pinagkawitan,361.5,5.85,3115.6,23.5,Excelsa,Agroforestry,Owned,Yes,9,86,27,1697,Honey,10.94,0,No,No,Yes,Yes,Yes,Yes,No,1
+F0003,Calamias,279.4,5.26,3085.4,21.2,Liberica,Monocrop,Shared,Yes,26,18,50,1558,Washed,12.82,9,No,Yes,Yes,Yes,No,Yes,Yes,1
+F0004,Talisay,538.6,6.77,2770.4,23.2,Liberica,Monocrop,Owned,Yes,2,33,56,939,Washed,14.29,17,No,Yes,No,No,No,Yes,Yes,1
+F0005,Barangay IV,296.2,5.9,3182.7,25.0,Liberica,Agroforestry,Owned,No,16,24,14,305,Natural,12.2,1,Yes,No,No,No,Yes,Yes,Yes,1
+F0006,Latag,508.3,5.39,2289.0,25.8,Liberica,Agroforestry,Leased,Yes,31,173,50,921,Washed,13.55,7,Yes,Yes,No,Yes,No,No,Yes,1
+F0007,San Jose,319.6,5.74,3125.5,25.8,Liberica,Agroforestry,Owned,Yes,6,22,32,42,Natural,13.58,21,No,Yes,Yes,No,Yes,Yes,No,1
+F0008,Inosluban,288.5,5.83,1351.2,24.2,Robusta,Agroforestry,Owned,No,21,356,101,1056,Natural,12.99,21,Yes,No,Yes,No,Yes,Yes,Yes,0
+F0009,Lumbang,331.3,6.66,1931.4,27.1,Robusta,Monocrop,Leased,Yes,26,181,47,1007,Washed,10.48,25,No,Yes,Yes,No,Yes,Yes,Yes,1
+F0010,Barangay VII,250.7,6.47,1650.8,26.4,Liberica,Agroforestry,Owned,Yes,19,366,30,1277,Washed,14.2,25,Yes,Yes,Yes,Yes,No,Yes,No,1
+F0011,Barangay VII,473.8,6.54,1591.7,25.8,Liberica,Monocrop,Leased,Yes,28,336,59,1003,Washed,11.62,8,Yes,Yes,No,No,No,No,Yes,1
+F0012,Mabini,351.4,5.02,1481.6,19.5,Arabica,Monocrop,Shared,No,8,209,118,204,Washed,9.27,20,No,Yes,Yes,No,Yes,Yes,No,0
+F0013,San Benito,216.1,5.83,2444.8,19.1,Liberica,Agroforestry,Owned,Yes,14,387,52,1438,Washed,10.47,30,No,Yes,Yes,Yes,Yes,No,No,1
+F0014,San Lucas,549.8,5.96,2762.6,20.9,Liberica,Monocrop,Owned,No,24,85,33,1655,Natural,13.59,42,No,Yes,Yes,Yes,No,No,Yes,1
+F0015,Mabini,291.9,5.04,2356.6,25.0,Liberica,Monocrop,Owned,Yes,44,173,31,270,Washed,9.41,5,Yes,Yes,Yes,No,Yes,Yes,No,1
+F0016,Balintawak,371.8,5.52,1493.9,22.7,Liberica,Monocrop,Shared,Yes,37,381,22,576,Honey,9.88,13,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0017,Lodlod,553.2,6.52,2822.2,22.6,Liberica,Monocrop,Leased,No,26,70,108,43,Washed,13.17,32,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0018,Bagong Pook,412.1,5.27,2471.9,27.0,Excelsa,Monocrop,Shared,Yes,31,254,64,1248,Natural,14.36,6,Yes,Yes,Yes,No,No,No,Yes,0
+F0019,Mabini,158.4,6.07,1976.3,27.1,Liberica,Agroforestry,Owned,Yes,32,391,78,1450,Natural,12.8,23,No,No,Yes,No,No,Yes,Yes,1
+F0020,Tambo,569.9,5.43,2548.3,27.2,Liberica,Monocrop,Leased,Yes,41,164,110,1484,Honey,10.33,8,Yes,Yes,No,Yes,No,Yes,Yes,1
+F0021,Pinagtongulan,413.9,5.02,1719.8,21.8,Robusta,Agroforestry,Owned,Yes,2,266,73,1359,Natural,9.32,10,No,No,Yes,Yes,Yes,Yes,Yes,1
+F0022,San Francisco,267.5,5.48,1890.4,25.2,Liberica,Monocrop,Owned,Yes,25,253,78,1387,Washed,12.69,22,Yes,No,Yes,No,No,Yes,No,0
+F0023,Bagong Pook,169.6,6.95,3035.0,21.4,Excelsa,Monocrop,Shared,Yes,44,171,118,754,Honey,9.28,1,No,Yes,No,Yes,Yes,Yes,No,0
+F0024,Latag,497.0,6.6,1781.0,20.7,Excelsa,Agroforestry,Owned,Yes,2,77,25,1463,Natural,12.68,14,Yes,No,No,Yes,No,Yes,No,0
+F0025,Quezon,410.0,6.92,2140.0,20.7,Liberica,Agroforestry,Shared,No,42,353,28,32,Washed,10.35,34,Yes,Yes,No,No,Yes,Yes,No,1
+F0026,Barangay VIII,366.7,5.98,2980.3,22.1,Robusta,Agroforestry,Owned,Yes,1,286,106,720,Natural,14.43,35,No,No,No,No,Yes,Yes,Yes,0
+F0027,Lodlod,546.9,5.22,2615.4,22.9,Liberica,Agroforestry,Leased,No,36,170,7,1605,Natural,11.85,27,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0028,Tambo,494.3,6.1,1324.4,26.5,Arabica,Agroforestry,Owned,Yes,12,268,108,1505,Washed,10.34,38,No,No,No,Yes,Yes,No,Yes,1
+F0029,Malagonlong,175.8,5.91,1494.6,20.1,Liberica,Monocrop,Owned,Yes,9,316,99,1729,Washed,14.12,43,No,Yes,Yes,Yes,No,Yes,Yes,1
+F0030,Mojon,255.9,6.69,1215.7,25.6,Arabica,Monocrop,Owned,Yes,36,344,66,776,Natural,10.52,3,Yes,No,Yes,Yes,No,No,No,0
+F0031,Santol,224.2,5.2,2461.8,23.8,Robusta,Monocrop,Owned,Yes,41,104,109,798,Natural,10.84,9,Yes,Yes,No,No,Yes,Yes,Yes,1
+F0032,Pangao,472.0,5.98,2095.3,21.6,Liberica,Agroforestry,Owned,Yes,28,255,105,901,Washed,14.01,5,Yes,No,Yes,Yes,No,No,Yes,1
+F0033,Cumba,116.8,5.3,1468.5,23.4,Liberica,Monocrop,Leased,No,38,230,6,524,Washed,10.85,29,Yes,Yes,No,No,Yes,Yes,Yes,1
+F0034,Calamias,384.9,5.65,3115.9,21.7,Arabica,Monocrop,Owned,No,33,132,70,446,Washed,11.46,34,Yes,No,No,No,No,Yes,Yes,0
+F0035,Tambo,481.2,6.47,2259.3,24.4,Excelsa,Agroforestry,Owned,No,42,196,107,1444,Natural,11.09,42,Yes,Yes,Yes,No,No,Yes,Yes,1
+F0036,Balintawak,538.4,5.95,1683.8,22.9,Liberica,Agroforestry,Owned,Yes,22,271,117,1426,Natural,9.7,9,Yes,Yes,No,Yes,No,Yes,Yes,1
+F0037,San Carlos,271.0,5.75,2201.2,20.5,Robusta,Agroforestry,Owned,No,25,282,46,657,Washed,9.23,31,Yes,Yes,Yes,Yes,Yes,No,No,1
+F0038,Barangay III,510.6,5.79,2559.2,20.0,Liberica,Monocrop,Leased,Yes,18,382,112,1105,Washed,13.35,41,Yes,No,Yes,Yes,Yes,Yes,Yes,1
+F0039,Latag,155.3,5.92,1352.5,23.9,Liberica,Agroforestry,Shared,Yes,6,69,38,1429,Washed,12.87,41,Yes,Yes,No,Yes,No,No,No,1
+F0040,Barangay V,523.2,6.57,1749.4,27.1,Liberica,Monocrop,Owned,No,18,134,46,1448,Natural,10.69,2,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0041,San Jose,163.7,6.78,2813.9,22.1,Liberica,Agroforestry,Owned,Yes,16,346,24,1050,Washed,10.77,25,Yes,Yes,No,Yes,No,Yes,Yes,1
+F0042,Halang,298.6,6.91,2119.3,25.6,Excelsa,Monocrop,Leased,Yes,15,350,101,171,Washed,14.67,14,Yes,No,Yes,No,No,Yes,No,0
+F0043,Banaybanay,498.6,6.57,2293.2,24.9,Liberica,Agroforestry,Owned,Yes,8,60,72,1139,Washed,14.93,16,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0044,Malagonlong,175.0,5.63,2065.6,27.4,Excelsa,Agroforestry,Owned,Yes,13,187,49,1517,Washed,11.84,26,Yes,Yes,No,Yes,No,Yes,Yes,1
+F0045,Bubuyan,214.6,6.38,1287.8,26.4,Liberica,Agroforestry,Owned,No,43,148,112,75,Washed,13.81,17,Yes,No,Yes,No,No,No,No,0
+F0046,Barangay V,461.1,5.88,1531.5,24.1,Liberica,Agroforestry,Owned,Yes,7,336,79,873,Washed,13.42,18,No,Yes,Yes,No,Yes,Yes,Yes,1
+F0047,Maraouy,460.0,5.51,2091.1,24.9,Liberica,Monocrop,Owned,No,17,179,46,1038,Honey,10.78,11,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0048,Bagong Pook,420.6,6.68,1618.4,27.1,Liberica,Agroforestry,Owned,Yes,32,48,51,1291,Washed,9.35,23,Yes,Yes,No,Yes,No,Yes,No,1
+F0049,Kayumanggi,447.0,5.08,1300.0,22.6,Liberica,Monocrop,Leased,Yes,22,78,9,39,Washed,9.86,4,No,Yes,Yes,Yes,Yes,Yes,No,1
+F0050,Pangao,371.4,6.8,2887.3,21.9,Liberica,Agroforestry,Owned,Yes,13,245,93,693,Honey,14.03,23,No,Yes,No,No,Yes,Yes,Yes,1
+F0051,Barangay III,225.9,5.92,3162.4,19.1,Liberica,Agroforestry,Owned,Yes,23,57,53,602,Washed,13.39,26,Yes,No,Yes,Yes,No,Yes,Yes,1
+F0052,Tambo,272.8,6.27,2786.3,26.4,Liberica,Agroforestry,Owned,Yes,29,390,41,1583,Washed,12.99,29,Yes,Yes,No,No,Yes,Yes,No,1
+F0053,Barangay IV,190.8,6.32,2907.6,26.2,Liberica,Agroforestry,Owned,No,22,66,38,1651,Washed,9.78,14,Yes,Yes,No,No,No,Yes,Yes,1
+F0054,Sampaguita,554.2,6.79,1684.0,19.9,Liberica,Monocrop,Owned,No,1,286,77,678,Natural,12.84,37,Yes,Yes,Yes,No,Yes,Yes,Yes,0
+F0055,Bubuyan,391.7,6.27,3121.3,24.2,Excelsa,Agroforestry,Shared,No,29,347,74,942,Washed,13.63,43,No,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0056,Dagatan,300.4,6.23,1593.9,23.2,Excelsa,Monocrop,Owned,No,5,108,22,1795,Natural,14.16,33,Yes,Yes,No,Yes,No,Yes,No,0
+F0057,San Benito,331.0,5.13,3102.9,20.1,Liberica,Monocrop,Leased,No,35,24,82,669,Washed,9.08,26,No,No,No,No,Yes,Yes,Yes,0
+F0058,San Lucas,573.6,6.04,3189.6,27.8,Liberica,Agroforestry,Owned,Yes,10,334,23,645,Washed,13.11,19,Yes,No,Yes,Yes,No,Yes,No,1
+F0059,Banaybanay,176.7,5.3,2623.4,20.9,Liberica,Agroforestry,Leased,No,19,188,82,727,Natural,9.11,40,No,Yes,No,Yes,No,No,Yes,1
+F0060,Bagong Pook,393.1,6.47,3162.3,19.6,Arabica,Monocrop,Owned,Yes,37,341,44,938,Honey,13.24,31,Yes,No,No,Yes,No,No,Yes,0
+F0061,Barangay II,352.9,6.02,2339.1,24.4,Liberica,Monocrop,Owned,Yes,7,71,21,207,Washed,12.81,3,Yes,Yes,No,Yes,Yes,Yes,No,1
+F0062,Santol,405.7,6.36,1719.1,25.6,Liberica,Monocrop,Leased,Yes,35,128,64,898,Natural,9.89,4,Yes,No,No,Yes,Yes,No,No,1
+F0063,Banaybanay,109.1,5.08,2074.0,19.3,Liberica,Agroforestry,Owned,Yes,13,46,103,1059,Washed,13.6,7,Yes,Yes,Yes,Yes,No,No,Yes,1
+F0064,Pinagkawitan,536.1,5.17,2387.1,24.9,Liberica,Monocrop,Leased,Yes,10,143,97,882,Washed,9.41,21,Yes,No,No,No,Yes,Yes,Yes,1
+F0065,Halang,566.1,6.43,1346.2,23.8,Liberica,Agroforestry,Owned,No,2,35,46,336,Washed,13.96,41,No,Yes,Yes,No,Yes,Yes,No,1
+F0066,Maraouy,382.6,5.14,2444.7,19.9,Robusta,Monocrop,Shared,Yes,6,17,85,577,Washed,10.57,6,Yes,Yes,Yes,Yes,Yes,No,No,1
+F0067,Tambo,448.3,5.14,3162.4,20.6,Liberica,Monocrop,Leased,Yes,8,13,111,356,Washed,13.13,21,No,Yes,Yes,Yes,Yes,No,Yes,1
+F0068,Sabang,561.2,5.02,1580.2,24.1,Robusta,Agroforestry,Shared,Yes,36,30,76,1409,Washed,14.54,29,Yes,Yes,Yes,No,No,No,Yes,0
+F0069,Barangay VI,453.6,6.91,2785.2,21.7,Liberica,Agroforestry,Owned,Yes,25,158,69,424,Washed,11.04,36,Yes,Yes,Yes,No,No,No,No,1
+F0070,San Benito,176.3,6.48,3015.8,27.4,Liberica,Agroforestry,Owned,Yes,44,34,113,329,Washed,12.02,15,No,Yes,Yes,Yes,No,Yes,No,1
+F0071,Bubuyan,388.1,5.71,3087.4,26.4,Excelsa,Agroforestry,Leased,Yes,40,152,57,1579,Honey,11.78,14,Yes,Yes,Yes,No,Yes,Yes,No,1
+F0072,Plaridel,403.4,5.59,3120.3,27.9,Liberica,Monocrop,Shared,Yes,7,254,104,778,Honey,9.95,4,Yes,No,No,No,No,Yes,Yes,1
+F0073,Calamias,312.1,5.7,2242.9,21.3,Excelsa,Agroforestry,Shared,Yes,23,52,11,314,Natural,12.54,2,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0074,Barangay IV,468.2,6.55,3154.6,27.7,Liberica,Agroforestry,Owned,No,19,302,114,359,Washed,13.46,22,Yes,Yes,Yes,No,Yes,Yes,No,1
+F0075,Bubuyan,567.2,6.32,2714.6,22.9,Liberica,Agroforestry,Leased,No,22,194,9,79,Washed,14.5,9,No,Yes,Yes,No,Yes,Yes,Yes,1
+F0076,Lumbang,562.8,5.37,1523.3,22.1,Arabica,Monocrop,Owned,Yes,13,51,28,802,Natural,14.1,4,Yes,No,Yes,No,No,Yes,No,0
+F0077,San Lucas,325.4,5.35,2153.8,19.5,Liberica,Agroforestry,Owned,Yes,21,101,32,1675,Honey,12.06,22,Yes,No,Yes,Yes,No,Yes,Yes,1
+F0078,Latag,156.6,5.2,2636.7,19.5,Excelsa,Agroforestry,Owned,Yes,1,326,66,1762,Washed,13.31,14,No,Yes,Yes,No,No,Yes,Yes,0
+F0079,Cumba,592.4,6.32,1694.7,25.2,Liberica,Agroforestry,Owned,No,19,333,111,407,Natural,13.8,17,Yes,Yes,No,No,No,Yes,Yes,1
+F0080,Tangob,519.4,6.53,2481.2,23.1,Excelsa,Monocrop,Shared,Yes,33,62,21,1653,Honey,11.96,24,Yes,Yes,No,Yes,No,Yes,No,0
+F0081,Halang,162.3,5.53,2533.2,21.0,Liberica,Monocrop,Owned,Yes,4,93,105,1029,Natural,9.69,7,No,No,No,No,Yes,Yes,No,1
+F0082,Mabini,560.4,5.04,1525.4,24.5,Liberica,Agroforestry,Leased,No,42,43,24,1591,Washed,11.63,30,Yes,Yes,Yes,Yes,No,No,Yes,1
+F0083,Maraouy,534.9,5.16,2330.2,21.3,Robusta,Agroforestry,Owned,Yes,3,85,7,803,Washed,14.05,20,No,Yes,Yes,Yes,Yes,No,Yes,1
+F0084,Malagonlong,359.4,6.94,2743.3,24.2,Excelsa,Agroforestry,Owned,Yes,27,362,41,1197,Washed,12.58,1,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0085,Tangob,395.6,5.59,2197.8,22.2,Excelsa,Agroforestry,Owned,Yes,41,206,94,1113,Washed,13.35,21,No,Yes,No,No,Yes,Yes,No,1
+F0086,San Salvador,299.5,6.54,1224.2,26.4,Excelsa,Agroforestry,Owned,No,35,295,19,897,Washed,10.11,7,No,Yes,Yes,No,Yes,No,Yes,0
+F0087,Pinagkawitan,127.4,6.25,1218.1,26.4,Excelsa,Monocrop,Owned,No,28,97,55,1128,Washed,14.79,22,Yes,No,Yes,Yes,Yes,Yes,No,0
+F0088,Calamias,267.6,5.76,1914.1,23.3,Liberica,Agroforestry,Leased,No,6,244,52,32,Natural,11.42,31,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0089,Tangob,501.4,5.41,3052.4,22.2,Liberica,Monocrop,Shared,Yes,6,241,12,1628,Washed,12.92,7,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0090,Anilao,102.3,5.24,1657.4,22.3,Liberica,Agroforestry,Owned,Yes,44,16,17,777,Washed,9.11,3,No,Yes,No,No,No,No,No,1
+F0091,Malagonlong,266.7,6.23,2468.7,26.3,Liberica,Monocrop,Owned,No,23,301,52,1501,Washed,9.76,29,Yes,Yes,No,No,No,No,Yes,1
+F0092,Barangay III,299.1,6.55,1644.2,22.0,Liberica,Monocrop,Owned,No,33,47,7,1794,Natural,13.69,18,Yes,Yes,No,No,Yes,No,Yes,0
+F0093,Barangay V,368.7,6.29,1843.3,20.9,Liberica,Agroforestry,Leased,Yes,16,61,69,304,Natural,14.81,22,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0094,Mabini,559.9,6.06,2896.1,19.8,Liberica,Agroforestry,Owned,No,24,152,77,1583,Washed,10.92,17,No,Yes,No,Yes,Yes,No,Yes,1
+F0095,Anilao,273.2,5.08,2657.7,23.2,Robusta,Agroforestry,Owned,Yes,5,230,35,1645,Natural,9.22,28,No,Yes,No,Yes,Yes,No,Yes,0
+F0096,Tambo,273.5,6.94,1390.8,23.3,Liberica,Agroforestry,Owned,Yes,41,249,109,244,Washed,11.17,22,Yes,Yes,No,No,Yes,No,Yes,1
+F0097,Barangay IV,468.8,6.6,2057.4,26.6,Liberica,Agroforestry,Shared,Yes,42,152,30,1736,Washed,9.1,32,Yes,Yes,Yes,Yes,No,Yes,No,1
+F0098,Mabini,326.1,5.59,1258.3,21.0,Liberica,Agroforestry,Owned,Yes,13,358,85,1538,Natural,10.15,17,Yes,Yes,Yes,No,Yes,No,No,1
+F0099,Barangay VII,212.3,6.96,2161.8,22.4,Robusta,Monocrop,Owned,No,12,372,60,358,Washed,13.51,43,Yes,Yes,No,No,Yes,Yes,No,0
+F0100,Dagatan,326.2,6.2,2524.9,26.3,Robusta,Agroforestry,Shared,Yes,5,391,38,284,Washed,14.62,32,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0101,Barangay IV,170.4,6.16,1437.0,26.4,Robusta,Monocrop,Leased,Yes,37,58,13,1440,Washed,9.52,6,No,Yes,No,No,Yes,Yes,No,1
+F0102,Sampaguita,188.2,6.5,1777.8,22.5,Liberica,Agroforestry,Leased,No,31,286,66,155,Washed,12.35,27,No,Yes,No,No,Yes,Yes,Yes,1
+F0103,Sampaguita,349.2,6.62,1995.7,23.1,Liberica,Monocrop,Owned,No,28,280,119,796,Washed,10.52,0,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0104,Quezon,309.5,6.31,3039.1,21.7,Liberica,Agroforestry,Shared,Yes,28,23,17,1637,Natural,9.83,38,Yes,Yes,Yes,Yes,No,Yes,No,1
+F0105,Barangay I,557.4,5.26,3186.5,27.4,Liberica,Monocrop,Leased,Yes,30,307,73,1603,Washed,10.31,33,Yes,No,Yes,Yes,Yes,Yes,No,1
+F0106,Santol,281.2,5.68,1289.8,20.1,Liberica,Agroforestry,Shared,Yes,18,24,45,1377,Honey,12.47,38,Yes,Yes,No,Yes,Yes,No,Yes,1
+F0107,San Jose,390.3,6.86,2722.0,27.4,Liberica,Agroforestry,Leased,Yes,44,243,81,1257,Washed,9.39,18,Yes,Yes,No,No,Yes,No,No,1
+F0108,San Salvador,416.1,5.45,1943.4,25.2,Liberica,Agroforestry,Leased,No,27,72,5,1225,Washed,11.61,30,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0109,Pangao,106.5,5.74,1984.9,23.8,Arabica,Agroforestry,Owned,No,35,205,93,1788,Washed,9.81,12,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0110,Barangay III,431.8,5.86,2708.5,19.3,Arabica,Agroforestry,Owned,Yes,26,36,51,246,Washed,10.64,23,No,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0111,Barangay V,189.0,5.88,3036.9,23.3,Liberica,Agroforestry,Leased,Yes,39,102,8,1298,Washed,10.14,4,No,No,No,Yes,Yes,Yes,No,1
+F0112,Barangay IV,580.5,6.23,3101.9,22.7,Liberica,Agroforestry,Owned,Yes,18,114,104,1389,Washed,14.3,22,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0113,Barangay VIII,174.3,6.89,2354.2,20.5,Liberica,Monocrop,Owned,No,33,318,67,1756,Washed,13.25,18,Yes,Yes,Yes,No,Yes,Yes,No,1
+F0114,Sabang,307.3,5.48,1914.2,24.9,Liberica,Agroforestry,Owned,Yes,25,61,56,1351,Natural,14.21,0,No,Yes,No,No,Yes,Yes,No,1
+F0115,Quezon,142.7,5.24,2775.1,27.7,Excelsa,Agroforestry,Leased,Yes,31,328,14,861,Washed,11.3,32,No,Yes,Yes,No,Yes,No,No,0
+F0116,Lumbang,598.4,5.39,1702.0,24.1,Liberica,Monocrop,Owned,Yes,37,190,32,211,Natural,10.88,32,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0117,Mabini,351.1,6.77,2328.1,25.4,Robusta,Agroforestry,Leased,Yes,2,66,10,363,Natural,11.28,31,Yes,No,Yes,No,Yes,Yes,No,0
+F0118,San Carlos,397.7,6.29,1917.2,19.6,Liberica,Agroforestry,Leased,Yes,33,129,31,540,Washed,9.11,27,Yes,No,Yes,No,Yes,Yes,No,1
+F0119,Sampaguita,133.5,5.57,2513.3,22.8,Arabica,Agroforestry,Owned,Yes,39,317,16,412,Washed,13.35,36,Yes,No,Yes,Yes,Yes,Yes,Yes,1
+F0120,Tambo,475.0,6.63,1680.8,20.0,Liberica,Monocrop,Owned,No,43,372,66,1770,Washed,11.1,40,Yes,Yes,No,No,Yes,Yes,No,0
+F0121,San Lucas,205.0,6.72,1583.2,24.5,Robusta,Monocrop,Owned,No,43,52,56,1252,Natural,10.88,11,Yes,Yes,No,No,Yes,Yes,Yes,0
+F0122,Lodlod,549.0,6.69,3036.5,27.4,Liberica,Monocrop,Owned,No,32,144,52,361,Washed,12.59,8,Yes,No,No,Yes,Yes,Yes,No,1
+F0123,Mojon,202.6,6.84,1403.6,25.0,Robusta,Agroforestry,Owned,Yes,18,382,71,1218,Washed,11.62,10,Yes,No,No,Yes,Yes,Yes,Yes,1
+F0124,Sampaguita,195.3,5.5,2211.9,19.7,Liberica,Monocrop,Owned,Yes,17,269,50,1295,Washed,14.89,32,Yes,No,Yes,Yes,No,Yes,Yes,1
+F0125,Anilao,118.3,6.51,1641.7,22.2,Liberica,Agroforestry,Shared,Yes,34,206,101,929,Washed,11.14,18,No,Yes,Yes,Yes,No,Yes,Yes,1
+F0126,Sampaguita,336.0,5.92,1277.9,24.0,Excelsa,Agroforestry,Owned,Yes,39,142,78,671,Washed,12.68,41,Yes,Yes,Yes,Yes,No,No,Yes,1
+F0127,San Carlos,382.4,6.68,1272.0,22.6,Excelsa,Agroforestry,Leased,No,7,264,99,1280,Natural,10.87,33,Yes,Yes,No,Yes,No,Yes,No,0
+F0128,Bubuyan,132.9,6.46,1550.4,26.5,Excelsa,Agroforestry,Owned,Yes,42,229,19,663,Washed,14.94,6,Yes,Yes,No,Yes,No,Yes,No,1
+F0129,Balintawak,487.8,6.55,2933.5,26.3,Robusta,Agroforestry,Leased,Yes,35,345,75,1609,Honey,11.67,30,Yes,Yes,Yes,Yes,No,Yes,No,0
+F0130,Anilao,326.6,6.31,1765.0,24.5,Excelsa,Agroforestry,Owned,No,30,50,40,480,Natural,12.8,1,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0131,Barangay I,362.2,5.35,3100.9,22.4,Liberica,Agroforestry,Leased,No,12,397,18,225,Washed,9.76,18,Yes,Yes,Yes,Yes,Yes,No,No,1
+F0132,Maraouy,320.4,6.09,2363.2,21.3,Liberica,Agroforestry,Leased,Yes,35,264,116,1257,Washed,13.4,37,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0133,Bubuyan,300.4,6.97,2073.2,20.0,Liberica,Monocrop,Leased,Yes,11,11,82,487,Washed,10.62,31,Yes,Yes,No,Yes,Yes,No,No,1
+F0134,San Jose,379.8,6.87,2360.2,22.2,Robusta,Agroforestry,Owned,Yes,44,204,7,859,Washed,11.69,9,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0135,Mojon,177.6,5.09,2233.4,22.7,Liberica,Monocrop,Leased,Yes,4,251,117,286,Washed,14.3,40,No,No,No,Yes,Yes,No,Yes,0
+F0136,Barangay V,191.0,5.33,2717.6,25.1,Liberica,Agroforestry,Owned,Yes,25,158,114,1582,Honey,14.82,7,Yes,Yes,Yes,No,No,Yes,No,1
+F0137,Calamias,530.9,5.26,1765.0,24.9,Liberica,Monocrop,Owned,Yes,32,207,118,1325,Washed,11.55,25,Yes,Yes,No,No,Yes,Yes,Yes,1
+F0138,Calamias,573.1,6.45,1906.1,19.6,Excelsa,Agroforestry,Owned,No,20,308,71,38,Washed,14.01,29,Yes,No,No,Yes,Yes,No,Yes,0
+F0139,Maraouy,286.7,6.64,2988.2,22.6,Liberica,Agroforestry,Owned,Yes,31,254,90,790,Washed,9.32,10,Yes,No,No,No,Yes,Yes,No,1
+F0140,Santol,235.4,5.43,3092.9,20.6,Liberica,Agroforestry,Owned,Yes,4,347,23,978,Washed,14.09,40,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0141,Bolbok,422.0,6.01,2985.1,20.4,Liberica,Agroforestry,Leased,Yes,38,117,103,1254,Natural,12.78,19,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0142,Poblacion Barangay,304.4,6.68,2038.9,26.4,Liberica,Monocrop,Owned,Yes,1,221,80,1112,Washed,11.93,19,No,Yes,Yes,No,No,Yes,Yes,1
+F0143,San Jose,112.7,6.47,2760.7,19.4,Liberica,Agroforestry,Owned,No,3,165,58,916,Washed,14.34,8,No,Yes,Yes,No,No,Yes,Yes,1
+F0144,Poblacion Barangay,178.1,6.08,2152.7,22.8,Robusta,Agroforestry,Owned,Yes,37,35,73,422,Washed,14.07,7,Yes,Yes,No,No,No,Yes,Yes,1
+F0145,Banaybanay,458.0,6.18,2195.1,20.5,Robusta,Monocrop,Leased,Yes,22,91,14,1705,Natural,10.78,14,No,Yes,No,No,Yes,No,No,0
+F0146,Pinagtongulan,429.5,6.02,1609.4,26.9,Robusta,Monocrop,Owned,Yes,17,92,109,1172,Washed,13.75,33,Yes,No,Yes,No,No,No,Yes,0
+F0147,San Carlos,113.5,5.6,2382.3,24.0,Liberica,Agroforestry,Owned,No,14,140,37,1606,Honey,9.6,23,No,No,Yes,No,Yes,No,No,1
+F0148,Lumbang,211.0,6.13,1572.3,21.1,Excelsa,Agroforestry,Leased,Yes,41,338,17,428,Washed,13.94,32,Yes,No,Yes,No,Yes,No,Yes,0
+F0149,San Jose,215.5,6.38,1863.1,23.5,Liberica,Agroforestry,Owned,No,35,109,103,360,Washed,13.05,40,Yes,No,No,No,No,No,Yes,1
+F0150,Tangob,435.9,6.75,2910.1,25.6,Liberica,Agroforestry,Owned,Yes,13,265,55,1320,Washed,9.53,40,Yes,Yes,No,No,Yes,Yes,No,1
+F0151,Calamias,109.9,6.27,1614.2,27.6,Excelsa,Agroforestry,Owned,Yes,35,58,36,1573,Washed,13.1,44,Yes,No,Yes,No,Yes,Yes,No,0
+F0152,Talisay,152.1,6.52,1342.3,21.0,Liberica,Monocrop,Leased,Yes,43,72,79,1748,Washed,12.48,39,No,No,Yes,No,Yes,Yes,No,0
+F0153,Pinagkawitan,500.0,5.32,1338.0,27.0,Liberica,Agroforestry,Leased,No,2,320,116,509,Washed,12.57,26,No,No,No,No,No,Yes,No,0
+F0154,San Benito,189.3,5.92,3081.6,27.4,Excelsa,Agroforestry,Owned,No,13,299,106,163,Washed,10.75,20,Yes,No,No,Yes,Yes,No,Yes,0
+F0155,Bolbok,426.4,5.02,2213.8,27.2,Liberica,Agroforestry,Owned,Yes,16,114,28,1746,Washed,10.6,4,No,No,Yes,Yes,Yes,Yes,Yes,1
+F0156,Poblacion Barangay,219.1,5.49,2018.8,24.7,Robusta,Monocrop,Owned,Yes,18,114,39,945,Washed,13.58,34,No,Yes,No,Yes,Yes,No,No,0
+F0157,Barangay III,149.7,6.45,2821.8,24.7,Liberica,Monocrop,Leased,Yes,7,334,87,964,Washed,10.54,20,Yes,No,No,Yes,No,Yes,Yes,1
+F0158,Lodlod,221.6,6.98,2871.7,22.6,Robusta,Agroforestry,Shared,Yes,36,24,74,384,Natural,11.68,3,Yes,No,Yes,Yes,No,No,Yes,1
+F0159,Pangao,461.1,5.2,1864.4,25.8,Liberica,Monocrop,Owned,Yes,41,184,44,613,Washed,13.17,15,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0160,Bagong Pook,527.8,5.8,2587.2,23.8,Liberica,Agroforestry,Owned,No,30,268,58,1551,Washed,9.48,30,Yes,Yes,Yes,No,Yes,Yes,No,1
+F0161,Santol,515.1,6.6,2742.2,25.1,Robusta,Agroforestry,Leased,No,42,220,113,654,Washed,12.57,25,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0162,Tangob,298.6,5.41,2509.3,22.9,Liberica,Agroforestry,Leased,Yes,41,268,48,1160,Natural,12.54,34,Yes,No,Yes,Yes,Yes,Yes,Yes,1
+F0163,Barangay II,434.0,6.11,1503.2,25.6,Liberica,Agroforestry,Shared,Yes,7,111,66,319,Natural,13.11,5,Yes,Yes,Yes,No,No,Yes,Yes,1
+F0164,Pangao,202.5,6.47,2951.8,26.4,Liberica,Agroforestry,Leased,No,15,269,110,854,Washed,11.22,32,Yes,Yes,Yes,No,Yes,Yes,No,1
+F0165,Pangao,246.6,6.23,2278.2,20.3,Liberica,Monocrop,Shared,No,40,353,103,658,Washed,11.69,20,No,Yes,Yes,No,Yes,Yes,Yes,1
+F0166,Tambo,548.2,5.38,1764.9,26.5,Liberica,Agroforestry,Owned,Yes,19,168,72,1048,Natural,10.98,15,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0167,Tambo,106.5,5.71,2050.5,23.9,Liberica,Monocrop,Owned,Yes,43,54,37,661,Honey,13.85,38,Yes,Yes,Yes,Yes,Yes,No,No,1
+F0168,Kayumanggi,142.8,6.57,1275.1,26.6,Excelsa,Agroforestry,Owned,Yes,37,310,81,1200,Natural,9.78,33,Yes,Yes,No,No,No,Yes,No,0
+F0169,Pinagtongulan,203.9,6.11,1455.7,22.9,Liberica,Agroforestry,Leased,Yes,2,260,60,356,Honey,14.78,41,Yes,Yes,No,No,No,Yes,No,0
+F0170,Barangay VII,113.3,5.01,2731.1,22.4,Liberica,Agroforestry,Owned,Yes,42,340,40,1468,Natural,12.81,14,Yes,Yes,Yes,No,No,Yes,No,1
+F0171,Pangao,190.7,6.52,1200.0,27.2,Liberica,Agroforestry,Owned,Yes,13,174,58,239,Natural,14.32,5,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0172,Malagonlong,391.5,5.07,2033.1,21.3,Liberica,Agroforestry,Owned,Yes,40,202,111,1349,Washed,11.56,1,Yes,Yes,No,No,Yes,No,Yes,1
+F0173,San Jose,310.7,6.49,2245.0,26.6,Excelsa,Agroforestry,Owned,Yes,41,18,23,1451,Washed,10.99,23,Yes,Yes,Yes,No,No,Yes,Yes,1
+F0174,Quezon,546.3,5.4,1309.3,23.4,Liberica,Agroforestry,Shared,Yes,43,383,47,1156,Washed,14.4,27,Yes,Yes,No,No,Yes,Yes,No,1
+F0175,Anilao,508.7,6.92,3146.2,23.6,Arabica,Agroforestry,Owned,Yes,43,74,16,665,Natural,9.59,0,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0176,Mojon,270.9,5.74,1652.3,21.8,Liberica,Monocrop,Owned,No,31,396,15,1561,Honey,9.7,0,No,No,No,Yes,Yes,No,No,1
+F0177,Bolbok,229.7,5.65,1808.4,24.2,Robusta,Agroforestry,Leased,No,16,291,74,897,Washed,10.8,27,Yes,Yes,Yes,Yes,Yes,No,No,1
+F0178,San Salvador,289.8,5.3,1807.9,21.9,Liberica,Agroforestry,Owned,Yes,42,190,16,1262,Washed,14.76,35,Yes,Yes,No,Yes,No,No,Yes,1
+F0179,Balintawak,395.1,5.61,1660.8,19.4,Excelsa,Agroforestry,Leased,Yes,44,291,95,457,Washed,12.8,19,Yes,No,No,Yes,Yes,Yes,Yes,1
+F0180,San Jose,234.0,6.75,1202.9,21.4,Liberica,Monocrop,Leased,No,6,288,45,422,Washed,12.33,7,No,Yes,No,Yes,Yes,Yes,Yes,1
+F0181,Barangay II,412.1,6.99,2658.7,19.1,Liberica,Monocrop,Shared,Yes,28,39,29,855,Washed,13.23,0,Yes,No,No,Yes,No,Yes,Yes,1
+F0182,Barangay IV,304.7,5.74,3133.7,27.8,Liberica,Agroforestry,Shared,Yes,32,275,110,945,Washed,11.5,25,No,No,Yes,No,No,Yes,Yes,1
+F0183,Mojon,376.0,5.9,1648.6,27.7,Liberica,Agroforestry,Owned,Yes,44,337,7,1162,Honey,13.55,42,No,Yes,Yes,Yes,Yes,Yes,No,1
+F0184,Barangay V,318.1,6.44,2526.1,22.6,Excelsa,Agroforestry,Owned,Yes,10,226,7,377,Washed,11.36,24,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0185,San Carlos,247.2,6.77,2683.8,25.6,Liberica,Monocrop,Owned,Yes,18,329,88,79,Washed,13.96,9,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0186,Quezon,574.2,6.19,2896.9,22.1,Liberica,Monocrop,Owned,No,4,388,32,945,Washed,10.6,11,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0187,Santol,481.8,5.78,2045.3,25.0,Robusta,Agroforestry,Owned,Yes,9,114,27,1158,Washed,10.67,40,Yes,Yes,No,No,No,No,No,1
+F0188,Tambo,170.1,5.83,1805.9,26.2,Liberica,Agroforestry,Owned,Yes,7,193,52,1473,Natural,12.13,6,Yes,Yes,No,No,Yes,Yes,No,1
+F0189,Mabini,534.2,6.39,1850.6,27.5,Arabica,Agroforestry,Shared,No,8,339,71,1426,Washed,11.58,11,Yes,No,Yes,Yes,Yes,No,No,1
+F0190,Calamias,343.7,5.01,2625.2,22.6,Robusta,Monocrop,Owned,Yes,43,157,46,1080,Washed,12.89,39,Yes,Yes,Yes,Yes,Yes,No,No,1
+F0191,Poblacion Barangay,547.3,6.24,2833.6,26.0,Liberica,Agroforestry,Owned,Yes,7,114,92,997,Washed,11.19,16,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0192,Poblacion Barangay,499.9,5.71,1563.2,21.4,Excelsa,Agroforestry,Owned,Yes,41,56,111,829,Washed,10.38,4,No,No,No,Yes,Yes,No,Yes,1
+F0193,Mabini,312.6,6.59,1941.9,27.9,Liberica,Agroforestry,Owned,Yes,40,96,44,1326,Washed,11.82,13,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0194,San Salvador,111.2,5.19,3003.9,19.2,Liberica,Monocrop,Shared,Yes,3,318,10,1046,Washed,12.37,33,No,Yes,No,No,No,Yes,Yes,0
+F0195,Barangay VIII,234.3,6.18,2813.4,24.4,Liberica,Monocrop,Owned,Yes,17,138,24,678,Washed,9.86,16,No,Yes,No,Yes,Yes,Yes,No,1
+F0196,San Jose,370.8,5.96,3169.7,24.9,Liberica,Monocrop,Leased,Yes,2,267,15,1393,Washed,12.34,34,No,Yes,No,Yes,No,No,Yes,1
+F0197,Bagong Pook,416.7,6.28,2708.5,25.2,Robusta,Agroforestry,Owned,Yes,15,323,100,330,Washed,10.92,0,No,No,Yes,Yes,Yes,No,Yes,1
+F0198,Balintawak,228.9,5.13,1986.4,20.1,Excelsa,Monocrop,Owned,Yes,29,156,31,1533,Washed,11.35,35,Yes,Yes,Yes,No,Yes,No,No,0
+F0199,San Carlos,169.7,6.16,2381.3,27.4,Liberica,Agroforestry,Owned,Yes,22,81,25,1597,Washed,10.68,14,Yes,Yes,No,Yes,Yes,Yes,No,1
+F0200,Dagatan,517.5,6.12,2522.0,20.6,Liberica,Agroforestry,Leased,Yes,4,149,112,1610,Natural,14.59,18,Yes,Yes,No,Yes,Yes,Yes,No,1
+F0201,Bagong Pook,592.2,6.12,1356.9,24.6,Arabica,Agroforestry,Owned,Yes,6,36,116,1318,Honey,13.1,41,Yes,Yes,No,Yes,Yes,No,Yes,0
+F0202,Bagong Pook,362.8,6.21,2289.0,21.0,Liberica,Monocrop,Owned,Yes,38,38,118,1595,Washed,10.57,4,No,Yes,Yes,Yes,Yes,No,No,1
+F0203,Pangao,185.8,6.35,2618.6,21.8,Liberica,Agroforestry,Owned,No,26,280,17,1649,Washed,12.87,18,No,No,No,Yes,No,Yes,Yes,1
+F0204,Lumbang,236.2,6.61,1534.6,23.9,Liberica,Monocrop,Leased,Yes,11,183,90,195,Washed,14.09,42,Yes,No,Yes,Yes,No,Yes,Yes,0
+F0205,San Carlos,109.2,5.54,2761.3,22.8,Excelsa,Monocrop,Leased,Yes,26,262,39,345,Washed,11.41,38,Yes,Yes,No,Yes,Yes,Yes,No,1
+F0206,Poblacion Barangay,557.1,6.65,2367.5,20.4,Liberica,Agroforestry,Owned,No,17,394,51,30,Washed,13.98,4,Yes,Yes,No,No,Yes,Yes,No,1
+F0207,Quezon,158.9,6.0,3104.4,20.5,Robusta,Agroforestry,Owned,Yes,24,69,90,1049,Natural,9.93,11,Yes,Yes,No,No,No,Yes,Yes,1
+F0208,Anilao,388.3,5.15,1284.8,22.8,Excelsa,Agroforestry,Shared,Yes,28,116,32,1314,Natural,13.94,18,Yes,Yes,No,No,Yes,Yes,Yes,0
+F0209,Inosluban,237.0,5.12,1730.7,25.8,Liberica,Agroforestry,Leased,No,35,229,25,92,Washed,12.24,11,Yes,Yes,Yes,Yes,No,No,Yes,1
+F0210,Bagong Pook,377.1,5.67,2403.1,27.1,Liberica,Agroforestry,Leased,No,31,268,114,512,Washed,10.34,35,No,Yes,No,Yes,No,Yes,Yes,1
+F0211,Tambo,425.7,6.57,1793.1,19.8,Excelsa,Agroforestry,Leased,Yes,13,380,22,1729,Honey,11.44,11,Yes,Yes,No,Yes,Yes,Yes,No,0
+F0212,Maraouy,514.9,6.42,2628.8,22.5,Liberica,Monocrop,Leased,Yes,35,155,35,1374,Washed,14.93,17,No,Yes,Yes,Yes,Yes,No,Yes,1
+F0213,Poblacion Barangay,203.2,6.58,2718.0,19.9,Robusta,Monocrop,Owned,Yes,16,61,64,1254,Washed,13.7,42,Yes,No,No,Yes,Yes,No,No,0
+F0214,Barangay II,105.5,6.03,1405.0,19.1,Excelsa,Agroforestry,Shared,No,15,69,114,251,Honey,12.45,33,No,No,Yes,Yes,No,No,No,0
+F0215,Poblacion Barangay,168.4,5.88,2227.7,25.0,Robusta,Agroforestry,Shared,Yes,43,43,41,181,Natural,9.69,32,Yes,Yes,No,No,Yes,Yes,No,1
+F0216,Banaybanay,550.0,5.29,2217.8,24.4,Robusta,Agroforestry,Owned,Yes,18,105,25,673,Natural,11.51,17,No,Yes,Yes,No,No,No,Yes,0
+F0217,Barangay VII,536.9,5.66,1938.6,20.5,Excelsa,Monocrop,Owned,No,37,98,18,655,Washed,10.58,28,Yes,No,No,No,Yes,Yes,Yes,1
+F0218,Dagatan,398.7,5.87,3065.8,21.1,Excelsa,Monocrop,Shared,Yes,41,325,93,1515,Washed,9.43,44,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0219,San Francisco,400.3,5.18,2855.0,19.2,Liberica,Agroforestry,Owned,No,27,240,95,246,Washed,12.25,4,Yes,No,Yes,No,Yes,No,Yes,1
+F0220,Mabini,432.5,5.44,2594.4,26.5,Liberica,Agroforestry,Shared,Yes,35,284,108,225,Washed,14.34,24,No,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0221,Barangay I,187.7,6.2,2628.7,27.8,Liberica,Monocrop,Owned,Yes,35,255,64,1255,Washed,13.05,23,Yes,Yes,Yes,No,Yes,Yes,No,1
+F0222,Sabang,557.2,6.47,2123.4,20.2,Robusta,Agroforestry,Owned,Yes,28,120,27,1024,Natural,10.5,28,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0223,Barangay II,309.4,7.0,3042.0,21.1,Liberica,Agroforestry,Owned,No,39,243,99,1044,Natural,12.44,37,Yes,No,Yes,Yes,Yes,No,No,0
+F0224,Lodlod,291.6,6.87,2589.2,26.8,Robusta,Agroforestry,Owned,Yes,38,287,115,676,Washed,14.66,32,Yes,Yes,No,No,Yes,Yes,Yes,0
+F0225,Barangay VII,359.5,6.29,2658.0,27.3,Liberica,Agroforestry,Owned,Yes,9,175,33,1287,Washed,13.34,9,No,Yes,No,No,Yes,Yes,No,1
+F0226,Cumba,123.5,5.84,2923.4,22.8,Robusta,Agroforestry,Owned,Yes,12,137,51,1194,Washed,13.14,36,Yes,Yes,No,Yes,No,Yes,No,1
+F0227,Quezon,183.1,6.27,1748.1,19.5,Liberica,Monocrop,Leased,No,15,246,34,737,Natural,14.81,32,Yes,No,No,Yes,Yes,Yes,Yes,1
+F0228,Barangay V,469.0,6.57,2814.1,19.4,Robusta,Monocrop,Shared,No,21,300,119,1551,Washed,13.79,22,No,No,Yes,Yes,Yes,No,No,0
+F0229,Barangay II,141.4,5.24,1590.5,24.2,Liberica,Agroforestry,Owned,Yes,35,116,94,1608,Natural,9.82,10,No,No,Yes,No,No,No,No,0
+F0230,Cumba,401.6,5.82,1890.7,22.5,Liberica,Monocrop,Owned,Yes,42,137,88,1110,Washed,11.09,23,No,No,Yes,No,No,No,No,1
+F0231,Pinagkawitan,222.7,6.68,1871.2,19.3,Liberica,Agroforestry,Owned,No,33,204,42,1557,Washed,14.79,23,Yes,Yes,Yes,No,Yes,Yes,No,1
+F0232,Balintawak,294.6,5.77,3157.1,24.2,Robusta,Monocrop,Owned,Yes,19,348,87,1195,Natural,11.94,6,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0233,Kayumanggi,244.3,6.14,2913.1,19.1,Liberica,Agroforestry,Owned,Yes,23,152,31,751,Washed,9.67,20,Yes,Yes,Yes,No,No,Yes,Yes,1
+F0234,San Benito,277.8,6.18,2602.3,26.1,Liberica,Monocrop,Owned,Yes,13,120,93,1637,Washed,11.75,19,No,Yes,No,No,No,Yes,Yes,1
+F0235,Inosluban,459.5,5.37,2654.1,21.8,Arabica,Monocrop,Owned,No,44,99,108,1789,Natural,13.18,9,Yes,No,Yes,Yes,No,Yes,Yes,0
+F0236,Maraouy,248.6,5.72,2324.1,19.4,Robusta,Agroforestry,Owned,Yes,1,260,106,1592,Washed,14.99,24,Yes,No,No,Yes,Yes,No,No,0
+F0237,Balintawak,383.2,5.67,3094.2,24.3,Arabica,Monocrop,Owned,Yes,29,289,91,669,Washed,10.94,35,Yes,Yes,Yes,No,Yes,Yes,No,1
+F0238,Inosluban,338.0,5.05,2192.5,22.6,Liberica,Monocrop,Leased,Yes,24,342,97,135,Washed,12.08,14,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0239,Kayumanggi,431.8,5.05,1961.0,27.8,Liberica,Monocrop,Owned,Yes,16,233,19,194,Washed,14.28,43,No,No,No,No,No,Yes,No,0
+F0240,Poblacion Barangay,568.4,6.66,1526.1,23.9,Excelsa,Agroforestry,Shared,Yes,25,110,63,244,Natural,11.13,39,Yes,Yes,Yes,No,Yes,Yes,No,0
+F0241,Barangay III,466.3,5.55,2772.4,21.5,Liberica,Monocrop,Shared,Yes,23,141,7,1124,Natural,9.66,39,Yes,Yes,No,No,Yes,No,Yes,1
+F0242,San Salvador,207.5,6.04,2668.9,25.4,Robusta,Monocrop,Shared,Yes,28,22,14,1769,Natural,14.69,5,No,Yes,Yes,No,No,Yes,Yes,1
+F0243,Quezon,115.6,5.6,1968.7,21.4,Liberica,Agroforestry,Shared,Yes,16,107,83,1718,Washed,11.93,36,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0244,San Lucas,231.1,6.88,1250.4,27.1,Liberica,Monocrop,Owned,Yes,43,129,84,1632,Washed,12.02,1,No,Yes,No,Yes,Yes,Yes,No,1
+F0245,San Jose,397.5,5.52,2878.0,22.4,Liberica,Agroforestry,Owned,No,38,302,21,119,Washed,12.73,11,No,Yes,Yes,No,Yes,No,No,1
+F0246,Halang,125.7,5.86,1222.8,23.9,Liberica,Agroforestry,Owned,No,11,313,87,903,Natural,9.02,3,No,Yes,No,No,Yes,No,Yes,1
+F0247,San Lucas,348.2,6.75,2607.4,19.5,Liberica,Agroforestry,Leased,No,3,208,15,1281,Washed,14.59,22,Yes,No,Yes,Yes,Yes,No,Yes,1
+F0248,Anilao,398.4,6.68,3140.5,22.8,Liberica,Agroforestry,Shared,Yes,15,10,52,1132,Natural,11.17,12,Yes,Yes,No,Yes,Yes,Yes,No,1
+F0249,Barangay VII,267.1,5.37,2075.3,26.5,Arabica,Agroforestry,Shared,Yes,1,69,9,637,Natural,11.38,16,Yes,Yes,Yes,Yes,Yes,Yes,No,0
+F0250,Pangao,485.5,6.61,1669.9,26.3,Liberica,Agroforestry,Owned,Yes,7,259,73,378,Washed,10.04,30,No,No,Yes,Yes,Yes,Yes,No,1
+F0251,Malagonlong,153.3,5.92,2609.7,21.0,Robusta,Monocrop,Leased,No,1,149,68,923,Washed,11.27,15,No,Yes,Yes,Yes,Yes,No,No,1
+F0252,Lumbang,137.6,5.97,2834.3,21.0,Excelsa,Agroforestry,Owned,No,32,158,18,275,Washed,13.82,40,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0253,Plaridel,464.1,5.27,2292.9,26.4,Liberica,Agroforestry,Owned,No,9,53,54,301,Natural,13.8,25,Yes,No,Yes,Yes,Yes,No,Yes,0
+F0254,Pinagtongulan,347.7,5.16,3134.1,27.4,Liberica,Agroforestry,Leased,Yes,29,380,30,432,Washed,14.61,27,Yes,Yes,No,No,Yes,Yes,Yes,1
+F0255,Santol,444.2,6.46,1303.3,19.9,Robusta,Agroforestry,Owned,Yes,26,195,76,1722,Honey,11.42,0,Yes,No,No,No,Yes,No,No,0
+F0256,Sampaguita,317.4,5.99,2209.6,23.1,Robusta,Monocrop,Shared,Yes,23,117,73,1169,Washed,13.25,11,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0257,Barangay III,223.2,5.87,2636.9,22.0,Robusta,Monocrop,Owned,Yes,43,53,11,1488,Honey,12.04,36,No,Yes,Yes,Yes,Yes,No,No,0
+F0258,Cumba,509.6,6.46,2925.3,26.8,Robusta,Monocrop,Shared,Yes,29,87,20,1583,Washed,13.82,19,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0259,Maraouy,499.7,6.53,1558.5,19.8,Arabica,Agroforestry,Owned,No,38,235,59,1495,Washed,13.28,1,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0260,Bagong Pook,447.3,5.32,2800.0,20.9,Liberica,Agroforestry,Leased,Yes,33,171,82,1225,Natural,11.21,35,Yes,No,Yes,Yes,Yes,Yes,Yes,1
+F0261,Anilao,236.1,6.22,2305.4,25.8,Liberica,Agroforestry,Leased,Yes,7,290,105,1069,Natural,11.02,14,Yes,Yes,Yes,No,No,Yes,Yes,1
+F0262,Barangay VIII,395.1,5.27,1993.1,19.5,Robusta,Agroforestry,Shared,Yes,12,262,60,990,Washed,10.51,37,Yes,No,No,No,Yes,Yes,No,0
+F0263,Barangay I,280.5,6.5,1463.4,23.4,Liberica,Agroforestry,Owned,No,31,141,109,927,Natural,12.46,21,Yes,No,No,Yes,Yes,No,Yes,1
+F0264,San Carlos,145.8,6.31,2930.6,23.0,Excelsa,Monocrop,Shared,Yes,32,381,8,1109,Natural,14.78,43,Yes,Yes,Yes,No,Yes,Yes,No,1
+F0265,Poblacion Barangay,558.7,6.91,1514.5,22.0,Liberica,Agroforestry,Owned,Yes,20,384,104,1644,Washed,10.2,31,Yes,No,Yes,No,No,Yes,Yes,1
+F0266,Barangay V,168.4,5.14,1819.6,22.6,Liberica,Monocrop,Owned,No,17,153,52,1156,Washed,9.57,19,Yes,Yes,No,No,Yes,Yes,Yes,1
+F0267,San Salvador,575.1,5.11,1780.1,23.8,Excelsa,Agroforestry,Owned,Yes,36,275,21,313,Natural,9.72,35,No,No,Yes,No,Yes,Yes,No,0
+F0268,Sampaguita,323.0,5.56,2942.8,20.5,Liberica,Agroforestry,Leased,Yes,3,118,115,1758,Washed,13.7,32,Yes,No,No,Yes,Yes,No,No,1
+F0269,Inosluban,192.6,5.52,2545.4,24.1,Liberica,Agroforestry,Owned,Yes,1,203,40,546,Washed,11.1,14,Yes,Yes,No,No,Yes,Yes,Yes,1
+F0270,Cumba,371.0,5.49,2793.4,26.2,Liberica,Agroforestry,Leased,Yes,27,44,74,647,Natural,10.35,2,No,Yes,Yes,Yes,No,Yes,No,1
+F0271,Balintawak,536.5,6.81,1700.9,25.8,Excelsa,Monocrop,Leased,No,40,399,84,1331,Washed,11.12,28,Yes,Yes,Yes,No,Yes,No,Yes,0
+F0272,Kayumanggi,466.1,5.5,2449.7,20.4,Liberica,Agroforestry,Owned,No,33,284,97,641,Washed,12.87,26,No,Yes,No,Yes,No,No,Yes,1
+F0273,Mabini,503.3,5.54,2343.5,20.3,Excelsa,Agroforestry,Shared,Yes,20,196,104,779,Honey,12.28,4,Yes,Yes,No,Yes,Yes,Yes,No,1
+F0274,Quezon,429.4,6.52,2865.7,21.4,Liberica,Monocrop,Owned,Yes,14,252,42,1322,Washed,13.46,30,No,Yes,Yes,No,Yes,No,Yes,1
+F0275,Mabini,446.1,5.9,3012.2,22.2,Robusta,Agroforestry,Shared,Yes,36,273,105,429,Natural,11.03,21,No,Yes,No,Yes,Yes,No,Yes,1
+F0276,Barangay VII,524.6,6.55,1224.3,22.7,Excelsa,Agroforestry,Owned,Yes,5,19,116,1556,Natural,11.71,34,No,Yes,Yes,Yes,Yes,No,Yes,0
+F0277,Barangay IV,224.8,5.13,2548.0,25.1,Liberica,Agroforestry,Owned,Yes,23,175,66,115,Washed,9.61,6,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0278,San Benito,344.7,5.98,1303.7,19.5,Liberica,Agroforestry,Owned,Yes,15,38,52,349,Washed,9.44,5,Yes,Yes,No,No,Yes,No,No,1
+F0279,San Francisco,210.6,5.07,2297.7,19.3,Liberica,Monocrop,Owned,Yes,6,280,14,1085,Washed,11.77,25,Yes,Yes,No,Yes,Yes,Yes,No,1
+F0280,San Lucas,593.8,5.13,1775.3,22.5,Robusta,Monocrop,Owned,No,33,96,109,365,Washed,10.81,0,Yes,No,No,Yes,No,Yes,No,1
+F0281,Kayumanggi,572.0,6.81,1813.6,25.3,Liberica,Monocrop,Owned,Yes,19,32,40,80,Natural,12.68,18,No,Yes,No,Yes,Yes,Yes,No,1
+F0282,Sampaguita,119.7,5.28,1905.9,20.7,Robusta,Agroforestry,Owned,Yes,13,219,33,1132,Washed,9.26,6,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0283,Malagonlong,452.8,6.06,2442.6,24.8,Liberica,Agroforestry,Owned,Yes,29,55,82,1751,Washed,9.73,35,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0284,Sampaguita,562.6,5.82,1868.1,21.3,Liberica,Monocrop,Owned,No,6,37,8,203,Washed,14.19,11,No,No,Yes,No,Yes,Yes,Yes,1
+F0285,Malagonlong,190.3,5.69,2665.4,27.0,Liberica,Agroforestry,Leased,Yes,15,35,48,1671,Washed,12.4,19,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0286,Pinagkawitan,384.0,6.8,2009.1,27.1,Liberica,Agroforestry,Owned,Yes,16,275,60,530,Washed,13.27,22,No,No,No,Yes,No,Yes,Yes,1
+F0287,Halang,557.7,5.04,1336.7,21.7,Liberica,Agroforestry,Shared,Yes,24,184,46,1628,Washed,14.05,24,No,No,Yes,Yes,No,Yes,Yes,1
+F0288,Halang,117.0,6.33,2767.5,21.1,Excelsa,Agroforestry,Leased,No,23,13,104,105,Washed,11.78,29,Yes,No,No,Yes,Yes,No,No,0
+F0289,Bagong Pook,448.7,6.93,1771.5,22.7,Robusta,Agroforestry,Leased,Yes,10,320,118,345,Washed,13.57,28,Yes,No,No,Yes,Yes,Yes,No,0
+F0290,Sampaguita,248.7,6.12,2065.5,21.2,Liberica,Monocrop,Leased,No,41,331,113,1426,Washed,12.15,30,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0291,Cumba,562.2,6.87,2570.9,25.1,Arabica,Monocrop,Owned,No,41,76,17,1134,Washed,10.34,17,Yes,Yes,Yes,Yes,No,No,Yes,1
+F0292,San Salvador,585.5,5.1,1864.9,26.4,Robusta,Agroforestry,Leased,No,17,144,50,1693,Natural,11.03,40,No,No,No,Yes,Yes,No,No,0
+F0293,San Benito,572.1,5.84,1313.2,25.1,Excelsa,Agroforestry,Owned,Yes,44,64,86,1748,Washed,11.94,18,No,No,No,No,Yes,No,No,0
+F0294,Quezon,337.1,5.52,1947.8,26.4,Liberica,Agroforestry,Shared,Yes,30,40,37,726,Washed,10.9,3,Yes,No,No,Yes,No,Yes,Yes,1
+F0295,Banaybanay,531.0,6.46,3088.9,22.6,Liberica,Monocrop,Leased,Yes,44,83,25,1039,Washed,11.01,0,Yes,No,Yes,No,No,No,Yes,1
+F0296,Quezon,522.3,6.96,2483.5,20.4,Liberica,Agroforestry,Owned,No,10,28,84,761,Washed,11.02,40,Yes,No,Yes,Yes,Yes,No,No,1
+F0297,Bubuyan,259.6,5.51,2543.0,25.6,Robusta,Monocrop,Leased,Yes,19,165,83,1124,Washed,9.74,14,Yes,Yes,Yes,Yes,No,No,No,1
+F0298,Latag,514.5,6.31,2464.6,22.2,Liberica,Agroforestry,Owned,Yes,29,346,61,998,Honey,9.51,7,Yes,No,Yes,No,Yes,No,No,1
+F0299,Kayumanggi,118.5,5.4,1598.0,25.0,Liberica,Agroforestry,Owned,Yes,2,165,73,883,Washed,9.28,14,Yes,No,No,Yes,Yes,No,Yes,1
+F0300,Barangay IV,398.1,6.13,2036.7,21.4,Liberica,Agroforestry,Owned,Yes,36,156,74,695,Honey,9.67,14,Yes,No,No,No,Yes,No,No,1
+F0301,Barangay III,215.0,5.93,2701.9,19.7,Liberica,Monocrop,Leased,Yes,19,96,106,681,Washed,11.06,38,Yes,Yes,Yes,No,No,No,Yes,1
+F0302,Balintawak,160.3,6.94,1402.7,27.9,Robusta,Agroforestry,Leased,Yes,7,29,71,1124,Washed,12.56,21,Yes,No,Yes,No,Yes,Yes,Yes,0
+F0303,Dagatan,138.5,6.22,1755.7,20.4,Liberica,Agroforestry,Leased,Yes,26,278,52,75,Washed,10.13,17,No,No,Yes,No,Yes,Yes,No,1
+F0304,Quezon,448.1,5.7,1752.6,27.9,Liberica,Agroforestry,Owned,No,15,342,80,1100,Washed,14.33,15,No,Yes,No,No,No,Yes,Yes,1
+F0305,Barangay VIII,269.9,5.23,2064.0,27.8,Robusta,Monocrop,Owned,Yes,38,52,104,1644,Washed,13.85,1,Yes,Yes,Yes,No,Yes,Yes,No,0
+F0306,Lodlod,462.4,5.3,3160.7,26.1,Arabica,Monocrop,Leased,Yes,3,315,37,1475,Washed,12.12,35,Yes,Yes,No,No,No,No,Yes,0
+F0307,Lodlod,132.7,5.45,1335.0,24.9,Robusta,Agroforestry,Owned,Yes,38,37,40,178,Washed,13.35,19,Yes,No,Yes,Yes,Yes,No,No,0
+F0308,Pinagtongulan,257.6,5.5,2237.4,24.2,Excelsa,Monocrop,Leased,Yes,16,269,37,939,Washed,11.2,15,Yes,Yes,No,Yes,Yes,No,Yes,1
+F0309,San Francisco,369.7,6.7,1558.7,26.8,Robusta,Agroforestry,Owned,No,2,31,35,1183,Washed,9.22,2,Yes,Yes,Yes,Yes,Yes,No,No,1
+F0310,San Francisco,495.4,6.12,3141.4,21.6,Liberica,Agroforestry,Owned,Yes,31,384,25,485,Washed,14.43,29,No,Yes,Yes,Yes,No,Yes,Yes,1
+F0311,Tangob,259.4,6.05,1426.6,23.2,Liberica,Agroforestry,Owned,Yes,28,110,31,1692,Washed,9.77,1,Yes,No,No,No,Yes,No,No,1
+F0312,Barangay IV,412.9,5.23,2007.2,24.6,Robusta,Agroforestry,Leased,Yes,7,48,95,906,Natural,14.69,34,Yes,Yes,Yes,Yes,Yes,Yes,No,0
+F0313,Mojon,543.0,6.72,2675.8,22.7,Robusta,Monocrop,Owned,No,30,299,76,1684,Natural,12.43,25,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0314,Mojon,407.9,6.45,2609.1,22.8,Robusta,Monocrop,Owned,Yes,43,362,105,995,Washed,10.83,4,No,No,Yes,No,No,Yes,Yes,1
+F0315,Sabang,216.5,5.14,2045.5,22.0,Liberica,Agroforestry,Owned,No,7,309,66,898,Washed,11.97,1,No,No,Yes,Yes,Yes,No,Yes,1
+F0316,Latag,112.2,6.42,1893.0,24.1,Liberica,Agroforestry,Owned,Yes,36,179,100,1558,Washed,12.01,19,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0317,Pinagtongulan,535.0,6.09,1995.2,26.7,Liberica,Monocrop,Owned,Yes,29,305,30,958,Natural,9.14,33,Yes,No,No,No,Yes,No,Yes,1
+F0318,Quezon,110.6,5.16,1728.6,20.8,Liberica,Monocrop,Owned,Yes,24,362,70,1053,Washed,11.13,33,Yes,No,No,No,No,Yes,Yes,0
+F0319,Pangao,537.4,5.92,1610.7,27.4,Liberica,Agroforestry,Leased,No,39,139,16,1030,Natural,13.44,19,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0320,Quezon,364.5,5.97,2166.1,25.2,Excelsa,Monocrop,Owned,Yes,4,165,26,803,Washed,12.06,24,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0321,Barangay I,569.5,5.33,1737.1,26.4,Liberica,Agroforestry,Leased,No,29,83,21,273,Washed,10.47,19,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0322,Inosluban,499.4,6.89,1774.9,24.0,Liberica,Agroforestry,Leased,Yes,44,351,11,503,Washed,11.01,24,Yes,No,Yes,No,No,No,Yes,1
+F0323,Banaybanay,599.0,6.7,2513.5,26.0,Liberica,Monocrop,Owned,Yes,5,99,111,411,Washed,14.18,13,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0324,Sampaguita,275.4,6.34,3137.1,19.1,Robusta,Agroforestry,Owned,Yes,29,76,72,1156,Natural,12.15,43,Yes,Yes,No,No,No,No,No,0
+F0325,Dagatan,483.6,5.92,2407.3,26.4,Liberica,Agroforestry,Shared,No,30,245,41,518,Washed,12.17,42,No,No,Yes,No,Yes,No,Yes,1
+F0326,Tambo,301.0,5.82,1354.0,19.4,Liberica,Agroforestry,Owned,Yes,29,209,42,1090,Washed,14.77,42,Yes,Yes,Yes,Yes,Yes,No,No,1
+F0327,Pangao,339.9,6.3,1351.2,27.0,Liberica,Monocrop,Owned,No,26,341,100,1707,Washed,10.93,38,No,No,No,Yes,Yes,Yes,No,1
+F0328,Pinagtongulan,413.8,6.09,3102.8,27.9,Liberica,Monocrop,Owned,No,19,236,15,1602,Washed,11.88,11,Yes,No,No,Yes,Yes,No,Yes,1
+F0329,Pinagkawitan,536.8,5.12,1794.6,21.6,Excelsa,Agroforestry,Leased,No,26,357,5,1573,Washed,13.87,4,Yes,Yes,No,No,No,Yes,Yes,1
+F0330,Barangay II,592.0,6.03,1384.1,20.9,Excelsa,Agroforestry,Owned,Yes,37,242,29,1796,Washed,13.55,1,Yes,No,No,Yes,Yes,Yes,No,1
+F0331,Sampaguita,484.1,6.61,2398.1,25.9,Liberica,Agroforestry,Shared,Yes,27,275,46,1386,Washed,10.59,15,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0332,San Salvador,308.9,5.92,2447.3,21.3,Liberica,Agroforestry,Shared,No,30,95,56,426,Washed,9.91,29,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0333,San Carlos,310.7,5.1,2497.0,26.8,Robusta,Agroforestry,Owned,Yes,30,111,28,325,Natural,13.2,42,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0334,Mabini,468.8,6.57,1734.8,19.9,Liberica,Monocrop,Owned,Yes,3,223,57,136,Washed,10.55,37,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0335,Pinagkawitan,219.4,5.4,1230.2,20.1,Liberica,Agroforestry,Owned,Yes,43,117,111,889,Washed,14.54,44,Yes,No,No,No,Yes,Yes,No,0
+F0336,Plaridel,155.2,5.52,3130.0,27.8,Liberica,Agroforestry,Owned,Yes,7,174,60,983,Washed,9.78,41,No,Yes,No,Yes,Yes,Yes,No,1
+F0337,Sampaguita,277.3,5.33,1701.8,25.1,Excelsa,Agroforestry,Owned,Yes,9,100,67,559,Honey,10.91,23,Yes,Yes,Yes,No,No,Yes,Yes,0
+F0338,Quezon,243.6,5.66,2552.1,26.6,Liberica,Agroforestry,Owned,Yes,41,201,85,1136,Washed,9.33,29,Yes,No,No,No,Yes,No,No,1
+F0339,Latag,248.2,6.51,2613.3,21.9,Liberica,Monocrop,Owned,Yes,42,344,12,963,Washed,13.22,36,Yes,Yes,No,Yes,Yes,Yes,No,1
+F0340,Poblacion Barangay,216.8,6.04,2420.0,25.1,Robusta,Agroforestry,Owned,Yes,13,95,63,317,Honey,14.35,38,No,No,No,No,Yes,No,Yes,0
+F0341,Lumbang,121.0,5.41,1825.8,24.3,Liberica,Agroforestry,Owned,Yes,15,231,49,735,Washed,12.82,10,Yes,Yes,No,Yes,Yes,No,No,1
+F0342,Quezon,108.9,6.76,1742.2,24.4,Liberica,Agroforestry,Shared,Yes,5,372,31,1514,Honey,14.63,13,No,No,No,No,No,No,Yes,0
+F0343,Balintawak,593.9,6.76,2395.3,25.1,Arabica,Agroforestry,Owned,Yes,29,110,56,244,Washed,9.77,22,No,Yes,Yes,Yes,No,Yes,No,1
+F0344,Halang,313.9,6.74,2932.2,24.2,Liberica,Agroforestry,Shared,Yes,35,235,22,1334,Washed,9.53,15,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0345,Malagonlong,292.2,5.48,3093.5,22.9,Robusta,Agroforestry,Owned,Yes,27,373,95,761,Natural,14.03,20,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0346,Santol,439.8,5.9,1411.8,21.5,Liberica,Agroforestry,Owned,Yes,27,69,90,1512,Natural,14.13,3,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0347,Plaridel,209.1,6.97,1509.7,25.9,Liberica,Agroforestry,Owned,Yes,8,259,20,373,Washed,13.99,32,No,No,Yes,No,Yes,No,No,0
+F0348,Balintawak,575.0,6.54,3089.5,21.0,Liberica,Agroforestry,Owned,No,32,57,70,223,Honey,13.79,13,Yes,Yes,No,No,Yes,No,Yes,0
+F0349,San Lucas,493.2,5.05,2673.1,25.2,Liberica,Agroforestry,Owned,Yes,20,126,9,187,Washed,11.17,18,Yes,Yes,No,No,No,No,Yes,1
+F0350,Mabini,144.7,5.13,2966.0,21.1,Liberica,Monocrop,Shared,No,10,236,86,494,Natural,10.3,4,Yes,Yes,No,Yes,No,No,Yes,1
+F0351,Poblacion Barangay,308.8,5.93,1605.3,24.6,Excelsa,Agroforestry,Shared,Yes,13,371,7,133,Washed,14.57,35,Yes,No,Yes,Yes,Yes,Yes,No,1
+F0352,Lodlod,539.6,6.82,2375.2,25.7,Liberica,Agroforestry,Owned,Yes,29,42,95,63,Washed,10.84,30,Yes,No,Yes,No,No,No,Yes,1
+F0353,Lumbang,572.4,6.08,2602.3,21.0,Liberica,Agroforestry,Owned,Yes,35,53,85,1155,Honey,11.39,44,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0354,Bagong Pook,333.7,6.0,2560.2,19.5,Liberica,Agroforestry,Owned,Yes,8,174,84,668,Honey,13.2,17,Yes,Yes,Yes,No,No,Yes,Yes,1
+F0355,Mojon,406.7,5.21,2016.3,20.2,Robusta,Monocrop,Owned,Yes,29,377,74,1779,Washed,10.76,43,Yes,Yes,Yes,No,No,No,No,0
+F0356,Santol,183.5,6.31,1230.8,24.5,Liberica,Agroforestry,Owned,Yes,31,354,119,354,Washed,13.91,30,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0357,Bagong Pook,595.6,6.64,2365.9,26.6,Liberica,Monocrop,Owned,Yes,41,301,11,720,Washed,9.42,29,No,Yes,Yes,No,Yes,Yes,Yes,1
+F0358,Maraouy,215.8,5.76,1706.2,19.4,Liberica,Agroforestry,Owned,Yes,30,346,54,621,Washed,13.75,20,Yes,Yes,No,No,No,Yes,Yes,1
+F0359,Dagatan,571.4,6.55,2100.5,25.6,Liberica,Agroforestry,Owned,Yes,22,353,18,170,Washed,12.61,29,No,Yes,Yes,No,No,Yes,Yes,1
+F0360,San Lucas,424.8,6.93,3115.2,22.1,Liberica,Monocrop,Owned,No,21,395,42,503,Washed,12.44,40,Yes,No,No,Yes,No,Yes,No,0
+F0361,Quezon,403.9,5.41,1998.1,23.3,Excelsa,Agroforestry,Owned,Yes,12,296,108,1084,Washed,11.75,3,Yes,Yes,Yes,Yes,Yes,No,No,1
+F0362,Barangay V,356.3,6.05,2879.6,27.4,Liberica,Agroforestry,Owned,Yes,11,373,83,913,Natural,10.66,4,No,No,No,Yes,Yes,No,No,1
+F0363,Talisay,215.3,5.57,1577.1,22.0,Liberica,Agroforestry,Shared,Yes,2,234,115,92,Washed,11.78,40,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0364,San Jose,188.3,6.59,2544.9,23.2,Liberica,Monocrop,Owned,Yes,41,295,51,1613,Washed,11.7,44,No,No,Yes,Yes,Yes,No,No,1
+F0365,Pinagkawitan,210.2,6.16,3154.0,19.1,Excelsa,Agroforestry,Shared,No,2,213,116,1140,Washed,12.5,9,No,Yes,Yes,No,Yes,Yes,Yes,0
+F0366,Santol,193.2,6.27,1403.8,19.7,Liberica,Monocrop,Leased,Yes,34,181,37,333,Washed,10.69,26,Yes,Yes,No,No,Yes,Yes,Yes,1
+F0367,Maraouy,489.8,6.6,1216.6,21.3,Liberica,Agroforestry,Shared,Yes,3,21,47,1114,Washed,9.47,15,Yes,No,Yes,No,Yes,Yes,No,1
+F0368,Sampaguita,275.1,5.79,2067.2,19.3,Liberica,Monocrop,Leased,No,16,316,95,425,Washed,9.87,29,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0369,Malagonlong,128.9,6.83,1385.3,24.7,Liberica,Agroforestry,Leased,Yes,4,130,33,363,Natural,13.2,12,Yes,Yes,No,No,Yes,No,Yes,0
+F0370,Mabini,584.6,6.07,2696.8,22.8,Liberica,Monocrop,Shared,Yes,23,253,61,815,Natural,9.13,35,Yes,Yes,Yes,Yes,Yes,No,No,1
+F0371,Bolbok,541.9,5.32,3029.1,23.9,Liberica,Agroforestry,Owned,No,20,161,105,440,Natural,14.14,20,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0372,Barangay III,563.9,6.39,2068.0,20.6,Liberica,Monocrop,Owned,Yes,25,161,9,313,Honey,13.17,44,Yes,Yes,Yes,No,Yes,Yes,No,1
+F0373,San Benito,597.5,6.59,1717.4,21.7,Liberica,Agroforestry,Shared,Yes,30,197,97,495,Natural,13.61,39,Yes,No,No,No,No,No,No,0
+F0374,Tangob,186.9,5.63,2068.8,25.0,Liberica,Agroforestry,Leased,Yes,18,22,100,109,Natural,14.02,44,No,Yes,Yes,No,Yes,Yes,Yes,1
+F0375,Kayumanggi,298.1,6.71,2646.9,27.7,Liberica,Agroforestry,Shared,Yes,42,100,64,1745,Washed,9.74,14,No,Yes,Yes,No,Yes,No,Yes,1
+F0376,Anilao,479.1,6.81,1218.1,19.5,Liberica,Agroforestry,Leased,Yes,11,209,74,813,Washed,13.93,19,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0377,Barangay IV,448.0,5.55,2378.9,27.0,Robusta,Agroforestry,Shared,No,29,83,6,1130,Washed,12.03,19,No,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0378,Cumba,176.9,6.97,2426.6,24.2,Arabica,Monocrop,Leased,Yes,17,265,74,762,Washed,14.31,44,Yes,Yes,No,Yes,No,No,Yes,0
+F0379,Bubuyan,507.9,5.28,2475.4,24.1,Arabica,Monocrop,Leased,No,26,285,114,1593,Washed,14.32,4,Yes,No,Yes,Yes,Yes,Yes,No,1
+F0380,Barangay VIII,212.2,5.4,1684.0,23.5,Excelsa,Agroforestry,Owned,No,23,337,47,1414,Washed,9.15,31,Yes,Yes,Yes,No,No,No,Yes,0
+F0381,Lumbang,211.9,5.37,2628.1,19.6,Robusta,Monocrop,Shared,Yes,20,338,8,106,Natural,11.3,5,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0382,Calamias,368.5,6.79,1382.8,19.8,Robusta,Agroforestry,Leased,Yes,2,80,60,538,Washed,12.16,29,Yes,No,Yes,No,No,Yes,Yes,0
+F0383,Pangao,396.5,6.31,1598.5,24.4,Liberica,Agroforestry,Leased,Yes,24,87,97,1217,Washed,13.07,25,No,No,Yes,Yes,No,No,No,1
+F0384,Sabang,390.0,5.3,2954.9,22.1,Robusta,Monocrop,Leased,No,31,293,63,1062,Honey,10.72,36,No,No,Yes,Yes,Yes,Yes,No,0
+F0385,Bagong Pook,145.7,5.88,2677.4,27.3,Liberica,Monocrop,Owned,No,27,139,93,1228,Washed,10.51,12,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0386,Poblacion Barangay,538.7,6.23,1227.5,22.7,Liberica,Monocrop,Owned,Yes,2,386,13,491,Washed,11.29,28,No,Yes,No,Yes,Yes,No,No,1
+F0387,Lumbang,232.8,5.17,1696.8,20.3,Robusta,Agroforestry,Shared,Yes,14,52,7,1360,Washed,12.01,4,Yes,No,Yes,No,Yes,Yes,Yes,0
+F0388,Lodlod,164.8,6.76,1628.8,25.4,Liberica,Monocrop,Owned,Yes,4,17,94,1641,Natural,14.71,24,Yes,Yes,Yes,No,Yes,Yes,Yes,0
+F0389,Malagonlong,544.4,6.61,1741.6,21.6,Liberica,Agroforestry,Owned,No,13,22,52,274,Washed,13.57,12,No,Yes,Yes,Yes,No,No,Yes,1
+F0390,Lodlod,577.8,6.01,1695.1,23.7,Excelsa,Agroforestry,Owned,Yes,36,222,47,151,Washed,11.58,23,Yes,No,Yes,Yes,Yes,Yes,Yes,1
+F0391,Lodlod,531.1,6.93,1325.1,25.3,Liberica,Agroforestry,Leased,Yes,35,120,95,214,Washed,9.33,30,Yes,No,No,Yes,Yes,No,No,1
+F0392,Santol,504.8,5.84,2117.9,27.1,Liberica,Monocrop,Leased,No,44,300,104,61,Washed,10.01,19,Yes,No,Yes,No,No,No,Yes,1
+F0393,Barangay II,427.6,6.97,2665.5,26.1,Excelsa,Monocrop,Leased,Yes,8,32,100,1027,Washed,11.74,7,Yes,Yes,Yes,No,Yes,Yes,No,1
+F0394,Calamias,375.4,6.34,2413.5,25.1,Robusta,Monocrop,Leased,Yes,2,311,5,791,Natural,13.88,8,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0395,Talisay,143.5,6.27,2545.7,25.1,Liberica,Agroforestry,Owned,Yes,6,263,61,598,Natural,11.28,20,Yes,Yes,Yes,No,No,Yes,No,1
+F0396,San Carlos,304.2,5.33,1362.3,27.5,Liberica,Agroforestry,Owned,Yes,31,24,57,339,Natural,12.23,19,Yes,No,Yes,Yes,No,Yes,Yes,1
+F0397,Quezon,286.3,6.76,3103.0,21.7,Liberica,Agroforestry,Owned,Yes,10,139,20,1425,Natural,14.35,14,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0398,Barangay IV,229.9,5.85,2877.0,19.0,Excelsa,Agroforestry,Leased,No,44,70,55,1709,Washed,14.48,25,Yes,No,Yes,No,No,No,Yes,0
+F0399,Tambo,461.7,5.32,2810.2,21.4,Liberica,Agroforestry,Owned,Yes,21,124,116,859,Natural,10.29,41,Yes,Yes,No,No,Yes,Yes,Yes,1
+F0400,Tambo,347.9,5.03,2846.0,21.0,Liberica,Monocrop,Leased,Yes,42,329,79,1649,Washed,9.26,10,No,No,Yes,No,Yes,Yes,No,1
+F0401,Barangay I,140.5,6.12,3065.4,25.0,Liberica,Agroforestry,Owned,Yes,10,317,94,1021,Natural,10.83,36,Yes,No,Yes,Yes,Yes,No,Yes,1
+F0402,San Jose,210.1,6.05,2288.5,24.7,Liberica,Agroforestry,Owned,Yes,23,334,108,1109,Washed,13.17,40,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0403,Banaybanay,441.6,6.44,1600.6,24.3,Arabica,Agroforestry,Shared,Yes,3,76,59,820,Washed,14.71,10,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0404,Barangay II,138.1,6.78,2433.6,19.1,Liberica,Agroforestry,Owned,No,32,258,5,1326,Washed,9.46,26,Yes,No,No,No,Yes,No,Yes,1
+F0405,Tangob,525.6,5.16,2685.8,25.6,Robusta,Agroforestry,Leased,No,20,184,94,493,Washed,9.17,29,Yes,Yes,Yes,Yes,No,Yes,No,1
+F0406,Poblacion Barangay,347.6,6.46,2675.8,21.9,Liberica,Monocrop,Owned,Yes,10,348,32,707,Washed,14.3,18,Yes,No,No,No,Yes,Yes,No,1
+F0407,Pinagtongulan,340.3,5.37,2242.9,25.0,Robusta,Agroforestry,Owned,Yes,29,11,57,1509,Natural,13.49,33,No,Yes,Yes,No,No,No,No,0
+F0408,Sampaguita,396.2,6.72,1336.9,24.0,Excelsa,Monocrop,Owned,Yes,41,181,62,1008,Washed,14.95,37,Yes,Yes,No,No,Yes,Yes,Yes,0
+F0409,San Lucas,512.3,6.64,1942.2,22.1,Liberica,Agroforestry,Owned,No,34,343,77,699,Washed,11.38,22,Yes,No,Yes,Yes,No,Yes,No,1
+F0410,Cumba,273.9,6.08,3041.5,20.2,Liberica,Agroforestry,Leased,Yes,37,293,64,1302,Natural,11.5,0,Yes,Yes,Yes,No,Yes,No,No,1
+F0411,Bolbok,439.0,6.42,2368.9,19.8,Liberica,Agroforestry,Owned,No,20,63,63,727,Washed,10.03,2,Yes,No,No,No,Yes,No,Yes,1
+F0412,Santol,382.9,5.63,2276.7,26.5,Robusta,Monocrop,Owned,Yes,8,76,112,1023,Natural,9.7,2,Yes,Yes,No,No,Yes,Yes,Yes,1
+F0413,Pinagtongulan,233.5,5.94,1737.7,27.3,Liberica,Monocrop,Owned,No,7,111,26,107,Washed,12.47,27,Yes,No,Yes,Yes,No,Yes,No,0
+F0414,Inosluban,539.3,6.64,1936.9,24.8,Excelsa,Agroforestry,Leased,No,6,129,12,563,Honey,11.19,13,No,Yes,Yes,Yes,No,Yes,Yes,0
+F0415,Dagatan,498.7,5.92,2990.7,19.9,Robusta,Agroforestry,Leased,No,11,200,53,137,Washed,9.48,29,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0416,Inosluban,429.2,5.72,2532.9,22.6,Excelsa,Agroforestry,Owned,Yes,44,313,46,1326,Washed,14.32,4,No,Yes,No,Yes,Yes,Yes,Yes,1
+F0417,Pangao,525.3,5.99,2774.8,25.6,Robusta,Agroforestry,Owned,Yes,18,56,31,793,Washed,10.19,14,Yes,No,Yes,Yes,Yes,Yes,Yes,1
+F0418,Maraouy,533.6,6.66,2108.7,26.0,Liberica,Monocrop,Leased,Yes,42,231,43,44,Washed,13.49,37,Yes,Yes,No,Yes,No,Yes,No,1
+F0419,San Carlos,454.2,5.67,2460.5,20.1,Liberica,Agroforestry,Leased,No,29,30,87,399,Honey,10.69,13,Yes,No,No,Yes,No,Yes,No,1
+F0420,Maraouy,518.5,5.35,1696.8,19.0,Liberica,Agroforestry,Owned,Yes,25,167,29,1357,Washed,13.88,13,Yes,Yes,No,Yes,No,Yes,Yes,1
+F0421,Lumbang,448.7,6.42,2610.9,25.4,Excelsa,Agroforestry,Leased,No,21,357,42,1725,Washed,9.71,7,No,No,Yes,Yes,No,Yes,No,1
+F0422,Barangay V,440.1,6.65,2055.2,22.2,Robusta,Agroforestry,Leased,No,3,168,89,234,Washed,13.54,7,Yes,No,Yes,No,No,Yes,Yes,0
+F0423,Barangay VIII,409.3,5.2,2085.1,21.3,Robusta,Agroforestry,Leased,Yes,18,386,28,1166,Natural,9.59,18,Yes,Yes,No,Yes,Yes,Yes,No,1
+F0424,Anilao,476.4,5.48,2498.6,19.1,Liberica,Agroforestry,Leased,No,24,381,28,1733,Washed,11.68,31,No,Yes,No,Yes,No,No,No,0
+F0425,Anilao,179.3,5.28,3072.6,23.9,Liberica,Monocrop,Shared,Yes,38,244,64,894,Honey,13.4,30,No,Yes,No,Yes,No,Yes,No,0
+F0426,Sabang,540.4,5.7,1328.0,26.7,Robusta,Monocrop,Owned,Yes,10,159,87,1306,Washed,10.04,28,No,Yes,Yes,No,No,No,Yes,0
+F0427,Poblacion Barangay,535.9,5.9,2849.5,27.6,Liberica,Agroforestry,Shared,Yes,27,266,54,470,Washed,10.71,40,No,Yes,No,No,Yes,No,Yes,1
+F0428,Malagonlong,114.6,6.5,1784.8,24.1,Liberica,Monocrop,Owned,Yes,12,174,115,1239,Washed,14.19,10,Yes,No,Yes,Yes,Yes,Yes,No,1
+F0429,San Lucas,512.9,6.3,2087.8,23.6,Robusta,Agroforestry,Leased,No,7,86,70,888,Natural,14.31,44,No,Yes,Yes,Yes,Yes,No,No,0
+F0430,Tangob,164.4,6.24,1243.8,19.8,Liberica,Agroforestry,Owned,Yes,17,94,18,256,Natural,9.27,12,No,No,No,No,Yes,Yes,Yes,1
+F0431,Anilao,267.6,5.7,1802.1,23.9,Liberica,Agroforestry,Owned,Yes,1,55,57,557,Washed,10.01,26,No,No,Yes,Yes,Yes,Yes,No,1
+F0432,Cumba,471.8,6.68,2205.3,22.4,Liberica,Agroforestry,Leased,Yes,26,56,36,1721,Washed,9.7,18,No,Yes,No,Yes,Yes,Yes,Yes,1
+F0433,San Jose,180.4,5.94,1312.4,24.5,Liberica,Agroforestry,Leased,No,15,222,110,383,Natural,10.08,25,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0434,Barangay I,509.0,6.96,2182.2,22.5,Arabica,Agroforestry,Owned,Yes,33,68,100,652,Washed,14.82,36,No,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0435,Lodlod,516.1,6.27,3054.2,21.2,Liberica,Agroforestry,Owned,No,37,63,96,1054,Washed,12.31,8,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0436,Pinagkawitan,353.7,5.25,1410.8,19.9,Liberica,Monocrop,Owned,Yes,31,351,52,1606,Washed,11.81,27,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0437,Balintawak,103.2,6.35,2728.9,21.8,Liberica,Agroforestry,Shared,Yes,35,21,43,1613,Washed,14.91,31,Yes,Yes,Yes,No,No,No,No,1
+F0438,Barangay VIII,243.5,5.65,2019.3,19.9,Robusta,Agroforestry,Shared,Yes,1,201,44,956,Washed,12.34,2,No,No,No,No,No,Yes,Yes,0
+F0439,Maraouy,408.5,6.37,2510.3,20.6,Liberica,Agroforestry,Owned,Yes,8,15,46,1473,Washed,12.97,31,Yes,Yes,No,No,Yes,Yes,Yes,1
+F0440,Cumba,590.6,5.14,1720.5,27.9,Liberica,Agroforestry,Shared,No,12,318,115,1673,Washed,11.0,4,Yes,No,Yes,Yes,No,Yes,No,1
+F0441,San Carlos,415.9,5.35,1519.0,23.0,Liberica,Agroforestry,Shared,Yes,19,153,108,1214,Natural,11.29,7,Yes,Yes,Yes,Yes,No,Yes,No,1
+F0442,Lodlod,229.9,6.71,1520.9,23.8,Liberica,Monocrop,Owned,No,25,355,81,190,Washed,12.57,13,No,Yes,No,Yes,Yes,No,No,0
+F0443,Pinagkawitan,417.0,5.45,1341.0,26.9,Liberica,Agroforestry,Leased,Yes,32,270,80,900,Natural,9.42,2,Yes,No,No,Yes,Yes,Yes,Yes,1
+F0444,Bubuyan,370.0,6.67,1571.3,28.0,Excelsa,Agroforestry,Owned,Yes,12,82,12,1181,Washed,10.54,23,No,Yes,No,No,Yes,Yes,No,0
+F0445,Pangao,489.9,5.56,2528.4,24.2,Excelsa,Agroforestry,Leased,No,13,183,83,1775,Natural,10.18,12,No,No,No,Yes,Yes,No,Yes,1
+F0446,Barangay I,153.5,6.29,2963.4,26.3,Liberica,Agroforestry,Owned,No,28,241,30,1204,Washed,9.1,42,Yes,Yes,Yes,No,No,No,Yes,1
+F0447,Pinagtongulan,480.5,6.39,2828.3,21.9,Liberica,Agroforestry,Owned,Yes,1,279,16,473,Natural,12.22,28,Yes,No,Yes,Yes,Yes,Yes,Yes,1
+F0448,Barangay I,370.6,6.03,2570.3,21.8,Excelsa,Agroforestry,Owned,Yes,6,371,47,1524,Washed,12.37,7,No,Yes,Yes,No,Yes,Yes,Yes,1
+F0449,Barangay VIII,581.5,5.61,1420.9,22.6,Liberica,Agroforestry,Owned,Yes,8,231,55,492,Natural,11.3,41,No,Yes,Yes,No,No,Yes,Yes,1
+F0450,Cumba,270.9,5.43,1778.4,25.1,Excelsa,Agroforestry,Leased,Yes,4,61,114,1783,Washed,10.61,30,No,Yes,No,Yes,Yes,Yes,No,0
+F0451,Maraouy,416.3,5.07,1819.6,25.1,Liberica,Agroforestry,Owned,No,5,125,95,1083,Washed,12.91,25,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0452,Maraouy,566.0,5.61,1699.9,21.8,Excelsa,Monocrop,Owned,No,25,35,86,502,Honey,9.81,17,No,Yes,No,Yes,Yes,Yes,No,0
+F0453,Latag,151.3,6.31,2230.0,20.2,Robusta,Agroforestry,Shared,Yes,22,62,113,586,Washed,12.11,17,Yes,Yes,No,Yes,Yes,No,Yes,1
+F0454,San Jose,568.6,6.88,2271.1,24.7,Excelsa,Monocrop,Owned,No,28,374,104,109,Washed,13.61,6,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0455,San Benito,443.9,6.74,1913.8,20.2,Robusta,Monocrop,Owned,Yes,39,38,67,1092,Honey,9.99,37,No,Yes,No,Yes,Yes,Yes,Yes,0
+F0456,Quezon,133.9,6.53,1907.6,24.2,Liberica,Agroforestry,Shared,Yes,23,28,53,269,Washed,13.52,15,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0457,Pinagtongulan,250.5,6.58,2857.1,25.2,Excelsa,Agroforestry,Shared,Yes,4,312,119,586,Washed,13.56,32,No,Yes,No,No,Yes,Yes,No,0
+F0458,San Carlos,454.1,6.33,2778.6,25.3,Liberica,Agroforestry,Owned,Yes,4,288,31,619,Honey,9.36,2,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0459,Lumbang,133.7,5.52,1815.6,25.8,Liberica,Monocrop,Owned,Yes,21,126,13,1390,Washed,9.11,37,No,No,Yes,Yes,Yes,Yes,No,1
+F0460,Barangay VI,391.1,6.81,3027.6,26.9,Robusta,Agroforestry,Shared,Yes,37,115,43,1333,Natural,14.84,3,Yes,Yes,No,Yes,Yes,Yes,No,0
+F0461,Barangay I,272.9,6.34,3105.6,23.5,Robusta,Monocrop,Owned,Yes,41,318,69,1169,Washed,10.16,35,Yes,Yes,Yes,Yes,No,Yes,No,1
+F0462,San Benito,410.5,6.12,1853.5,25.6,Excelsa,Monocrop,Owned,Yes,2,236,75,298,Natural,13.93,3,No,Yes,No,Yes,Yes,Yes,No,1
+F0463,Sabang,122.9,5.22,1908.8,24.6,Liberica,Monocrop,Owned,No,7,361,94,364,Washed,12.37,41,Yes,No,No,No,Yes,Yes,Yes,0
+F0464,Plaridel,535.8,5.89,2211.3,20.7,Robusta,Agroforestry,Owned,Yes,16,195,75,341,Honey,10.59,8,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0465,Barangay VI,586.7,5.92,3082.2,19.2,Robusta,Agroforestry,Leased,Yes,17,270,11,1106,Washed,9.78,39,No,No,Yes,Yes,Yes,Yes,Yes,1
+F0466,Inosluban,584.4,6.73,2952.6,21.6,Liberica,Monocrop,Leased,No,20,25,76,1121,Washed,11.98,16,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0467,Poblacion Barangay,474.8,6.09,1405.1,23.0,Liberica,Agroforestry,Shared,No,23,282,84,723,Washed,11.44,16,No,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0468,Anilao,165.0,5.76,1985.5,24.6,Liberica,Agroforestry,Leased,No,34,169,71,63,Washed,13.19,32,Yes,No,No,Yes,No,No,Yes,1
+F0469,Barangay I,479.1,6.95,2306.7,26.6,Liberica,Monocrop,Owned,Yes,11,367,113,415,Natural,14.43,19,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0470,Tangob,112.3,5.22,2206.3,20.8,Arabica,Agroforestry,Owned,Yes,34,259,14,278,Natural,13.83,13,No,Yes,No,Yes,Yes,Yes,Yes,0
+F0471,Banaybanay,111.1,5.85,1587.7,20.1,Robusta,Monocrop,Shared,Yes,33,233,118,1164,Washed,10.65,21,Yes,No,Yes,Yes,Yes,No,No,1
+F0472,Cumba,261.8,5.08,2917.6,27.7,Robusta,Monocrop,Owned,Yes,26,265,75,1147,Natural,14.27,26,Yes,Yes,Yes,No,No,Yes,Yes,0
+F0473,Mabini,344.3,6.48,2553.9,20.0,Arabica,Agroforestry,Owned,No,2,189,89,1463,Washed,14.0,42,Yes,No,Yes,Yes,Yes,No,Yes,1
+F0474,Cumba,485.2,6.84,2875.8,23.3,Liberica,Monocrop,Shared,Yes,23,29,57,1232,Washed,14.57,2,No,Yes,Yes,Yes,Yes,Yes,No,1
+F0475,Bagong Pook,441.6,5.56,2917.5,24.3,Excelsa,Agroforestry,Owned,Yes,41,121,105,1100,Washed,11.75,23,Yes,No,No,No,Yes,Yes,Yes,1
+F0476,Pangao,323.0,6.72,2696.7,23.9,Liberica,Agroforestry,Owned,Yes,22,129,99,823,Washed,13.61,29,Yes,No,Yes,Yes,Yes,Yes,Yes,1
+F0477,Poblacion Barangay,236.8,5.58,2078.4,19.8,Excelsa,Agroforestry,Shared,Yes,34,203,91,881,Washed,12.55,7,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0478,Mojon,598.6,6.82,2421.1,19.5,Liberica,Agroforestry,Shared,No,15,120,61,903,Natural,10.86,21,Yes,No,Yes,Yes,No,No,Yes,1
+F0479,Kayumanggi,313.1,6.51,1520.7,19.9,Excelsa,Agroforestry,Owned,Yes,10,219,95,1657,Washed,14.97,24,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0480,Mabini,325.7,6.61,2547.3,24.3,Liberica,Agroforestry,Shared,Yes,15,10,90,405,Natural,9.23,9,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0481,Barangay VIII,181.8,5.04,1558.5,23.9,Liberica,Agroforestry,Owned,Yes,42,67,107,753,Washed,9.97,28,Yes,Yes,No,Yes,No,Yes,Yes,1
+F0482,Sampaguita,497.4,6.93,2587.9,21.1,Robusta,Agroforestry,Owned,Yes,29,102,31,1640,Natural,14.36,39,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0483,Quezon,446.8,6.45,1659.2,24.7,Liberica,Monocrop,Shared,Yes,23,230,58,231,Washed,9.36,0,Yes,No,Yes,Yes,Yes,Yes,No,1
+F0484,Quezon,210.4,5.61,1435.1,26.4,Robusta,Monocrop,Shared,Yes,17,220,117,474,Washed,14.32,20,No,Yes,Yes,No,Yes,Yes,No,0
+F0485,Talisay,141.2,6.66,1530.6,19.4,Liberica,Agroforestry,Owned,Yes,9,241,8,326,Washed,13.29,38,Yes,No,Yes,No,Yes,Yes,Yes,0
+F0486,San Carlos,440.2,5.56,1204.0,23.5,Robusta,Agroforestry,Owned,No,36,271,92,1361,Natural,9.22,23,No,Yes,Yes,Yes,Yes,No,Yes,1
+F0487,Barangay VIII,427.3,6.75,2637.5,25.2,Liberica,Agroforestry,Owned,No,9,373,27,1776,Washed,11.58,8,No,Yes,Yes,No,Yes,Yes,No,1
+F0488,Balintawak,236.6,5.23,2664.8,21.3,Liberica,Agroforestry,Owned,No,16,112,52,522,Natural,13.53,43,Yes,Yes,No,No,No,Yes,Yes,1
+F0489,Anilao,575.4,6.41,2229.9,21.8,Liberica,Monocrop,Owned,No,36,59,87,367,Washed,12.5,25,Yes,Yes,Yes,No,No,No,No,1
+F0490,Quezon,175.5,6.08,1522.7,24.5,Liberica,Monocrop,Owned,Yes,33,383,46,952,Natural,14.62,8,Yes,No,Yes,Yes,No,No,Yes,1
+F0491,San Lucas,316.2,5.19,1367.1,27.1,Liberica,Agroforestry,Owned,Yes,31,119,7,1699,Washed,14.21,19,No,No,Yes,No,Yes,Yes,No,1
+F0492,Barangay VI,571.8,5.48,1238.3,26.3,Liberica,Agroforestry,Owned,Yes,6,97,95,1119,Washed,11.0,34,No,No,No,Yes,Yes,Yes,Yes,1
+F0493,Talisay,309.9,5.02,1531.5,24.2,Liberica,Agroforestry,Owned,No,10,29,7,821,Washed,9.51,35,Yes,No,No,Yes,Yes,No,Yes,1
+F0494,Tambo,419.3,5.94,2981.7,25.6,Liberica,Agroforestry,Leased,No,16,23,32,1475,Washed,14.67,41,No,Yes,Yes,Yes,Yes,Yes,No,1
+F0495,Pinagkawitan,298.8,5.6,1683.1,22.3,Liberica,Agroforestry,Owned,No,4,142,67,1593,Washed,12.1,35,Yes,Yes,No,No,No,Yes,No,0
+F0496,Bolbok,237.1,6.2,1908.5,24.8,Excelsa,Monocrop,Owned,Yes,22,305,85,1682,Honey,9.45,8,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0497,Barangay VIII,592.0,5.59,1410.7,23.2,Liberica,Monocrop,Shared,No,13,43,35,1546,Honey,13.9,21,No,Yes,Yes,No,No,No,No,0
+F0498,Plaridel,304.7,5.6,1644.7,20.7,Liberica,Agroforestry,Leased,Yes,16,389,14,991,Natural,14.21,0,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0499,Bagong Pook,547.0,6.49,2238.4,25.3,Robusta,Agroforestry,Owned,Yes,29,217,53,346,Washed,12.84,4,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0500,Sampaguita,215.0,5.1,2415.5,24.0,Liberica,Monocrop,Owned,Yes,6,310,90,971,Washed,11.69,8,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0501,Lumbang,206.6,6.81,1690.7,22.2,Robusta,Agroforestry,Leased,Yes,26,208,98,655,Washed,12.97,36,No,Yes,Yes,Yes,Yes,Yes,No,0
+F0502,Dagatan,115.6,6.7,1315.5,27.2,Liberica,Agroforestry,Owned,Yes,11,89,117,104,Washed,13.24,37,Yes,No,Yes,Yes,No,Yes,No,0
+F0503,Maraouy,425.8,6.34,1982.1,19.2,Liberica,Agroforestry,Leased,Yes,24,80,25,1767,Honey,14.36,18,No,Yes,Yes,Yes,No,No,Yes,1
+F0504,Barangay IV,284.3,6.19,1668.4,21.8,Liberica,Monocrop,Owned,Yes,29,164,104,968,Washed,14.74,7,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0505,Pinagkawitan,532.2,6.78,1639.1,19.5,Robusta,Agroforestry,Owned,Yes,3,87,57,88,Honey,12.09,41,Yes,Yes,Yes,Yes,Yes,Yes,No,0
+F0506,Maraouy,336.6,5.37,3119.7,25.9,Robusta,Monocrop,Owned,No,10,87,91,415,Washed,13.79,42,No,No,No,No,Yes,No,Yes,0
+F0507,Barangay VI,584.1,5.16,2432.6,25.3,Liberica,Monocrop,Leased,Yes,1,181,106,44,Natural,14.79,31,Yes,No,Yes,Yes,Yes,Yes,Yes,1
+F0508,Maraouy,192.8,5.48,2313.8,22.0,Liberica,Monocrop,Shared,Yes,43,298,80,1284,Washed,9.91,12,Yes,No,No,Yes,Yes,Yes,Yes,1
+F0509,Sabang,534.3,6.59,2031.6,25.1,Arabica,Monocrop,Owned,No,26,42,93,1670,Natural,9.11,19,Yes,Yes,No,No,No,No,Yes,0
+F0510,San Salvador,488.3,5.07,2057.9,22.6,Liberica,Agroforestry,Owned,No,12,309,58,1730,Washed,14.21,35,Yes,No,Yes,Yes,Yes,Yes,Yes,1
+F0511,Barangay III,485.5,6.17,2281.8,25.8,Liberica,Agroforestry,Owned,Yes,14,285,61,228,Natural,10.17,42,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0512,Banaybanay,522.4,6.99,2592.9,23.1,Excelsa,Monocrop,Owned,Yes,25,376,24,1407,Natural,9.25,43,No,No,Yes,No,No,Yes,No,0
+F0513,Tangob,480.5,6.71,2604.3,22.7,Robusta,Monocrop,Shared,Yes,8,16,117,64,Washed,9.96,36,Yes,No,Yes,Yes,Yes,No,No,0
+F0514,Barangay VII,413.1,6.04,1543.4,27.4,Liberica,Agroforestry,Owned,Yes,43,169,53,191,Washed,11.3,29,No,Yes,Yes,No,Yes,No,Yes,1
+F0515,Pinagkawitan,165.6,5.13,2200.2,21.3,Robusta,Agroforestry,Shared,Yes,4,249,110,1011,Washed,10.32,9,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0516,San Benito,116.3,6.66,2023.9,20.1,Excelsa,Monocrop,Leased,No,28,33,11,828,Washed,10.83,30,Yes,Yes,Yes,No,Yes,No,Yes,0
+F0517,Malagonlong,560.4,6.2,2941.1,24.3,Liberica,Monocrop,Shared,Yes,7,223,33,924,Washed,14.85,24,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0518,Latag,408.3,5.23,2462.8,27.7,Liberica,Agroforestry,Leased,No,10,79,52,500,Washed,13.23,28,No,No,Yes,Yes,Yes,Yes,No,1
+F0519,San Benito,498.3,5.19,2265.0,22.4,Liberica,Agroforestry,Owned,No,36,377,97,560,Washed,13.27,23,No,No,No,Yes,No,No,No,0
+F0520,Barangay VI,340.8,6.82,1430.8,19.6,Arabica,Agroforestry,Owned,No,2,225,17,821,Natural,9.57,38,No,No,Yes,Yes,No,Yes,No,0
+F0521,San Carlos,158.7,6.34,2411.3,22.1,Robusta,Agroforestry,Owned,Yes,26,113,7,881,Washed,13.39,20,Yes,Yes,No,No,No,No,No,0
+F0522,Barangay V,162.6,6.66,1434.4,23.6,Liberica,Agroforestry,Owned,No,14,224,6,1476,Washed,13.44,40,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0523,Mabini,442.8,6.76,1874.4,20.5,Excelsa,Agroforestry,Owned,Yes,16,63,20,377,Natural,12.96,8,Yes,Yes,Yes,No,No,No,Yes,0
+F0524,Sampaguita,315.2,6.14,1485.7,24.9,Liberica,Agroforestry,Owned,Yes,43,303,98,723,Natural,10.37,41,No,Yes,No,Yes,Yes,Yes,No,1
+F0525,Sampaguita,200.3,6.03,2584.1,28.0,Liberica,Agroforestry,Shared,Yes,42,339,106,964,Washed,11.54,41,Yes,Yes,No,No,Yes,Yes,No,1
+F0526,San Benito,345.8,5.86,1612.5,23.1,Liberica,Monocrop,Owned,Yes,17,345,10,942,Washed,14.08,1,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0527,Halang,132.1,5.63,1983.7,22.2,Liberica,Monocrop,Leased,No,22,212,49,176,Washed,13.02,3,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0528,San Jose,391.0,5.87,2991.3,22.6,Excelsa,Agroforestry,Shared,Yes,4,297,75,1427,Natural,13.4,7,Yes,No,No,No,Yes,No,No,1
+F0529,Poblacion Barangay,234.5,6.55,1608.6,20.0,Liberica,Agroforestry,Shared,Yes,19,54,9,1741,Natural,12.52,31,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0530,Mabini,498.8,6.2,2215.6,26.9,Excelsa,Monocrop,Owned,Yes,2,326,60,704,Washed,11.7,13,No,No,Yes,No,No,Yes,No,0
+F0531,Lumbang,255.2,6.79,2038.5,22.7,Liberica,Agroforestry,Owned,Yes,39,207,75,1469,Natural,13.55,12,Yes,Yes,Yes,Yes,Yes,No,No,1
+F0532,Poblacion Barangay,327.6,5.89,1236.2,22.5,Liberica,Monocrop,Owned,Yes,9,225,102,716,Washed,9.41,20,No,Yes,No,No,No,No,Yes,1
+F0533,San Carlos,105.8,6.21,2785.5,24.9,Arabica,Monocrop,Owned,No,19,318,36,1547,Washed,13.04,23,No,No,Yes,No,Yes,Yes,No,0
+F0534,Barangay VIII,136.2,6.26,1338.1,23.0,Liberica,Agroforestry,Owned,Yes,16,393,53,1612,Natural,14.98,17,Yes,No,No,No,Yes,Yes,No,1
+F0535,Bolbok,296.2,6.18,2148.5,24.8,Liberica,Monocrop,Leased,Yes,25,341,17,1309,Washed,13.68,44,Yes,Yes,Yes,No,Yes,No,No,1
+F0536,Lumbang,340.0,6.41,2321.4,19.6,Liberica,Agroforestry,Owned,Yes,18,193,34,989,Washed,10.74,39,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0537,Malagonlong,400.0,5.47,2456.9,26.3,Excelsa,Agroforestry,Owned,Yes,23,36,29,715,Washed,10.67,25,No,Yes,No,No,Yes,No,Yes,0
+F0538,Sampaguita,245.8,6.02,2577.3,27.5,Liberica,Agroforestry,Shared,Yes,21,175,89,1156,Honey,13.0,31,Yes,No,No,Yes,Yes,Yes,No,1
+F0539,San Salvador,447.5,5.21,1706.5,24.8,Liberica,Agroforestry,Owned,Yes,11,327,64,150,Washed,14.38,43,Yes,No,Yes,Yes,Yes,Yes,Yes,1
+F0540,Pinagtongulan,530.1,5.77,1220.0,27.6,Liberica,Monocrop,Owned,No,39,283,63,448,Natural,12.47,32,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0541,Dagatan,489.9,5.98,2646.9,20.4,Liberica,Agroforestry,Leased,Yes,41,392,89,379,Washed,12.16,30,Yes,Yes,Yes,No,No,Yes,Yes,1
+F0542,Kayumanggi,119.8,6.3,2271.3,23.3,Robusta,Agroforestry,Owned,Yes,4,374,32,1710,Washed,9.96,17,Yes,No,No,No,Yes,Yes,No,1
+F0543,Malagonlong,340.3,6.9,2872.2,24.4,Liberica,Agroforestry,Leased,Yes,25,112,116,71,Washed,13.29,34,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0544,Lodlod,152.5,6.2,2842.8,24.2,Liberica,Monocrop,Owned,No,32,342,62,1420,Washed,13.21,11,No,No,Yes,No,No,No,Yes,1
+F0545,Bolbok,221.0,6.49,2886.7,22.6,Liberica,Agroforestry,Shared,Yes,30,382,24,58,Natural,14.8,24,No,Yes,No,No,Yes,Yes,Yes,1
+F0546,Inosluban,593.3,6.01,2170.2,22.0,Liberica,Agroforestry,Owned,Yes,26,113,38,995,Washed,10.8,44,Yes,Yes,No,Yes,No,Yes,No,1
+F0547,San Benito,171.2,6.27,1867.3,20.1,Excelsa,Monocrop,Owned,No,36,254,9,814,Washed,13.54,30,Yes,Yes,Yes,Yes,No,No,No,0
+F0548,Barangay VIII,349.4,5.14,2783.1,22.5,Liberica,Agroforestry,Owned,Yes,34,314,86,43,Washed,11.6,9,No,Yes,Yes,No,No,Yes,Yes,1
+F0549,San Salvador,409.1,5.51,2102.6,20.5,Arabica,Monocrop,Owned,Yes,9,178,64,949,Washed,12.35,33,Yes,Yes,No,No,Yes,Yes,No,0
+F0550,Inosluban,451.2,5.72,1566.9,25.6,Liberica,Agroforestry,Owned,Yes,12,125,107,847,Honey,13.9,2,No,No,Yes,No,Yes,Yes,Yes,1
+F0551,Barangay VIII,379.8,5.94,2909.9,20.9,Liberica,Monocrop,Owned,Yes,2,150,47,854,Washed,10.33,38,Yes,No,No,Yes,Yes,No,No,1
+F0552,Barangay V,104.9,5.09,2965.1,19.5,Excelsa,Monocrop,Owned,Yes,38,365,61,1538,Washed,11.06,7,Yes,No,Yes,No,Yes,Yes,No,1
+F0553,Barangay III,263.2,5.28,2132.6,24.0,Liberica,Agroforestry,Owned,Yes,5,134,61,1242,Natural,13.64,31,Yes,Yes,No,No,Yes,Yes,No,0
+F0554,Pangao,358.9,5.55,1351.4,24.4,Robusta,Agroforestry,Owned,Yes,5,34,79,901,Natural,12.42,42,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0555,Bubuyan,143.9,6.94,1975.7,26.8,Arabica,Monocrop,Owned,Yes,22,203,58,324,Natural,9.55,28,No,Yes,Yes,No,No,No,No,0
+F0556,Plaridel,275.3,5.66,2807.1,24.2,Liberica,Agroforestry,Leased,Yes,5,393,85,1236,Washed,11.58,21,Yes,No,Yes,Yes,Yes,No,No,1
+F0557,Inosluban,116.6,5.96,3003.5,22.1,Liberica,Monocrop,Owned,No,4,109,116,893,Washed,12.52,19,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0558,Cumba,139.3,5.39,1606.9,26.2,Robusta,Agroforestry,Owned,No,9,14,49,577,Washed,14.46,5,Yes,Yes,Yes,Yes,No,Yes,Yes,0
+F0559,Barangay I,298.5,6.22,1333.9,23.9,Liberica,Agroforestry,Leased,No,29,28,90,1090,Natural,10.13,42,No,Yes,Yes,Yes,Yes,No,Yes,1
+F0560,Sampaguita,166.4,5.56,2954.7,19.7,Liberica,Agroforestry,Shared,Yes,22,179,41,1037,Natural,13.84,28,Yes,Yes,No,No,Yes,Yes,Yes,1
+F0561,Barangay VIII,383.8,5.41,1978.8,24.1,Liberica,Monocrop,Owned,Yes,27,283,88,1067,Washed,9.78,41,No,Yes,No,No,Yes,No,Yes,1
+F0562,Malagonlong,444.7,6.03,2283.5,27.2,Liberica,Agroforestry,Owned,Yes,10,263,52,664,Washed,10.45,16,Yes,No,Yes,Yes,No,Yes,No,1
+F0563,Latag,500.3,5.01,3136.1,22.6,Robusta,Monocrop,Owned,Yes,16,130,58,624,Washed,10.46,30,Yes,No,No,Yes,Yes,No,Yes,0
+F0564,San Benito,200.1,5.02,1333.1,21.7,Liberica,Monocrop,Owned,No,42,41,52,1212,Washed,14.26,33,No,No,Yes,Yes,Yes,Yes,No,0
+F0565,Lumbang,183.7,5.44,2496.6,20.3,Liberica,Agroforestry,Leased,Yes,42,158,116,1547,Honey,10.19,37,Yes,No,No,No,Yes,No,Yes,0
+F0566,Cumba,152.3,5.07,1348.2,20.4,Robusta,Agroforestry,Owned,Yes,10,275,114,1382,Washed,13.72,36,Yes,No,No,No,No,Yes,Yes,0
+F0567,San Jose,418.2,5.22,1950.9,22.9,Liberica,Monocrop,Leased,Yes,6,46,10,643,Washed,11.77,3,Yes,Yes,Yes,No,No,Yes,Yes,1
+F0568,Tangob,453.2,5.68,2807.6,24.4,Liberica,Agroforestry,Owned,Yes,5,186,38,1136,Honey,14.99,1,Yes,Yes,No,No,Yes,Yes,Yes,1
+F0569,Santol,115.8,6.61,2066.9,19.7,Robusta,Monocrop,Owned,Yes,6,351,67,1609,Washed,14.03,11,Yes,No,No,No,Yes,Yes,Yes,0
+F0570,San Jose,568.1,6.14,3194.4,27.5,Liberica,Agroforestry,Leased,Yes,25,22,82,1633,Natural,13.44,34,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0571,Bubuyan,126.0,6.03,2318.1,25.8,Robusta,Agroforestry,Owned,Yes,4,192,52,1613,Washed,14.22,5,Yes,Yes,No,No,Yes,Yes,No,1
+F0572,Plaridel,370.6,5.59,1842.3,24.3,Excelsa,Monocrop,Owned,No,40,154,27,1622,Washed,12.8,7,Yes,Yes,No,No,No,No,Yes,1
+F0573,Barangay I,454.5,6.86,1640.2,26.5,Liberica,Agroforestry,Shared,Yes,32,274,88,1640,Washed,14.06,20,Yes,Yes,Yes,No,No,Yes,No,1
+F0574,Sampaguita,535.5,5.79,1901.0,19.7,Liberica,Agroforestry,Shared,No,35,97,17,1075,Natural,10.57,34,Yes,Yes,No,No,No,No,Yes,1
+F0575,Lumbang,457.0,5.17,1945.1,23.3,Liberica,Agroforestry,Leased,No,10,55,51,1185,Washed,9.59,14,No,Yes,No,No,Yes,Yes,Yes,1
+F0576,Pinagkawitan,500.9,6.23,1337.4,24.7,Liberica,Agroforestry,Owned,Yes,34,128,48,494,Washed,12.7,6,No,Yes,Yes,No,Yes,Yes,Yes,1
+F0577,Talisay,269.7,5.23,1939.1,26.5,Excelsa,Agroforestry,Owned,No,36,28,109,1509,Natural,11.61,14,Yes,No,Yes,No,Yes,Yes,No,0
+F0578,Barangay VII,507.4,5.69,2128.5,26.1,Excelsa,Monocrop,Shared,Yes,6,229,36,1355,Washed,11.56,44,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0579,Halang,140.1,6.01,2645.5,21.5,Liberica,Agroforestry,Owned,No,43,242,30,984,Washed,12.16,5,No,No,No,No,Yes,No,Yes,1
+F0580,Barangay VIII,547.4,6.75,2513.5,27.5,Robusta,Agroforestry,Shared,Yes,16,103,118,959,Washed,11.17,16,Yes,Yes,No,Yes,No,Yes,No,1
+F0581,Barangay V,373.8,5.99,2617.5,20.1,Excelsa,Monocrop,Owned,Yes,19,260,57,1320,Washed,12.76,3,Yes,Yes,Yes,Yes,Yes,No,No,1
+F0582,Barangay VI,508.6,6.4,1216.7,26.9,Arabica,Agroforestry,Owned,Yes,34,259,18,828,Natural,9.18,21,No,Yes,No,No,No,Yes,No,0
+F0583,Tambo,326.2,6.99,1635.3,27.7,Liberica,Agroforestry,Shared,Yes,25,291,56,424,Natural,14.82,31,Yes,Yes,No,Yes,Yes,Yes,No,1
+F0584,Dagatan,421.8,5.26,2523.4,20.6,Liberica,Monocrop,Owned,No,31,241,40,1173,Honey,14.55,21,Yes,No,No,Yes,Yes,Yes,No,0
+F0585,San Francisco,363.2,5.55,2168.0,25.5,Liberica,Monocrop,Owned,Yes,41,55,12,275,Natural,14.61,26,No,No,Yes,Yes,Yes,Yes,Yes,1
+F0586,Barangay III,465.8,5.79,1210.6,19.4,Arabica,Agroforestry,Owned,Yes,17,383,44,597,Washed,11.19,14,Yes,No,Yes,No,Yes,Yes,No,1
+F0587,Bolbok,140.8,5.84,2809.0,22.6,Liberica,Agroforestry,Owned,Yes,30,55,90,67,Natural,12.19,43,Yes,No,No,Yes,Yes,No,No,1
+F0588,San Lucas,130.2,5.82,2745.6,23.6,Liberica,Agroforestry,Owned,No,39,23,26,274,Washed,14.72,21,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0589,Santol,223.6,6.82,2296.8,24.2,Liberica,Agroforestry,Owned,Yes,31,94,20,50,Washed,14.41,27,Yes,Yes,No,Yes,Yes,No,Yes,1
+F0590,Barangay V,179.8,6.43,1332.9,27.4,Liberica,Agroforestry,Owned,Yes,19,328,95,1163,Washed,13.74,41,No,Yes,No,No,No,Yes,Yes,1
+F0591,Mojon,535.9,6.22,2733.0,25.1,Liberica,Agroforestry,Leased,Yes,35,337,64,1659,Washed,11.44,37,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0592,Bagong Pook,209.6,5.62,2367.4,23.3,Arabica,Agroforestry,Owned,No,29,12,64,423,Natural,12.39,8,Yes,Yes,No,Yes,Yes,No,No,1
+F0593,Barangay I,587.9,6.65,2763.9,26.3,Liberica,Agroforestry,Shared,Yes,1,37,14,1463,Washed,13.76,33,No,Yes,Yes,No,No,No,Yes,1
+F0594,Pinagkawitan,268.4,6.91,2703.5,27.6,Liberica,Agroforestry,Owned,Yes,4,390,29,1016,Washed,10.64,35,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0595,San Carlos,191.1,6.64,2806.0,19.2,Liberica,Monocrop,Owned,Yes,28,166,35,1701,Washed,12.76,8,Yes,Yes,Yes,Yes,No,Yes,No,1
+F0596,San Francisco,494.8,5.0,2236.0,27.8,Liberica,Agroforestry,Owned,No,18,352,25,1796,Washed,13.97,14,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0597,Inosluban,429.4,6.27,1480.6,19.8,Liberica,Agroforestry,Leased,Yes,26,342,95,37,Washed,13.24,44,Yes,No,Yes,Yes,Yes,No,Yes,1
+F0598,Barangay IV,349.1,5.1,2542.3,26.3,Liberica,Agroforestry,Shared,Yes,40,341,85,1497,Natural,11.88,19,Yes,Yes,No,No,Yes,Yes,No,1
+F0599,Tangob,377.7,5.52,2440.9,21.5,Liberica,Agroforestry,Leased,Yes,19,184,37,357,Washed,12.51,7,No,No,No,Yes,Yes,Yes,Yes,1
+F0600,Anilao,459.6,5.12,2684.5,20.2,Liberica,Monocrop,Owned,No,6,123,35,319,Natural,14.93,27,No,No,Yes,Yes,No,Yes,No,0
+F0601,Lodlod,214.2,6.21,1539.8,23.0,Liberica,Agroforestry,Owned,No,1,398,118,540,Washed,12.61,18,Yes,Yes,No,No,No,Yes,Yes,1
+F0602,Dagatan,598.2,6.37,1590.0,24.8,Liberica,Agroforestry,Leased,Yes,8,340,110,941,Washed,13.71,15,Yes,Yes,Yes,No,No,Yes,Yes,1
+F0603,Barangay III,587.4,5.23,2980.8,22.4,Arabica,Agroforestry,Shared,Yes,33,259,94,390,Washed,13.36,10,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0604,Malagonlong,425.2,5.77,2700.0,19.5,Excelsa,Monocrop,Shared,Yes,43,68,25,1652,Natural,13.21,41,Yes,No,No,Yes,Yes,Yes,Yes,1
+F0605,Tangob,199.8,5.91,3016.5,24.4,Liberica,Agroforestry,Owned,Yes,21,212,40,745,Washed,13.3,7,Yes,No,No,No,Yes,No,No,1
+F0606,Banaybanay,440.1,5.74,2717.4,27.1,Liberica,Agroforestry,Shared,Yes,24,324,69,248,Natural,11.73,32,No,Yes,No,No,Yes,No,No,1
+F0607,San Benito,136.1,5.24,2394.3,22.4,Excelsa,Agroforestry,Owned,Yes,25,248,8,435,Honey,11.84,9,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0608,Barangay II,115.3,5.84,2508.3,20.9,Liberica,Agroforestry,Owned,Yes,43,243,72,782,Honey,11.81,17,Yes,No,No,No,Yes,Yes,Yes,1
+F0609,Plaridel,228.8,6.5,2978.3,23.0,Excelsa,Agroforestry,Owned,No,19,312,94,952,Natural,9.2,34,Yes,Yes,No,Yes,Yes,Yes,No,1
+F0610,Inosluban,331.3,5.14,2357.6,19.4,Excelsa,Agroforestry,Owned,Yes,29,104,8,861,Natural,10.45,42,Yes,No,No,Yes,Yes,No,No,0
+F0611,Tambo,534.1,5.16,2464.8,26.4,Liberica,Monocrop,Leased,Yes,10,150,117,1674,Washed,9.93,2,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0612,San Jose,463.6,5.71,1513.0,26.4,Liberica,Monocrop,Shared,Yes,12,343,13,823,Natural,14.32,39,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0613,Mojon,471.4,6.88,2147.8,24.3,Arabica,Agroforestry,Leased,Yes,33,122,34,1273,Washed,10.65,26,Yes,No,No,Yes,No,No,Yes,1
+F0614,Barangay VI,312.7,6.34,2632.8,22.2,Liberica,Agroforestry,Leased,Yes,7,118,119,624,Honey,9.83,27,No,No,No,Yes,Yes,Yes,Yes,1
+F0615,Maraouy,273.0,6.36,1741.9,26.2,Liberica,Agroforestry,Owned,Yes,17,371,49,136,Washed,9.72,5,Yes,No,Yes,Yes,No,No,No,1
+F0616,Inosluban,285.5,5.72,1604.5,24.0,Liberica,Monocrop,Leased,Yes,10,354,8,610,Washed,13.2,13,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0617,San Jose,593.8,6.19,1827.7,26.4,Liberica,Agroforestry,Owned,No,31,298,73,638,Washed,9.04,6,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0618,Balintawak,120.1,5.02,1683.0,24.7,Robusta,Monocrop,Leased,No,6,106,113,1777,Washed,11.83,9,No,No,Yes,Yes,Yes,Yes,Yes,0
+F0619,Tangob,533.5,6.27,1629.8,26.1,Robusta,Agroforestry,Leased,Yes,17,344,27,1339,Washed,9.71,14,Yes,Yes,Yes,No,Yes,Yes,No,1
+F0620,Bolbok,389.3,6.83,2049.7,24.4,Arabica,Agroforestry,Leased,Yes,37,25,20,37,Washed,14.1,30,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0621,Pangao,319.3,6.23,3015.7,22.7,Liberica,Agroforestry,Owned,Yes,18,53,26,835,Natural,14.75,28,Yes,No,Yes,No,No,No,Yes,1
+F0622,Kayumanggi,462.6,6.75,2214.1,27.6,Liberica,Agroforestry,Shared,Yes,26,385,105,218,Washed,14.75,41,No,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0623,Pangao,343.3,6.45,1575.8,23.9,Liberica,Monocrop,Owned,Yes,16,239,76,110,Washed,11.65,16,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0624,Barangay IV,536.7,5.24,1353.9,24.4,Liberica,Monocrop,Owned,No,8,399,52,137,Natural,12.87,28,Yes,No,Yes,No,No,Yes,No,0
+F0625,San Salvador,550.4,6.8,2592.3,21.0,Liberica,Agroforestry,Leased,No,24,117,66,1374,Washed,12.6,43,Yes,No,Yes,No,Yes,No,Yes,1
+F0626,San Jose,310.9,5.13,1965.6,24.6,Arabica,Agroforestry,Owned,No,13,226,101,1632,Washed,11.1,14,Yes,Yes,No,Yes,Yes,No,Yes,1
+F0627,Anilao,238.4,6.07,2843.7,24.1,Excelsa,Monocrop,Shared,Yes,29,269,64,715,Natural,11.66,25,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0628,Balintawak,396.2,5.28,2519.0,20.7,Liberica,Monocrop,Owned,No,32,321,106,375,Natural,9.39,11,Yes,No,No,No,Yes,Yes,No,1
+F0629,Bolbok,556.2,5.02,2792.5,19.5,Robusta,Agroforestry,Owned,No,24,329,111,357,Washed,13.77,24,No,No,Yes,No,Yes,Yes,No,0
+F0630,Pangao,205.3,5.84,1743.9,24.4,Liberica,Agroforestry,Shared,Yes,16,205,84,584,Washed,10.44,40,Yes,No,No,No,Yes,No,No,1
+F0631,Malagonlong,411.5,5.59,2584.7,25.9,Liberica,Agroforestry,Owned,Yes,11,104,9,1752,Washed,11.76,4,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0632,Quezon,415.8,5.97,1728.1,23.7,Robusta,Agroforestry,Owned,No,32,65,84,331,Washed,11.88,3,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0633,San Francisco,466.6,6.15,3078.1,21.0,Liberica,Agroforestry,Owned,Yes,6,41,11,229,Washed,12.36,43,Yes,Yes,Yes,No,Yes,Yes,No,1
+F0634,Barangay II,165.8,5.09,2472.7,25.0,Arabica,Agroforestry,Owned,Yes,35,240,55,922,Honey,13.91,40,Yes,No,No,No,Yes,No,No,0
+F0635,Tambo,457.9,5.25,1849.0,19.7,Robusta,Agroforestry,Leased,Yes,33,381,69,1472,Natural,13.15,30,No,No,Yes,No,No,No,No,0
+F0636,Tangob,554.5,6.12,1739.0,23.0,Liberica,Agroforestry,Owned,Yes,18,18,13,1092,Natural,12.98,2,No,Yes,Yes,No,No,No,No,1
+F0637,Poblacion Barangay,189.8,5.69,1581.9,20.5,Robusta,Agroforestry,Shared,Yes,37,200,86,1785,Washed,12.16,2,Yes,Yes,Yes,No,No,Yes,No,1
+F0638,Tangob,218.8,6.46,2589.3,20.7,Liberica,Monocrop,Leased,No,13,370,49,336,Natural,9.58,25,Yes,Yes,No,Yes,Yes,Yes,No,1
+F0639,Latag,585.7,6.3,1637.4,20.8,Liberica,Monocrop,Owned,Yes,10,209,51,1057,Washed,11.41,16,Yes,No,Yes,Yes,No,No,No,1
+F0640,Cumba,190.5,6.69,2390.6,22.5,Liberica,Agroforestry,Leased,Yes,37,343,71,1686,Washed,14.74,9,Yes,No,Yes,No,No,Yes,No,1
+F0641,Latag,527.2,6.38,1729.3,19.5,Liberica,Monocrop,Leased,Yes,26,170,28,1130,Washed,14.97,1,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0642,Barangay VII,346.1,5.86,2523.9,22.6,Robusta,Monocrop,Owned,Yes,17,96,96,497,Washed,13.38,23,No,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0643,San Carlos,223.6,6.35,2829.9,23.6,Liberica,Agroforestry,Owned,Yes,1,30,14,208,Honey,10.37,10,No,Yes,No,Yes,Yes,Yes,No,1
+F0644,San Benito,535.4,5.55,2756.1,23.3,Robusta,Agroforestry,Owned,Yes,25,320,77,674,Washed,9.61,23,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0645,Sampaguita,322.7,5.61,2721.7,22.4,Liberica,Monocrop,Leased,Yes,34,85,81,1794,Washed,11.49,34,Yes,No,Yes,Yes,No,Yes,No,1
+F0646,Inosluban,357.4,6.58,1575.4,26.6,Liberica,Monocrop,Leased,Yes,39,395,52,305,Washed,14.14,22,No,No,No,No,No,Yes,Yes,0
+F0647,Kayumanggi,279.6,5.89,1376.8,20.3,Excelsa,Monocrop,Owned,Yes,10,150,39,1205,Natural,13.33,31,Yes,Yes,No,Yes,No,Yes,Yes,0
+F0648,Halang,396.5,6.6,2597.9,23.6,Liberica,Monocrop,Leased,Yes,20,135,58,1217,Washed,14.3,22,Yes,Yes,Yes,Yes,No,No,Yes,1
+F0649,San Salvador,181.8,6.64,1936.7,19.6,Liberica,Agroforestry,Leased,Yes,7,260,91,1343,Washed,12.69,33,Yes,No,No,Yes,Yes,Yes,Yes,1
+F0650,Bubuyan,295.5,6.72,2064.7,19.6,Liberica,Agroforestry,Leased,Yes,16,397,115,1431,Washed,9.78,40,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0651,Calamias,584.7,6.83,1262.3,24.2,Liberica,Agroforestry,Leased,No,37,93,85,650,Washed,9.69,18,Yes,Yes,Yes,No,No,No,Yes,1
+F0652,Plaridel,229.1,5.86,1719.2,24.1,Liberica,Agroforestry,Owned,Yes,29,380,114,667,Washed,9.29,1,Yes,No,No,No,Yes,No,No,1
+F0653,Anilao,428.4,5.64,1267.4,26.9,Robusta,Agroforestry,Shared,Yes,12,57,75,1363,Washed,12.4,1,No,No,No,Yes,Yes,Yes,Yes,1
+F0654,Balintawak,262.6,6.16,2958.4,24.0,Liberica,Agroforestry,Leased,Yes,17,388,20,959,Washed,10.46,14,Yes,No,Yes,No,Yes,No,Yes,1
+F0655,Cumba,486.7,5.74,1686.8,27.6,Liberica,Agroforestry,Leased,Yes,20,87,57,1442,Washed,13.41,20,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0656,Lumbang,165.4,6.2,2314.7,19.4,Arabica,Monocrop,Owned,No,26,39,44,1711,Honey,13.12,34,No,Yes,Yes,No,Yes,Yes,No,0
+F0657,Barangay VII,584.9,6.41,1278.0,19.9,Liberica,Agroforestry,Owned,Yes,19,294,104,212,Natural,10.91,4,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0658,Barangay VIII,326.9,6.38,2533.7,19.4,Excelsa,Agroforestry,Owned,Yes,12,145,24,1359,Washed,10.06,42,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0659,Barangay VI,218.0,5.75,1846.1,20.7,Liberica,Agroforestry,Owned,Yes,21,149,92,101,Washed,9.61,26,Yes,No,Yes,No,No,No,Yes,1
+F0660,Poblacion Barangay,136.7,5.33,2995.8,23.9,Liberica,Agroforestry,Leased,Yes,42,50,115,1272,Washed,13.42,23,Yes,Yes,No,No,No,Yes,Yes,1
+F0661,Cumba,184.9,5.86,2976.2,24.8,Excelsa,Monocrop,Owned,No,34,291,73,748,Washed,11.7,6,Yes,No,No,Yes,No,Yes,No,1
+F0662,Barangay IV,359.9,5.29,1850.6,19.4,Liberica,Monocrop,Leased,Yes,7,59,49,1226,Honey,10.94,5,No,Yes,Yes,No,Yes,No,No,1
+F0663,San Francisco,268.5,6.78,3001.9,27.5,Robusta,Monocrop,Leased,Yes,35,267,10,1706,Natural,14.14,32,Yes,Yes,Yes,Yes,No,Yes,Yes,0
+F0664,Barangay VIII,514.4,5.69,3192.3,26.6,Liberica,Agroforestry,Leased,Yes,15,320,96,1325,Washed,12.56,16,Yes,No,Yes,No,No,No,Yes,1
+F0665,Mabini,315.4,5.31,2850.8,21.7,Liberica,Agroforestry,Owned,Yes,1,369,73,755,Washed,12.11,41,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0666,Pangao,224.4,5.05,2889.7,19.7,Liberica,Agroforestry,Shared,No,26,279,53,1521,Washed,13.46,29,Yes,Yes,Yes,No,No,Yes,Yes,1
+F0667,Barangay IV,408.6,6.29,1698.0,20.5,Liberica,Agroforestry,Leased,Yes,35,143,43,298,Washed,13.89,7,No,Yes,No,Yes,Yes,No,No,1
+F0668,Pangao,453.4,6.27,2353.4,20.1,Excelsa,Monocrop,Leased,Yes,25,243,106,1073,Washed,13.12,39,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0669,San Benito,183.5,5.68,1334.5,20.1,Liberica,Monocrop,Owned,Yes,42,137,6,607,Washed,11.64,6,Yes,Yes,No,No,Yes,Yes,Yes,1
+F0670,Maraouy,183.8,5.14,1389.8,23.7,Arabica,Monocrop,Owned,Yes,15,113,111,1024,Honey,11.28,5,No,Yes,No,No,Yes,Yes,Yes,0
+F0671,Barangay IV,118.3,5.82,3197.8,21.2,Arabica,Agroforestry,Owned,Yes,22,263,43,844,Washed,13.63,3,Yes,No,Yes,No,Yes,Yes,No,1
+F0672,Pangao,468.2,5.62,1853.3,22.2,Liberica,Monocrop,Owned,Yes,6,104,25,1556,Washed,12.11,0,No,No,Yes,Yes,Yes,Yes,No,1
+F0673,Pangao,431.9,6.35,2696.4,27.9,Liberica,Agroforestry,Owned,Yes,15,346,44,176,Natural,13.23,14,Yes,Yes,No,Yes,Yes,Yes,No,1
+F0674,San Carlos,337.3,6.21,2813.3,25.2,Excelsa,Monocrop,Owned,Yes,24,226,105,1482,Washed,14.34,30,Yes,Yes,No,Yes,No,Yes,Yes,1
+F0675,San Salvador,522.1,5.73,2916.0,27.5,Arabica,Agroforestry,Leased,Yes,21,70,86,1218,Washed,14.5,24,No,Yes,No,Yes,No,Yes,No,1
+F0676,San Benito,502.8,5.44,3195.3,20.3,Liberica,Agroforestry,Owned,No,7,277,58,919,Washed,10.67,32,No,Yes,Yes,No,No,No,Yes,0
+F0677,Mojon,392.7,6.98,1683.0,22.4,Liberica,Agroforestry,Owned,Yes,29,250,116,339,Washed,10.13,34,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0678,Dagatan,534.1,5.91,1280.7,24.0,Liberica,Monocrop,Shared,Yes,32,22,114,547,Honey,10.57,4,Yes,No,Yes,No,No,No,Yes,1
+F0679,Barangay V,202.9,6.38,2022.4,19.7,Robusta,Agroforestry,Owned,Yes,32,156,16,43,Honey,13.51,4,Yes,Yes,No,No,Yes,No,No,0
+F0680,Quezon,156.0,5.28,1460.2,19.0,Liberica,Agroforestry,Leased,Yes,5,249,85,161,Honey,11.22,35,Yes,No,No,Yes,No,Yes,Yes,0
+F0681,Kayumanggi,234.9,5.97,1244.9,25.0,Robusta,Monocrop,Owned,Yes,4,98,41,784,Natural,10.04,16,No,No,No,No,Yes,Yes,No,0
+F0682,Bolbok,128.5,5.06,1920.9,24.8,Liberica,Agroforestry,Owned,No,22,104,114,468,Washed,9.59,13,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0683,Pangao,365.6,6.01,2767.5,22.7,Liberica,Agroforestry,Owned,Yes,18,324,42,772,Honey,10.96,28,Yes,Yes,No,No,No,No,Yes,1
+F0684,Pinagkawitan,568.3,6.93,2332.4,23.4,Liberica,Agroforestry,Leased,Yes,35,302,19,769,Honey,9.82,7,No,Yes,Yes,Yes,No,Yes,Yes,1
+F0685,Bolbok,119.7,5.77,1825.6,22.7,Liberica,Agroforestry,Owned,Yes,17,34,11,1727,Washed,9.94,33,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0686,Sampaguita,161.1,5.08,2508.7,19.2,Liberica,Monocrop,Shared,Yes,24,281,82,824,Washed,13.1,39,Yes,Yes,Yes,Yes,No,No,Yes,1
+F0687,Barangay II,326.1,5.06,1664.0,22.0,Liberica,Monocrop,Owned,Yes,2,175,54,292,Washed,9.12,0,No,No,No,Yes,Yes,No,Yes,1
+F0688,Halang,566.9,5.78,1228.8,20.6,Liberica,Agroforestry,Owned,No,13,259,69,672,Washed,9.71,28,No,Yes,No,No,No,Yes,Yes,1
+F0689,Barangay I,258.1,5.32,2728.7,19.9,Liberica,Monocrop,Leased,Yes,15,96,106,1278,Washed,14.07,35,No,Yes,Yes,No,Yes,Yes,Yes,1
+F0690,Malagonlong,353.6,5.05,2447.5,27.6,Liberica,Agroforestry,Owned,Yes,5,151,71,287,Honey,14.07,36,Yes,No,No,Yes,Yes,No,Yes,0
+F0691,Bagong Pook,120.8,6.51,2724.6,24.4,Arabica,Agroforestry,Leased,Yes,3,143,105,1287,Honey,10.98,28,No,No,Yes,No,Yes,Yes,Yes,0
+F0692,Barangay VI,174.2,5.92,1277.9,25.6,Liberica,Agroforestry,Owned,Yes,37,288,48,1389,Washed,9.53,4,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0693,Pinagtongulan,593.3,5.58,2874.2,21.8,Liberica,Agroforestry,Owned,Yes,37,135,35,438,Washed,13.23,31,Yes,No,Yes,Yes,No,Yes,Yes,1
+F0694,Tangob,582.6,6.8,2439.1,22.5,Liberica,Agroforestry,Leased,Yes,37,325,47,1004,Natural,11.16,23,No,Yes,Yes,No,Yes,Yes,Yes,1
+F0695,Barangay I,102.5,5.23,2326.8,21.1,Arabica,Monocrop,Shared,Yes,3,150,81,1077,Natural,9.27,18,Yes,Yes,Yes,No,Yes,No,No,0
+F0696,Quezon,575.9,6.91,2449.2,19.9,Liberica,Monocrop,Owned,Yes,35,365,52,300,Washed,9.95,11,No,No,Yes,No,Yes,Yes,Yes,1
+F0697,Anilao,419.6,5.63,2928.9,20.6,Robusta,Agroforestry,Leased,Yes,23,112,86,1148,Natural,9.82,0,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0698,Halang,534.0,6.78,2373.9,26.2,Robusta,Agroforestry,Owned,Yes,28,235,85,171,Natural,12.53,6,Yes,No,Yes,Yes,No,Yes,No,0
+F0699,Poblacion Barangay,327.4,6.21,2361.9,25.1,Robusta,Monocrop,Leased,Yes,30,399,85,1747,Honey,14.39,16,No,Yes,No,No,Yes,Yes,No,0
+F0700,Barangay VII,357.8,6.65,3181.4,23.9,Liberica,Monocrop,Leased,Yes,18,72,65,1771,Washed,13.76,33,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0701,Latag,344.4,6.97,2713.5,23.3,Robusta,Monocrop,Owned,Yes,36,303,79,931,Washed,12.28,42,Yes,Yes,No,Yes,Yes,No,No,0
+F0702,Maraouy,433.4,5.58,2084.6,27.3,Liberica,Agroforestry,Owned,Yes,33,393,88,1003,Honey,11.53,6,Yes,Yes,No,No,Yes,Yes,Yes,1
+F0703,Malagonlong,169.8,6.92,2614.8,19.7,Liberica,Monocrop,Owned,Yes,26,315,14,1134,Washed,12.71,16,No,No,No,Yes,No,No,Yes,0
+F0704,Lodlod,115.0,5.78,1978.5,21.5,Robusta,Agroforestry,Owned,No,40,263,33,303,Natural,11.66,2,Yes,No,Yes,No,Yes,No,No,1
+F0705,Mojon,254.0,5.77,1657.8,22.1,Liberica,Agroforestry,Owned,Yes,17,189,52,305,Washed,10.48,28,Yes,Yes,No,No,Yes,Yes,No,1
+F0706,Bolbok,452.3,5.68,2393.7,26.0,Excelsa,Agroforestry,Leased,Yes,40,49,102,494,Washed,13.08,21,Yes,Yes,Yes,No,No,Yes,No,1
+F0707,Quezon,200.9,6.08,3056.4,27.9,Liberica,Agroforestry,Shared,Yes,7,273,85,1261,Washed,14.24,37,No,Yes,No,No,Yes,No,No,0
+F0708,Sabang,436.7,5.31,3058.3,21.2,Excelsa,Agroforestry,Owned,Yes,8,198,66,1349,Washed,11.24,42,No,Yes,Yes,Yes,No,Yes,Yes,0
+F0709,San Salvador,585.0,6.11,1883.8,26.9,Liberica,Agroforestry,Owned,Yes,31,17,110,1092,Honey,14.05,28,No,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0710,Sampaguita,147.0,6.08,2255.4,26.5,Liberica,Agroforestry,Owned,Yes,12,113,17,317,Washed,11.59,41,Yes,Yes,Yes,No,No,Yes,No,1
+F0711,Anilao,436.3,6.52,1623.3,21.0,Liberica,Monocrop,Shared,Yes,31,234,48,1177,Natural,11.41,4,Yes,Yes,No,Yes,Yes,No,No,1
+F0712,Latag,321.9,6.67,3191.3,22.6,Arabica,Agroforestry,Owned,Yes,44,43,51,905,Natural,9.17,29,Yes,Yes,Yes,No,Yes,Yes,No,1
+F0713,Barangay II,534.1,5.88,3162.2,22.7,Liberica,Agroforestry,Owned,Yes,19,245,107,1336,Washed,13.17,22,Yes,Yes,No,No,Yes,Yes,No,1
+F0714,Pangao,188.6,5.6,2499.0,27.8,Liberica,Agroforestry,Owned,No,10,237,68,907,Natural,13.85,20,Yes,Yes,No,Yes,No,Yes,Yes,1
+F0715,Dagatan,446.3,5.52,2808.8,20.6,Liberica,Monocrop,Owned,Yes,39,197,95,209,Washed,12.98,25,No,Yes,No,No,No,Yes,Yes,1
+F0716,Barangay I,519.1,5.39,2630.2,26.2,Robusta,Agroforestry,Owned,Yes,12,322,57,1150,Natural,9.91,20,No,Yes,Yes,Yes,Yes,Yes,No,1
+F0717,Plaridel,572.3,5.12,2386.3,22.0,Liberica,Agroforestry,Owned,Yes,20,31,94,1244,Washed,9.62,19,Yes,Yes,No,Yes,No,Yes,Yes,1
+F0718,Barangay I,441.6,5.68,1306.7,25.6,Liberica,Agroforestry,Owned,Yes,37,352,96,1127,Washed,12.44,22,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0719,San Francisco,348.6,5.54,2109.5,22.8,Liberica,Monocrop,Owned,Yes,41,49,81,476,Washed,11.41,3,No,Yes,Yes,No,No,Yes,Yes,1
+F0720,Balintawak,408.9,6.93,2549.6,24.2,Liberica,Monocrop,Owned,Yes,7,182,80,814,Natural,11.57,20,Yes,No,No,Yes,No,Yes,Yes,1
+F0721,Lumbang,534.5,6.12,2555.1,26.5,Liberica,Agroforestry,Owned,Yes,14,188,48,1550,Honey,14.81,20,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0722,San Carlos,385.3,5.69,1946.2,26.2,Liberica,Agroforestry,Owned,Yes,11,95,32,590,Washed,13.34,0,Yes,No,No,Yes,No,Yes,No,1
+F0723,San Carlos,115.2,6.16,3083.4,26.8,Robusta,Monocrop,Shared,No,7,142,6,513,Washed,11.47,14,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0724,Barangay VI,565.5,5.28,1534.7,19.5,Liberica,Agroforestry,Shared,No,29,360,105,878,Washed,9.11,16,No,No,Yes,Yes,Yes,No,Yes,1
+F0725,Barangay VI,444.8,5.89,2200.7,25.2,Liberica,Agroforestry,Owned,Yes,10,22,61,751,Natural,9.2,13,Yes,Yes,Yes,Yes,Yes,No,No,1
+F0726,Inosluban,438.3,6.25,2581.8,20.3,Liberica,Agroforestry,Owned,Yes,29,37,61,145,Washed,13.11,18,Yes,No,Yes,No,No,Yes,Yes,1
+F0727,Dagatan,207.8,5.98,2594.3,22.7,Arabica,Agroforestry,Leased,Yes,9,93,38,564,Natural,14.03,33,Yes,Yes,Yes,No,No,Yes,No,0
+F0728,Latag,429.4,5.8,2497.3,23.9,Arabica,Agroforestry,Owned,Yes,36,327,91,1151,Washed,13.25,5,No,Yes,Yes,Yes,No,Yes,Yes,1
+F0729,Bubuyan,296.9,6.99,1750.6,22.6,Excelsa,Agroforestry,Owned,Yes,10,358,62,1381,Washed,11.44,44,Yes,No,No,Yes,No,Yes,No,0
+F0730,Barangay V,425.6,6.76,1512.4,23.7,Liberica,Monocrop,Owned,Yes,19,352,56,436,Natural,9.19,5,Yes,Yes,No,No,No,Yes,Yes,1
+F0731,Anilao,153.3,6.25,2471.9,28.0,Liberica,Monocrop,Shared,No,31,289,113,1366,Natural,14.8,4,No,No,No,No,Yes,Yes,Yes,1
+F0732,Tangob,428.9,6.14,2398.6,20.2,Liberica,Agroforestry,Shared,Yes,17,363,33,1755,Natural,14.92,6,No,Yes,No,No,Yes,No,No,1
+F0733,Bolbok,599.7,6.24,1558.7,25.1,Liberica,Monocrop,Owned,Yes,9,272,39,723,Washed,12.3,32,No,Yes,Yes,Yes,Yes,Yes,No,1
+F0734,Banaybanay,124.1,5.4,2610.3,22.6,Liberica,Agroforestry,Owned,Yes,33,175,79,1201,Natural,9.42,12,No,No,Yes,Yes,Yes,Yes,Yes,1
+F0735,Anilao,588.6,5.79,2110.3,20.2,Robusta,Agroforestry,Shared,No,34,302,52,1395,Washed,12.25,0,Yes,Yes,No,Yes,Yes,No,No,1
+F0736,San Lucas,303.5,5.08,2535.5,20.4,Excelsa,Agroforestry,Shared,Yes,24,77,37,524,Honey,14.35,12,Yes,Yes,Yes,No,Yes,No,Yes,0
+F0737,Poblacion Barangay,535.4,5.95,2874.7,27.5,Excelsa,Monocrop,Shared,Yes,9,235,119,977,Washed,13.08,42,Yes,No,Yes,Yes,No,Yes,No,0
+F0738,Sabang,491.2,6.09,1539.5,26.9,Liberica,Monocrop,Owned,Yes,7,179,79,52,Washed,13.32,26,Yes,No,Yes,No,No,Yes,Yes,0
+F0739,Pangao,383.5,5.46,1238.3,27.2,Robusta,Monocrop,Owned,No,16,95,77,1158,Washed,9.51,6,No,No,Yes,Yes,Yes,Yes,Yes,1
+F0740,Plaridel,469.2,6.93,2758.2,27.9,Liberica,Monocrop,Leased,Yes,19,142,82,1728,Washed,9.64,2,No,Yes,No,Yes,No,Yes,Yes,1
+F0741,Barangay IV,539.3,6.82,2419.4,20.9,Liberica,Agroforestry,Owned,No,39,187,13,1632,Washed,9.76,24,No,Yes,No,No,Yes,Yes,Yes,1
+F0742,San Jose,302.1,6.44,2599.3,22.2,Robusta,Monocrop,Owned,Yes,6,352,107,587,Natural,14.43,32,Yes,Yes,No,Yes,No,Yes,Yes,1
+F0743,Maraouy,263.5,6.07,2876.3,25.0,Liberica,Monocrop,Owned,Yes,11,261,52,1646,Natural,12.16,39,No,Yes,Yes,No,Yes,Yes,Yes,1
+F0744,Sabang,433.8,6.74,2805.6,23.4,Liberica,Monocrop,Shared,Yes,12,24,71,970,Honey,13.75,16,No,No,Yes,Yes,Yes,No,Yes,1
+F0745,Balintawak,503.9,5.26,3121.8,22.8,Liberica,Agroforestry,Shared,Yes,42,232,97,1712,Washed,9.69,44,Yes,Yes,No,Yes,No,No,Yes,1
+F0746,Barangay VIII,481.1,6.58,2271.9,22.2,Robusta,Agroforestry,Owned,Yes,13,388,87,1275,Washed,14.57,13,No,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0747,Anilao,498.9,5.25,2177.0,24.3,Robusta,Agroforestry,Shared,No,12,210,40,884,Natural,13.93,36,Yes,Yes,Yes,Yes,Yes,Yes,No,0
+F0748,Tambo,317.8,6.59,2003.8,24.2,Liberica,Agroforestry,Owned,Yes,21,116,100,1068,Washed,10.35,22,Yes,No,No,Yes,Yes,Yes,No,1
+F0749,Barangay I,508.9,5.55,1507.4,20.5,Excelsa,Agroforestry,Leased,Yes,10,259,75,920,Washed,14.25,23,Yes,No,No,No,Yes,Yes,No,0
+F0750,Pinagtongulan,160.1,6.75,2345.2,23.2,Liberica,Agroforestry,Owned,Yes,20,98,96,1686,Natural,10.58,28,Yes,No,No,No,No,Yes,No,1
+F0751,Pinagtongulan,372.2,6.89,1754.0,24.0,Liberica,Agroforestry,Owned,Yes,36,134,48,107,Washed,10.23,37,Yes,Yes,Yes,Yes,Yes,No,No,1
+F0752,Dagatan,102.9,5.3,3042.6,24.1,Robusta,Agroforestry,Owned,Yes,28,122,86,1375,Washed,10.59,26,Yes,No,Yes,Yes,No,No,No,0
+F0753,Lumbang,262.3,5.93,2366.4,20.9,Robusta,Agroforestry,Owned,Yes,24,146,64,836,Natural,14.46,37,No,Yes,No,No,Yes,No,Yes,0
+F0754,Calamias,283.2,6.96,2385.7,25.7,Arabica,Agroforestry,Owned,Yes,5,256,67,1294,Washed,14.49,39,Yes,Yes,Yes,Yes,Yes,No,Yes,0
+F0755,San Carlos,298.1,5.97,1909.8,19.2,Liberica,Monocrop,Owned,Yes,37,175,9,1071,Natural,10.97,44,No,Yes,No,Yes,Yes,No,Yes,1
+F0756,Latag,447.7,6.73,1304.0,22.2,Robusta,Agroforestry,Shared,No,12,159,91,797,Washed,13.23,22,Yes,Yes,Yes,Yes,No,No,Yes,0
+F0757,Bubuyan,294.3,6.18,1263.5,26.0,Robusta,Agroforestry,Owned,Yes,35,372,90,483,Natural,13.05,30,Yes,Yes,No,No,Yes,No,No,0
+F0758,Bagong Pook,324.3,5.75,2046.7,24.1,Excelsa,Monocrop,Owned,No,40,352,94,1496,Washed,13.84,35,Yes,No,No,Yes,Yes,Yes,Yes,1
+F0759,Barangay VII,218.8,5.57,1369.1,21.4,Liberica,Agroforestry,Owned,Yes,2,77,110,957,Natural,10.78,16,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0760,San Jose,286.6,5.41,2413.7,25.3,Robusta,Agroforestry,Owned,Yes,41,230,80,306,Washed,12.06,36,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0761,San Francisco,213.6,6.52,2961.9,24.1,Liberica,Agroforestry,Owned,Yes,39,280,44,1477,Natural,13.01,2,Yes,No,No,Yes,No,No,Yes,1
+F0762,Sabang,136.6,5.77,2965.8,26.2,Liberica,Agroforestry,Leased,Yes,42,330,23,1529,Washed,9.16,35,Yes,No,No,Yes,Yes,Yes,Yes,1
+F0763,San Francisco,401.7,6.02,2518.1,25.6,Liberica,Monocrop,Owned,No,9,319,51,1080,Washed,11.26,4,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0764,Sabang,434.1,5.98,1622.5,24.5,Liberica,Agroforestry,Leased,Yes,22,358,69,543,Natural,13.18,14,No,Yes,No,No,Yes,Yes,No,1
+F0765,Halang,409.7,6.15,2926.0,23.4,Liberica,Agroforestry,Leased,Yes,5,29,71,493,Washed,10.52,5,Yes,Yes,Yes,Yes,Yes,No,No,1
+F0766,Pinagtongulan,331.7,6.73,2972.2,20.2,Excelsa,Agroforestry,Owned,No,12,298,95,836,Washed,14.75,9,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0767,Calamias,289.9,6.96,1593.3,21.4,Liberica,Agroforestry,Owned,Yes,1,109,22,853,Washed,9.18,31,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0768,Mojon,531.7,5.82,2674.9,22.8,Robusta,Monocrop,Shared,Yes,44,261,54,392,Washed,14.75,22,Yes,Yes,No,No,Yes,No,Yes,1
+F0769,Sabang,359.5,6.66,1773.0,24.4,Liberica,Agroforestry,Owned,Yes,22,86,34,1436,Washed,10.3,16,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0770,San Francisco,339.6,6.53,2805.3,23.6,Liberica,Agroforestry,Owned,No,38,144,70,780,Washed,9.29,19,No,Yes,Yes,No,Yes,Yes,No,1
+F0771,Quezon,112.8,6.15,3194.5,21.6,Liberica,Agroforestry,Shared,Yes,19,182,9,554,Washed,10.75,43,No,Yes,No,Yes,No,Yes,Yes,1
+F0772,Mabini,270.6,6.91,1260.1,19.1,Liberica,Agroforestry,Owned,Yes,16,372,97,1435,Washed,13.72,40,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0773,Calamias,290.1,5.4,2994.7,23.5,Liberica,Agroforestry,Owned,Yes,31,210,101,1237,Washed,13.51,14,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0774,Pinagtongulan,299.4,5.22,2445.3,21.6,Liberica,Monocrop,Shared,No,3,226,46,1247,Washed,10.25,43,Yes,Yes,Yes,No,Yes,Yes,No,1
+F0775,Santol,390.1,6.71,3146.8,25.6,Liberica,Monocrop,Owned,Yes,23,385,88,1515,Honey,10.18,21,No,Yes,No,Yes,No,No,No,0
+F0776,Dagatan,366.8,5.88,2130.0,19.2,Liberica,Monocrop,Owned,Yes,42,217,98,85,Natural,12.86,5,Yes,Yes,Yes,No,No,Yes,Yes,1
+F0777,Barangay I,404.0,6.69,2894.8,24.3,Liberica,Monocrop,Shared,Yes,18,83,110,1283,Washed,11.75,3,Yes,Yes,No,No,Yes,No,Yes,1
+F0778,Pinagkawitan,482.4,6.79,1324.8,27.5,Liberica,Monocrop,Shared,No,26,20,9,518,Washed,13.75,22,No,Yes,No,No,No,No,Yes,0
+F0779,Banaybanay,506.5,5.12,1870.6,20.6,Liberica,Agroforestry,Owned,No,13,296,54,1081,Honey,9.14,43,No,Yes,No,Yes,No,Yes,No,0
+F0780,Barangay VI,459.1,6.77,1334.0,23.2,Excelsa,Monocrop,Owned,No,18,265,89,1636,Washed,12.66,44,No,No,No,Yes,Yes,No,Yes,0
+F0781,Dagatan,577.8,5.9,3150.7,19.8,Excelsa,Monocrop,Leased,Yes,3,21,62,751,Washed,13.38,18,No,No,Yes,No,Yes,No,No,0
+F0782,Barangay VI,109.1,6.02,2833.9,24.6,Robusta,Monocrop,Leased,Yes,23,389,83,1237,Washed,14.96,44,No,Yes,Yes,No,No,Yes,No,0
+F0783,Dagatan,197.9,6.25,2905.1,24.0,Liberica,Agroforestry,Owned,Yes,3,87,88,1478,Natural,13.07,30,Yes,No,No,No,Yes,Yes,Yes,1
+F0784,Kayumanggi,103.8,6.85,3075.9,22.7,Robusta,Agroforestry,Owned,No,25,181,12,1428,Washed,10.39,43,Yes,Yes,No,Yes,No,Yes,Yes,0
+F0785,Mabini,423.7,5.04,1370.2,23.7,Excelsa,Monocrop,Owned,Yes,27,105,117,70,Natural,9.65,2,No,Yes,Yes,Yes,No,Yes,No,0
+F0786,Barangay I,549.0,5.95,1971.2,27.1,Robusta,Monocrop,Shared,Yes,44,315,35,1537,Natural,12.85,27,No,No,Yes,No,No,Yes,No,0
+F0787,Sabang,221.7,6.38,1342.1,20.8,Liberica,Monocrop,Shared,No,27,382,16,1033,Washed,12.14,2,No,Yes,Yes,Yes,Yes,Yes,No,1
+F0788,Barangay II,563.5,6.45,1621.6,19.2,Robusta,Agroforestry,Shared,Yes,39,282,25,289,Natural,14.39,13,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0789,Bagong Pook,130.1,6.39,1658.7,26.8,Excelsa,Agroforestry,Shared,Yes,25,394,98,470,Washed,13.36,17,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0790,Bolbok,567.2,5.27,2138.2,24.2,Liberica,Agroforestry,Owned,Yes,24,188,66,955,Washed,12.06,26,Yes,Yes,Yes,Yes,No,Yes,No,1
+F0791,Talisay,275.8,5.6,1737.1,27.0,Robusta,Monocrop,Owned,Yes,8,73,95,885,Washed,11.42,9,Yes,Yes,Yes,Yes,No,Yes,No,1
+F0792,Talisay,150.7,5.72,1402.0,24.4,Liberica,Agroforestry,Leased,No,9,141,112,113,Washed,11.43,14,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0793,Barangay VII,342.9,6.61,1535.0,26.3,Liberica,Agroforestry,Leased,Yes,37,352,94,75,Washed,10.36,18,No,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0794,Lumbang,228.4,5.56,1494.6,22.9,Liberica,Monocrop,Owned,Yes,30,281,37,469,Washed,9.1,8,Yes,Yes,No,No,No,Yes,No,1
+F0795,Cumba,242.4,5.42,3146.2,25.7,Robusta,Agroforestry,Owned,Yes,19,328,30,1724,Washed,12.45,3,No,Yes,No,Yes,No,No,Yes,0
+F0796,Plaridel,253.6,6.91,2718.6,27.2,Liberica,Monocrop,Shared,Yes,16,341,94,1572,Washed,10.27,14,No,No,No,Yes,Yes,Yes,No,1
+F0797,Barangay VII,501.5,5.02,3135.5,24.1,Liberica,Agroforestry,Owned,Yes,24,350,104,1015,Washed,10.25,7,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0798,Cumba,369.6,7.0,2079.5,20.6,Liberica,Monocrop,Owned,Yes,44,118,44,1491,Natural,9.75,0,Yes,Yes,Yes,Yes,No,Yes,No,1
+F0799,Barangay IV,255.7,6.35,1756.7,21.4,Liberica,Agroforestry,Leased,Yes,21,282,69,165,Washed,10.14,6,Yes,Yes,No,Yes,No,Yes,No,1
+F0800,Banaybanay,405.2,6.66,2796.6,20.8,Liberica,Monocrop,Leased,Yes,36,177,63,1236,Natural,9.19,30,No,No,No,No,No,Yes,Yes,1
+F0801,San Lucas,458.1,5.59,1852.5,21.2,Robusta,Monocrop,Owned,Yes,40,189,19,1762,Washed,13.05,17,No,Yes,Yes,No,Yes,Yes,No,1
+F0802,Banaybanay,236.3,5.03,1798.8,21.8,Robusta,Agroforestry,Leased,Yes,39,67,118,1225,Washed,11.41,11,No,Yes,Yes,Yes,Yes,No,No,1
+F0803,Malagonlong,306.8,6.48,1665.0,24.0,Liberica,Agroforestry,Owned,No,6,88,5,938,Washed,12.37,29,No,Yes,Yes,Yes,Yes,No,No,1
+F0804,Balintawak,160.9,6.67,1459.4,24.3,Liberica,Agroforestry,Owned,No,5,70,15,890,Washed,12.82,32,Yes,No,Yes,No,No,Yes,Yes,0
+F0805,Poblacion Barangay,190.6,6.48,1712.9,22.8,Liberica,Monocrop,Owned,No,14,378,59,817,Washed,14.83,6,No,Yes,Yes,Yes,No,No,No,1
+F0806,Balintawak,440.6,5.29,1910.6,24.5,Excelsa,Monocrop,Leased,Yes,42,130,6,619,Washed,9.41,27,No,Yes,No,No,No,Yes,No,0
+F0807,Mojon,190.7,6.51,2548.0,19.7,Liberica,Agroforestry,Shared,Yes,4,216,69,985,Honey,11.51,2,No,Yes,Yes,No,Yes,No,Yes,1
+F0808,Pinagkawitan,362.6,6.54,1325.1,19.8,Liberica,Agroforestry,Leased,Yes,8,43,99,719,Honey,10.48,42,Yes,Yes,No,No,No,Yes,No,0
+F0809,Poblacion Barangay,454.5,6.32,1621.0,20.5,Liberica,Agroforestry,Shared,Yes,24,79,48,568,Washed,11.86,5,No,Yes,No,Yes,Yes,Yes,Yes,1
+F0810,Inosluban,153.4,6.53,2818.0,23.7,Robusta,Monocrop,Owned,Yes,11,26,20,1173,Natural,14.52,30,Yes,Yes,No,Yes,Yes,Yes,Yes,0
+F0811,Latag,383.7,6.69,1493.8,20.9,Excelsa,Monocrop,Owned,Yes,17,29,26,1334,Washed,13.34,37,No,Yes,No,No,Yes,Yes,Yes,0
+F0812,Barangay I,228.3,6.23,1885.3,21.5,Excelsa,Agroforestry,Owned,No,21,324,110,1361,Washed,12.97,14,Yes,Yes,No,Yes,No,No,Yes,1
+F0813,Halang,581.5,5.18,2929.3,22.6,Robusta,Agroforestry,Owned,Yes,26,78,22,737,Natural,11.65,6,Yes,Yes,Yes,Yes,No,Yes,No,1
+F0814,Pangao,341.8,5.98,1509.9,26.3,Liberica,Agroforestry,Leased,Yes,43,224,51,1330,Washed,13.03,42,Yes,No,No,No,Yes,Yes,No,1
+F0815,Santol,503.0,5.16,1365.5,19.1,Liberica,Agroforestry,Leased,No,44,170,85,1583,Washed,9.19,29,Yes,No,No,Yes,Yes,Yes,Yes,1
+F0816,Lodlod,375.1,5.82,2169.1,24.8,Liberica,Agroforestry,Shared,Yes,27,111,34,324,Washed,12.52,26,Yes,Yes,Yes,Yes,No,Yes,No,1
+F0817,Latag,121.7,5.81,1804.8,25.0,Liberica,Agroforestry,Owned,No,16,385,14,82,Washed,12.32,16,No,Yes,No,No,Yes,Yes,Yes,1
+F0818,Barangay II,416.6,5.13,2326.8,26.2,Liberica,Agroforestry,Owned,No,26,215,103,835,Washed,11.08,17,Yes,Yes,No,Yes,No,No,Yes,1
+F0819,Anilao,575.7,5.7,2807.6,27.4,Liberica,Agroforestry,Owned,No,33,154,62,1485,Washed,10.21,21,Yes,Yes,No,Yes,Yes,No,Yes,1
+F0820,Barangay I,400.8,5.22,1474.3,19.2,Liberica,Agroforestry,Owned,Yes,31,66,66,81,Washed,13.85,25,Yes,No,Yes,Yes,Yes,Yes,Yes,1
+F0821,San Salvador,509.6,6.62,2361.4,20.4,Excelsa,Agroforestry,Owned,Yes,6,92,89,757,Washed,9.32,26,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0822,Barangay VIII,542.1,6.9,2211.0,27.0,Robusta,Agroforestry,Owned,Yes,44,394,84,101,Natural,9.42,39,Yes,No,Yes,Yes,Yes,Yes,No,0
+F0823,Maraouy,214.0,5.14,1488.2,23.1,Excelsa,Monocrop,Owned,Yes,8,278,10,57,Washed,11.64,23,Yes,No,Yes,Yes,Yes,No,Yes,0
+F0824,Sabang,206.0,6.91,2448.0,24.1,Robusta,Monocrop,Owned,Yes,7,196,71,498,Natural,10.52,7,Yes,No,Yes,No,Yes,No,Yes,0
+F0825,Bubuyan,405.5,6.05,1747.3,25.0,Liberica,Agroforestry,Owned,Yes,34,15,45,793,Natural,13.47,20,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0826,Maraouy,305.5,5.6,2175.7,25.1,Robusta,Agroforestry,Owned,Yes,44,362,47,915,Natural,12.81,28,Yes,Yes,No,Yes,Yes,No,Yes,1
+F0827,Tangob,519.9,5.15,1364.5,27.4,Liberica,Monocrop,Owned,Yes,14,359,89,941,Natural,13.64,42,Yes,Yes,Yes,No,No,Yes,No,0
+F0828,Mojon,550.0,6.0,2119.2,28.0,Robusta,Monocrop,Owned,No,16,119,81,576,Washed,10.95,20,Yes,No,Yes,Yes,Yes,Yes,Yes,1
+F0829,Barangay V,276.7,6.59,1812.9,25.5,Liberica,Agroforestry,Owned,No,43,147,22,1454,Washed,13.44,2,No,No,Yes,No,Yes,No,No,1
+F0830,Maraouy,218.4,6.41,2844.8,21.6,Arabica,Agroforestry,Owned,Yes,9,60,62,230,Washed,14.17,30,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0831,Lodlod,490.3,5.1,1314.0,26.9,Liberica,Agroforestry,Owned,Yes,10,60,64,1664,Honey,11.07,26,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0832,Pinagtongulan,237.4,5.15,2037.2,19.4,Liberica,Agroforestry,Owned,No,17,96,92,849,Washed,11.04,26,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0833,Talisay,511.3,5.81,2116.9,21.1,Excelsa,Agroforestry,Owned,Yes,12,77,31,1519,Washed,14.4,8,Yes,Yes,Yes,Yes,No,Yes,No,1
+F0834,Dagatan,311.9,5.59,2650.0,27.1,Liberica,Agroforestry,Leased,No,6,93,72,1705,Washed,9.3,32,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0835,Maraouy,433.8,5.46,2348.6,21.3,Robusta,Monocrop,Leased,No,19,51,26,1648,Honey,11.1,32,Yes,Yes,Yes,Yes,No,No,No,0
+F0836,San Benito,147.8,5.56,2534.4,21.0,Robusta,Agroforestry,Leased,Yes,43,228,28,589,Washed,9.71,25,Yes,Yes,Yes,No,Yes,No,No,1
+F0837,Anilao,411.9,6.61,2754.1,20.2,Excelsa,Agroforestry,Owned,No,41,66,44,408,Washed,9.17,27,Yes,No,Yes,Yes,No,No,No,0
+F0838,Barangay IV,325.9,6.86,2924.4,26.7,Arabica,Agroforestry,Owned,Yes,29,235,113,1230,Washed,9.68,43,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0839,Sampaguita,393.3,5.81,1827.8,23.5,Arabica,Agroforestry,Leased,Yes,6,205,78,1105,Honey,11.59,42,No,Yes,Yes,Yes,Yes,Yes,No,1
+F0840,Calamias,184.0,6.81,2276.0,25.1,Liberica,Agroforestry,Owned,Yes,25,257,70,108,Washed,13.12,30,No,Yes,No,Yes,No,No,No,0
+F0841,Lodlod,468.4,5.64,2880.2,21.2,Excelsa,Agroforestry,Leased,Yes,24,175,44,1438,Washed,10.74,0,Yes,No,No,Yes,Yes,Yes,Yes,1
+F0842,Bubuyan,531.4,5.95,3178.9,25.8,Robusta,Monocrop,Owned,No,25,71,10,863,Washed,14.1,19,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0843,Maraouy,208.4,5.45,2979.0,25.8,Robusta,Agroforestry,Owned,Yes,16,272,116,1629,Washed,11.63,11,No,No,Yes,Yes,Yes,Yes,Yes,1
+F0844,Pangao,147.9,6.28,1942.9,21.8,Liberica,Monocrop,Leased,Yes,16,121,22,1061,Natural,14.81,16,No,Yes,No,Yes,Yes,Yes,Yes,1
+F0845,Lumbang,111.8,6.96,1590.3,22.7,Robusta,Monocrop,Owned,Yes,6,262,85,1267,Washed,14.72,14,Yes,No,Yes,No,No,Yes,No,0
+F0846,Bubuyan,421.0,6.21,2178.8,20.9,Arabica,Agroforestry,Owned,No,37,208,106,54,Washed,13.64,33,No,No,No,No,Yes,No,No,0
+F0847,Mabini,403.5,5.72,2683.3,27.8,Excelsa,Agroforestry,Owned,No,21,187,113,479,Natural,14.59,15,Yes,Yes,No,No,No,No,Yes,0
+F0848,Bagong Pook,373.3,6.3,2185.1,24.8,Liberica,Agroforestry,Owned,No,4,35,91,797,Honey,13.24,3,Yes,No,No,Yes,No,Yes,No,1
+F0849,Tangob,216.0,5.25,2166.4,27.4,Liberica,Monocrop,Owned,Yes,34,255,114,784,Washed,14.37,7,Yes,Yes,No,No,No,No,Yes,1
+F0850,Maraouy,295.5,6.78,2876.5,21.7,Liberica,Monocrop,Owned,Yes,28,28,34,1510,Washed,10.42,33,Yes,Yes,No,Yes,Yes,No,No,1
+F0851,Bubuyan,397.2,6.01,1922.8,26.0,Excelsa,Monocrop,Leased,Yes,38,274,25,1514,Natural,11.07,24,Yes,Yes,No,No,Yes,No,No,0
+F0852,Barangay III,348.4,5.9,2919.6,25.9,Robusta,Agroforestry,Leased,Yes,41,326,66,227,Washed,13.52,14,Yes,Yes,No,Yes,No,Yes,No,1
+F0853,Balintawak,593.9,6.17,2013.6,25.2,Liberica,Monocrop,Owned,Yes,28,29,14,1147,Honey,11.55,27,No,No,No,Yes,No,Yes,No,1
+F0854,Lumbang,168.2,6.25,1856.5,27.7,Liberica,Agroforestry,Shared,Yes,17,115,111,1772,Honey,14.02,8,Yes,No,No,Yes,Yes,Yes,Yes,1
+F0855,Talisay,447.6,5.14,2108.0,22.5,Liberica,Agroforestry,Owned,Yes,14,246,17,466,Washed,14.27,1,Yes,Yes,Yes,Yes,No,Yes,Yes,1
+F0856,Tangob,302.2,6.37,2724.9,20.2,Liberica,Agroforestry,Owned,No,7,315,80,1580,Honey,10.8,16,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0857,Halang,314.1,5.48,1452.0,25.0,Excelsa,Agroforestry,Leased,Yes,22,255,13,719,Washed,13.94,9,Yes,Yes,No,No,No,Yes,Yes,0
+F0858,San Francisco,458.8,6.43,1592.8,25.6,Robusta,Monocrop,Leased,Yes,1,90,72,1431,Washed,9.93,8,Yes,No,Yes,No,Yes,Yes,No,1
+F0859,Sampaguita,446.2,6.65,3102.9,24.2,Liberica,Agroforestry,Leased,Yes,29,159,43,616,Washed,11.01,30,No,Yes,No,No,Yes,Yes,Yes,1
+F0860,Calamias,595.6,6.61,1551.0,20.9,Liberica,Agroforestry,Owned,No,31,19,28,133,Natural,12.11,1,Yes,No,No,Yes,Yes,Yes,No,0
+F0861,Malagonlong,164.2,6.11,2335.5,23.5,Liberica,Agroforestry,Owned,No,30,330,38,1733,Washed,10.36,23,Yes,Yes,No,Yes,Yes,Yes,No,1
+F0862,San Carlos,152.1,6.04,2358.6,21.8,Arabica,Monocrop,Shared,No,15,233,107,656,Washed,12.48,18,No,Yes,No,No,No,No,Yes,0
+F0863,Pangao,462.2,5.29,2179.2,22.8,Liberica,Monocrop,Owned,Yes,18,273,65,1092,Honey,12.47,16,Yes,No,No,No,Yes,Yes,Yes,1
+F0864,Barangay VI,389.2,6.55,2489.5,24.8,Liberica,Agroforestry,Leased,No,35,158,45,487,Washed,10.24,42,No,Yes,Yes,No,No,No,Yes,1
+F0865,San Jose,237.1,5.54,1659.7,25.7,Liberica,Agroforestry,Owned,Yes,30,287,9,393,Washed,13.77,9,Yes,Yes,No,Yes,Yes,No,No,1
+F0866,Dagatan,139.7,5.99,2305.3,21.1,Robusta,Agroforestry,Leased,Yes,34,283,83,164,Natural,12.79,27,Yes,Yes,Yes,Yes,Yes,No,No,0
+F0867,San Jose,142.8,5.57,1944.3,22.6,Robusta,Monocrop,Owned,No,42,203,54,403,Natural,10.91,37,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0868,Lodlod,547.1,5.27,2523.3,21.4,Robusta,Agroforestry,Owned,Yes,11,181,8,1285,Honey,10.39,27,Yes,No,Yes,Yes,Yes,No,Yes,1
+F0869,Maraouy,195.9,6.26,1482.4,20.8,Liberica,Agroforestry,Owned,Yes,27,274,55,68,Honey,14.27,0,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0870,Tambo,261.7,5.11,2341.8,26.1,Liberica,Agroforestry,Leased,Yes,24,319,56,848,Washed,14.01,2,No,Yes,Yes,Yes,Yes,No,No,1
+F0871,Malagonlong,213.3,6.5,1570.5,27.2,Liberica,Agroforestry,Leased,Yes,35,35,43,76,Washed,10.38,14,No,Yes,Yes,No,No,No,Yes,1
+F0872,Dagatan,277.5,5.64,1757.3,22.3,Robusta,Monocrop,Owned,No,39,359,12,65,Washed,9.21,9,Yes,Yes,No,Yes,Yes,No,Yes,1
+F0873,Bolbok,134.7,5.0,1637.4,25.8,Liberica,Agroforestry,Leased,Yes,8,365,117,124,Natural,13.83,20,No,No,No,Yes,Yes,Yes,No,0
+F0874,Kayumanggi,359.5,6.02,1565.7,27.1,Liberica,Agroforestry,Owned,Yes,18,35,49,1014,Washed,12.69,36,Yes,No,Yes,Yes,No,Yes,No,1
+F0875,Malagonlong,133.8,5.09,2851.4,26.6,Excelsa,Agroforestry,Owned,Yes,13,43,92,1414,Natural,9.61,14,Yes,No,Yes,Yes,Yes,No,No,1
+F0876,Banaybanay,500.2,5.55,1771.4,20.6,Excelsa,Agroforestry,Owned,Yes,24,273,32,1578,Washed,12.52,22,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0877,Barangay VI,216.9,6.41,3054.2,27.6,Liberica,Monocrop,Owned,Yes,23,147,111,1199,Washed,11.71,13,No,Yes,No,Yes,Yes,No,No,1
+F0878,Balintawak,370.0,5.13,3139.9,22.4,Liberica,Agroforestry,Owned,Yes,12,313,31,397,Washed,13.65,14,Yes,Yes,No,No,Yes,Yes,Yes,1
+F0879,San Salvador,540.0,6.68,2342.5,22.1,Liberica,Monocrop,Owned,Yes,30,192,69,94,Washed,10.25,9,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0880,Tangob,425.4,5.01,1486.0,19.6,Robusta,Monocrop,Leased,Yes,31,372,38,1281,Washed,11.72,8,No,Yes,No,Yes,Yes,Yes,No,0
+F0881,Halang,366.5,5.49,1949.1,23.4,Excelsa,Agroforestry,Leased,No,28,251,85,783,Washed,9.94,43,Yes,Yes,Yes,No,No,Yes,Yes,1
+F0882,San Benito,262.2,6.48,2795.5,20.0,Liberica,Agroforestry,Leased,Yes,22,63,105,1573,Washed,14.75,38,Yes,No,No,No,No,Yes,Yes,1
+F0883,Lodlod,266.5,5.63,1934.8,21.2,Liberica,Agroforestry,Owned,Yes,44,177,66,845,Washed,13.67,4,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0884,Sabang,434.7,5.2,1374.0,21.9,Excelsa,Monocrop,Shared,Yes,28,128,66,1608,Natural,13.42,24,Yes,Yes,Yes,Yes,No,Yes,Yes,0
+F0885,Barangay IV,597.1,5.72,2313.6,26.3,Excelsa,Agroforestry,Leased,Yes,13,152,42,785,Natural,13.14,41,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0886,San Lucas,430.9,5.54,2890.2,26.9,Liberica,Agroforestry,Owned,No,25,90,30,210,Washed,11.54,25,No,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0887,Tambo,378.9,6.69,2791.9,21.7,Liberica,Agroforestry,Leased,No,44,254,28,1554,Natural,14.54,7,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0888,Inosluban,465.3,5.63,1550.2,26.7,Liberica,Monocrop,Owned,Yes,7,361,43,626,Washed,9.44,21,Yes,Yes,No,No,Yes,No,No,1
+F0889,Santol,332.6,6.58,2545.5,26.7,Liberica,Agroforestry,Owned,No,6,367,25,1208,Washed,13.82,24,Yes,Yes,No,Yes,Yes,No,No,1
+F0890,San Salvador,130.1,6.78,1641.0,25.9,Excelsa,Agroforestry,Owned,Yes,24,71,98,816,Washed,10.29,11,Yes,Yes,Yes,No,Yes,Yes,Yes,1
+F0891,San Carlos,381.1,5.87,1636.4,20.3,Excelsa,Agroforestry,Owned,Yes,19,55,51,1588,Washed,10.94,8,Yes,No,Yes,Yes,No,Yes,No,1
+F0892,Barangay II,578.8,6.82,2948.1,25.2,Robusta,Agroforestry,Shared,Yes,19,96,119,656,Natural,12.12,9,No,Yes,Yes,Yes,No,Yes,Yes,1
+F0893,Maraouy,187.7,5.75,1699.3,27.5,Liberica,Monocrop,Owned,Yes,36,108,52,1488,Washed,13.7,9,Yes,No,No,Yes,Yes,No,No,1
+F0894,Sabang,445.0,6.93,1726.5,25.1,Excelsa,Agroforestry,Owned,Yes,9,304,17,1152,Honey,14.03,8,Yes,Yes,Yes,Yes,No,No,Yes,0
+F0895,Tangob,200.5,5.18,1201.3,22.0,Liberica,Monocrop,Shared,No,36,62,105,645,Washed,12.5,25,Yes,Yes,Yes,No,No,Yes,No,0
+F0896,Barangay II,367.9,6.37,2941.3,23.5,Liberica,Monocrop,Shared,Yes,38,201,7,1425,Washed,11.42,34,No,No,Yes,No,Yes,No,Yes,1
+F0897,San Carlos,148.3,5.99,2785.2,24.8,Liberica,Agroforestry,Leased,No,40,89,36,1616,Honey,14.68,26,No,Yes,No,Yes,Yes,Yes,No,1
+F0898,Quezon,325.2,5.78,2454.7,23.6,Liberica,Monocrop,Owned,No,29,25,39,1415,Washed,10.48,30,No,Yes,Yes,No,Yes,Yes,No,1
+F0899,Lodlod,478.1,6.27,2700.5,20.1,Robusta,Agroforestry,Owned,Yes,24,369,23,141,Washed,13.82,18,Yes,No,Yes,No,Yes,No,Yes,1
+F0900,Latag,273.8,6.41,1504.1,21.8,Liberica,Agroforestry,Leased,Yes,5,335,18,482,Washed,12.67,42,No,Yes,No,No,Yes,Yes,No,1
+F0901,Barangay II,432.5,5.01,2116.6,26.2,Liberica,Monocrop,Owned,Yes,42,203,52,785,Washed,11.26,37,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0902,Barangay II,497.7,5.33,1902.4,26.8,Liberica,Agroforestry,Owned,No,26,150,90,1222,Washed,9.01,5,No,Yes,No,No,Yes,No,Yes,1
+F0903,Banaybanay,563.6,6.43,1387.6,20.2,Liberica,Agroforestry,Owned,Yes,14,117,85,613,Washed,11.68,14,Yes,No,Yes,Yes,Yes,Yes,No,1
+F0904,Pinagtongulan,217.3,6.33,2172.3,27.6,Liberica,Agroforestry,Owned,Yes,39,312,72,168,Washed,10.66,28,Yes,No,Yes,No,Yes,Yes,Yes,1
+F0905,Barangay VII,299.7,6.93,3041.5,22.0,Liberica,Monocrop,Owned,Yes,29,274,49,260,Washed,9.63,44,No,Yes,No,Yes,Yes,No,Yes,1
+F0906,Pinagtongulan,176.2,6.52,1280.1,25.0,Excelsa,Agroforestry,Owned,Yes,6,299,108,1292,Washed,9.45,4,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0907,Plaridel,596.2,6.9,1782.9,25.8,Liberica,Agroforestry,Owned,Yes,7,218,23,1013,Washed,11.09,13,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0908,Mabini,563.5,6.41,1615.1,26.3,Liberica,Agroforestry,Owned,Yes,37,174,68,282,Washed,12.69,1,No,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0909,Barangay V,370.0,5.6,1676.3,27.5,Liberica,Monocrop,Owned,Yes,18,351,105,1489,Washed,14.03,22,Yes,Yes,Yes,No,No,Yes,Yes,1
+F0910,Balintawak,521.0,5.21,3016.9,21.8,Excelsa,Monocrop,Owned,Yes,23,380,70,590,Washed,10.1,43,No,Yes,Yes,Yes,Yes,Yes,No,1
+F0911,Plaridel,360.5,6.56,2136.1,26.7,Liberica,Agroforestry,Leased,Yes,44,329,83,1475,Washed,11.55,18,Yes,Yes,No,Yes,Yes,Yes,No,1
+F0912,San Lucas,411.8,6.29,2132.6,20.2,Liberica,Monocrop,Leased,Yes,38,161,70,1356,Washed,11.35,23,Yes,Yes,No,No,Yes,Yes,No,1
+F0913,San Carlos,144.6,5.1,2721.2,25.3,Liberica,Agroforestry,Owned,Yes,1,299,79,101,Washed,12.08,19,No,No,Yes,Yes,No,Yes,No,1
+F0914,San Benito,477.6,5.72,1509.0,25.7,Liberica,Agroforestry,Owned,Yes,4,277,49,1316,Washed,13.86,26,Yes,Yes,Yes,Yes,No,No,No,1
+F0915,Mabini,163.9,6.91,2174.5,25.1,Liberica,Monocrop,Owned,Yes,44,160,91,251,Washed,12.32,23,No,Yes,No,No,Yes,No,Yes,0
+F0916,Plaridel,513.0,6.0,2060.0,21.3,Robusta,Monocrop,Owned,Yes,35,216,78,1130,Washed,14.08,16,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0917,Barangay II,491.0,5.87,2393.8,26.9,Robusta,Monocrop,Owned,Yes,23,264,71,91,Washed,12.11,24,No,No,No,Yes,Yes,Yes,No,0
+F0918,Bagong Pook,454.4,5.92,3199.1,20.5,Liberica,Monocrop,Owned,Yes,27,362,73,1524,Washed,12.62,30,Yes,No,No,Yes,Yes,Yes,No,1
+F0919,Kayumanggi,118.1,5.42,2738.9,19.5,Robusta,Agroforestry,Leased,Yes,26,386,7,1210,Washed,11.62,27,Yes,No,No,No,No,No,No,0
+F0920,Pangao,251.6,5.74,1995.7,25.5,Robusta,Monocrop,Leased,Yes,8,150,42,835,Washed,13.94,27,No,Yes,Yes,No,Yes,Yes,Yes,0
+F0921,Barangay VII,231.6,5.74,2855.1,23.3,Liberica,Agroforestry,Owned,Yes,43,352,81,154,Washed,14.54,21,Yes,No,Yes,Yes,Yes,Yes,Yes,1
+F0922,Banaybanay,280.1,5.1,1541.4,26.6,Liberica,Agroforestry,Owned,No,16,367,46,770,Washed,12.83,4,No,Yes,Yes,Yes,Yes,No,No,1
+F0923,Calamias,143.8,6.54,1260.9,22.5,Liberica,Agroforestry,Leased,No,41,105,87,190,Honey,13.92,43,No,Yes,Yes,Yes,Yes,Yes,No,0
+F0924,Barangay II,568.5,5.83,1608.9,20.5,Liberica,Agroforestry,Owned,No,3,379,44,570,Natural,9.35,41,No,Yes,Yes,No,No,Yes,No,1
+F0925,Pinagtongulan,376.9,6.64,1880.8,26.5,Robusta,Agroforestry,Leased,No,32,236,54,655,Natural,14.44,7,No,No,No,Yes,Yes,No,Yes,0
+F0926,San Francisco,252.8,6.7,2221.2,23.9,Excelsa,Agroforestry,Owned,Yes,5,202,39,1644,Natural,10.13,37,Yes,No,No,No,No,No,Yes,0
+F0927,Bagong Pook,298.5,5.42,2430.3,20.7,Arabica,Agroforestry,Leased,Yes,20,312,28,1588,Washed,10.54,27,Yes,No,No,Yes,Yes,Yes,No,0
+F0928,Calamias,323.6,6.31,3021.2,25.5,Robusta,Agroforestry,Shared,Yes,14,323,92,135,Washed,9.32,11,Yes,No,Yes,No,Yes,Yes,No,1
+F0929,Barangay VII,400.3,5.94,2219.7,23.6,Liberica,Agroforestry,Shared,Yes,32,398,21,1184,Washed,14.79,24,Yes,Yes,No,No,Yes,Yes,Yes,1
+F0930,Barangay IV,357.8,6.76,2202.6,24.4,Liberica,Agroforestry,Owned,Yes,26,386,44,1410,Washed,14.11,37,Yes,Yes,No,No,Yes,No,Yes,1
+F0931,Maraouy,559.7,5.43,1300.5,23.1,Excelsa,Agroforestry,Owned,No,6,127,78,1738,Washed,14.48,43,Yes,Yes,Yes,Yes,Yes,Yes,No,0
+F0932,Tangob,348.5,6.36,1269.8,26.5,Liberica,Monocrop,Owned,Yes,36,14,70,805,Natural,14.08,14,Yes,No,No,No,Yes,Yes,No,1
+F0933,Tambo,596.1,6.22,2302.3,26.5,Robusta,Monocrop,Shared,Yes,40,361,48,31,Natural,11.88,43,Yes,Yes,Yes,Yes,No,No,Yes,0
+F0934,Barangay I,525.7,5.59,2076.4,25.4,Robusta,Monocrop,Owned,Yes,5,252,27,262,Washed,14.54,40,Yes,No,Yes,Yes,Yes,Yes,Yes,1
+F0935,Barangay II,204.3,5.27,2878.4,19.9,Robusta,Agroforestry,Owned,Yes,13,30,10,398,Washed,14.82,33,No,Yes,Yes,Yes,Yes,No,Yes,0
+F0936,Maraouy,565.3,6.3,1521.4,26.5,Excelsa,Monocrop,Owned,Yes,32,161,70,1304,Washed,12.02,44,Yes,Yes,No,No,Yes,No,Yes,0
+F0937,Banaybanay,158.2,6.48,1249.9,25.0,Liberica,Agroforestry,Owned,No,16,137,25,975,Natural,10.05,12,Yes,Yes,No,No,Yes,Yes,No,1
+F0938,Inosluban,508.7,5.63,2098.1,25.3,Robusta,Agroforestry,Owned,Yes,1,133,39,1161,Natural,12.95,7,No,Yes,Yes,Yes,No,No,No,1
+F0939,Kayumanggi,290.3,6.29,1675.0,22.3,Excelsa,Agroforestry,Owned,No,13,155,117,1329,Honey,14.85,12,Yes,No,Yes,No,Yes,Yes,No,0
+F0940,Quezon,539.0,5.79,1299.2,26.9,Liberica,Monocrop,Owned,Yes,11,286,33,209,Washed,14.23,35,No,Yes,Yes,Yes,No,No,No,1
+F0941,Kayumanggi,534.0,6.43,2649.2,25.5,Robusta,Agroforestry,Owned,No,8,319,11,1778,Washed,14.17,5,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0942,Barangay VIII,503.0,5.4,1423.2,20.0,Liberica,Agroforestry,Shared,Yes,25,161,97,322,Washed,14.6,37,Yes,Yes,Yes,No,No,Yes,Yes,1
+F0943,Anilao,495.0,6.78,2416.6,22.7,Arabica,Agroforestry,Leased,Yes,40,369,57,613,Washed,14.36,31,Yes,Yes,Yes,No,No,No,Yes,0
+F0944,Maraouy,252.3,5.57,1762.1,27.0,Liberica,Monocrop,Leased,Yes,32,120,41,824,Honey,13.66,20,No,Yes,Yes,Yes,No,No,Yes,1
+F0945,Bubuyan,140.5,5.74,1547.0,19.4,Liberica,Agroforestry,Owned,No,24,125,27,204,Honey,13.31,43,Yes,Yes,No,No,Yes,Yes,Yes,0
+F0946,San Francisco,301.5,5.12,1959.5,27.7,Liberica,Agroforestry,Leased,No,28,197,101,152,Washed,10.59,43,No,No,Yes,No,Yes,Yes,No,1
+F0947,San Carlos,186.8,5.22,2802.9,25.1,Robusta,Agroforestry,Owned,Yes,14,66,12,256,Washed,12.73,6,Yes,Yes,No,No,Yes,Yes,No,1
+F0948,Barangay VII,447.5,6.03,1984.2,24.7,Liberica,Agroforestry,Owned,Yes,3,260,80,473,Washed,12.13,25,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0949,San Benito,273.0,5.54,2701.5,21.4,Liberica,Monocrop,Owned,No,36,393,114,457,Natural,14.17,14,Yes,Yes,Yes,No,Yes,No,No,1
+F0950,Bolbok,587.8,6.67,1451.0,21.2,Liberica,Agroforestry,Owned,Yes,27,159,52,1136,Washed,11.95,41,Yes,Yes,Yes,No,No,No,No,1
+F0951,Talisay,420.5,5.03,2745.5,27.5,Excelsa,Monocrop,Owned,Yes,20,171,14,794,Washed,9.77,22,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0952,Balintawak,511.2,5.76,1673.9,21.7,Liberica,Agroforestry,Shared,Yes,15,129,83,1711,Washed,9.03,37,No,Yes,Yes,Yes,No,Yes,Yes,1
+F0953,Quezon,166.3,5.67,2554.8,26.0,Liberica,Monocrop,Owned,Yes,27,79,28,661,Washed,13.07,40,Yes,Yes,No,Yes,Yes,Yes,No,1
+F0954,Barangay II,531.0,5.04,2331.6,22.5,Robusta,Agroforestry,Owned,No,41,360,94,94,Honey,12.3,14,Yes,No,No,No,No,Yes,Yes,0
+F0955,Barangay VI,561.4,5.25,3058.3,20.3,Liberica,Agroforestry,Owned,No,28,108,51,1334,Washed,10.99,39,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0956,Barangay I,343.5,5.83,1974.6,19.1,Excelsa,Agroforestry,Owned,Yes,25,176,110,1444,Washed,10.01,15,No,No,Yes,Yes,Yes,Yes,Yes,1
+F0957,Lumbang,403.1,5.99,1332.3,23.9,Liberica,Agroforestry,Owned,Yes,42,307,57,457,Washed,11.8,31,No,No,No,No,No,Yes,No,1
+F0958,Barangay VI,482.4,5.81,1238.3,27.8,Robusta,Agroforestry,Owned,No,44,160,43,647,Washed,9.6,36,No,Yes,Yes,Yes,Yes,No,No,1
+F0959,Tambo,187.4,6.06,2853.7,22.3,Liberica,Monocrop,Leased,Yes,33,335,71,954,Natural,11.02,17,No,Yes,No,Yes,No,Yes,No,1
+F0960,Bagong Pook,351.3,6.19,2249.5,22.2,Liberica,Agroforestry,Owned,No,14,11,70,841,Washed,11.28,19,No,Yes,No,Yes,Yes,Yes,No,1
+F0961,Bolbok,299.3,5.02,2750.5,22.1,Robusta,Monocrop,Owned,Yes,8,161,10,136,Washed,11.79,1,No,Yes,No,No,Yes,Yes,Yes,0
+F0962,San Lucas,173.2,5.93,1668.9,23.7,Liberica,Monocrop,Leased,Yes,14,374,25,1601,Natural,11.8,22,No,No,Yes,No,No,No,No,0
+F0963,Bagong Pook,283.8,6.93,1890.2,23.0,Robusta,Agroforestry,Shared,No,1,74,77,688,Washed,10.54,29,Yes,No,Yes,Yes,Yes,No,No,0
+F0964,Kayumanggi,134.1,6.04,1260.2,26.9,Liberica,Monocrop,Leased,Yes,16,335,78,1315,Washed,14.1,2,Yes,Yes,Yes,No,No,No,No,1
+F0965,Anilao,112.9,6.36,3123.0,23.5,Liberica,Monocrop,Leased,Yes,18,78,40,1212,Washed,11.13,38,Yes,Yes,No,Yes,Yes,Yes,Yes,1
+F0966,San Carlos,167.6,5.62,2535.7,23.6,Liberica,Agroforestry,Owned,Yes,7,130,7,294,Washed,10.38,0,Yes,Yes,No,No,No,Yes,Yes,1
+F0967,Barangay V,581.6,6.55,3066.4,20.2,Arabica,Monocrop,Owned,Yes,15,118,109,1521,Natural,10.05,40,Yes,Yes,No,Yes,Yes,Yes,No,0
+F0968,Dagatan,374.8,6.55,1731.0,27.8,Liberica,Agroforestry,Leased,Yes,24,325,92,1255,Natural,10.94,21,Yes,No,No,Yes,Yes,Yes,Yes,1
+F0969,Barangay V,582.9,6.04,2422.9,21.2,Liberica,Agroforestry,Shared,No,13,256,90,184,Washed,9.41,28,No,Yes,No,Yes,Yes,No,No,1
+F0970,Barangay VII,316.2,6.95,2557.0,19.7,Liberica,Monocrop,Owned,No,9,102,117,1066,Washed,9.2,13,Yes,Yes,No,Yes,Yes,No,Yes,1
+F0971,Calamias,255.9,5.25,1835.1,25.0,Liberica,Agroforestry,Owned,Yes,15,277,82,1350,Washed,12.63,27,No,No,No,Yes,Yes,Yes,No,1
+F0972,Mabini,353.1,5.03,2896.2,24.4,Liberica,Agroforestry,Leased,Yes,35,112,46,925,Washed,12.71,20,No,Yes,No,No,Yes,Yes,Yes,1
+F0973,San Francisco,319.8,6.54,3094.3,22.7,Excelsa,Agroforestry,Owned,Yes,24,121,49,1551,Washed,12.18,44,No,Yes,Yes,No,Yes,No,No,0
+F0974,Sampaguita,152.8,6.61,2969.7,22.8,Liberica,Monocrop,Owned,Yes,33,330,48,1650,Natural,13.57,31,No,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0975,Pinagtongulan,420.4,5.24,2678.1,26.1,Excelsa,Monocrop,Owned,Yes,16,313,95,1022,Washed,9.23,5,No,Yes,No,Yes,Yes,Yes,No,1
+F0976,Plaridel,208.0,5.53,1754.9,20.8,Liberica,Agroforestry,Leased,No,8,353,37,274,Washed,14.62,0,Yes,No,Yes,Yes,Yes,No,Yes,1
+F0977,Barangay I,409.8,5.04,1763.2,26.4,Robusta,Monocrop,Shared,Yes,29,71,64,1353,Washed,9.57,20,Yes,No,Yes,Yes,Yes,Yes,No,1
+F0978,Tambo,425.1,5.59,3126.7,24.8,Excelsa,Monocrop,Owned,No,23,309,90,1415,Washed,13.04,3,Yes,Yes,No,No,Yes,No,No,0
+F0979,Bubuyan,176.0,6.55,1220.6,22.8,Liberica,Agroforestry,Owned,Yes,31,145,97,1407,Natural,9.8,2,No,No,No,Yes,Yes,Yes,Yes,1
+F0980,Barangay VII,130.7,6.04,2632.1,23.1,Arabica,Agroforestry,Owned,Yes,40,64,87,1574,Washed,14.28,29,No,Yes,No,No,No,No,No,0
+F0981,Barangay V,490.4,5.7,2612.5,21.3,Liberica,Monocrop,Owned,Yes,14,117,87,415,Washed,12.06,30,No,No,Yes,Yes,Yes,No,Yes,1
+F0982,Sabang,329.9,5.74,2445.4,25.8,Excelsa,Monocrop,Owned,Yes,30,312,74,788,Honey,9.49,33,Yes,No,No,Yes,No,No,Yes,0
+F0983,Barangay VIII,129.1,5.0,3180.2,23.6,Robusta,Monocrop,Owned,Yes,39,267,113,1365,Washed,12.7,18,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0984,Sampaguita,597.4,5.6,1823.8,21.9,Liberica,Agroforestry,Owned,No,27,262,87,443,Washed,9.05,19,Yes,No,No,Yes,No,Yes,No,1
+F0985,Sampaguita,128.9,6.29,1879.9,24.4,Liberica,Agroforestry,Leased,Yes,16,231,81,1331,Washed,13.66,22,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1
+F0986,Anilao,447.5,6.95,1357.9,28.0,Liberica,Agroforestry,Leased,No,6,378,30,744,Honey,12.9,39,Yes,Yes,No,No,Yes,Yes,Yes,0
+F0987,San Lucas,591.8,6.69,2085.6,22.9,Liberica,Agroforestry,Owned,Yes,33,176,90,788,Honey,10.28,24,Yes,No,No,Yes,No,No,No,1
+F0988,Lodlod,219.6,5.05,1722.1,27.3,Liberica,Agroforestry,Owned,No,44,169,25,776,Washed,11.25,14,No,No,Yes,Yes,No,Yes,No,1
+F0989,Pinagkawitan,171.1,6.8,1886.8,22.1,Liberica,Monocrop,Shared,Yes,18,175,104,622,Washed,9.05,37,Yes,No,No,No,Yes,No,Yes,1
+F0990,Barangay IV,160.7,6.57,2869.1,19.5,Liberica,Agroforestry,Owned,No,16,214,6,1409,Honey,13.16,22,Yes,Yes,No,Yes,Yes,Yes,No,0
+F0991,Barangay VII,251.6,6.56,3071.0,20.8,Robusta,Monocrop,Leased,Yes,12,276,51,1578,Washed,10.94,1,No,Yes,Yes,No,Yes,Yes,No,0
+F0992,San Salvador,150.5,5.92,1571.5,22.8,Liberica,Agroforestry,Owned,No,20,147,112,868,Washed,12.43,14,Yes,Yes,Yes,Yes,Yes,No,Yes,1
+F0993,San Carlos,446.1,5.8,1945.0,21.0,Liberica,Agroforestry,Leased,No,40,377,34,45,Natural,14.74,43,Yes,No,Yes,Yes,No,Yes,No,1
+F0994,Bubuyan,131.1,5.61,3057.3,19.0,Robusta,Agroforestry,Leased,Yes,29,355,31,1022,Washed,10.8,34,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0995,Pinagtongulan,354.7,5.13,1323.6,27.2,Liberica,Agroforestry,Leased,Yes,30,257,75,1098,Washed,14.94,9,Yes,No,No,No,Yes,Yes,No,1
+F0996,Sampaguita,598.3,5.46,1384.7,26.6,Liberica,Agroforestry,Shared,Yes,26,64,24,1374,Natural,12.8,13,Yes,Yes,No,Yes,Yes,No,Yes,1
+F0997,Latag,507.0,5.49,1525.6,25.7,Liberica,Monocrop,Shared,No,22,218,54,680,Washed,10.45,26,Yes,Yes,Yes,Yes,Yes,Yes,No,1
+F0998,San Carlos,407.6,5.97,2390.4,20.5,Excelsa,Monocrop,Owned,Yes,33,26,99,1379,Washed,11.62,13,Yes,Yes,Yes,No,Yes,No,Yes,1
+F0999,Barangay I,253.1,6.49,1500.9,20.1,Excelsa,Agroforestry,Owned,Yes,39,77,27,177,Washed,13.44,34,Yes,No,Yes,Yes,No,Yes,No,0
+F1000,Inosluban,411.9,5.95,3136.2,19.6,Liberica,Agroforestry,Owned,Yes,29,142,17,384,Washed,11.68,32,Yes,Yes,Yes,Yes,Yes,Yes,Yes,1

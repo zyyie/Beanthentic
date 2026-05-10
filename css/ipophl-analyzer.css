@@ -23,49 +23,62 @@
     background: #faf8f5;
     border-radius: 12px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    max-width: 95vw;
+    width: 90vw;
+    max-width: 1400px;
     max-height: 95vh;
     overflow: hidden;
     position: relative;
 }
 
 .modal-content.large {
-    width: 1200px;
-    height: 800px;
+    width: 95vw;
+    max-width: 1600px;
+    height: 90vh;
 }
 
 .modal-header {
-    background: linear-gradient(135deg, #8b4513 0%, #a0522d 100%);
+    background: linear-gradient(135deg, #2e7d32 0%, #388e3c 100%);
     color: white;
-    padding: 20px 24px;
+    padding: 16px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 3px solid #d4a574;
+    border-bottom: 2px solid #81c784;
 }
 
 .modal-header h3 {
     margin: 0;
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     font-weight: 600;
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
+.modal-header.minimal {
+    padding: 10px 16px;
+    background: #2e7d32;
+    border-bottom: 1px solid #c8e6c9;
+}
+
+.modal-header.minimal h3 {
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
 .modal-close {
     background: rgba(255, 255, 255, 0.2);
     border: none;
     color: white;
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-size: 1.2rem;
+    font-size: 1rem;
 }
 
 .modal-close:hover {
@@ -75,8 +88,18 @@
 
 .modal-body {
     padding: 0;
-    height: calc(100% - 73px);
+    height: calc(100% - 62px);
     overflow: hidden;
+}
+
+.modal-content.wide-modal {
+    width: 95vw;
+    height: 90vh;
+    max-width: 1800px;
+}
+
+.modal-content.wide-modal .modal-body {
+    height: calc(100% - 53px);
 }
 
 /* File Preview Layout */
@@ -89,25 +112,25 @@
 
 /* Preview Section */
 .preview-section {
-    border-right: 2px solid #e8dcc6;
+    border-right: 2px solid #c8e6c9;
     display: flex;
     flex-direction: column;
     background: white;
 }
 
 .preview-header {
-    padding: 20px 24px;
-    border-bottom: 2px solid #e8dcc6;
+    padding: 15px 20px;
+    border-bottom: 1px solid #c8e6c9;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #faf8f5;
+    background: #f1f8e9;
 }
 
 .preview-header h4 {
     margin: 0;
-    color: #5d4037;
-    font-size: 1.2rem;
+    color: #1b5e20;
+    font-size: 1.1rem;
     font-weight: 600;
 }
 
@@ -119,7 +142,8 @@
 .preview-container {
     flex: 1;
     position: relative;
-    background: white;
+    background: #f5f5f5;
+    height: 100%;
 }
 
 .preview-frame {
@@ -135,7 +159,7 @@
     left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
-    color: #8b4513;
+    color: #2e7d32;
     font-size: 1.1rem;
 }
 
@@ -143,11 +167,12 @@
     font-size: 2rem;
     margin-bottom: 12px;
     display: block;
+    color: #2e7d32;
 }
 
 /* Analysis Section */
 .analysis-section {
-    background: #faf8f5;
+    background: #f1f8e9;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -155,7 +180,7 @@
 
 .analysis-header {
     padding: 20px 24px;
-    border-bottom: 2px solid #e8dcc6;
+    border-bottom: 2px solid #c8e6c9;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -164,7 +189,7 @@
 
 .analysis-header h4 {
     margin: 0;
-    color: #5d4037;
+    color: #1b5e20;
     font-size: 1.2rem;
     font-weight: 600;
     display: flex;
@@ -182,15 +207,15 @@
 }
 
 .status-badge.success {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
+    background: #c8e6c9;
+    color: #1b5e20;
+    border: 1px solid #81c784;
 }
 
 .status-badge.warning {
-    background: #fff3cd;
-    color: #856404;
-    border: 1px solid #ffeaa7;
+    background: #fff9c4;
+    color: #f57f17;
+    border: 1px solid #fff176;
 }
 
 /* GI Progress Indicator */
@@ -200,17 +225,18 @@
     margin: 20px 24px;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-left: 4px solid #4caf50;
 }
 
 .progress-label {
     font-weight: 600;
-    color: #5d4037;
+    color: #1b5e20;
     margin-bottom: 12px;
     font-size: 1rem;
 }
 
 .progress-bar-container {
-    background: #e8dcc6;
+    background: #e8f5e9;
     height: 12px;
     border-radius: 6px;
     overflow: hidden;
@@ -219,26 +245,26 @@
 
 .progress-bar {
     height: 100%;
-    background: linear-gradient(90deg, #8b4513 0%, #a0522d 100%);
+    background: linear-gradient(90deg, #4caf50 0%, #81c784 100%);
     transition: width 0.8s ease;
     border-radius: 6px;
 }
 
 .progress-bar.success {
-    background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+    background: linear-gradient(90deg, #2e7d32 0%, #43a047 100%);
 }
 
 .progress-bar.warning {
-    background: linear-gradient(90deg, #ffc107 0%, #fd7e14 100%);
+    background: linear-gradient(90deg, #ffa000 0%, #ffc107 100%);
 }
 
 .progress-bar.danger {
-    background: linear-gradient(90deg, #dc3545 0%, #e83e8c 100%);
+    background: linear-gradient(90deg, #d32f2f 0%, #f44336 100%);
 }
 
 .progress-percentage {
     font-weight: 700;
-    color: #5d4037;
+    color: #1b5e20;
     font-size: 1.1rem;
 }
 
@@ -253,7 +279,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #8b4513;
+    color: #2e7d32;
 }
 
 .result-section {
@@ -262,11 +288,12 @@
     padding: 20px;
     margin-bottom: 16px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-top: 3px solid #4caf50;
 }
 
 .result-section h5 {
     margin: 0 0 16px 0;
-    color: #5d4037;
+    color: #1b5e20;
     font-size: 1.1rem;
     font-weight: 600;
     display: flex;
@@ -285,7 +312,7 @@
     align-items: center;
     gap: 12px;
     padding: 8px 0;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid #e8f5e9;
     font-size: 0.95rem;
 }
 
@@ -299,7 +326,7 @@
 }
 
 .placeholder {
-    color: #999;
+    color: #9e9e9e;
     font-style: italic;
     padding: 8px 0;
 }
@@ -310,6 +337,7 @@
     border-radius: 8px;
     padding: 20px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid #c8e6c9;
 }
 
 .metadata-item {
@@ -317,7 +345,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 8px 0;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid #e8f5e9;
 }
 
 .metadata-item:last-child {
@@ -326,12 +354,12 @@
 
 .metadata-label {
     font-weight: 600;
-    color: #5d4037;
+    color: #1b5e20;
     font-size: 0.9rem;
 }
 
 .metadata-value {
-    color: #666;
+    color: #4caf50;
     font-size: 0.9rem;
 }
 
@@ -342,7 +370,7 @@
     justify-content: space-between;
     padding: 12px 16px;
     background: white;
-    border: 2px solid #e8dcc6;
+    border: 2px solid #c8e6c9;
     border-radius: 8px;
     margin-bottom: 8px;
     transition: all 0.3s ease;
@@ -354,13 +382,13 @@
 }
 
 .file-item.success {
-    border-color: #28a745;
-    background: #f8fff9;
+    border-color: #4caf50;
+    background: #f1f8e9;
 }
 
 .file-item.error {
-    border-color: #dc3545;
-    background: #fff8f8;
+    border-color: #d32f2f;
+    background: #ffebee;
 }
 
 .file-info {
@@ -372,7 +400,7 @@
 
 .file-name {
     font-weight: 500;
-    color: #5d4037;
+    color: #1b5e20;
 }
 
 .file-status {

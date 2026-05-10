@@ -81,7 +81,7 @@ def register_ipophl_routes(app):
             task_id = request.form.get('task_id', 'unknown')
 
             # Validate file type
-            allowed_extensions = {'.pdf', '.doc', '.docx', '.txt', '.md'}
+            allowed_extensions = {'.pdf', '.doc', '.docx', '.txt', '.md', '.csv'}
             file_ext = Path(file.filename).suffix.lower()
             if file_ext not in allowed_extensions:
                 return jsonify({"error": f"Unsupported file type: {file_ext}"}), 400
@@ -89,8 +89,8 @@ def register_ipophl_routes(app):
             # Save file securely
             file_path = gi_analyzer.save_uploaded_file(file, file.filename)
 
-            # Perform AI analysis
-            analysis_result = gi_analyzer.analyze_document(file_path)
+            # Perform AI analysis with task context
+            analysis_result = gi_analyzer.analyze_document(file_path, task_id=task_id)
 
             if not analysis_result.get('success', False):
                 return jsonify({"error": analysis_result.get('error', 'Analysis failed')}), 500
@@ -177,7 +177,18 @@ def register_ipophl_routes(app):
             if not file_path.exists():
                 return jsonify({"error": "File not found on disk"}), 404
 
-            return send_file(file_path, as_attachment=False)
+            # Determine mimetype for better browser preview
+            mimetype = None
+            if file_path.suffix.lower() == '.pdf':
+                mimetype = 'application/pdf'
+            elif file_path.suffix.lower() == '.csv':
+                mimetype = 'text/plain'  # Better for previewing in iframe than text/csv which might trigger download
+            elif file_path.suffix.lower() in ['.doc', '.docx']:
+                # Word docs usually can't be previewed in iframe directly without Google Docs viewer or similar
+                # But we can try to serve it and see
+                mimetype = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+
+            return send_file(file_path, as_attachment=False, mimetype=mimetype)
 
         except Exception as e:
             return jsonify({"error": f"Preview failed: {str(e)}"}), 500

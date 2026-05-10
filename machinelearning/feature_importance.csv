@@ -1,38 +1,84 @@
 feature,importance
-Barako,0.18402777777777782
-geographical,0.11458333333333334
-distinctive,0.09375000000000001
-standards,0.07291666666666667
-association,0.07291666666666667
-word_count,0.06250000000000001
-altitude,0.06250000000000001
-notary,0.06250000000000001
-Batangas,0.06250000000000001
-climate,0.05902777777777778
-specifications,0.052083333333333336
-Lipa,0.052083333333333336
-cultivation,0.03125000000000001
-method,0.01041666666666667
-origin,0.003472222222222224
-production,0.003472222222222224
-text_length,0.0
-coffee,0.0
-reputation,0.0
-soil,0.0
-quality,0.0
-certification,0.0
-traditional,0.0
-harvesting,0.0
-processing,0.0
-LGU,0.0
-yield,0.0
-cooperative,0.0
-farmers,0.0
-arabica,0.0
-variety,0.0
-robusta,0.0
-excelsa,0.0
-organoleptic,0.0
-liberica,0.0
-characteristics,0.0
-practice,0.0
+coffee_species_Liberica,0.11757007083256914
+soil_pH,0.0674169190557798
+defect_count_per_300g,0.06467563696162695
+annual_rainfall_mm,0.0513541446934257
+years_in_farming,0.048133329384798286
+elevation_masl,0.04666928979125614
+moisture_content_pct,0.04446623404308078
+non_bearing_trees,0.041845314837647925
+bearing_trees,0.040671911117207846
+coffee_species_Robusta,0.03866621706449874
+annual_yield_kg,0.038181493517820894
+mean_temperature_C,0.03488607714068825
+coffee_species_Excelsa,0.025707988035302456
+processing_method_Washed,0.01931055065660596
+processing_method_Honey,0.017561678560386075
+cooperative_member_Yes,0.01657782899765339
+cooperative_member_No,0.014316918081045946
+coffee_species_Arabica,0.013364188051363399
+sales_records_maintained_Yes,0.012496878909335764
+geographic_compliance_No,0.011334538016120438
+sales_records_maintained_No,0.010393257555423656
+geographic_compliance_Yes,0.010294147013321799
+quality_linkage_documented_Yes,0.009989830801839338
+farm_records_maintained_No,0.009659947312745904
+farm_records_maintained_Yes,0.009359448371347407
+traditional_method_compliance_Yes,0.009274690707495273
+planting_system_Agroforestry,0.009036077845128098
+quality_linkage_documented_No,0.009034308580355775
+planting_system_Monocrop,0.008552957638529802
+traditional_method_compliance_No,0.008512957203947867
+processing_method_Natural,0.008052512685436932
+selective_picking_practiced_No,0.007472388136012831
+barangay_Sabang,0.00746104450054593
+selective_picking_practiced_Yes,0.00649417382791834
+rsbsa_registered_Yes,0.006477848172595866
+rsbsa_registered_No,0.006105930790144159
+farm_ownership_Leased,0.005525392389253588
+farm_ownership_Owned,0.005069937731699405
+barangay_San Benito,0.00503366417696077
+barangay_Calamias,0.0036418030783053916
+farm_ownership_Shared,0.0035171812161444082
+barangay_Bubuyan,0.0033865245932809943
+barangay_Pinagkawitan,0.003302548911002387
+barangay_Dagatan,0.003154010701878011
+barangay_Balintawak,0.002997427566484667
+barangay_Lumbang,0.002993938893395652
+barangay_Mabini,0.002728223279635313
+barangay_Latag,0.002631433854961179
+barangay_San Salvador,0.002487849075227007
+barangay_Barangay III,0.0023901109273592727
+barangay_Barangay II,0.002277483273967063
+barangay_Bagong Pook,0.0020959007599614054
+barangay_San Lucas,0.0020695978106307447
+barangay_Maraouy,0.0020492376257906543
+barangay_Plaridel,0.0019838752815409446
+barangay_Mojon,0.0018802354012795392
+barangay_Pangao,0.0018519620724510755
+barangay_Barangay IV,0.0018318610742528447
+barangay_Malagonlong,0.001831811110454161
+barangay_San Carlos,0.001812916635943862
+barangay_Tangob,0.0017450109194249838
+barangay_Poblacion Barangay,0.0017050561888666846
+barangay_Cumba,0.0016946757613599064
+barangay_Santol,0.0015762320106075135
+barangay_Inosluban,0.00155772421637053
+barangay_Barangay VII,0.0014952734432096813
+barangay_Lodlod,0.0014931973911438301
+barangay_Pinagtongulan,0.0014896813757017482
+barangay_Bolbok,0.0014274144527300291
+barangay_San Jose,0.0014155436991508598
+barangay_Kayumanggi,0.001407933674799993
+barangay_Barangay I,0.0013860527420956742
+barangay_San Francisco,0.0013818819707314051
+barangay_Halang,0.0013441972758887497
+barangay_Quezon,0.001316662837428838
+barangay_Barangay VIII,0.0012467538737003165
+barangay_Tambo,0.001206987803399712
+barangay_Sampaguita,0.0012053467046372656
+barangay_Talisay,0.0010201173727947476
+barangay_Barangay V,0.0008970602862412542
+barangay_Barangay VI,0.0008356829081430619
+barangay_Anilao,0.0006654880564524561
+barangay_Banaybanay,0.0005623687022574163

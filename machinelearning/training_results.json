@@ -1,92 +1,92 @@
 {
-  "accuracy": 0.0,
-  "cv_mean": 0.5833333333333333,
-  "cv_std": 0.08333333333333331,
+  "accuracy": 0.82,
+  "cv_mean": 0.836,
+  "cv_std": 0.01200000000000001,
   "best_params": {
-    "max_depth": 10,
+    "max_depth": 20,
     "max_features": "sqrt",
     "min_samples_leaf": 1,
-    "min_samples_split": 2,
-    "n_estimators": 50
+    "min_samples_split": 5,
+    "n_estimators": 100
   },
   "classification_report": {
     "0": {
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1-score": 0.0,
-      "support": 0.0
+      "precision": 0.7692307692307693,
+      "recall": 0.4,
+      "f1-score": 0.5263157894736842,
+      "support": 50.0
     },
     "1": {
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1-score": 0.0,
-      "support": 1.0
+      "precision": 0.8275862068965517,
+      "recall": 0.96,
+      "f1-score": 0.8888888888888888,
+      "support": 150.0
     },
-    "accuracy": 0.0,
+    "accuracy": 0.82,
     "macro avg": {
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1-score": 0.0,
-      "support": 1.0
+      "precision": 0.7984084880636605,
+      "recall": 0.6799999999999999,
+      "f1-score": 0.7076023391812865,
+      "support": 200.0
     },
     "weighted avg": {
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1-score": 0.0,
-      "support": 1.0
+      "precision": 0.8129973474801062,
+      "recall": 0.82,
+      "f1-score": 0.7982456140350876,
+      "support": 200.0
     }
   },
   "confusion_matrix": [
     [
-      0,
-      0
+      20,
+      30
     ],
     [
-      1,
-      0
+      6,
+      144
     ]
   ],
-  "training_date": "2026-04-28T22:08:14.692512",
+  "training_date": "2026-05-10T19:17:59.393344",
   "feature_importance_top10": [
     {
-      "feature": "Barako",
-      "importance": 0.18402777777777782
+      "feature": "coffee_species_Liberica",
+      "importance": 0.11757007083256914
     },
     {
-      "feature": "geographical",
-      "importance": 0.11458333333333334
+      "feature": "soil_pH",
+      "importance": 0.0674169190557798
     },
     {
-      "feature": "distinctive",
-      "importance": 0.09375000000000001
+      "feature": "defect_count_per_300g",
+      "importance": 0.06467563696162695
     },
     {
-      "feature": "standards",
-      "importance": 0.07291666666666667
+      "feature": "annual_rainfall_mm",
+      "importance": 0.0513541446934257
     },
     {
-      "feature": "association",
-      "importance": 0.07291666666666667
+      "feature": "years_in_farming",
+      "importance": 0.048133329384798286
     },
     {
-      "feature": "word_count",
-      "importance": 0.06250000000000001
+      "feature": "elevation_masl",
+      "importance": 0.04666928979125614
     },
     {
-      "feature": "altitude",
-      "importance": 0.06250000000000001
+      "feature": "moisture_content_pct",
+      "importance": 0.04446623404308078
     },
     {
-      "feature": "notary",
-      "importance": 0.06250000000000001
+      "feature": "non_bearing_trees",
+      "importance": 0.041845314837647925
     },
     {
-      "feature": "Batangas",
-      "importance": 0.06250000000000001
+      "feature": "bearing_trees",
+      "importance": 0.040671911117207846
     },
     {
-      "feature": "climate",
-      "importance": 0.05902777777777778
+      "feature": "coffee_species_Robusta",
+      "importance": 0.03866621706449874
     }
   ]
 }

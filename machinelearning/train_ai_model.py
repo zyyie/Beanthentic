@@ -37,22 +37,131 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class GIDocumentTrainer:
-    """Training pipeline for GI Document Analysis"""
+    """Training pipeline for GI Document and Farmer Profile Analysis"""
 
-    def __init__(self, data_dir: str = "training_data", models_dir: str = "../uploads"):
+    def __init__(self, data_dir: str = "training_data", models_dir: str = None):
         self.data_dir = Path(data_dir)
-        self.models_dir = Path(models_dir)
+        # Default models_dir to the directory where the script is located
+        if models_dir is None:
+            self.models_dir = Path(__file__).parent
+        else:
+            self.models_dir = Path(models_dir)
+            
         self.data_dir.mkdir(exist_ok=True)
         self.models_dir.mkdir(exist_ok=True)
 
         # Initialize analyzer for feature extraction
-        self.analyzer = GIAnalyzer(str(models_dir))
+        self.analyzer = GIAnalyzer(str(self.models_dir))
 
         # Training data paths
         self.raw_data_path = self.data_dir / "gi_documents_raw.json"
+        # CSV dataset path is in uploads subfolder
+        self.csv_dataset_path = self.models_dir / "uploads" / "beanthentic_synthetic_dataset_1000 (1).csv"
         self.processed_data_path = self.data_dir / "gi_documents_processed.csv"
         self.features_path = self.data_dir / "features_matrix.npy"
         self.labels_path = self.data_dir / "labels.npy"
+
+    def prepare_training_data_from_csv(self) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+        """Prepare training data from the CSV dataset."""
+        logger.info("Preparing training data from CSV: %s", self.csv_dataset_path)
+
+        if not self.csv_dataset_path.exists():
+            raise FileNotFoundError(f"CSV dataset not found: {self.csv_dataset_path}")
+
+        df = pd.read_csv(self.csv_dataset_path)
+
+        # Drop ID column
+        if 'farmer_id' in df.columns:
+            df = df.drop(columns=['farmer_id'])
+
+        # Separate features and labels
+        X = df.drop(columns=['gi_ready'])
+        y = df['gi_ready']
+
+        # Handle categorical variables
+        categorical_cols = X.select_dtypes(include=['object']).columns.tolist()
+        logger.info("Encoding categorical columns: %s", categorical_cols)
+
+        # We'll use one-hot encoding for the model training
+        X_encoded = pd.get_dummies(X, columns=categorical_cols)
+
+        feature_names = X_encoded.columns.tolist()
+        feature_matrix = X_encoded.values
+        labels = y.values
+
+        # Save processed data for later use
+        np.save(self.features_path, feature_matrix)
+        np.save(self.labels_path, labels)
+
+        # Save feature names to a JSON for ai_engine to use
+        with open(self.models_dir / "feature_names.json", 'w') as f:
+            json.dump(feature_names, f)
+
+        # Save the column structure for consistent encoding later
+        with open(self.models_dir / "column_structure.json", 'w') as f:
+            json.dump({
+                'original_cols': X.columns.tolist(),
+                'categorical_cols': categorical_cols,
+                'encoded_cols': feature_names
+            }, f)
+
+        logger.info("Training data prepared with %s features", len(feature_names))
+        return feature_matrix, labels, feature_names
+
+    def train_model_from_csv(self) -> Dict:
+        """Train model using the CSV dataset."""
+        feature_matrix, labels, feature_names = self.prepare_training_data_from_csv()
+
+        # Split data
+        feature_train, feature_test, label_train, label_test = train_test_split(
+            feature_matrix, labels, test_size=0.2, random_state=42, stratify=labels
+        )
+
+        # Hyperparameter grid
+        param_grid = {
+            'n_estimators': [100, 200],
+            'max_depth': [10, 20, None],
+            'min_samples_split': [2, 5],
+            'min_samples_leaf': [1, 2],
+            'max_features': ['sqrt']
+        }
+
+        # Initialize and train model
+        rf = RandomForestClassifier(random_state=42)
+        grid_search = GridSearchCV(
+            rf, param_grid, cv=5, scoring='accuracy', n_jobs=-1, verbose=1
+        )
+
+        grid_search.fit(feature_train, label_train)
+
+        # Best model
+        best_model = grid_search.best_estimator_
+
+        # Evaluate
+        predictions = best_model.predict(feature_test)
+        accuracy = accuracy_score(label_test, predictions)
+
+        # Cross-validation
+        cv_scores = cross_val_score(best_model, feature_matrix, labels, cv=5)
+
+        feature_importance = pd.DataFrame({
+            'feature': feature_names,
+            'importance': best_model.feature_importances_
+        }).sort_values('importance', ascending=False)
+
+        results = {
+            'model': best_model,
+            'accuracy': accuracy,
+            'cv_mean': cv_scores.mean(),
+            'cv_std': cv_scores.std(),
+            'best_params': grid_search.best_params_,
+            'feature_importance': feature_importance,
+            'classification_report': classification_report(label_test, predictions, output_dict=True),
+            'confusion_matrix': confusion_matrix(label_test, predictions).tolist(),
+            'feature_names': feature_names
+        }
+
+        return results
 
     def create_sample_dataset(self) -> List[Dict]:
         """Create a sample dataset for demonstration"""
@@ -471,7 +580,8 @@ class GIDocumentTrainer:
 def main():
     parser = argparse.ArgumentParser(description='Train Random Forest model for GI document analysis')
     parser.add_argument('--prepare-data', action='store_true', help='Prepare training data')
-    parser.add_argument('--train', action='store_true', help='Train the model')
+    parser.add_argument('--train', action='store_true', help='Train the model from JSON')
+    parser.add_argument('--train-csv', action='store_true', help='Train the model from CSV dataset')
     parser.add_argument('--evaluate', action='store_true', help='Evaluate the model')
     parser.add_argument('--full-pipeline', action='store_true', help='Run complete pipeline')
     parser.add_argument('--create-template', action='store_true', help='Create dataset template')
@@ -483,6 +593,15 @@ def main():
 
     if args.create_template:
         trainer.create_real_dataset_template()
+        return
+
+    if args.train_csv:
+        logger.info("Running training pipeline from CSV...")
+        results = trainer.train_model_from_csv()
+        trainer.save_model(results)
+        print("\nCSV Training completed successfully!")
+        print(f"Model accuracy: {results['accuracy']:.3f}")
+        print(f"Cross-validation score: {results['cv_mean']:.3f} ± {results['cv_std']:.3f}")
         return
 
     if args.full_pipeline:

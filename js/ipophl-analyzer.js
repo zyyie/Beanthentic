@@ -191,41 +191,27 @@ class IPOPHLAnalyzer {
     showFilePreview(fileData) {
         // For simple preview, show basic file info
         const modal = document.getElementById('simpleFilePreviewModal');
-        modal.classList.add('active');
-        
-        // Set file info
-        document.getElementById('simplePreviewFileName').textContent = fileData.file_info.filename;
-        document.getElementById('simplePreviewFileType').textContent = `Type: ${fileData.file_info.file_type}`;
-        document.getElementById('simplePreviewFileSize').textContent = `Size: ${this.formatFileSize(fileData.file_info.file_size)}`;
-        document.getElementById('simplePreviewPhase').textContent = `Phase: ${fileData.file_info.ipophl_phase || 'Unknown'}`;
-        
-        // Load file preview
-        this.loadSimpleFilePreview(fileData.preview_url);
-        
-        // Store data for AI analysis
-        this.currentFileData = fileData;
+        if (modal) {
+            modal.classList.add('active');
+            
+            // Set file info
+            const nameEl = document.getElementById('simplePreviewFileName');
+            if (nameEl) nameEl.textContent = fileData.file_info.filename;
+            
+            // Load file preview
+            this.loadSimpleFilePreview(fileData.preview_url);
+            
+            // Store data for AI analysis
+            this.currentFileData = fileData;
+        }
     }
     
     loadSimpleFilePreview(previewUrl) {
         const frame = document.getElementById('simplePreviewFrame');
-        const loading = document.getElementById('simplePreviewLoading');
-        
-        // Show loading
-        loading.classList.remove('hidden');
-        frame.style.display = 'none';
-        
-        // Load file
-        frame.src = previewUrl;
-        
-        // Hide loading when loaded
-        frame.onload = () => {
-            loading.classList.add('hidden');
+        if (frame) {
             frame.style.display = 'block';
-        };
-        
-        frame.onerror = () => {
-            loading.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> Failed to load document';
-        };
+            frame.src = previewUrl;
+        }
     }
     
     formatFileSize(bytes) {
