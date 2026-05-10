@@ -436,6 +436,58 @@
     color: #444444;
 }
 
+/* Pagination */
+.txn-pagination {
+    padding: 16px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #f3ede7;
+    background: #fdfaf7;
+}
+
+.txn-page-info {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #7b6a5f;
+}
+
+.txn-page-info span {
+    color: #2b140a;
+    font-weight: 800;
+}
+
+.txn-page-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.txn-page-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    border: 1px solid #e9dfd6;
+    background: #ffffff;
+    color: #5b4b42;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.txn-page-btn:hover {
+    background: #fdfaf7;
+    border-color: #dccbc0;
+    color: #2b140a;
+}
+
+.txn-page-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f1f5f9;
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
     .farmer-profile-layout-new {
