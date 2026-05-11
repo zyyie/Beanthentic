@@ -22,7 +22,14 @@ def register_farmer_routes(app):
 
     @app.route("/api/farmer-data", methods=["GET"])
     def api_farmer_data():
-        """Provide farmer data for dashboard in the same format as the original JSON."""
+        """
+        Provide farmer data for dashboard.
+        
+        MOBILE APP CONNECTION:
+        - Method: GET
+        - Endpoint: /api/farmer-data
+        - Returns: List of all farmer records.
+        """
         farmers = Farmer.query.order_by(Farmer.no.asc()).all()
 
         # Convert to the same format as the original JSON data
@@ -93,7 +100,15 @@ def register_farmer_routes(app):
 
     @app.route("/api/farmer-coffee-transactions", methods=["GET", "POST"])
     def api_farmer_coffee_transactions():
-        """List or create farmer coffee bean kg ledger entries (admin Transactions module)."""
+        """
+        List or create farmer coffee bean transactions.
+        
+        MOBILE APP CONNECTION:
+        - GET: Fetch history (filter by farmer_id)
+        - POST: Record new transaction
+        - Endpoint: /api/farmer-coffee-transactions
+        - JSON Payload (POST): farmer_id, variety, delta_kg, payment_amount, payment_method, reference_no, buyer_name, notes
+        """
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
@@ -135,6 +150,9 @@ def register_farmer_routes(app):
                         "variety": v,
                         "delta_kg": float(tx.delta_kg or 0),
                         "balance_after_kg": balance_after.get(tx.id),
+                        "payment_amount": float(tx.payment_amount or 0) if tx.payment_amount else 0,
+                        "payment_method": tx.payment_method or "",
+                        "reference_no": tx.reference_no or "",
                         "buyer_name": (tx.buyer_name or "").strip(),
                         "notes": (tx.notes or "").strip(),
                         "recorded_by_phone": (tx.recorded_by_phone or "").strip(),
@@ -166,6 +184,15 @@ def register_farmer_routes(app):
         if delta_kg == 0:
             return jsonify({"error": "delta_kg cannot be zero"}), 400
 
+        payment_amount = payload.get("payment_amount")
+        if payment_amount:
+            try:
+                payment_amount = Decimal(str(payment_amount))
+            except (InvalidOperation, TypeError, ValueError):
+                payment_amount = None
+
+        payment_method = payload.get("payment_method")
+        reference_no = payload.get("reference_no")
         buyer = (payload.get("buyer_name") or "").strip()[:200]
         notes = (payload.get("notes") or "").strip()
         user_phone = get_current_user_phone() or ""
@@ -175,6 +202,9 @@ def register_farmer_routes(app):
             recorded_at=datetime.utcnow(),
             variety=variety,
             delta_kg=delta_kg,
+            payment_amount=payment_amount,
+            payment_method=payment_method,
+            reference_no=reference_no,
             buyer_name=buyer,
             notes=notes,
             recorded_by_phone=user_phone,

@@ -30,6 +30,9 @@ class Farmer(db.Model):
     farm_info = db.relationship('FarmInfo', backref='farmer', uselist=False, cascade='all, delete-orphan')
     tree_counts = db.relationship('TreeCounts', backref='farmer', uselist=False, cascade='all, delete-orphan')
     production = db.relationship('Production', backref='farmer', uselist=False, cascade='all, delete-orphan')
+    profile_photo = db.Column(db.String(255))
+    account_id = db.Column(db.Integer, db.ForeignKey('admin_user.id', ondelete='SET NULL'))
+    client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='SET NULL'))
 
     @property
     def name(self):
@@ -116,6 +119,7 @@ class Production(db.Model):
     liberica_kg = db.Column(db.Numeric(10, 2), default=0)
     excelsa_kg = db.Column(db.Numeric(10, 2), default=0)
     robusta_kg = db.Column(db.Numeric(10, 2), default=0)
+    beans_remaining = db.Column(db.Numeric(10, 2), default=0)
 
     @property
     def total_production(self):
@@ -125,12 +129,85 @@ class Production(db.Model):
     def __repr__(self):
         return f"Production(Total: {self.total_production} kg)"
 
+# Notification table
+class Notification(db.Model):
+    """General notifications for users."""
+    __tablename__ = 'notifications'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    account_id = db.Column(db.Integer, db.ForeignKey('admin_user.id', ondelete='CASCADE'))
+    message = db.Column(db.Text, nullable=False)
+    type = db.Column(db.String(50))  # e.g., 'info', 'warning', 'alert'
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# Social table
+class Social(db.Model):
+    """Social media links for accounts."""
+    __tablename__ = 'social'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    account_id = db.Column(db.Integer, db.ForeignKey('admin_user.id', ondelete='CASCADE'))
+    url = db.Column(db.String(500), nullable=False)
+
+# Client table
+class Client(db.Model):
+    """Client information."""
+    __tablename__ = 'clients'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    report = db.Column(db.Text)
+
+# Maps table
+class Map(db.Model):
+    """Geographic information for farmers."""
+    __tablename__ = 'maps'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    farmer_id = db.Column(db.Integer, db.ForeignKey('farmers.id', ondelete='CASCADE'))
+    coffee_variety = db.Column(db.String(100))
+    barangay_landmarks = db.Column(db.Text)
+
+# GI Farmers Contribution table
+class GIFarmersContribution(db.Model):
+    """Geographic Indication contribution data."""
+    __tablename__ = 'gi_farmers_contribution'
+
+    farmer_id = db.Column(db.Integer, db.ForeignKey('farmers.id', ondelete='CASCADE'), primary_key=True)
+    ipophil_id = db.Column(db.Integer, db.ForeignKey('document_analysis.id', ondelete='CASCADE'))
+    gi_document = db.Column(db.String(500))
+    images = db.Column(db.Text)  # JSON string of image paths
+
+# Admin Notification table
+class AdminNotification(db.Model):
+    """Notifications specifically for admins regarding farmer registrations."""
+    __tablename__ = 'admin_notifications'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    farmer_id = db.Column(db.Integer, db.ForeignKey('farmers.id', ondelete='CASCADE'))
+    admin_id = db.Column(db.Integer, db.ForeignKey('admin_user.id', ondelete='CASCADE'))
+    approve_decline_registration = db.Column(db.String(20))  # 'PENDING', 'APPROVED', 'DECLINED'
+
+# Updates table
+class Update(db.Model):
+    """Platform updates or posts."""
+    __tablename__ = 'updates'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('admin_user.id', ondelete='CASCADE'))
+    image_url = db.Column(db.String(500))
+    content = db.Column(db.Text)
+    title = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    likes_count = db.Column(db.Integer, default=0)
+
 # Admin user table (keeping existing)
 class AdminUser(db.Model):
     """Admin user accounts."""
     __tablename__ = "admin_user"
 
-    phone_number = db.Column(db.String(255), primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    phone_number = db.Column(db.String(255), unique=True, nullable=False)
     full_name = db.Column(db.String(255), nullable=False)
     password_hash = db.Column(db.String(512), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -224,6 +301,9 @@ class FarmerCoffeeTransaction(db.Model):
     variety = db.Column(db.String(20), nullable=False)
     # Positive = farmer gains kg (e.g. correction, return). Negative = kg left stock (e.g. sale to buyer).
     delta_kg = db.Column(db.Numeric(14, 4), nullable=False)
+    payment_amount = db.Column(db.Numeric(14, 2))
+    payment_method = db.Column(db.String(50))
+    reference_no = db.Column(db.String(100))
     buyer_name = db.Column(db.String(200), default="")
     notes = db.Column(db.Text, default="")
     recorded_by_phone = db.Column(db.String(32), default="")

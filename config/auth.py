@@ -62,7 +62,15 @@ def register_auth_routes(app):
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
-        """Handle user login."""
+        """
+        Handle user login.
+        
+        MOBILE APP CONNECTION:
+        - Method: POST
+        - Endpoint: /login
+        - Payload (Form Data): phone (10 digits), password
+        - Success: Sets a session cookie. The app MUST persist this cookie.
+        """
         if not has_admin_account():
             return redirect(url_for("signup"))
 

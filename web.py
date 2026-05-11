@@ -18,6 +18,7 @@ from api.farmer_api import register_farmer_routes
 from api.ipophl_api import register_ipophl_routes
 from api.misconduct_report_api import register_misconduct_report_routes
 from api.messaging_api import register_messaging_routes
+from api.platform_api import register_platform_routes
 from routes.dashboard import register_dashboard_routes
 from routes.farmer_portal import register_farmer_portal_routes
 
@@ -65,6 +66,7 @@ register_export_routes(app)
 register_ipophl_routes(app)
 register_misconduct_report_routes(app)
 register_messaging_routes(app)
+register_platform_routes(app)
 register_farmer_portal_routes(app)
 
 # Health check endpoint
