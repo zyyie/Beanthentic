@@ -1,4 +1,11 @@
 {
+  "connection": {
+    "app_db_host": "",
+    "app_db_port": 3306,
+    "app_db_user": "root",
+    "app_db_pass": "",
+    "app_db_name": "beanthentic_app"
+  },
   "notifications": {
     "email_system_events": true,
     "email_user_registrations": true,
