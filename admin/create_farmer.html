@@ -46,12 +46,6 @@
                         {{ form.birthday(class='form-control') }}
                     </div>
                 </div>
-                <div class="row">
-                    <div class="col-md-12">
-                        {{ form.remarks.label(class='control-label') }}
-                        {{ form.remarks(class='form-control', rows=3) }}
-                    </div>
-                </div>
             </div>
             
             <!-- AFFILIATION Tab -->
@@ -67,11 +61,15 @@
                     </div>
                 </div>
                 <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         {{ form.status_ownership.label(class='control-label') }}
                         {{ form.status_ownership(class='form-control') }}
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
+                        {{ form.rsbsa_number.label(class='control-label') }}
+                        {{ form.rsbsa_number(class='form-control') }}
+                    </div>
+                    <div class="col-md-4">
                         {{ form.ncfrs.label(class='control-label') }}
                         {{ form.ncfrs(class='form-control') }}
                     </div>

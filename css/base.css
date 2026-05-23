@@ -17,8 +17,8 @@
 }
 
 body {
-  color: #25130c;
-  background: #fff9f2;
+  color: #1e293b;
+  background: #f8fafc;
   line-height: 1.6;
 }
 
@@ -41,13 +41,13 @@ section {
 .section-heading {
   font-size: 1.55rem;
   margin-bottom: 0.75rem;
-  color: #281711;
+  color: #0f172a;
 }
 
 .section-intro {
   max-width: 40rem;
   font-size: 0.96rem;
-  color: #6a574c;
+  color: #475569;
   margin-bottom: 1.75rem;
 }
 

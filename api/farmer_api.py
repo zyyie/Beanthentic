@@ -187,8 +187,8 @@ def register_farmer_routes(app):
                     "LIBERICA PRODUCTION": float(r.get("liberica_qty_kg") or 0) if r.get("liberica_qty_kg") is not None else 0,
                     "EXCELSA PRODUCTION": float(r.get("excelsa_qty_kg") or 0) if r.get("excelsa_qty_kg") is not None else 0,
                     "ROBUSTA PRODUCTION": float(r.get("robusta_qty_kg") or 0) if r.get("robusta_qty_kg") is not None else 0,
-                    "NCFRS": "",
-                    "REMARKS": "",
+                    "RSBSA NUMBER": r.get("rsbsa_number") or "",
+                    "NCFRS": ""
                 }
                 out.append(rec)
 
@@ -220,8 +220,8 @@ def register_farmer_routes(app):
                     "LIBERICA PRODUCTION": farmer.liberica_production,
                     "EXCELSA PRODUCTION": farmer.excelsa_production,
                     "ROBUSTA PRODUCTION": farmer.robusta_production,
+                    "RSBSA NUMBER": farmer.rsbsa_number or "",
                     "NCFRS": farmer.ncfrs or "",
-                    "REMARKS": farmer.remarks or "",
                 }
             )
 

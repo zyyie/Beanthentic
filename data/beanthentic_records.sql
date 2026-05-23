@@ -32,6 +32,7 @@ CREATE TABLE `affiliations` (
   `farmer_id` int(11) DEFAULT NULL,
   `fa_officer_member` varchar(100) DEFAULT NULL,
   `rsbsa_registered` enum('YES','NO') DEFAULT NULL,
+  `rsbsa_number` varchar(100) DEFAULT NULL,
   `ncfrs` varchar(100) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -47,8 +48,7 @@ CREATE TABLE `farmers` (
   `last_name` varchar(100) DEFAULT NULL,
   `first_name` varchar(100) DEFAULT NULL,
   `address_barangay` varchar(150) DEFAULT NULL,
-  `birthday` date DEFAULT NULL,
-  `remarks` text DEFAULT NULL
+  `birthday` date DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------

@@ -41,13 +41,6 @@ class FarmerMessagingApp {
     const listEl = document.getElementById('messagingList');
     if (listEl) {
       listEl.addEventListener('click', (e) => {
-        const starBtn = e.target.closest('.messaging-item__star');
-        if (starBtn) {
-          e.stopPropagation();
-          const id = Number(starBtn.getAttribute('data-msg-id'));
-          if (id) this.toggleStar(id);
-          return;
-        }
         const item = e.target.closest('.messaging-item');
         if (item) {
           const id = Number(item.getAttribute('data-msg-id'));
@@ -58,9 +51,6 @@ class FarmerMessagingApp {
 
     const backBtn = document.getElementById('messagingDetailBackBtn');
     if (backBtn) backBtn.addEventListener('click', () => this.closeDetail());
-
-    const starBtn = document.getElementById('messagingDetailStarBtn');
-    if (starBtn) starBtn.addEventListener('click', () => this.selectedId && this.toggleStar(this.selectedId));
 
     const archiveBtn = document.getElementById('messagingDetailArchiveBtn');
     if (archiveBtn) archiveBtn.addEventListener('click', () => this.selectedId && this.toggleArchive(this.selectedId));
@@ -166,8 +156,6 @@ class FarmerMessagingApp {
         const activeClass = m.id === this.selectedId ? ' is-active' : '';
         const initials = this.getInitials(m.sender_name);
         const timeStr = this.formatMessageTime(m.created_at);
-        const starClass = m.is_starred ? ' is-starred' : '';
-        const starIcon = m.is_starred ? 'fa-solid fa-star' : 'fa-regular fa-star';
         const preview = (m.body || '').substring(0, 100);
 
         return `<li class="messaging-item${unreadClass}${activeClass}" data-msg-id="${m.id}">
@@ -179,11 +167,6 @@ class FarmerMessagingApp {
             </div>
             <div class="messaging-item__subject">${esc(m.subject)}</div>
             <div class="messaging-item__preview">${esc(preview)}</div>
-            <div class="messaging-item__meta">
-              <button type="button" class="messaging-item__star${starClass}" data-msg-id="${m.id}" title="Star">
-                <i class="${starIcon}"></i>
-              </button>
-            </div>
           </div>
         </li>`;
       })
@@ -192,17 +175,42 @@ class FarmerMessagingApp {
 
   renderConversation(message) {
     const esc = (s) => this.escapeHtml(s);
-    // We don't have real threads yet; show single message as bubble.
-    const isSent = message.sender_phone === (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.phone);
-    const direction = isSent ? 'sent' : 'received';
-    const avatarInitials = this.getInitials(message.sender_name || message.sender_phone);
-    const timeStr = this.formatMessageTime(message.created_at);
+    if (message.conversation && Array.isArray(message.conversation)) {
+      return message.conversation
+        .map((msg) => {
+          const isSentByMe = msg.sender_type === 'farmer';
+          const direction = isSentByMe ? 'sent' : 'received';
+          const isAdmin = msg.sender_type === 'admin';
+          const adminClass = isAdmin ? ' messaging-message--admin' : '';
+          const senderName = isSentByMe ? (msg.sender_name || 'Me') : 'Administrator';
+          const avatarInitials = isSentByMe ? this.getInitials(senderName) : 'AD';
+          const timeStr = this.formatMessageTime(msg.created_at);
+          return `
+          <div class="messaging-message messaging-message--${direction}${adminClass}">
+            <div class="messaging-message__avatar">${esc(avatarInitials)}</div>
+            <div class="messaging-message__content">
+              ${!isSentByMe ? `<div class="messaging-message__sender">${esc(senderName)}</div>` : ''}
+              <div class="messaging-message__bubble">${esc(msg.body)}</div>
+              <div class="messaging-message__timestamp">${esc(timeStr)}</div>
+            </div>
+          </div>
+        `;
+        })
+        .join('');
+    }
 
+    const isSentByMe = message.sender_role === 'farmer' || message.sender_type === 'farmer';
+    const direction = isSentByMe ? 'sent' : 'received';
+    const isAdmin = message.sender_role === 'admin' || message.sender_type === 'admin';
+    const adminClass = isAdmin ? ' messaging-message--admin' : '';
+    const senderName = isSentByMe ? (message.sender_name || 'Me') : 'Administrator';
+    const avatarInitials = isSentByMe ? this.getInitials(senderName) : 'AD';
+    const timeStr = this.formatMessageTime(message.created_at);
     return `
-      <div class="messaging-message messaging-message--${direction}">
+      <div class="messaging-message messaging-message--${direction}${adminClass}">
         <div class="messaging-message__avatar">${esc(avatarInitials)}</div>
         <div class="messaging-message__content">
-          ${!isSent ? `<div class="messaging-message__sender">${esc(message.sender_name || message.sender_phone)}</div>` : ''}
+          ${!isSentByMe ? `<div class="messaging-message__sender">${esc(senderName)}</div>` : ''}
           <div class="messaging-message__bubble">${esc(message.body || '')}</div>
           <div class="messaging-message__timestamp">${esc(timeStr)}</div>
         </div>
@@ -259,10 +267,24 @@ class FarmerMessagingApp {
       const tsEl = document.getElementById('messagingDetailTimestamp');
       const bodyEl = document.getElementById('messagingDetailBody');
 
+      // Determine who to show in the header (the admin)
+      const isFarmerSender = m.sender_role === 'farmer';
+      const displayName = isFarmerSender 
+        ? (m.recipient_name || m.recipient_phone || 'Admin')
+        : (m.sender_name || m.sender_phone || 'Admin');
+      const displayPhone = isFarmerSender ? m.recipient_phone : m.sender_phone;
+
       if (subjectEl) subjectEl.textContent = m.subject;
-      if (avatarEl) avatarEl.textContent = this.getInitials(m.sender_name);
-      if (nameEl) nameEl.textContent = m.sender_name || m.sender_phone;
-      if (phoneEl) phoneEl.textContent = m.sender_phone ? `+63${m.sender_phone}` : '';
+      if (avatarEl) {
+        avatarEl.textContent = this.getInitials(displayName);
+        avatarEl.className = 'messaging-detail__sender-avatar';
+      }
+      if (nameEl) nameEl.textContent = displayName;
+      if (phoneEl) {
+        let p = displayPhone || '';
+        if (p && !p.startsWith('+') && p.length >= 10) p = `+63${p}`;
+        phoneEl.textContent = p;
+      }
       if (tsEl) {
         try {
           const d = new Date(m.created_at);
@@ -315,8 +337,8 @@ class FarmerMessagingApp {
   openCompose() {
     const overlay = document.getElementById('messagingComposeOverlay');
     if (overlay) overlay.classList.add('is-visible');
-    const subjectInput = document.getElementById('msgComposeSubject');
-    if (subjectInput) setTimeout(() => subjectInput.focus(), 100);
+    const bodyInput = document.getElementById('msgComposeBody');
+    if (bodyInput) setTimeout(() => bodyInput.focus(), 100);
   }
 
   closeCompose() {
@@ -327,13 +349,12 @@ class FarmerMessagingApp {
   }
 
   async sendMessage() {
-    const subject = (document.getElementById('msgComposeSubject')?.value || '').trim();
     const body = (document.getElementById('msgComposeBody')?.value || '').trim();
     const category = document.getElementById('msgComposeCategory')?.value || 'farmers';
     const recipientPhone = (document.getElementById('msgComposeRecipient')?.value || '').trim();
 
-    if (!subject || !body) {
-      this.showToast('Subject and message body are required.');
+    if (!body) {
+      this.showToast('Message body is required.');
       return;
     }
 
@@ -344,7 +365,7 @@ class FarmerMessagingApp {
       const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ subject, body, category, recipient_phone: recipientPhone }),
+        body: JSON.stringify({ body, category, recipient_phone: recipientPhone }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -376,12 +397,10 @@ class FarmerMessagingApp {
     if (sendBtn) sendBtn.disabled = true;
 
     try {
-      const subject = msg.subject && msg.subject.toLowerCase().startsWith('re:') ? msg.subject : `Re: ${msg.subject || 'Message'}`;
       const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
-          subject,
           body,
           category: 'farmers',
           recipient_phone: msg.sender_phone,
@@ -407,17 +426,6 @@ class FarmerMessagingApp {
   autoResizeTextarea(textarea) {
     textarea.style.height = 'auto';
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
-  }
-
-  async toggleStar(id) {
-    try {
-      const res = await fetch(`/api/messages/${id}/star`, { method: 'POST' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const m = this.messages.find((x) => x.id === id);
-      if (m) m.is_starred = data.is_starred;
-      this.renderList();
-    } catch {}
   }
 
   async toggleArchive(id) {

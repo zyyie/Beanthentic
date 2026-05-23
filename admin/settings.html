@@ -489,43 +489,6 @@
                 <button type="submit" class="btn btn-primary">Update Password</button>
               </form>
             </div>
-
-            <div class="settings-card">
-              <h3>Two-Factor Authentication</h3>
-              <div id="2faStatus">
-                {% if settings.security.two_factor_enabled %}
-                  <div class="alert alert-success">
-                    <i class="fa-solid fa-shield-halved"></i> 2FA is currently enabled
-                  </div>
-                  <p>Your account is protected with two-factor authentication.</p>
-                  <button type="button" class="btn btn-danger" id="disable2faBtn">Disable 2FA</button>
-                  <button type="button" class="btn btn-secondary" id="viewBackupCodesBtn">View Backup Codes</button>
-                {% else %}
-                  <div class="alert alert-warning">
-                    <i class="fa-solid fa-triangle-exclamation"></i> 2FA is not enabled
-                  </div>
-                  <p>Enable two-factor authentication to add an extra layer of security to your account.</p>
-                  <button type="button" class="btn btn-primary" id="enable2faBtn">Enable 2FA</button>
-                {% endif %}
-              </div>
-              
-              <div id="2faSetup" style="display: none;">
-                <h4>Setup Two-Factor Authentication</h4>
-                <div class="qr-code">
-                  <p>Scan this QR code with your authenticator app:</p>
-                  <div id="qrCodePlaceholder">
-                    <i class="fa-solid fa-qrcode" style="font-size: 200px; color: #d1d5db;"></i>
-                  </div>
-                  <p id="manualKey"></p>
-                </div>
-                <div class="backup-codes">
-                  <h4>Backup Recovery Codes</h4>
-                  <p>Save these codes in a safe place. You can use them to access your account if you lose your authenticator device.</p>
-                  <div id="backupCodesList"></div>
-                </div>
-                <button type="button" class="btn btn-secondary" id="cancel2faSetupBtn">Cancel</button>
-              </div>
-            </div>
           </div>
 
           <!-- Notifications Section -->
@@ -657,7 +620,6 @@
                     <th>Date & Time</th>
                     <th>Action</th>
                     <th>Details</th>
-                    <th>IP Address</th>
                   </tr>
                 </thead>
                 <tbody id="activityTableBody">
@@ -666,7 +628,6 @@
                       <td>{{ activity.timestamp[:19].replace('T', ' ') }}</td>
                       <td>{{ activity.action }}</td>
                       <td>{{ activity.details }}</td>
-                      <td>{{ activity.ip_address }}</td>
                     </tr>
                   {% endfor %}
                 </tbody>
@@ -715,16 +676,6 @@
 
               <div class="faq-item">
                 <button class="faq-question">
-                  <span>What are backup codes?</span>
-                  <i class="fa-solid fa-chevron-down faq-icon"></i>
-                </button>
-                <div class="faq-answer">
-                  <p>Backup codes are one-time use codes that you can use to access your account if you lose your authenticator device. Each code can only be used once. Keep them in a secure location.</p>
-                </div>
-              </div>
-
-              <div class="faq-item">
-                <button class="faq-question">
                   <span>How can I view my activity log?</span>
                   <i class="fa-solid fa-chevron-down faq-icon"></i>
                 </button>
@@ -749,7 +700,7 @@
                   <i class="fa-solid fa-chevron-down faq-icon"></i>
                 </button>
                 <div class="faq-answer">
-                  <p>Yes, we take security seriously. All passwords are encrypted, we support 2FA, and we maintain detailed activity logs. We recommend enabling 2FA and using a strong, unique password for maximum security.</p>
+                  <p>Yes, we take security seriously. All passwords are encrypted and we maintain detailed activity logs. We recommend using a strong, unique password for maximum security.</p>
                 </div>
               </div>
             </div>
@@ -776,7 +727,6 @@
             <div class="settings-card">
               <h3>Account Actions</h3>
               <p>Manage your account session and access.</p>
-              <button type="button" class="btn btn-secondary" id="refreshSessionBtn">Refresh Session</button>
               <button type="button" class="btn btn-danger" id="logoutBtn">Log Out</button>
             </div>
           </div>

@@ -130,7 +130,7 @@
 
 /* Buttons */
 .btn-edit {
-  background: #f97316;
+  background: #16a34a;
   color: #ffffff;
   border: none;
   padding: 6px 12px;
@@ -142,11 +142,11 @@
   gap: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(249, 115, 22, 0.2);
+  box-shadow: 0 2px 4px rgba(22, 163, 74, 0.2);
 }
 
 .btn-edit:hover {
-  background: #ea580c;
+  background: #15803d;
   transform: translateY(-1px);
 }
 
@@ -276,8 +276,8 @@
 .modal-form-group input:focus,
 .modal-form-group select:focus {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+  border-color: #16a34a;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
 }
 
 .modal-input-icon-wrapper,
@@ -308,7 +308,7 @@
 }
 
 .btn-save-changes {
-  background: #f97316;
+  background: #16a34a;
   color: #ffffff;
   border: none;
   padding: 12px 24px;
@@ -317,13 +317,13 @@
   font-size: 0.95rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 6px -1px rgba(249, 115, 22, 0.2);
+  box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.2);
 }
 
 .btn-save-changes:hover {
-  background: #ea580c;
+  background: #15803d;
   transform: translateY(-1px);
-  box-shadow: 0 10px 15px -3px rgba(249, 115, 22, 0.3);
+  box-shadow: 0 10px 15px -3px rgba(34, 197, 94, 0.3);
 }
 
 /* Security Card Specifics */

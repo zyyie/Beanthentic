@@ -180,6 +180,14 @@ def register_messaging_routes(app):
                         else:
                             where.append("recipient_role='farmer' AND recipient_phone=%s AND is_archived=1")
                             args.append(phone)
+                    elif folder == "all":
+                        if role == "admin":
+                            # All conversations (sent and received)
+                            where.append("((recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s)) OR (sender_role='admin' AND sender_phone=%s))")
+                            args.extend([phone, phone])
+                        else:
+                            where.append("((recipient_role='farmer' AND recipient_phone=%s) OR (sender_role='farmer' AND sender_phone=%s))")
+                            args.extend([phone, phone])
                     else:
                         if role == "admin":
                             where.append("recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s) AND is_archived=0")
@@ -200,7 +208,8 @@ def register_messaging_routes(app):
                           recipient_phone, recipient_name,
                           subject, body, category, farmer_id,
                           is_read, is_starred, is_archived,
-                          created_at, read_at
+                          created_at, read_at,
+                          sender_role, recipient_role
                         FROM shared_messages
                         WHERE """
                         + " AND ".join(where)
@@ -252,6 +261,7 @@ def register_messaging_routes(app):
                     conn.close()
 
         user_phone = (get_current_user_phone() or get_current_farmer_phone() or "")
+        normalized_user_phone = _normalize_phone(user_phone)
         folder = request.args.get("folder", "inbox")  # inbox | sent | starred | archived
         search = (request.args.get("search", "") or "").strip().lower()
         category = request.args.get("category", "").strip().lower()
@@ -261,24 +271,46 @@ def register_messaging_routes(app):
 
         if folder == "inbox":
             query = query.filter(
-                (Message.recipient_phone == user_phone) | (Message.recipient_phone == ""),
+                (Message.recipient_phone == user_phone) | 
+                (Message.recipient_phone == normalized_user_phone) | 
+                (Message.recipient_phone == ""),
                 Message.is_archived == False,
             )
         elif folder == "sent":
-            query = query.filter(Message.sender_phone == user_phone)
+            query = query.filter(
+                (Message.sender_phone == user_phone) | 
+                (Message.sender_phone == normalized_user_phone)
+            )
         elif folder == "starred":
             query = query.filter(
-                ((Message.recipient_phone == user_phone) | (Message.recipient_phone == "") | (Message.sender_phone == user_phone)),
+                (Message.recipient_phone == user_phone) | 
+                (Message.recipient_phone == normalized_user_phone) | 
+                (Message.recipient_phone == "") | 
+                (Message.sender_phone == user_phone) |
+                (Message.sender_phone == normalized_user_phone),
                 Message.is_starred == True,
             )
         elif folder == "archived":
             query = query.filter(
-                ((Message.recipient_phone == user_phone) | (Message.recipient_phone == "")),
+                (Message.recipient_phone == user_phone) | 
+                (Message.recipient_phone == normalized_user_phone) | 
+                (Message.recipient_phone == ""),
                 Message.is_archived == True,
+            )
+        elif folder == "all":
+            # All conversations for the current user
+            query = query.filter(
+                (Message.recipient_phone == user_phone) | 
+                (Message.recipient_phone == normalized_user_phone) | 
+                (Message.recipient_phone == "") | 
+                (Message.sender_phone == user_phone) |
+                (Message.sender_phone == normalized_user_phone)
             )
         else:
             query = query.filter(
-                (Message.recipient_phone == user_phone) | (Message.recipient_phone == ""),
+                (Message.recipient_phone == user_phone) | 
+                (Message.recipient_phone == normalized_user_phone) | 
+                (Message.recipient_phone == ""),
                 Message.is_archived == False,
             )
 
@@ -318,7 +350,7 @@ def register_messaging_routes(app):
             role, phone, name_hint = _shared_identity()
             users = load_users()
             sender = users.get(get_current_user_phone() or get_current_farmer_phone() or "", {})
-            sender_name = (
+            sender_name = "Administrator" if role == "admin" else (
                 sender.get("full_name")
                 or name_hint
                 or phone
@@ -345,8 +377,8 @@ def register_messaging_routes(app):
             if role == "admin" and not recipient_phone:
                 return jsonify({"error": "recipient_phone is required for admin replies."}), 400
 
-            recipient_name = ""
-            if recipient_phone_raw:
+            recipient_name = (data.get("recipient_name") or "").strip()
+            if not recipient_name and recipient_phone_raw:
                 recipient = users.get(recipient_phone_raw, {})
                 recipient_name = recipient.get("full_name", "")
 
@@ -388,7 +420,7 @@ def register_messaging_routes(app):
         user_phone = (get_current_user_phone() or get_current_farmer_phone() or "")
         users = load_users()
         sender = users.get(user_phone, {})
-        sender_name = (
+        sender_name = "Administrator" if is_authenticated() else (
             sender.get("full_name")
             or session.get("user_name")
             or session.get("farmer_name")
@@ -410,8 +442,8 @@ def register_messaging_routes(app):
             category = "general"
 
         # Resolve recipient name (admin users live in JSON; farmers may be unknown here)
-        recipient_name = ""
-        if recipient_phone:
+        recipient_name = (data.get("recipient_name") or "").strip()
+        if not recipient_name and recipient_phone:
             recipient = users.get(recipient_phone, {})
             recipient_name = recipient.get("full_name", "")
 

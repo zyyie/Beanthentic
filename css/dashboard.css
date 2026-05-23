@@ -2,7 +2,7 @@
 
 /* This page uses a full-bleed app layout; override the site's centered <main>. */
 .dashboard-page {
-  background: linear-gradient(135deg, #f8f6f3, #f0ebe4, #f5f2ed);
+  background: #f8fafc;
   background-attachment: fixed;
   min-height: 100vh;
   position: relative;
@@ -271,9 +271,9 @@ body.dashboard-page {
   right: 0;
   bottom: 0;
   background: 
-    radial-gradient(circle at 20% 20%, rgba(139, 74, 43, 0.03) 0%, transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(59, 33, 7, 0.02) 0%, transparent 50%),
-    radial-gradient(circle at 40% 60%, rgba(212, 177, 141, 0.04) 0%, transparent 50%);
+    radial-gradient(circle at 20% 20%, rgba(22, 163, 74, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(34, 197, 94, 0.02) 0%, transparent 50%),
+    radial-gradient(circle at 40% 60%, rgba(21, 128, 61, 0.04) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
 }
@@ -334,13 +334,13 @@ body.dashboard-page {
 .dashboard-title {
   font-size: 2rem;
   font-weight: 700;
-  color: #25130c;
+  color: #0f172a;
   margin-bottom: 0.5rem;
 }
 
 .dashboard-subtitle {
   font-size: 1.1rem;
-  color: #6a574c;
+  color: #475569;
   max-width: 600px;
   margin: 0;
 }
@@ -1128,6 +1128,40 @@ body.dashboard-page {
   border: 1px dashed rgba(212, 177, 141, 0.4);
   border-radius: 12px;
   background: #faf9f7;
+}
+
+/* General Select Styles */
+select {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  color: #1f2937;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+select:hover {
+  border-color: #cbd5e1;
+}
+
+select:focus {
+  outline: none;
+  border-color: #2c7a3e;
+  box-shadow: 0 0 0 3px rgba(44, 122, 62, 0.1);
+}
+
+/* Pagination Selects */
+.farmer-rows-field select,
+.farmers-list-rows-field select,
+#pageSizeSelect,
+#farmersListPageSizeSelect {
+  height: 36px;
+  padding: 0 10px;
+  min-width: 70px;
+  font-weight: 600;
 }
 
 /* Transactions module */
@@ -2898,6 +2932,40 @@ body.dashboard-page #client-report-module .action-btn:hover {
 
 body.dashboard-page #client-report-module .action-btn:active {
   transform: translateY(0);
+}
+
+body.dashboard-page #client-report-module .take-action-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #2c7a3e;
+  background: #ffffff;
+  color: #2c7a3e;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+body.dashboard-page #client-report-module .take-action-btn:hover {
+  background: #2c7a3e;
+  color: #ffffff;
+  box-shadow: 0 4px 8px rgba(44, 122, 62, 0.2);
+  transform: translateY(-1px);
+}
+
+body.dashboard-page #client-report-module .take-action-btn:active {
+  transform: translateY(0);
+}
+
+body.dashboard-page #client-report-module .report-action-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
 }
 
 body.dashboard-page #client-report-module .table-container {
@@ -7370,6 +7438,7 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   text-transform: none;
 }
 
+.beanthentic-tag--error {
   box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
   background: #fff1f2;
   color: #be123c;
@@ -7426,10 +7495,14 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   height: 48px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 
-/* Farmer's Contribution Detail Modal */
 .beanthentic-detail-dialog {
-  color: #4CAF50;
+  position: fixed;
   inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
 .beanthentic-detail-dialog[hidden] {
   display: none;
@@ -7438,34 +7511,34 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 .beanthentic-detail-dialog__backdrop {
   position: absolute;
   inset: 0;
-  color: #333;
+  background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(2px);
 }
 
-  color: #666;
+.beanthentic-detail-dialog__card {
   position: relative;
   width: 90%;
   max-width: 820px;
   background: #ffffff;
   border-radius: 14px;
-  box-shadow:
-  background: #4CAF50;
-    0 4px 16px rgba(0, 0, 0, 0.10);
-  padding: 18px 20px 20px;
-  padding: 12px 24px;
-  border-radius: 24px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+  z-index: 2;
+}
+
+.beanthentic-detail-dialog__close {
   position: absolute;
-  font-weight: 500;
+  top: 12px;
   right: 12px;
-  transition: background-color 0.2s, box-shadow 0.2s;
-  box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
   border: none;
   border-radius: 10px;
   background: #f3f4f6;
-  background: #45a049;
-  box-shadow: 0 4px 8px rgba(76, 175, 80, 0.4);
+  width: 32px;
+  height: 32px;
+  display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
   transition: background 0.15s ease, transform 0.15s ease;
 }
 

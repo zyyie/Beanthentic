@@ -33,6 +33,7 @@ class DashboardApp {
     this.notificationsFeed = this.hydrateNotificationsFeed();
     /** @type {number | null} */
     this.pendingDeleteRowIndex = null;
+    this.currentFarmerNo = null;
     this.transactionsRows = [];
     this.transactionsSearchTerm = '';
     this.transactionsFarmerFilterId = null;
@@ -42,6 +43,7 @@ class DashboardApp {
     this.transactionsSortOrder = 'newest';
     this.transactionsMonthFilter = '';
     this.transactionsYearFilter = '';
+    this.farmerProfileSource = 'profiles';
     
     // Explicitly hide the receipt modal on startup
     this.closeReceipt();
@@ -58,6 +60,7 @@ class DashboardApp {
         meta: 'Today · 9:41 AM',
         detail:
           'A new farmer record was merged into your dashboard from the latest data sync. You can open Farmer Records to check the new row, verify names and barangay, and fix any typos. If counts look wrong, use the header Refresh button to reload from your saved or imported file.',
+        targetModule: 'farmers',
       },
       {
         id: 'feed-export-1',
@@ -66,14 +69,52 @@ class DashboardApp {
         meta: 'Yesterday · 4:12 PM',
         detail:
           'Your export to Excel finished successfully. The file includes the farmer table as shown in the Export module (columns depend on the view you used). Download again anytime from Export Data if you need another copy. Large exports may take a few seconds—wait for the success message before closing the tab.',
+        targetModule: 'export',
       },
       {
         id: 'feed-reminder-1',
         icon: 'fa-triangle-exclamation',
-        title: 'Reminder: Review pending remarks',
+        title: 'Reminder: Complete profile details',
         meta: 'Mar 26 · 11:00 AM',
         detail:
-          'Some rows still have empty or generic remarks in the REMARKS column. Review Farmer Records (Basic Info tab), filter or search if needed, and add clear notes for follow-up—for example planting status, visits, or data issues. Saving the table stores updates in your browser for next session.',
+          'Some rows still have empty or incomplete information in the Farmer Records (Basic Info tab). Review and add clear notes for follow-up—for example planting status, visits, or data issues. Saving the table stores updates in your browser for next session.',
+        targetModule: 'farmers',
+      },
+      {
+        id: 'feed-misconduct-1',
+        icon: 'fa-gavel',
+        title: 'New Misconduct Report',
+        meta: 'May 23 · 2:15 PM',
+        detail:
+          'A new report regarding farmer misconduct has been submitted. Please review the details in the Client Report module and take appropriate action if necessary.',
+        targetModule: 'client-report',
+      },
+      {
+        id: 'feed-message-1',
+        icon: 'fa-message',
+        title: 'New message from Romeo Montoya',
+        meta: 'Today · 1:30 PM',
+        detail: 'Good afternoon, I would like to inquire about the upcoming GI registration process for my farm.',
+        targetModule: 'messaging',
+        targetPayload: { phone: '+63 912 345 6789' },
+      },
+      {
+        id: 'feed-profile-1',
+        icon: 'fa-user-check',
+        title: 'Profile Verified: Maria Santos',
+        meta: 'Yesterday · 10:00 AM',
+        detail: 'The profile for farmer Maria Santos (No. #5) has been successfully verified and added to the registry.',
+        targetModule: 'farmers-list',
+        targetPayload: { farmerNo: 5 },
+      },
+      {
+        id: 'feed-system-1',
+        icon: 'fa-server',
+        title: 'System Maintenance Completed',
+        meta: 'May 22 · 11:30 PM',
+        detail:
+          'The scheduled system maintenance and database optimization have been completed successfully. All services are fully operational.',
+        targetModule: 'overview',
       },
     ];
   }
@@ -114,6 +155,9 @@ class DashboardApp {
       detail: row.detail || '',
       category: row.category || '',
       categoryLabel: row.category_label || '',
+      targetModule: row.targetModule || row.target_module || '',
+      targetId: row.targetId || row.target_id || '',
+      targetPayload: row.targetPayload || row.target_payload || null,
       read: !!row.read,
     };
   }
@@ -174,8 +218,7 @@ class DashboardApp {
     const icon = this.iconForActivityAction(action);
     const title = this.titleForActivity(action);
     const meta = this.formatActivityMeta(row.timestamp);
-    const parts = [row.details, row.ip_address ? `IP: ${row.ip_address}` : ''].filter(Boolean);
-    const detail = parts.join(' · ');
+    const detail = row.details || '';
     return { id, icon, title, meta, detail, read: false };
   }
 
@@ -285,6 +328,22 @@ class DashboardApp {
       n.read = true;
       this.persistNotificationReadState();
       this.renderNotificationsList();
+    }
+
+    // Handle navigation action if targetModule exists
+    if (n.targetModule) {
+      this.switchModule(n.targetModule);
+      
+      // Additional logic for specific modules
+      if (n.targetModule === 'messaging' && n.targetPayload?.phone) {
+        this.goToFarmerMessage(n.targetPayload.phone);
+      } else if (n.targetModule === 'farmers-list' && n.targetPayload?.farmerNo) {
+        this.openFarmerProfile(n.targetPayload.farmerNo);
+      }
+      
+      // Optional: if you want to also show the detail modal, don't return here.
+      // But typically, navigating is the primary action.
+      return;
     }
 
     const root = document.getElementById('notificationDetailModal');
@@ -518,12 +577,28 @@ class DashboardApp {
     this.initFarmerProfileTabs();
     // Initialize Map Layer Toggles
     this.initMapLayerToggles();
+    // Initialize Farmer Admin Actions Modal
+    this.initFarmerActionModal();
+    // Start global suspension timers
+    this.startSuspensionTimers();
 
     // Global click listener to close custom dropdowns
     document.addEventListener('click', (e) => {
+      // Close modern dropdowns
       if (!e.target.closest('.modern-dropdown')) {
         document.querySelectorAll('.modern-dropdown.active').forEach((d) => {
           d.classList.remove('active');
+        });
+      }
+
+      // Close profile actions dropdown
+      if (!e.target.closest('.profile-actions-dropdown')) {
+        const content = document.getElementById('profileActionsContent');
+        if (content) content.classList.remove('active');
+        
+        // Also close card menus
+        document.querySelectorAll('.card-menu-content.active').forEach(c => {
+          c.classList.remove('active');
         });
       }
     });
@@ -732,16 +807,14 @@ class DashboardApp {
     if (!tbody) return;
 
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 3rem; color: #94a3b8; font-weight: 500;">No transactions available</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 3rem; color: #94a3b8; font-weight: 500;">No client transactions available</td></tr>';
       return;
     }
 
     tbody.innerHTML = rows
       .map((row) => {
-        const farmerLabel =
-          row.farmer_no != null && row.farmer_no !== ''
-            ? `#${this.escapeHtml(row.farmer_no)} — ${this.escapeHtml(row.farmer_name || '')}`
-            : this.escapeHtml(row.farmer_name || '—');
+        const farmerNo = row.farmer_no != null && row.farmer_no !== '' ? `#${this.escapeHtml(row.farmer_no)}` : '—';
+        const farmerName = this.escapeHtml(row.farmer_name || '—');
         
         let dateStr = '—';
         let timeStr = '—';
@@ -758,17 +831,20 @@ class DashboardApp {
         }
 
         const deltaText = row.delta_kg != null ? `${Math.abs(row.delta_kg).toFixed(2)} kg` : '0.00 kg';
+        const amountText = row.amount != null ? `₱${Number(row.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '₱0.00';
         const variety = this.varietyLabel(row.variety) || '—';
         const txnId = row.id || `TXN-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
 
         return `<tr>
-          <td>${farmerLabel}</td>
+          <td style="font-weight: 600; color: #111827;">${farmerNo}</td>
+          <td style="font-weight: 700;">${farmerName}</td>
           <td>${this.escapeHtml(dateStr)}</td>
-          <td style="color: #64748b; font-weight: 600;">${this.escapeHtml(timeStr)}</td>
+          <td style="color: #111827; font-weight: 600;">${this.escapeHtml(timeStr)}</td>
           <td>${this.escapeHtml(row.buyer_name || '—')}</td>
           <td><span class="txn-product-badge">${this.escapeHtml(variety)}</span></td>
           <td style="font-weight: 700;">${this.escapeHtml(deltaText)}</td>
-          <td><button type="button" class="txn-view-btn" data-action="view-receipt" data-txn-id="${this.escapeHtml(txnId)}">View</button></td>
+          <td style="font-weight: 700; color: #111827;">${this.escapeHtml(amountText)}</td>
+          <td><button type="button" class="txn-view-btn" data-action="view-receipt" data-txn-id="${this.escapeHtml(txnId)}">Receipt</button></td>
         </tr>`;
       })
       .join('');
@@ -780,7 +856,7 @@ class DashboardApp {
 
     this.transactionsCurrentPage = 1; // Reset to page 1 on load
     await this.loadFarmerOptionsForTransactionsModule();
-    tbody.innerHTML = '<tr><td colspan="8" class="transactions-loading-cell">Loading...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="transactions-loading-cell">Loading...</td></tr>';
 
     try {
       const res = await fetch('/api/farmer-coffee-transactions?limit=500');
@@ -818,7 +894,8 @@ class DashboardApp {
         recorded_at: getYmd(0),
         buyer_name: 'Lipa Coffee Trading',
         variety: 'liberica',
-        delta_kg: 25.5
+        delta_kg: 25.5,
+        amount: 3060.00
       },
       {
         id: 'ex-2',
@@ -827,7 +904,8 @@ class DashboardApp {
         recorded_at: getYmd(1),
         buyer_name: 'Batangas Brew Co.',
         variety: 'robusta',
-        delta_kg: 50.0
+        delta_kg: 50.0,
+        amount: 4500.00
       },
       {
         id: 'ex-3',
@@ -836,7 +914,8 @@ class DashboardApp {
         recorded_at: getYmd(2),
         buyer_name: 'Manila Coffee Roasters',
         variety: 'excelsa',
-        delta_kg: 15.75
+        delta_kg: 15.75,
+        amount: 2205.00
       },
       {
         id: 'ex-4',
@@ -845,7 +924,8 @@ class DashboardApp {
         recorded_at: getYmd(3),
         buyer_name: 'Local Farmers Coop',
         variety: 'liberica',
-        delta_kg: 30.2
+        delta_kg: 30.2,
+        amount: 3624.00
       },
       {
         id: 'ex-5',
@@ -854,7 +934,8 @@ class DashboardApp {
         recorded_at: getYmd(4),
         buyer_name: 'Global Bean Exports',
         variety: 'robusta',
-        delta_kg: 100.0
+        delta_kg: 100.0,
+        amount: 9000.00
       }
     ];
   }
@@ -901,6 +982,12 @@ class DashboardApp {
     const variety = this.varietyLabel(row.variety);
     if (productLabelEl) productLabelEl.textContent = `${variety} Coffee`;
     if (weightEl) weightEl.textContent = row.delta_kg != null ? `${Math.abs(row.delta_kg).toFixed(2)} kg` : '0.00 kg';
+
+    const amountEl = document.getElementById('receiptAmount');
+    if (amountEl) {
+      const amount = row.amount != null ? Number(row.amount) : 0;
+      amountEl.textContent = `₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
 
     // Show modal and handle focus
     modal.removeAttribute('hidden');
@@ -1184,25 +1271,10 @@ class DashboardApp {
       <td>${farmerLabel}</td>
       <td>${this.escapeHtml(r.allegation || '')}</td>
       <td>
-        <div class="modern-dropdown" id="clientReportDropdown-${r.id}">
-          <button class="modern-dropdown-trigger status-${statusClass}" onclick="dashboardApp.toggleModernDropdown(event, ${r.id})">
-            <span>${this.clientReportStatusLabel(statusValue)}</span>
-            <i class="fa-solid fa-chevron-down"></i>
+        <div class="report-action-container">
+          <button class="take-action-btn" onclick="dashboardApp.openReportActionModal(${r.id})">
+            Take Action
           </button>
-          <div class="modern-dropdown-menu">
-            <div class="modern-dropdown-item ${statusValue === 'under review' ? 'active' : ''}" onclick="dashboardApp.updateMisconductStatus(${r.id}, 'under review')">
-              <i class="fa-solid fa-magnifying-glass" style="color: #2b6cb0;"></i> Under review
-            </div>
-            <div class="modern-dropdown-item ${statusValue === 'blocked' ? 'active' : ''}" onclick="dashboardApp.updateMisconductStatus(${r.id}, 'blocked')">
-              <i class="fa-solid fa-ban" style="color: #c53030;"></i> Blocked
-            </div>
-            <div class="modern-dropdown-item ${statusValue === 'resolved' ? 'active' : ''}" onclick="dashboardApp.updateMisconductStatus(${r.id}, 'resolved')">
-              <i class="fa-solid fa-check" style="color: #2f855a;"></i> Resolved
-            </div>
-            <div class="modern-dropdown-item ${statusValue === 'dismissed' ? 'active' : ''}" onclick="dashboardApp.updateMisconductStatus(${r.id}, 'dismissed')">
-              <i class="fa-solid fa-xmark" style="color: #4a5568;"></i> Dismissed
-            </div>
-          </div>
         </div>
       </td>
     </tr>`;
@@ -1228,30 +1300,27 @@ class DashboardApp {
     }
   }
 
-  toggleModernDropdown(event, reportId) {
-    if (event) event.stopPropagation();
-    const dropdown = document.getElementById(`clientReportDropdown-${reportId}`);
-    if (!dropdown) return;
+  openReportActionModal(reportId) {
+    const report = (this.misconductReportRows || []).find(r => r.id === reportId);
+    if (!report) return;
 
-    const isActive = dropdown.classList.contains('active');
-
-    // Close all other open dropdowns first
-    document.querySelectorAll('.modern-dropdown.active').forEach((d) => {
-      d.classList.remove('active');
-    });
-
-    if (!isActive) {
-      dropdown.classList.add('active');
+    if (report.farmer_no) {
+      // First switch to the farmers list module
+      this.switchModule('farmers-list');
+      // Then open the specific farmer's profile
+      this.openFarmerProfile(report.farmer_no, 'client-report');
+      this.showNotification(`Reviewing report for ${report.farmer_name}`, 'info');
+    } else {
+      this.showNotification('Farmer record not found for this report.', 'error');
     }
   }
 
   clientReportStatusLabel(value) {
     const v = String(value || '').toLowerCase();
-    if (v === 'under review') return 'Under review';
     if (v === 'blocked') return 'Blocked';
     if (v === 'resolved') return 'Resolved';
     if (v === 'dismissed') return 'Dismissed';
-    return 'Under review';
+    return 'Open';
   }
 
   updateClientReportCountLabel(count) {
@@ -1304,9 +1373,28 @@ class DashboardApp {
 
     this.initTransactionsModuleControls();
 
+    // Farmer Profile Actions Dropdown
+    const profileActionsToggle = document.getElementById('profileActionsToggle');
+    const profileActionsContent = document.getElementById('profileActionsContent');
+    if (profileActionsToggle && profileActionsContent) {
+      profileActionsToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        profileActionsContent.classList.toggle('active');
+      });
+
+      // Close dropdown when clicking anywhere else
+      document.addEventListener('click', (e) => {
+        if (!profileActionsToggle.contains(e.target) && !profileActionsContent.contains(e.target)) {
+          profileActionsContent.classList.remove('active');
+        }
+      });
+    }
+
     // Sidebar submenu toggles
     const submenuToggles = [
       { link: 'sidebarFarmersLink', submenu: 'sidebarFarmersSubmenu' },
+      { link: 'sidebarTransactionsLink', submenu: 'sidebarTransactionsSubmenu' },
       { link: 'sidebarIpophlLink', submenu: 'sidebarIpophlSubmenu' },
       { link: 'sidebarSettingsLink', submenu: 'sidebarSettingsSubmenu' }
     ];
@@ -1573,6 +1661,48 @@ class DashboardApp {
     const farmersCardGrid = document.getElementById('farmersCardGrid');
     if (farmersCardGrid) {
       farmersCardGrid.addEventListener('click', (e) => {
+        // Toggle card menu
+        const toggle = e.target.closest('.card-menu-toggle');
+        if (toggle) {
+          e.preventDefault();
+          e.stopPropagation();
+          const content = toggle.nextElementSibling;
+          if (content) {
+            // Close other open card menus first
+            document.querySelectorAll('.card-menu-content.active').forEach(c => {
+              if (c !== content) c.classList.remove('active');
+            });
+            content.classList.toggle('active');
+          }
+          return;
+        }
+
+        // Handle card actions (Warning/Suspend/Unsuspend)
+        const actionBtn = e.target.closest('[data-card-action]');
+        if (actionBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          const action = actionBtn.getAttribute('data-card-action');
+          const n = Number(actionBtn.getAttribute('data-farmer-no'));
+          const idx = this.data.findIndex(f => Number(f['NO.']) === n);
+          
+          if (idx !== -1) {
+            if (action === 'warning') {
+              this.handleWarningFarmer(idx, 'Administrative Warning');
+            } else if (action === 'unsuspend') {
+              // Unsuspend directly without modal
+              this.handleUnblockFarmer(idx, 'Manual Unsuspend');
+            } else {
+              this.openFarmerActionModal(action, idx);
+            }
+          }
+          
+          // Close the menu
+          const content = actionBtn.closest('.card-menu-content');
+          if (content) content.classList.remove('active');
+          return;
+        }
+
         const btn = e.target.closest('[data-action="open-farmer-profile"]');
         if (btn) {
           const nRaw = btn.getAttribute('data-farmer-no') || '';
@@ -1593,6 +1723,61 @@ class DashboardApp {
     const farmerProfileBackBtn = document.getElementById('farmerProfileBackBtn');
     if (farmerProfileBackBtn) {
       farmerProfileBackBtn.addEventListener('click', () => this.closeFarmerProfile());
+    }
+
+    const farmerProfileMessageBtn = document.getElementById('farmerProfileMessageBtn');
+    if (farmerProfileMessageBtn) {
+      farmerProfileMessageBtn.addEventListener('click', () => {
+        if (!this.currentFarmerNo) return;
+        const farmer = (this.data || []).find(f => Number(f['NO.']) === Number(this.currentFarmerNo));
+        if (farmer) {
+          const phone = this.getValue(farmer, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']);
+          if (phone) {
+            this.goToFarmerMessage(phone);
+          } else {
+            this.showNotification('Farmer phone number not found.', 'error');
+          }
+        }
+      });
+    }
+
+    // Farmer Profile Admin Actions
+    const profileWarningBtn = document.getElementById('profileWarningBtn');
+    if (profileWarningBtn) {
+      profileWarningBtn.addEventListener('click', () => {
+        // Automatically close dropdown on click
+        const profileActionsContent = document.getElementById('profileActionsContent');
+        if (profileActionsContent) profileActionsContent.classList.remove('active');
+
+        if (this.currentFarmerNo) {
+          const idx = this.data.findIndex(f => Number(f['NO.']) === this.currentFarmerNo);
+          if (idx !== -1) {
+            this.openFarmerActionModal('warning', idx);
+          }
+        }
+      });
+    }
+
+    const profileSuspendBtn = document.getElementById('profileSuspendBtn');
+    if (profileSuspendBtn) {
+      profileSuspendBtn.addEventListener('click', () => {
+        // Automatically close dropdown on click
+        const profileActionsContent = document.getElementById('profileActionsContent');
+        if (profileActionsContent) profileActionsContent.classList.remove('active');
+
+        if (this.currentFarmerNo) {
+          const idx = this.data.findIndex(f => Number(f['NO.']) === this.currentFarmerNo);
+          if (idx !== -1) {
+            const isBlocked = this.data[idx].is_blocked === true || this.data[idx].is_blocked === 'true';
+            if (isBlocked) {
+              // Unsuspend directly without modal
+              this.handleUnblockFarmer(idx, 'Manual Unsuspend');
+            } else {
+              this.openFarmerActionModal('suspend', idx);
+            }
+          }
+        }
+      });
     }
 
     // Register module actions (download/share)
@@ -1714,17 +1899,25 @@ class DashboardApp {
       });
     }
 
-    // Inline edit + row delete (event delegation)
+    // Inline edit + row actions (event delegation)
     document.addEventListener('click', (e) => {
-      const delBtn = e.target.closest('[data-action="delete-farmer"]');
-      if (!delBtn) return;
-      const idx = Number.parseInt(delBtn.getAttribute('data-row-index') || '', 10);
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      
+      const action = btn.getAttribute('data-action');
+      const idx = Number.parseInt(btn.getAttribute('data-row-index') || '', 10);
       if (!Number.isFinite(idx) || idx < 0) return;
-      if (!this.data[idx]) {
-        this.showNotification('Could not find that row to delete.', 'error');
-        return;
+      if (!this.data[idx]) return;
+
+      if (action === 'warning-farmer') {
+        this.handleWarningFarmer(idx);
+      } else if (action === 'block-farmer') {
+        this.handleBlockFarmer(idx);
+      } else if (action === 'unblock-farmer') {
+        this.handleUnblockFarmer(idx);
+      } else if (action === 'delete-farmer') {
+        this.openDeleteFarmerConfirm(idx);
       }
-      this.openDeleteFarmerConfirm(idx);
     });
 
     this.initDeleteFarmerConfirmModal();
@@ -1834,7 +2027,7 @@ class DashboardApp {
   }
 
   switchModule(moduleName) {
-    const settingsTabs = new Set(['security', 'notifications', 'activity', 'faq', 'profile']);
+    const settingsTabs = new Set(['security', 'activity', 'faq', 'profile']);
     const isSettingsTab = settingsTabs.has(moduleName);
     const isHeaderNotificationsFeed = moduleName === 'notifications-feed';
     const resolvedModuleName = isHeaderNotificationsFeed
@@ -1867,10 +2060,10 @@ class DashboardApp {
       'overview': 'Overview',
       'notifications': 'Notifications',
       'notifications-feed': 'Notifications',
-      'farmers': 'Farmer Records',
-      'farmers-list': "Farmer's Record",
+      'farmers': "Farmer's Record",
+      'farmers-list': "Farmer's Profile",
       'maps': 'Maps',
-      'transactions': 'Transactions',
+      'transactions': 'Client Transaction',
       'client-report': 'Client Report',
       'register': 'IPOPHL Register',
       'security': 'Account Security',
@@ -1921,11 +2114,15 @@ class DashboardApp {
       this.renderNotificationsList();
       this.refreshNotificationsModule();
     }
+
     if (resolvedModuleName === 'analytics') {
       this.renderAnalyticsModule();
     }
     if (resolvedModuleName === 'maps') {
       this.renderMapsModule();
+    }
+    if (resolvedModuleName === 'farmers-list') {
+      this.renderFarmersListCards();
     }
     if (resolvedModuleName === 'register') {
       this.renderRegisterModule();
@@ -2053,14 +2250,8 @@ class DashboardApp {
       {
         tab: 'security',
         title: 'Account Security',
-        desc: 'Change your password and manage two-factor authentication.',
+        desc: 'Change your password to keep your account safe.',
         icon: 'fa-shield-halved',
-      },
-      {
-        tab: 'notifications',
-        title: 'Notifications Settings',
-        desc: 'Control email, SMS, and in-app alerts.',
-        icon: 'fa-bell',
       },
       {
         tab: 'activity',
@@ -2071,13 +2262,13 @@ class DashboardApp {
       {
         tab: 'faq',
         title: 'FAQ',
-        desc: 'Quick answers about passwords, 2FA, and backups.',
+        desc: 'Quick answers about passwords and account security.',
         icon: 'fa-circle-question',
       },
       {
         tab: 'profile',
         title: 'Profile Actions',
-        desc: 'Update your name, refresh session, or sign out.',
+        desc: 'Update your name or sign out.',
         icon: 'fa-user-gear',
       },
     ];
@@ -2121,7 +2312,6 @@ class DashboardApp {
 
     const fragments = {
       security: '/admin/settings/account_security.html',
-      notifications: '/admin/settings/notifications_settings.html',
       activity: '/admin/settings/activity_log.html',
       faq: '/admin/settings/faq.html',
       profile: '/admin/settings/profile_actions.html',
@@ -2129,7 +2319,6 @@ class DashboardApp {
 
     const titleMap = {
       security: 'Account Security',
-      notifications: 'Notifications Settings',
       activity: 'Activity Log',
       faq: 'FAQ',
       profile: 'Profile Actions',
@@ -2184,7 +2373,7 @@ class DashboardApp {
       };
 
       const applyFilters = () => {
-        const term = (search && (search.value || '')).toString().toLowerCase().trim();
+        const term = (search?.value || '').toLowerCase().trim();
         const selectedAction = actionFilter && actionFilter.value ? actionFilter.value : 'all';
 
         rows.forEach((row) => {
@@ -2203,52 +2392,11 @@ class DashboardApp {
 
     const needsServerState =
       !!containerEl.querySelector('#passwordForm') ||
-      !!containerEl.querySelector('#saveNotificationsBtn') ||
       !!containerEl.querySelector('#profileForm');
 
     let state = null;
     if (needsServerState) {
       state = await this.fetchSettingsState();
-    }
-
-    const NOTIFICATION_KEYS = [
-      'email_system_events',
-      'email_user_registrations',
-      'email_security_breaches',
-      'sms_system_events',
-      'sms_user_registrations',
-      'sms_security_breaches',
-      'in_app_system_events',
-      'in_app_user_registrations',
-      'in_app_security_breaches',
-    ];
-
-    const saveNotificationsBtn = containerEl.querySelector('#saveNotificationsBtn');
-    if (saveNotificationsBtn) {
-      if (state && state.notifications) {
-        NOTIFICATION_KEYS.forEach((k) => {
-          const el = containerEl.querySelector(`#${k}`);
-          if (el) el.checked = !!state.notifications[k];
-        });
-      }
-      saveNotificationsBtn.addEventListener('click', async () => {
-        const fd = new FormData();
-        NOTIFICATION_KEYS.forEach((k) => {
-          const el = containerEl.querySelector(`#${k}`);
-          fd.append(k, el && el.checked ? 'true' : 'false');
-        });
-        try {
-          const res = await fetch('/settings/notifications', { method: 'POST', body: fd });
-          const result = await res.json();
-          if (result.error) {
-            this.showNotification(result.error, 'error');
-            return;
-          }
-          this.showNotification(result.success || 'Notification settings saved.', 'success');
-        } catch {
-          this.showNotification('Could not save notifications.', 'error');
-        }
-      });
     }
 
     const profileForm = containerEl.querySelector('#profileForm');
@@ -2282,13 +2430,6 @@ class DashboardApp {
         } catch {
           this.showNotification('Could not update profile.', 'error');
         }
-      });
-    }
-
-    const refreshSessionBtn = containerEl.querySelector('#refreshSessionBtn');
-    if (refreshSessionBtn) {
-      refreshSessionBtn.addEventListener('click', () => {
-        window.location.reload();
       });
     }
 
@@ -2476,157 +2617,9 @@ class DashboardApp {
     }
 
     const enable2faBtn = containerEl.querySelector('#enable2faBtn');
-    const disable2faBtn = containerEl.querySelector('#disable2faBtn');
-    const viewBackupCodesBtn = containerEl.querySelector('#viewBackupCodesBtn');
-    const cancel2faSetupBtn = containerEl.querySelector('#cancel2faSetupBtn');
-    const twoFaStatus = containerEl.querySelector('[id="2faStatus"]');
-    const twoFaSetup = containerEl.querySelector('[id="2faSetup"]');
-    const enable2faToggle = containerEl.querySelector('#enable2faToggle');
-    const notEnabledState = containerEl.querySelector('[id="2faNotEnabledState"]');
-    const enabledState = containerEl.querySelector('[id="2faEnabledState"]');
-
-    const set2faEnabledState = (enabled) => {
-      if (twoFaStatus) twoFaStatus.style.display = 'block';
-      if (notEnabledState) notEnabledState.style.display = enabled ? 'none' : 'block';
-      if (enabledState) enabledState.style.display = enabled ? 'block' : 'none';
-    };
-
-    let twoFaActive = !!(state && state.security && state.security.two_factor_enabled);
-
-    const userIdentifier =
-      (state && state.user && state.user.phone) ||
-      (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.phone) ||
-      '';
-
-    const startEnable2fa = async (showSuccessMsg = true) => {
-      try {
-        const body = new URLSearchParams();
-        body.set('action', 'toggle_2fa');
-        body.set('enable_2fa', 'true');
-        const res = await fetch('/settings/security', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: body.toString(),
-        });
-        const result = await res.json();
-        if (result.error) {
-          this.showNotification(result.error, 'error');
-          return;
-        }
-        twoFaActive = true;
-        if (enable2faToggle) enable2faToggle.checked = true;
-        set2faEnabledState(true);
-        this.fill2faSetupPanel(containerEl, userIdentifier, result.secret, result.backup_codes);
-        if (showSuccessMsg) this.showNotification(result.success || '2FA enabled.', 'success');
-      } catch {
-        this.showNotification('Could not enable 2FA.', 'error');
-      }
-    };
-
-    if (passwordForm || enable2faBtn || enable2faToggle) {
-      if (twoFaSetup) twoFaSetup.style.display = 'none';
-      if (twoFaStatus) twoFaStatus.style.display = 'block';
-      set2faEnabledState(twoFaActive);
-      if (enable2faToggle) enable2faToggle.checked = twoFaActive;
-      this.reset2faQrPlaceholder(containerEl);
-    }
-
-    if (enable2faToggle) {
-      enable2faToggle.addEventListener('change', () => {
-        const on = enable2faToggle.checked;
-        if (on) {
-          startEnable2fa(true);
-        } else if (twoFaActive) {
-          enable2faToggle.checked = true;
-          this.openDisable2faConfirmModal();
-        } else {
-          set2faEnabledState(false);
-        }
-      });
-    } else if (notEnabledState && enabledState) {
-      set2faEnabledState(twoFaActive);
-    }
-
     if (enable2faBtn) {
       enable2faBtn.addEventListener('click', () => {
-        if (enable2faToggle) enable2faToggle.checked = true;
-        startEnable2fa(true);
-      });
-    }
-
-    if (viewBackupCodesBtn) {
-      viewBackupCodesBtn.addEventListener('click', async () => {
-        const fresh = await this.fetchSettingsState();
-        if (!fresh || !fresh.security || !fresh.security.totp_secret) {
-          this.showNotification('Backup codes are not available. Enable 2FA first.', 'error');
-          return;
-        }
-        this.fill2faSetupPanel(
-          containerEl,
-          fresh.user && fresh.user.phone,
-          fresh.security.totp_secret,
-          fresh.security.backup_codes || []
-        );
-        this.showNotification('Store these codes in a safe place.', 'success');
-      });
-    }
-
-    if (disable2faBtn) {
-      disable2faBtn.addEventListener('click', () => {
-        this.openDisable2faConfirmModal();
-      });
-    }
-
-    const submitDisable2fa = async () => {
-      const pwEl = document.getElementById('disable2faPasswordInput');
-      const password = (pwEl && pwEl.value) || '';
-      if (!password) {
-        this.showNotification('Enter your password to disable 2FA.', 'error');
-        return;
-      }
-      const body = new URLSearchParams();
-      body.set('action', 'toggle_2fa');
-      body.set('enable_2fa', 'false');
-      body.set('password', password);
-      try {
-        const res = await fetch('/settings/security', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: body.toString(),
-        });
-        const result = await res.json();
-        if (result.error) {
-          this.showNotification(result.error, 'error');
-          return;
-        }
-        this.closeDisable2faConfirmModal();
-        twoFaActive = false;
-        if (enable2faToggle) enable2faToggle.checked = false;
-        set2faEnabledState(false);
-        if (twoFaSetup) {
-          twoFaSetup.style.display = 'none';
-          this.reset2faQrPlaceholder(containerEl);
-        }
-        if (twoFaStatus) twoFaStatus.style.display = 'block';
-        this.showNotification(result.success || '2FA disabled.', 'success');
-      } catch {
-        this.showNotification('Could not disable 2FA.', 'error');
-      }
-    };
-
-    const disableOk = document.getElementById('disable2faConfirmOk');
-    const disableCancel = document.getElementById('disable2faConfirmCancel');
-    const disableBackdrop = document.getElementById('disable2faConfirmBackdrop');
-    if (disableOk) disableOk.addEventListener('click', () => submitDisable2fa());
-    if (disableCancel) disableCancel.addEventListener('click', () => this.closeDisable2faConfirmModal());
-    if (disableBackdrop) disableBackdrop.addEventListener('click', () => this.closeDisable2faConfirmModal());
-
-    if (cancel2faSetupBtn) {
-      cancel2faSetupBtn.addEventListener('click', () => {
-        if (twoFaSetup) twoFaSetup.style.display = 'none';
-        if (twoFaStatus) twoFaStatus.style.display = 'block';
-        set2faEnabledState(twoFaActive);
-        this.reset2faQrPlaceholder(containerEl);
+        this.showNotification('2FA feature is currently unavailable.', 'info');
       });
     }
   }
@@ -2649,10 +2642,12 @@ class DashboardApp {
       // Always fetch from DB-backed API so Flask-Admin changes
       // are immediately reflected on the website.
       const response = await fetch('/api/farmer-data');
+      console.log('API response status:', response.status);
       if (!response.ok) {
-        throw new Error('Failed to fetch farmer data from database');
+        throw new Error(`Failed to fetch farmer data: HTTP ${response.status}`);
       }
       const apiData = await response.json();
+      console.log('Received data length:', apiData.length);
       this.data = Array.isArray(apiData) ? apiData.slice(0, this.maxFarmers) : [];
       
       this.filteredData = [...this.data];
@@ -2665,7 +2660,6 @@ class DashboardApp {
       this.updateStats();
       this.createCharts();
       this.updateTable();
-      this.populateRecipientDropdown();
       
     } catch (error) {
       console.error('Error loading farmer data:', error);
@@ -2691,7 +2685,6 @@ class DashboardApp {
       this.updateStats();
       this.createCharts();
       this.updateTable();
-      this.populateRecipientDropdown();
     }
   }
 
@@ -2705,7 +2698,6 @@ class DashboardApp {
         'FIRST NAME': 'Romeo',
         'ADDRESS (BARANGAY)': 'San Jose',
         'BIRTHDAY': '1990-01-15',
-        'REMARKS': 'Good yield',
         'FA OFFICER / MEMBER': 'Juan Dela Cruz',
         'REGISTERED (YES/NO)': 'Yes',
         'STATUS OF OWNERSHIP': 'A',
@@ -2722,6 +2714,7 @@ class DashboardApp {
         'LIBERICA PRODUCTION': 450,
         'EXCELSA PRODUCTION': 600,
         'ROBUSTA PRODUCTION': 900,
+        'RSBSA NUMBER': 'RSB-2026-001',
         'NCFRS': 'NCF001',
         'PHONE': '+63 912 345 6789'
       },
@@ -2731,7 +2724,6 @@ class DashboardApp {
         'FIRST NAME': 'Anghelito',
         'ADDRESS (BARANGAY)': 'San Pedro',
         'BIRTHDAY': '1985-05-20',
-        'REMARKS': 'Needs fertilizer',
         'FA OFFICER / MEMBER': 'Maria Santos',
         'REGISTERED (YES/NO)': 'Yes',
         'STATUS OF OWNERSHIP': 'B',
@@ -2748,6 +2740,7 @@ class DashboardApp {
         'LIBERICA PRODUCTION': 300,
         'EXCELSA PRODUCTION': 450,
         'ROBUSTA PRODUCTION': 750,
+        'RSBSA NUMBER': 'RSB-2026-002',
         'NCFRS': 'NCF002',
         'PHONE': '+63 923 456 7890'
       },
@@ -2757,7 +2750,6 @@ class DashboardApp {
         'FIRST NAME': 'Avelino',
         'ADDRESS (BARANGAY)': 'San Miguel',
         'BIRTHDAY': '1978-11-10',
-        'REMARKS': 'Excellent growth',
         'FA OFFICER / MEMBER': 'Carlos Reyes',
         'REGISTERED (YES/NO)': 'No',
         'STATUS OF OWNERSHIP': 'C',
@@ -2774,6 +2766,7 @@ class DashboardApp {
         'LIBERICA PRODUCTION': 600,
         'EXCELSA PRODUCTION': 540,
         'ROBUSTA PRODUCTION': 1050,
+        'RSBSA NUMBER': 'RSB-2026-003',
         'NCFRS': 'NCF003',
         'PHONE': '+63 934 567 8901'
       }
@@ -2787,7 +2780,6 @@ class DashboardApp {
     this.updateTable();
     this.updateStats();
     this.createCharts();
-    this.populateRecipientDropdown();
   }
 
   updateTable() {
@@ -2798,6 +2790,83 @@ class DashboardApp {
     this.renderFarmersListCards();
     this.renderMapsModule();
     this.renderRegisterModule();
+  }
+
+  getSuspensionCountdown(until) {
+    if (!until) return '';
+    const diff = until - Date.now();
+    if (diff <= 0) return 'Lifting...';
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+    let parts = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    parts.push(`${seconds}s`);
+
+    return parts.join(' ');
+  }
+
+  startSuspensionTimers() {
+    if (this.suspensionInterval) clearInterval(this.suspensionInterval);
+    this.suspensionInterval = setInterval(() => {
+      let needsRefresh = false;
+      
+      // Update countdowns in cards and profile
+      document.querySelectorAll('.suspension-countdown').forEach(el => {
+        const until = Number(el.dataset.until);
+        if (until) {
+          const now = Date.now();
+          const diff = until - now;
+          
+          if (diff <= 0) {
+            // Auto-unsuspend if time is up
+            const n = Number(el.dataset.farmerNo);
+            const idx = this.data.findIndex(f => Number(f['NO.']) === n);
+            if (idx !== -1 && this.data[idx].is_blocked) {
+              this.data[idx].is_blocked = false;
+              delete this.data[idx].suspended_until;
+              needsRefresh = true;
+            }
+            el.textContent = 'Lifting...';
+          } else {
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+            
+            // Standard text update (Hidden but still useful for card views)
+            if (el.id !== 'profileSuspensionTimer') {
+              el.textContent = this.getSuspensionCountdown(until);
+            }
+            
+            // Special boxed update for profile view
+            if (el.id === 'profileSuspensionTimer') {
+              const d = document.getElementById('timerDays');
+              const h = document.getElementById('timerHours');
+              const m = document.getElementById('timerMinutes');
+              
+              if (d) d.textContent = String(days).padStart(2, '0');
+              if (h) h.textContent = String(hours).padStart(2, '0');
+              if (m) m.textContent = String(minutes).padStart(2, '0');
+            }
+          }
+        }
+      });
+
+      if (needsRefresh) {
+        this.renderFarmersListCards();
+        this.renderTableBody();
+        if (this.currentFarmerNo) {
+          const idx = this.data.findIndex(f => Number(f['NO.']) === this.currentFarmerNo);
+          if (idx !== -1) this.updateProfileStatusButtons(this.data[idx].is_blocked);
+        }
+      }
+    }, 1000);
   }
 
   renderFarmersListCards() {
@@ -2816,6 +2885,16 @@ class DashboardApp {
         .replace(/"/g, '&quot;');
 
     if (!pageData.length) {
+      if (this.data.length === 0) {
+        grid.innerHTML = `
+          <div class="placeholder-content" style="grid-column: 1 / -1; padding: 4rem 2rem;">
+            <div class="placeholder-icon"><i class="fa-solid fa-people-group"></i></div>
+            <h3>No Farmers Found</h3>
+            <p>There are currently no farmer records in the database.</p>
+          </div>
+        `;
+        return;
+      }
       grid.innerHTML = Array.from({ length: 6 }, (_, idx) => {
         const n = idx + 1;
         return `<article class="farmer-card" aria-label="Placeholder farmer card ${n}">
@@ -2831,7 +2910,7 @@ class DashboardApp {
   <div class="farmer-card__identity">
     <h3 class="farmer-card__name">Name</h3>
   </div>
-  <div class="farmer-card__inner-box">
+  <div class="farmer-card__inner-box" style="background: #ffffff; border: 1px solid #f1f5f9;">
     <div class="farmer-card__detail-row">
       <i class="fa-solid fa-hashtag"></i>
       <span>#${n}</span>
@@ -2846,7 +2925,7 @@ class DashboardApp {
     </div>
     <div class="farmer-card__detail-row">
       <i class="fa-solid fa-phone"></i>
-      <span class="farmer-card__pill">+63 900 XXXX XXXX</span>
+      <span class="farmer-card__pill" style="background: #f8fafc; border: 1px solid #e2e8f0; color: #475569;">+63 900 XXXX XXXX</span>
     </div>
   </div>
   <div class="farmer-card__footer">
@@ -2875,13 +2954,34 @@ class DashboardApp {
         const dob = this.getValue(row, ['BIRTHDAY', 'birthday', 'Date of Birth']);
         const phone = this.getValue(row, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']);
         const address = this.getValue(row, ['ADDRESS (BARANGAY)', 'barangay', 'BARANGAY', 'address']) || 'Address not set';
-        const remarks = this.getValue(row, ['REMARKS', 'remarks']) || 'Coffee farmer profile preview card.';
         const photo = this.getValue(row, ['PHOTO', 'photo', 'photo_url', 'image']);
+        const isBlocked = row.is_blocked === true || row.is_blocked === 'true';
         
         return `<article class="farmer-card" aria-label="${esc(fullName)}">
   <div class="farmer-card__header">
-    <div class="farmer-card__status-badge">Active</div>
-    <div class="farmer-card__menu-dots"><i class="fa-solid fa-ellipsis"></i></div>
+    <div class="farmer-card__status-badge ${isBlocked ? 'is-blocked' : ''}">
+      ${isBlocked ? 'Suspended' : 'Active'}
+      ${isBlocked && row.suspended_until ? `<span class="suspension-countdown" data-until="${row.suspended_until}" data-farmer-no="${esc(n)}">${this.getSuspensionCountdown(row.suspended_until)}</span>` : ''}
+    </div>
+    <div class="profile-actions-dropdown">
+      <button type="button" class="profile-actions-toggle card-menu-toggle" aria-label="More actions">
+        <i class="fa-solid fa-ellipsis"></i>
+      </button>
+      <div class="profile-actions-content card-menu-content">
+        <button type="button" class="profile-action-item warning" data-card-action="warning" data-farmer-no="${esc(n)}">
+          <i class="fa-solid fa-triangle-exclamation"></i> Warning
+        </button>
+        ${!isBlocked ? `
+          <button type="button" class="profile-action-item suspend" data-card-action="suspend" data-farmer-no="${esc(n)}">
+            <i class="fa-solid fa-user-slash"></i> Suspend
+          </button>
+        ` : `
+          <button type="button" class="profile-action-item unsuspend" data-card-action="unsuspend" data-farmer-no="${esc(n)}">
+            <i class="fa-solid fa-user-check"></i> Unsuspend
+          </button>
+        `}
+      </div>
+    </div>
   </div>
   <div class="farmer-card__media">
     <div class="farmer-card__avatar-circle">
@@ -2891,7 +2991,7 @@ class DashboardApp {
   <div class="farmer-card__identity">
     <h3 class="farmer-card__name">${esc(fullName)}</h3>
   </div>
-  <div class="farmer-card__inner-box">
+  <div class="farmer-card__inner-box" style="background: #ffffff; border: 1px solid #f1f5f9;">
     <div class="farmer-card__detail-row">
       <i class="fa-solid fa-hashtag"></i>
       <span>#${esc(n)}</span>
@@ -2906,7 +3006,7 @@ class DashboardApp {
     </div>
     <div class="farmer-card__detail-row">
       <i class="fa-solid fa-phone"></i>
-      <span class="farmer-card__pill">${esc(phone || '—')}</span>
+      <span class="farmer-card__pill" style="background: #f8fafc; border: 1px solid #e2e8f0; color: #475569;">${esc(phone || '—')}</span>
     </div>
   </div>
   <div class="farmer-card__footer">
@@ -2920,10 +3020,20 @@ class DashboardApp {
       .join('');
   }
 
-  openFarmerProfile(farmerNo) {
+  openFarmerProfile(farmerNo, source = 'profiles') {
+    this.farmerProfileSource = source;
     const profileView = document.getElementById('farmerProfileView');
     const listView = document.getElementById('farmersListView');
     if (!profileView || !listView) return;
+
+    // Update Back button text based on source
+    const backBtn = document.getElementById('farmerProfileBackBtn');
+    if (backBtn) {
+      const span = backBtn.querySelector('span');
+      if (span) {
+        span.textContent = source === 'client-report' ? 'Back to Client Report' : 'Back to Profiles';
+      }
+    }
 
     // Reset See More state
     const detailsArea = document.getElementById('detailsScrollArea');
@@ -2936,6 +3046,9 @@ class DashboardApp {
       this.showNotification('Farmer not found.', 'error');
       return;
     }
+
+    this.currentFarmerNo = Number(farmerNo);
+    this.updateProfileStatusButtons(farmer.is_blocked === true || farmer.is_blocked === 'true');
 
     const fullName =
       this.getValue(farmer, ['NAME OF FARMER', 'name', 'FULL NAME', 'full_name']) ||
@@ -2964,8 +3077,8 @@ class DashboardApp {
 
     setText('farmerProfileLastNameText', this.getValue(farmer, ['LAST NAME', 'last_name']) || nameParts.last);
     setText('farmerProfileFirstNameText', this.getValue(farmer, ['FIRST NAME', 'first_name']) || nameParts.first);
-    setText('farmerProfileProvinceText', this.getValue(farmer, ['PROVINCE', 'province']) || '');
-    setText('farmerProfileMunicipalityText', this.getValue(farmer, ['MUNICIPALITY', 'municipality', 'CITY']) || '');
+    setText('farmerProfileProvinceText', this.getValue(farmer, ['PROVINCE', 'province']) || 'Batangas');
+    setText('farmerProfileMunicipalityText', this.getValue(farmer, ['MUNICIPALITY', 'municipality', 'CITY']) || 'Lipa City');
     setText('farmerProfileBarangayText', this.getValue(farmer, ['BARANGAY', 'ADDRESS (BARANGAY)', 'barangay']) || '');
     setText('farmerProfileFederationText', this.getValue(farmer, ['FA OFFICER / MEMBER', 'FEDERATION', 'Federation Association']) || '');
     setText('farmerProfileRsbsaText', this.getValue(farmer, ['REGISTERED (YES/NO)', 'RSBSA Registered']) || '');
@@ -3096,9 +3209,9 @@ class DashboardApp {
 
       txnBody.innerHTML = pagedTxns.map(t => `
         <tr>
-          <td class="txn-date">${t.date}</td>
-          <td>${t.desc}</td>
-          <td style="font-weight:700">${t.results}</td>
+          <td class="txn-date" style="background: #ffffff;">${t.date}</td>
+          <td style="background: #ffffff;">${t.desc}</td>
+          <td style="font-weight:700; background: #ffffff;">${t.results}</td>
         </tr>
       `).join('');
 
@@ -3195,17 +3308,36 @@ class DashboardApp {
     const listView = document.getElementById('farmersListView');
     if (!profileView || !listView) return;
 
-    const toolbar = document.getElementById('farmersListToolbar');
-    if (toolbar) toolbar.style.display = 'flex';
+    if (this.farmerProfileSource === 'client-report') {
+      this.switchModule('client-report');
+      // Also ensure the farmers list views are reset for next time
+      profileView.hidden = true;
+      listView.hidden = false;
+      const toolbar = document.getElementById('farmersListToolbar');
+      if (toolbar) toolbar.style.display = 'flex';
+    } else {
+      const toolbar = document.getElementById('farmersListToolbar');
+      if (toolbar) toolbar.style.display = 'flex';
 
-    profileView.hidden = true;
-    listView.hidden = false;
+      profileView.hidden = true;
+      listView.hidden = false;
+    }
   }
 
   openFarmerPlaceholderProfile(farmerNo = 1) {
+    this.farmerProfileSource = 'profiles';
     const profileView = document.getElementById('farmerProfileView');
     const listView = document.getElementById('farmersListView');
     if (!profileView || !listView) return;
+
+    // Update Back button text
+    const backBtn = document.getElementById('farmerProfileBackBtn');
+    if (backBtn) {
+      const span = backBtn.querySelector('span');
+      if (span) {
+        span.textContent = 'Back to Profiles';
+      }
+    }
 
     const setText = (id, value) => {
       const el = document.getElementById(id);
@@ -3298,14 +3430,14 @@ class DashboardApp {
     if (pageData.length === 0) {
       const colSpan =
         this.farmerTableView === 'trees'
-          ? 13
+          ? 12
           : this.farmerTableView === 'production'
-            ? 7
+            ? 6
             : this.farmerTableView === 'affiliation'
-              ? 7
+              ? 8
               : this.farmerTableView === 'farm'
-                ? 10
-                : 7;
+                ? 9
+              : 5;
       tableBody.innerHTML = `<tr><td colspan="${colSpan}" class="no-data">No data available.</td></tr>`;
       return;
     }
@@ -3339,8 +3471,7 @@ class DashboardApp {
 
               this.createInputCell(this.getValue(row, ['TOTAL BEARING', 'Total_Bearing']), 'number', 'highlight-green'),
               this.createInputCell(this.getValue(row, ['TOTAL NON-BEARING', 'Total_Non-bearing']), 'number', 'highlight-green'),
-              this.createInputCell(this.getValue(row, ['TOTAL TREES', 'TOTAL_TREES']), 'number', 'highlight-green'),
-              this.createRowActionsCell(rowIndexInData)
+              this.createInputCell(this.getValue(row, ['TOTAL TREES', 'TOTAL_TREES']), 'number', 'highlight-green')
             ]
           : this.farmerTableView === 'production'
             ? [
@@ -3349,8 +3480,7 @@ class DashboardApp {
                 this.createInputCell(nameParts.first, 'text'),
                 this.createInputCell(this.getValue(row, ['LIBERICA PRODUCTION', 'Liberica_Production']), 'number', 'highlight-blue'),
                 this.createInputCell(this.getValue(row, ['EXCELSA PRODUCTION', 'Excelsa_Production']), 'number', 'highlight-blue'),
-                this.createInputCell(this.getValue(row, ['ROBUSTA PRODUCTION', 'Robusta_Production']), 'number', 'highlight-blue'),
-                this.createRowActionsCell(rowIndexInData)
+                this.createInputCell(this.getValue(row, ['ROBUSTA PRODUCTION', 'Robusta_Production']), 'number', 'highlight-blue')
               ]
           : this.farmerTableView === 'affiliation'
             ? [
@@ -3359,8 +3489,12 @@ class DashboardApp {
                 this.createInputCell(nameParts.first, 'text'),
                 this.createInputCell(this.getValue(row, ['FA OFFICER / MEMBER', 'FA Officer / member', 'officer']), 'text'),
                 this.createRSBSABadge(this.getValue(row, ['RSBSA Registered (Yes/No)', 'REGISTERED (YES/NO)', 'Registered (Yes/No)', 'registered'])),
-                this.createInputCell(this.getValue(row, ['NCFRS', 'ncfrs']), 'text'),
-                this.createRowActionsCell(rowIndexInData)
+                this.createInputCell(this.getValue(row, ['RSBSA NUMBER', 'rsbsa_number']), 'text'),
+                this.createRSBSAStatusBadge(
+                  this.getValue(row, ['RSBSA Registered (Yes/No)', 'REGISTERED (YES/NO)', 'Registered (Yes/No)', 'registered']),
+                  this.getValue(row, ['RSBSA STATUS', 'RSBSA Status', 'rsbsa_status', 'status'])
+                ),
+                this.createInputCell(this.getValue(row, ['NCFRS', 'ncfrs']), 'text')
               ]
           : this.farmerTableView === 'farm'
             ? [
@@ -3372,17 +3506,14 @@ class DashboardApp {
                 this.createOwnershipCell(this.getValue(row, ['LESSEE', 'Lessee', 'C'])),
                 this.createOwnershipCell(this.getValue(row, ['SHAREHOLDER', 'Shareholder', 'D'])),
                 this.createOwnershipCell(this.getValue(row, ['OTHERS', 'Others', 'E'])),
-                this.createInputCell(this.getValue(row, ['Total Area Planted (HA.)', 'TOTAL AREA PLANTED (HA.)', 'area']), 'number'),
-                this.createRowActionsCell(rowIndexInData)
+                this.createInputCell(this.getValue(row, ['Total Area Planted (HA.)', 'TOTAL AREA PLANTED (HA.)', 'area']), 'number')
               ]
           : [
               this.createInputCell(displayNo, 'number'),
               this.createInputCell(nameParts.last, 'text'),
               this.createInputCell(nameParts.first, 'text'),
               this.createInputCell(this.getValue(row, ['ADDRESS (BARANGAY)', 'Address (Barangay)', 'address']), 'text'),
-              this.createInputCell(this.getValue(row, ['BIRTHDAY', 'birthday']), 'text'),
-              this.createEditableCell(this.getValue(row, ['REMARKS', 'remarks']), rowIndexInData, 'REMARKS', 'text'),
-              this.createRowActionsCell(rowIndexInData)
+              this.createInputCell(this.getValue(row, ['BIRTHDAY', 'birthday']), 'text')
             ];
 
       return `<tr data-row-index="${rowIndexInData}">${cells.join('')}</tr>`;
@@ -3491,7 +3622,18 @@ class DashboardApp {
   }
 
   createRowActionsCell(rowIndex) {
-    return `<td><button type="button" class="row-action-btn" data-action="delete-farmer" data-row-index="${rowIndex}">Delete</button></td>`;
+    const row = this.data[rowIndex];
+    const isBlocked = row && (row.is_blocked === true || row.is_blocked === 'true');
+    
+    return `<td>
+      <div class="row-actions">
+        <button type="button" class="row-action-btn action-warning" data-action="warning-farmer" data-row-index="${rowIndex}">Warning</button>
+        ${isBlocked 
+          ? `<button type="button" class="row-action-btn action-unblock" data-action="unblock-farmer" data-row-index="${rowIndex}">Unblock</button>`
+          : `<button type="button" class="row-action-btn action-block" data-action="block-farmer" data-row-index="${rowIndex}">Block</button>`
+        }
+      </div>
+    </td>`;
   }
 
   createRSBSABadge(value) {
@@ -3505,6 +3647,146 @@ class DashboardApp {
     } else {
       return `<td></td>`;
     }
+  }
+
+  async handleWarningFarmer(idx, reason) {
+    const farmer = this.data[idx];
+    if (!farmer) return;
+    
+    try {
+      // Simulate API call to record warning
+      console.log(`Warning issued to ${farmer['NAME OF FARMER']} for reason: ${reason}`);
+      this.showNotification(`Warning recorded for ${farmer['NAME OF FARMER']}`, 'success');
+      
+      // Optionally log this as an activity
+      if (this.logActivity) {
+        this.logActivity('ADMIN', 'WARNING_ISSUED', `Reason: ${reason} - Farmer: ${farmer['NAME OF FARMER']}`);
+      }
+    } catch (err) {
+      console.error('Failed to record warning:', err);
+      this.showNotification('Could not record warning.', 'error');
+    }
+  }
+
+  async handleBlockFarmer(idx, reason) {
+    const farmer = this.data[idx];
+    if (!farmer) return;
+    
+    try {
+      const now = new Date();
+      const liftDate = new Date();
+      liftDate.setDate(now.getDate() + 3);
+
+      // Simulate API call to suspend
+      console.log(`Farmer suspended for 3 days: ${farmer['NAME OF FARMER']} for reason: ${reason}`);
+      farmer.is_blocked = true;
+      farmer.suspended_until = liftDate.getTime();
+      
+      this.showNotification(`${farmer['NAME OF FARMER']} has been suspended for 3 days.`, 'success');
+      
+      this.saveFarmers(); // Persist the suspension state
+      
+      if (this.logActivity) {
+        this.logActivity('ADMIN', 'FARMER_SUSPENDED', `Duration: 3 Days - Reason: ${reason} - Farmer: ${farmer['NAME OF FARMER']}`);
+      }
+    } catch (err) {
+      console.error('Failed to suspend farmer:', err);
+      this.showNotification('Could not suspend farmer.', 'error');
+    }
+  }
+
+  async handleUnblockFarmer(idx, reason) {
+    const farmer = this.data[idx];
+    if (!farmer) return;
+    
+    try {
+      // Simulate API call to unsuspend
+      console.log(`Farmer unsuspended: ${farmer['NAME OF FARMER']} for reason: ${reason}`);
+      farmer.is_blocked = false;
+      delete farmer.suspended_until;
+      
+      this.showNotification(`${farmer['NAME OF FARMER']} access has been restored.`, 'success');
+      
+      this.saveFarmers(); // Persist the change
+      
+      // Update UI if on profile view
+      if (this.currentFarmerNo === Number(farmer['NO.'] || farmer.no || farmer.No)) {
+        this.updateProfileStatusButtons(false);
+      }
+      
+      this.renderFarmersListCards();
+      this.renderTableBody();
+      
+      if (this.logActivity) {
+        this.logActivity('ADMIN', 'FARMER_UNSUSPENDED', `Reason: ${reason} - Farmer: ${farmer['NAME OF FARMER']}`);
+      }
+    } catch (err) {
+      console.error('Failed to unsuspend farmer:', err);
+      this.showNotification('Could not unsuspend farmer.', 'error');
+    }
+  }
+
+  updateProfileStatusButtons(isBlocked) {
+    const suspendBtn = document.getElementById('profileSuspendBtn');
+    const countdownContainer = document.getElementById('profileSuspensionCountdown');
+    const timerEl = document.getElementById('profileSuspensionTimer');
+    
+    if (!suspendBtn) return;
+
+    const icon = suspendBtn.querySelector('i');
+    const label = suspendBtn.querySelector('span');
+
+    if (isBlocked) {
+      suspendBtn.classList.remove('suspend');
+      suspendBtn.classList.add('unsuspend');
+      if (icon) icon.className = 'fa-solid fa-user-check';
+      if (label) label.textContent = 'Unsuspend';
+      
+      // Show countdown if we have a suspension end time
+      const farmer = (this.data || []).find(f => {
+        const no = f['NO.'] || f['no'] || f['No'] || f['id'] || f['ID'];
+        return Number(no) === Number(this.currentFarmerNo);
+      });
+
+      if (farmer && farmer.suspended_until && countdownContainer && timerEl) {
+        countdownContainer.hidden = false;
+        countdownContainer.style.setProperty('display', 'flex', 'important');
+        timerEl.dataset.until = farmer.suspended_until;
+        timerEl.dataset.farmerNo = this.currentFarmerNo;
+      } else {
+        if (countdownContainer) {
+          countdownContainer.hidden = true;
+          countdownContainer.style.setProperty('display', 'none', 'important');
+        }
+      }
+    } else {
+      suspendBtn.classList.remove('unsuspend');
+      suspendBtn.classList.add('suspend');
+      if (icon) icon.className = 'fa-solid fa-user-slash';
+      if (label) label.textContent = 'Suspend';
+      
+      if (countdownContainer) {
+        countdownContainer.hidden = true;
+        countdownContainer.style.setProperty('display', 'none', 'important');
+      }
+    }
+  }
+
+  createRSBSAStatusBadge(registeredValue, statusValue) {
+    const normalizedReg = String(registeredValue || '').toLowerCase().trim();
+    const isNo = normalizedReg === 'no' || normalizedReg === 'n';
+
+    if (isNo) {
+      // Use provided status or default to "NOT YET APPLIED"
+      let status = String(statusValue || '').toUpperCase().trim();
+      if (!status) status = 'NOT YET APPLIED';
+      
+      // Map common status values to standard labels if needed
+      if (status.includes('PENDING')) status = 'PENDING RSBSA';
+
+      return `<td><span class="rsbsa-badge rsbsa-pending">${status}</span></td>`;
+    }
+    return `<td></td>`;
   }
 
   createOwnershipCell(value) {
@@ -3573,12 +3855,23 @@ class DashboardApp {
     if (backdrop) backdrop.addEventListener('click', () => this.closeAddFarmerModal());
     const rsbsaSelect = document.getElementById('newFarmerRsbsa');
     const ncfrsInput = document.getElementById('newFarmerNcfrs');
+    const rsbsaStatusContainer = document.getElementById('newFarmerRsbsaStatus')?.closest('label');
+
     if (rsbsaSelect && ncfrsInput) {
       rsbsaSelect.addEventListener('change', () => {
-        const requiresNcfrs = rsbsaSelect.value === 'YES';
-        ncfrsInput.required = requiresNcfrs;
-        if (!requiresNcfrs) {
+        const isYes = rsbsaSelect.value === 'YES';
+        const isNo = rsbsaSelect.value === 'NO';
+        
+        ncfrsInput.required = isYes;
+        if (!isYes) {
           ncfrsInput.setCustomValidity('');
+        }
+
+        // Toggle RSBSA Status visibility
+        if (rsbsaStatusContainer) {
+          rsbsaStatusContainer.style.display = isNo ? 'flex' : 'none';
+          const statusSelect = document.getElementById('newFarmerRsbsaStatus');
+          if (statusSelect) statusSelect.required = isNo;
         }
       });
     }
@@ -3681,7 +3974,11 @@ class DashboardApp {
     document.body.classList.remove('confirm-dialog-active');
     this.clearAddFarmerValidation();
     const form = document.getElementById('addFarmerForm');
-    if (form) form.reset();
+    if (form) {
+      form.reset();
+      const statusContainer = document.getElementById('newFarmerRsbsaStatus')?.closest('label');
+      if (statusContainer) statusContainer.style.display = 'none';
+    }
   }
 
   clearAddFarmerValidation() {
@@ -3773,10 +4070,10 @@ class DashboardApp {
       birthday: (document.getElementById('newFarmerBirthday')?.value || '').trim(),
       association: (document.getElementById('newFarmerAssociation')?.value || '').trim(),
       rsbsa,
+      rsbsaNumber: (document.getElementById('newFarmerRsbsaNumber')?.value || '').trim(),
       ncfrs: (document.getElementById('newFarmerNcfrs')?.value || '').trim(),
       ownership: (document.getElementById('newFarmerOwnership')?.value || '').trim(),
       area: this.getNumberInputValue('newFarmerArea'),
-      remarks: (document.getElementById('newFarmerRemarks')?.value || '').trim(),
       libBearing: this.getNumberInputValue('newLibBearing', { integer: true }),
       libNonBearing: this.getNumberInputValue('newLibNonBearing', { integer: true }),
       excBearing: this.getNumberInputValue('newExcBearing', { integer: true }),
@@ -3787,6 +4084,7 @@ class DashboardApp {
       excProd: this.getNumberInputValue('newExcProduction'),
       robProd: this.getNumberInputValue('newRobProduction'),
       prodUnit: (document.getElementById('newProductionUnit')?.value || 'kg').trim(),
+      rsbsaStatus: (document.getElementById('newFarmerRsbsaStatus')?.value || '').trim(),
     };
 
     return payload;
@@ -3822,8 +4120,9 @@ class DashboardApp {
       'EXCELSA PRODUCTION': payload.excProd,
       'ROBUSTA PRODUCTION': payload.robProd,
       'PRODUCTION UNIT': payload.prodUnit,
-      'NCFRS': payload.ncfrs,
-      'REMARKS': payload.remarks
+      'RSBSA NUMBER': payload.rsbsaNumber,
+      'RSBSA STATUS': payload.rsbsaStatus,
+      'NCFRS': payload.ncfrs
     };
 
     this.data.push(newRow);
@@ -3968,9 +4267,8 @@ class DashboardApp {
       'TOTAL TREES': 0,
       'LIBERICA PRODUCTION': '',
       'EXCELSA PRODUCTION': '',
-      'ROBUSTA PRODUCTION': '',
-      'NCFRS': '',
-      'REMARKS': ''
+      'ROBUSTA PRODUCTION': 0,
+      'NCFRS': ''
     };
     
     this.data.push(newRow);
@@ -4054,9 +4352,16 @@ class DashboardApp {
 
   updateRecordInfo() {
     const recordInfo = document.getElementById('recordInfo');
+    const listRecordInfo = document.getElementById('farmersListRecordInfo');
+    
+    if (this.filteredData.length === 0) {
+      if (recordInfo) recordInfo.textContent = 'No records found';
+      if (listRecordInfo) listRecordInfo.textContent = 'No profiles found';
+      return;
+    }
+
     const startIndex = (this.currentPage - 1) * this.pageSize + 1;
     const endIndex = Math.min(this.currentPage * this.pageSize, this.filteredData.length);
-    const listRecordInfo = document.getElementById('farmersListRecordInfo');
     const text = `Showing ${startIndex}-${endIndex} of ${this.filteredData.length} records`;
 
     if (recordInfo) recordInfo.textContent = text;
@@ -4216,8 +4521,6 @@ class DashboardApp {
     const failCounts = new Map([
       ['Tree Count (< 500 trees)', 0],
       ['RSBSA Registration', 0],
-      ['Traditional Method (from remarks)', 0],
-      ['Soil Type info in remarks', 0],
       ['NCFRS / Traceability ID', 0],
     ]);
 
@@ -4251,7 +4554,6 @@ class DashboardApp {
         this.num(farmer, ['TOTAL TREES', 'TOTAL_TREES']) ||
         (this.num(farmer, ['TOTAL BEARING', 'Total_Bearing']) +
           this.num(farmer, ['TOTAL NON-BEARING', 'Total_Non-bearing']));
-      const remarks = (this.getValue(farmer, ['REMARKS', 'remarks']) || '').toString().toLowerCase();
       const ncfrs = (this.getValue(farmer, ['NCFRS', 'ncfrs']) || '').toString().trim();
 
       const libTrees =
@@ -4268,15 +4570,9 @@ class DashboardApp {
       varietyTotals.Robusta += robTrees;
       varietyTotals.Excelsa += excTrees;
 
-      const hasTraditionalHint =
-        /traditional|organic|heritage|manual|handpicked|intercrop/.test(remarks);
-      const hasSoilHint = /soil|loam|clay|volcanic|pH/.test(remarks);
-
       const checks = {
         treeCount: totalTrees >= 500,
         rsbsa: rsbsa === true,
-        traditional: hasTraditionalHint,
-        soil: hasSoilHint,
         ncfrs: !!ncfrs,
       };
 
@@ -4288,8 +4584,6 @@ class DashboardApp {
         notEligible += 1;
         if (!checks.treeCount) failCounts.set('Tree Count (< 500 trees)', failCounts.get('Tree Count (< 500 trees)') + 1);
         if (!checks.rsbsa) failCounts.set('RSBSA Registration', failCounts.get('RSBSA Registration') + 1);
-        if (!checks.traditional) failCounts.set('Traditional Method (from remarks)', failCounts.get('Traditional Method (from remarks)') + 1);
-        if (!checks.soil) failCounts.set('Soil Type info in remarks', failCounts.get('Soil Type info in remarks') + 1);
         if (!checks.ncfrs) failCounts.set('NCFRS / Traceability ID', failCounts.get('NCFRS / Traceability ID') + 1);
       }
 
@@ -5935,6 +6229,172 @@ class DashboardApp {
   }
 
   // New dashboard functionality
+  initFarmerActionModal() {
+    const root = document.getElementById('farmerActionModal');
+    const cancelBtn = document.getElementById('farmerActionCancel');
+    const okBtn = document.getElementById('farmerActionConfirm');
+    if (!root || !cancelBtn || !okBtn) return;
+
+    const backdrop = root.querySelector('.confirm-dialog__backdrop');
+    cancelBtn.addEventListener('click', () => this.closeFarmerActionModal());
+    if (backdrop) backdrop.addEventListener('click', () => this.closeFarmerActionModal());
+
+    okBtn.addEventListener('click', () => {
+      const reason = (document.getElementById('farmerActionReason')?.value || '').trim();
+      if (!reason) {
+        this.showNotification('Please enter a reason for this action.', 'error');
+        return;
+      }
+
+      const action = root.dataset.action;
+      const idx = Number.parseInt(root.dataset.farmerIdx, 10);
+      if (Number.isNaN(idx)) return;
+
+      if (action === 'warning') {
+        this.handleWarningFarmer(idx, reason);
+      } else if (action === 'suspend') {
+        this.handleBlockFarmer(idx, reason);
+        this.updateProfileStatusButtons(true);
+      }
+
+      this.renderFarmersListCards();
+      this.renderTableBody();
+      this.closeFarmerActionModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || root.hasAttribute('hidden')) return;
+      this.closeFarmerActionModal();
+    });
+  }
+
+  openFarmerActionModal(action, farmerIdx) {
+    const root = document.getElementById('farmerActionModal');
+    const titleEl = document.getElementById('farmerActionTitle');
+    const subtitleEl = document.getElementById('farmerActionSubtitle');
+    const iconEl = document.getElementById('farmerActionIcon');
+    const iconWrap = document.getElementById('farmerActionIconWrap');
+    const confirmBtn = document.getElementById('farmerActionConfirm');
+    const reasonInput = document.getElementById('farmerActionReason');
+    const chipsContainer = document.getElementById('farmerActionQuickReasons');
+
+    if (!root || !titleEl || !subtitleEl || !iconEl || !iconWrap || !confirmBtn || !chipsContainer) return;
+
+    if (reasonInput) reasonInput.value = '';
+    root.dataset.action = action;
+    root.dataset.farmerIdx = farmerIdx;
+
+    // Reset suspension timeframe and countdown
+    const timeframe = document.getElementById('suspensionTimeframe');
+    const countdownMsg = document.getElementById('modalCountdownMsg');
+    const cancelBtn = document.getElementById('farmerActionCancel');
+    if (timeframe) timeframe.style.display = 'none';
+    if (countdownMsg) countdownMsg.style.display = 'none';
+    if (confirmBtn) confirmBtn.style.display = 'block';
+    if (cancelBtn) cancelBtn.style.display = 'block';
+
+    const farmer = this.data[farmerIdx];
+    const farmerName = farmer ? (farmer['NAME OF FARMER'] || farmer.name || 'Farmer') : 'Farmer';
+
+    // Define quick reasons based on action
+    let reasons = [];
+    if (action === 'warning' || action === 'suspend') {
+      reasons = [
+        'Misconduct',
+        'Policy Violation',
+        'Fraudulent Activity',
+        'Incomplete Data',
+        'Quality Standards',
+        'Other'
+      ];
+    } else if (action === 'unsuspend') {
+      reasons = [
+        'Issue Resolved',
+        'Requirements Met',
+        'Suspension Lifted',
+        'Error Correction',
+        'Other'
+      ];
+    }
+
+    // Populate chips
+    chipsContainer.innerHTML = reasons.map(r => `
+      <div class="reason-chip" data-reason="${r}">${r}</div>
+    `).join('');
+
+    // Add click listeners to chips
+    chipsContainer.querySelectorAll('.reason-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        chipsContainer.querySelectorAll('.reason-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        
+        const selectedReason = chip.dataset.reason;
+        if (selectedReason === 'Other') {
+          reasonInput.value = '';
+          reasonInput.focus();
+        } else {
+          reasonInput.value = selectedReason;
+        }
+      });
+    });
+
+    if (action === 'warning') {
+      titleEl.textContent = 'Warning Farmer';
+      subtitleEl.textContent = `Issuing a formal warning to ${farmerName}`;
+      iconEl.className = 'fa-solid fa-triangle-exclamation';
+      iconWrap.style.backgroundColor = '#fffbeb';
+      iconEl.style.color = '#b45309';
+      confirmBtn.textContent = 'Issue Warning';
+      confirmBtn.style.backgroundColor = '#b45309';
+    } else if (action === 'suspend') {
+      // Calculate and show suspension dates
+      const now = new Date();
+      const liftDate = new Date();
+      liftDate.setDate(now.getDate() + 3);
+
+      const options = { 
+        year: 'numeric', month: 'short', day: 'numeric', 
+        hour: '2-digit', minute: '2-digit' 
+      };
+      
+      const startText = document.getElementById('suspensionStartText');
+      const liftText = document.getElementById('suspensionLiftText');
+      if (startText) startText.textContent = now.toLocaleDateString(undefined, options);
+      if (liftText) liftText.textContent = liftDate.toLocaleDateString(undefined, options);
+      if (timeframe) timeframe.style.display = 'block';
+
+      titleEl.textContent = 'Suspend Farmer (3 Days)';
+      subtitleEl.textContent = `Suspending access for ${farmerName} for 3 days`;
+      iconEl.className = 'fa-solid fa-user-slash';
+      iconWrap.style.backgroundColor = '#fef2f2';
+      iconEl.style.color = '#b91c1c';
+      confirmBtn.textContent = 'Suspend for 3 Days';
+      confirmBtn.style.backgroundColor = '#b91c1c';
+    } else if (action === 'unsuspend') {
+      titleEl.textContent = 'Unsuspend Farmer';
+      subtitleEl.textContent = `Restoring access for ${farmerName}`;
+      iconEl.className = 'fa-solid fa-user-check';
+      iconWrap.style.backgroundColor = '#f0fdf4';
+      iconEl.style.color = '#15803d';
+      confirmBtn.textContent = 'Unsuspend Account';
+      confirmBtn.style.backgroundColor = '#15803d';
+    }
+
+    root.removeAttribute('hidden');
+    root.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('confirm-dialog-active');
+    if (reasonInput) reasonInput.focus();
+  }
+
+  closeFarmerActionModal() {
+    const root = document.getElementById('farmerActionModal');
+    if (root) {
+      root.setAttribute('hidden', '');
+      root.setAttribute('aria-hidden', 'true');
+    }
+    document.body.classList.remove('confirm-dialog-active');
+  }
+
   initNewDashboardFeatures() {
     this.initThemeToggle();
     this.initGlobalSearch();
@@ -6492,56 +6952,50 @@ class DashboardApp {
     // Search
     const searchInput = document.getElementById('messagingSearchInput');
     if (searchInput) {
-      searchInput.addEventListener('input', (e) => {
+      searchInput.oninput = (e) => {
         this.messagingSearchTerm = (e.target.value || '').trim();
         this.loadMessagingFolder();
-      });
+      };
     }
 
     // Refresh
     const refreshBtn = document.getElementById('messagingRefreshBtn');
     if (refreshBtn) {
-      refreshBtn.addEventListener('click', () => this.loadMessagingFolder());
-    }
-
-    // Mark all read
-    const markAllBtn = document.getElementById('messagingMarkAllReadBtn');
-    if (markAllBtn) {
-      markAllBtn.addEventListener('click', () => this.messagingMarkAllRead());
+      refreshBtn.onclick = () => this.loadMessagingFolder();
     }
 
     // Compose
     const composeBtn = document.getElementById('messagingComposeBtn');
     if (composeBtn) {
-      composeBtn.addEventListener('click', () => this.openMessagingCompose());
+      composeBtn.onclick = () => this.openMessagingCompose();
     }
     const composeClose = document.getElementById('messagingComposeClose');
     if (composeClose) {
-      composeClose.addEventListener('click', () => this.closeMessagingCompose());
+      composeClose.onclick = () => this.closeMessagingCompose();
     }
     const composeCancel = document.getElementById('messagingComposeCancel');
     if (composeCancel) {
-      composeCancel.addEventListener('click', () => this.closeMessagingCompose());
+      composeCancel.onclick = () => this.closeMessagingCompose();
     }
     const composeOverlay = document.getElementById('messagingComposeOverlay');
     if (composeOverlay) {
-      composeOverlay.addEventListener('click', (e) => {
+      composeOverlay.onclick = (e) => {
         if (e.target === composeOverlay) this.closeMessagingCompose();
-      });
+      };
     }
     const composeForm = document.getElementById('messagingComposeForm');
     if (composeForm) {
-      composeForm.addEventListener('submit', (e) => {
+      composeForm.onsubmit = (e) => {
         e.preventDefault();
         this.sendMessage();
-      });
+      };
     }
 
     // Contact dropdown listeners
     const recipientInput = document.getElementById('msgComposeRecipientInput');
     if (recipientInput) {
-      recipientInput.addEventListener('focus', () => this.showContactDropdown());
-      recipientInput.addEventListener('input', (e) => this.filterContactDropdown(e.target.value));
+      recipientInput.onfocus = () => this.showContactDropdown();
+      recipientInput.oninput = (e) => this.filterContactDropdown(e.target.value);
     }
     
     document.addEventListener('click', (e) => {
@@ -6554,20 +7008,20 @@ class DashboardApp {
 
     const dropdownList = document.getElementById('messagingContactDropdownList');
     if (dropdownList) {
-      dropdownList.addEventListener('click', (e) => {
+      dropdownList.onclick = (e) => {
         const item = e.target.closest('.messaging-contact-dropdown__item');
         if (item) {
           const phone = item.getAttribute('data-phone');
           const name = item.getAttribute('data-name');
           this.selectContact(name, phone);
         }
-      });
+      };
     }
 
     // Message list clicks
     const listEl = document.getElementById('messagingList');
     if (listEl) {
-      listEl.addEventListener('click', (e) => {
+      listEl.onclick = (e) => {
         const contactBtn = e.target.closest('.messaging-contact-message-btn');
         if (contactBtn) {
           e.stopPropagation();
@@ -6576,67 +7030,77 @@ class DashboardApp {
           return;
         }
 
-        const starBtn = e.target.closest('.messaging-item__star');
-        if (starBtn) {
-          e.stopPropagation();
-          const id = Number(starBtn.getAttribute('data-msg-id'));
-          if (id) this.toggleMessagingStar(id);
-          return;
-        }
         const item = e.target.closest('.messaging-item');
         if (item) {
           if (this.messagingFolder === 'contacts') return;
           const id = Number(item.getAttribute('data-msg-id'));
           if (id) this.openMessagingDetail(id);
         }
-      });
+      };
     }
 
     // Detail actions
-    const backBtn = document.getElementById('messagingDetailBackBtn');
-    if (backBtn) {
-      backBtn.addEventListener('click', () => this.closeMessagingDetail());
-    }
-    const starBtn = document.getElementById('messagingDetailStarBtn');
-    if (starBtn) {
-      starBtn.addEventListener('click', () => {
-        if (this.messagingSelectedId) this.toggleMessagingStar(this.messagingSelectedId);
-      });
-    }
     const archiveBtn = document.getElementById('messagingDetailArchiveBtn');
     if (archiveBtn) {
-      archiveBtn.addEventListener('click', () => {
-        if (this.messagingSelectedId) this.toggleMessagingArchive(this.messagingSelectedId);
-      });
+      archiveBtn.onclick = () => {
+        if (this.messagingSelectedId) {
+          this.toggleMessagingArchive(this.messagingSelectedId);
+          const menu = document.getElementById('messagingActionsMenu');
+          if (menu) menu.classList.remove('is-visible');
+        }
+      };
     }
     const deleteBtn = document.getElementById('messagingDetailDeleteBtn');
     if (deleteBtn) {
-      deleteBtn.addEventListener('click', () => {
-        if (this.messagingSelectedId) this.deleteMessagingMessage(this.messagingSelectedId);
+      deleteBtn.onclick = () => {
+        if (this.messagingSelectedId) {
+          this.deleteMessagingMessage(this.messagingSelectedId);
+          const menu = document.getElementById('messagingActionsMenu');
+          if (menu) menu.classList.remove('is-visible');
+        }
+      };
+    }
+
+    // Dropdown toggle logic
+    const toggleBtn = document.getElementById('messagingActionsToggle');
+    const actionsMenu = document.getElementById('messagingActionsMenu');
+    if (toggleBtn && actionsMenu) {
+      toggleBtn.onclick = (e) => {
+        e.stopPropagation();
+        actionsMenu.classList.toggle('is-visible');
+      };
+      document.addEventListener('click', (e) => {
+        if (!toggleBtn.contains(e.target) && !actionsMenu.contains(e.target)) {
+          actionsMenu.classList.remove('is-visible');
+        }
       });
     }
 
     // Inline Reply functionality
-    const inlineReplySendBtn = document.getElementById('msgInlineReplySendBtn');
-    if (inlineReplySendBtn) {
-      inlineReplySendBtn.addEventListener('click', () => {
-        this.sendInlineReply();
-      });
-    }
-    const inlineReplyInput = document.getElementById('msgInlineReplyInput');
-    if (inlineReplyInput) {
-      // Send on Enter (new line with Shift+Enter)
-      inlineReplyInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
+    const bindReplyEvents = () => {
+      const inlineReplySendBtn = document.getElementById('msgInlineReplySendBtn');
+      if (inlineReplySendBtn) {
+        inlineReplySendBtn.onclick = () => {
           this.sendInlineReply();
-        }
-      });
-      // Auto-resize textarea and typing indicators
-      inlineReplyInput.addEventListener('input', () => {
-        this.autoResizeTextarea(inlineReplyInput);
-      });
-    }
+        };
+      }
+      const inlineReplyInput = document.getElementById('msgInlineReplyInput');
+      if (inlineReplyInput) {
+        // Send on Enter (new line with Shift+Enter)
+        inlineReplyInput.onkeydown = (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            this.sendInlineReply();
+          }
+        };
+        // Auto-resize textarea and typing indicators
+        inlineReplyInput.oninput = () => {
+          this.autoResizeTextarea(inlineReplyInput);
+        };
+      }
+    };
+    
+    bindReplyEvents();
 
     // Escape to close compose / detail
     document.addEventListener('keydown', (e) => {
@@ -6656,73 +7120,88 @@ class DashboardApp {
     const listEl = document.getElementById('messagingList');
     if (!listEl) return;
 
-    if (this.messagingFolder === 'contacts') {
-      this.renderMessagingContacts();
-      return;
-    }
-
-    listEl.innerHTML = '<li class="messaging-loading"><i class="fa-solid fa-spinner"></i><span>Loading messages…</span></li>';
+    listEl.innerHTML = '<li class="messaging-loading"><i class="fa-solid fa-spinner fa-spin"></i><span>Loading chats…</span></li>';
 
     try {
-      let url = `/api/messages?folder=${encodeURIComponent(this.messagingFolder)}`;
-      if (this.messagingCategory) url += `&category=${encodeURIComponent(this.messagingCategory)}`;
+      // Unified Messenger view: Fetch all messages for the current admin
+      let url = `/api/messages?folder=all`;
       if (this.messagingSearchTerm) url += `&search=${encodeURIComponent(this.messagingSearchTerm)}`;
 
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      this.messagingMessages = Array.isArray(data.items) ? data.items : [];
+      console.log('Fetched messages:', data);
+      
+      // Handle both {items: []} and [] formats
+      const allMessages = Array.isArray(data) ? data : (data.items || []);
+      
+      // Update local storage of messages
+      this.messagingMessages = allMessages;
 
-      // If no messages from API, add sample data for demonstration
-      if (this.messagingMessages.length === 0 && this.messagingFolder === 'inbox') {
-        this.messagingMessages = this.getSampleFarmerMessages();
+      // Group messages by farmer (the other party in the conversation)
+      const conversations = new Map();
+
+      // Normalize helper
+      const normalize = (p) => {
+        if (!p) return '';
+        let d = String(p).replace(/\D/g, '');
+        if (d.startsWith('0')) d = d.substring(1);
+        if (d.startsWith('63')) d = d.substring(2);
+        return d;
+      };
+
+      const myPhoneRaw = (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.phone) || '';
+      const myPhone = normalize(myPhoneRaw);
+
+      allMessages.forEach(m => {
+        const senderPhone = normalize(m.sender_phone);
+        const recipientPhone = normalize(m.recipient_phone);
+        
+        const isSentByMe = (m.sender_role === 'admin' || m.sender_type === 'admin') || 
+                           (myPhone && senderPhone === myPhone);
+        
+        // The "other party" is the one who isn't me
+        let otherPhoneRaw = isSentByMe ? m.recipient_phone : m.sender_phone;
+        let otherName = isSentByMe ? m.recipient_name : m.sender_name;
+        
+        // Fallback for announcements/broadcasts
+        if (!otherPhoneRaw) {
+          otherPhoneRaw = 'system';
+          otherName = 'Announcement';
+        }
+
+        const otherPhone = normalize(otherPhoneRaw) || otherPhoneRaw;
+        const resolvedName = this.resolveFarmerName(otherPhoneRaw, otherName);
+
+        if (!conversations.has(otherPhone) || new Date(m.created_at) > new Date(conversations.get(otherPhone).latest_message.created_at)) {
+          conversations.set(otherPhone, {
+            phone: otherPhoneRaw,
+            name: resolvedName,
+            latest_message: m,
+            unread_count: (!m.is_read && !isSentByMe) ? 1 : 0
+          });
+        } else if (!m.is_read && !isSentByMe) {
+          conversations.get(otherPhone).unread_count++;
+        }
+      });
+
+      this.messagingConversations = Array.from(conversations.values()).sort((a, b) => 
+        new Date(b.latest_message.created_at) - new Date(a.latest_message.created_at)
+      );
+
+      // Ensure detail view is hidden if no conversation is selected
+      if (!this.messagingSelectedId) {
+        const detail = document.getElementById('messagingDetail');
+        const placeholder = document.getElementById('messagingNoChatSelected');
+        if (detail) detail.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'flex';
       }
 
-      // Filter messages based on selected category
-      if (this.messagingCategory) {
-        this.messagingMessages = this.messagingMessages.filter(m => {
-          if (this.messagingCategory === 'farmers') {
-            // Only show messages from farmers (category: 'farmers' or sender_type: 'farmer')
-            return m.category === 'farmers' || m.sender_type === 'farmer';
-          } else {
-            // Other categories filter by exact category match
-            return m.category === this.messagingCategory;
-          }
-        });
-      }
-
-      // Update badge
-      const badge = document.getElementById('messagingInboxBadge');
-      if (badge) {
-        const unread = data.unread_count || this.messagingMessages.filter(m => !m.is_read).length;
-        badge.textContent = unread > 0 ? (unread > 99 ? '99+' : String(unread)) : '';
-      }
       this.updateMessagingBadge();
-
       this.renderMessagingList();
     } catch (err) {
-      console.warn('Failed to load messages:', err);
-      // Add sample data on error for demonstration
-      if (this.messagingFolder === 'inbox') {
-        this.messagingMessages = this.getSampleFarmerMessages();
-        
-        // Apply category filtering even for error-loaded sample data
-        if (this.messagingCategory) {
-          this.messagingMessages = this.messagingMessages.filter(m => {
-            if (this.messagingCategory === 'farmers') {
-              // Only show messages from farmers (category: 'farmers' or sender_type: 'farmer')
-              return m.category === 'farmers' || m.sender_type === 'farmer';
-            } else {
-              // Other categories filter by exact category match
-              return m.category === this.messagingCategory;
-            }
-          });
-        }
-        
-        this.renderMessagingList();
-      } else {
-        listEl.innerHTML = '<li class="messaging-list-empty"><i class="fa-solid fa-circle-exclamation"></i><p>Could not load messages. Try refreshing.</p></li>';
-      }
+      console.warn('Failed to load chats:', err);
+      listEl.innerHTML = '<li class="messaging-list-empty"><i class="fa-solid fa-circle-exclamation"></i><p>Could not load chats. Try refreshing.</p></li>';
     }
   }
 
@@ -6730,45 +7209,63 @@ class DashboardApp {
     const listEl = document.getElementById('messagingList');
     if (!listEl) return;
 
-    const msgs = this.messagingMessages;
-    if (!msgs.length) {
-      const folderLabels = { inbox: 'inbox', sent: 'sent folder', starred: 'starred list', archived: 'archive' };
-      const label = folderLabels[this.messagingFolder] || 'folder';
+    if (!this.messagingConversations || !this.messagingConversations.length) {
       listEl.innerHTML = `<li class="messaging-list-empty">
-        <i class="fa-solid fa-envelope-open"></i>
-        <p>No messages in your ${this.escapeHtml(label)}.</p>
+        <i class="fa-solid fa-comment-slash"></i>
+        <p>No conversations yet. Start a new chat by searching for a farmer!</p>
       </li>`;
       return;
     }
 
     const esc = (s) => this.escapeHtml(s);
-    listEl.innerHTML = msgs.map(m => {
-      const unreadClass = m.is_read ? '' : ' is-unread';
-      const activeClass = m.id === this.messagingSelectedId ? ' is-active' : '';
-      const initials = this.getInitials(m.sender_name);
-      const avatarClass = this.getAvatarClass(m.category);
-      const timeStr = this.formatMessageTime(m.created_at);
-      const starClass = m.is_starred ? ' is-starred' : '';
-      const starIcon = m.is_starred ? 'fa-solid fa-star' : 'fa-regular fa-star';
-      const preview = (m.body || '').substring(0, 100);
+    
+    // Normalize helper for active class comparison
+    const normalize = (p) => {
+      if (!p) return '';
+      let d = String(p).replace(/\D/g, '');
+      if (d.startsWith('0')) d = d.substring(1);
+      if (d.startsWith('63')) d = d.substring(2);
+      return d;
+    };
 
-      return `<li class="messaging-item${unreadClass}${activeClass}" data-msg-id="${m.id}">
-        <div class="messaging-item__avatar ${avatarClass}">${esc(initials)}</div>
+    listEl.innerHTML = this.messagingConversations.map(c => {
+      const m = c.latest_message;
+      const isUnread = c.unread_count > 0;
+      const unreadClass = isUnread ? ' is-unread' : '';
+      
+      const selectedPhone = normalize(this.messagingSelectedPhone);
+      const currentConvPhone = normalize(c.phone);
+      const activeClass = (this.messagingSelectedId && (m.id === this.messagingSelectedId || currentConvPhone === selectedPhone)) ? ' is-active' : '';
+      
+      const displayName = c.name;
+      const initials = this.getInitials(displayName);
+      const timeStr = this.formatMessageTime(m.created_at);
+      
+      const isSentByMe = m.sender_role === 'admin' || m.sender_type === 'admin';
+      const prefix = isSentByMe ? 'You: ' : '';
+      const preview = prefix + (m.body || '').substring(0, 60);
+
+      return `<li class="messaging-item${unreadClass}${activeClass}" data-phone="${esc(c.phone)}" data-msg-id="${m.id}">
+        <div class="messaging-item__avatar">${esc(initials)}</div>
         <div class="messaging-item__content">
           <div class="messaging-item__top">
-            <span class="messaging-item__sender">${esc(m.sender_name || m.sender_phone)}</span>
+            <span class="messaging-item__sender">${esc(displayName)}</span>
             <span class="messaging-item__time">${esc(timeStr)}</span>
           </div>
-          <div class="messaging-item__subject">${esc(m.subject)}</div>
           <div class="messaging-item__preview">${esc(preview)}</div>
-          <div class="messaging-item__meta">
-            <button type="button" class="messaging-item__star${starClass}" data-msg-id="${m.id}" title="Star">
-              <i class="${starIcon}"></i>
-            </button>
-          </div>
         </div>
       </li>`;
     }).join('');
+
+    // Re-attach listeners to list items
+    listEl.querySelectorAll('.messaging-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const phone = item.getAttribute('data-phone');
+        const msgId = item.getAttribute('data-msg-id');
+        this.messagingSelectedPhone = phone;
+        this.openMessagingDetail(msgId);
+      });
+    });
   }
 
   renderMessagingContacts() {
@@ -6818,42 +7315,41 @@ class DashboardApp {
   renderConversation(message) {
     const esc = (s) => this.escapeHtml(s);
     
-    // If message has conversation array, render it
-    if (message.conversation && Array.isArray(message.conversation)) {
-      return message.conversation.map(msg => {
-        const isSent = msg.sender_type === 'admin';
-        const direction = isSent ? 'sent' : 'received';
-        const avatarInitials = this.getInitials(msg.sender_name);
-        const timeStr = this.formatMessageTime(msg.created_at);
-        
-        return `
-          <div class="messaging-message messaging-message--${direction}">
-            <div class="messaging-message__avatar">${esc(avatarInitials)}</div>
-            <div class="messaging-message__content">
-              ${!isSent ? `<div class="messaging-message__sender">${esc(msg.sender_name)}</div>` : ''}
-              <div class="messaging-message__bubble">${esc(msg.body)}</div>
-              <div class="messaging-message__timestamp">${esc(timeStr)}</div>
-            </div>
-          </div>
-        `;
-      }).join('');
+    // Normalize helper for identification
+    const normalize = (p) => String(p || '').replace(/\D/g, '').replace(/^(0|63)/, '');
+    const myPhoneRaw = (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.phone) || '';
+    const myPhone = normalize(myPhoneRaw);
+
+    // Build the full thread
+    let thread = [];
+    if (message.conversation && Array.isArray(message.conversation) && message.conversation.length > 0) {
+      thread = message.conversation;
+    } else if (message.body) {
+      thread = [message];
     }
-    
-    // Fallback: render single message as conversation
-    const isFarmerMessage = message.category === 'farmers' || message.sender_type === 'farmer';
-    const avatarInitials = this.getInitials(message.sender_name || message.sender_phone);
-    const timeStr = this.formatMessageTime(message.created_at);
-    
-    return `
-      <div class="messaging-message messaging-message--received">
-        <div class="messaging-message__avatar">${esc(avatarInitials)}</div>
-        <div class="messaging-message__content">
-          <div class="messaging-message__sender">${esc(message.sender_name || message.sender_phone)}</div>
-          <div class="messaging-message__bubble">${esc(message.body || '')}</div>
-          <div class="messaging-message__timestamp">${esc(timeStr)}</div>
+
+    if (thread.length === 0) return '';
+
+    return thread.map(msg => {
+      const senderPhone = normalize(msg.sender_phone);
+      const isSentByMe = (msg.sender_role === 'admin' || msg.sender_type === 'admin') || 
+                         (myPhone && senderPhone === myPhone);
+      
+      const direction = isSentByMe ? 'sent' : 'received';
+      const senderName = isSentByMe ? 'Administrator' : (msg.sender_name || 'Farmer');
+      const avatarInitials = isSentByMe ? 'AD' : this.getInitials(senderName);
+      const timeStr = this.formatMessageTime(msg.created_at);
+      
+      return `
+        <div class="messaging-message messaging-message--${direction}">
+          <div class="messaging-message__avatar">${esc(avatarInitials)}</div>
+          <div class="messaging-message__content">
+            <div class="messaging-message__bubble">${esc(msg.body)}</div>
+            <div class="messaging-message__timestamp">${esc(timeStr)}</div>
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    }).join('');
   }
 
   async sendInlineReply() {
@@ -6882,14 +7378,24 @@ class DashboardApp {
     }
 
     try {
-      // Get the original message to extract recipient info
-      const originalMessage = this.messagingMessages.find(m => m.id === this.messagingSelectedId);
-      if (!originalMessage) throw new Error('Original message not found');
-      if (!originalMessage.sender_phone) throw new Error('Open a farmer message to reply.');
+      // Use the correctly identified farmer phone as the recipient
+      const recipientPhone = this.messagingSelectedPhone;
+      if (!recipientPhone) throw new Error('No recipient phone found. Select a conversation to reply.');
 
-      const subject = originalMessage.subject && originalMessage.subject.toLowerCase().startsWith('re:')
+      const normalize = (p) => String(p || '').replace(/\D/g, '').replace(/^(0|63)/, '');
+      const target = normalize(recipientPhone);
+
+      // Get any existing message in this conversation to extract farmer_id if possible
+      const originalMessage = this.messagingMessages.find(m => {
+        return normalize(m.sender_phone) === target || normalize(m.recipient_phone) === target;
+      });
+
+      const subject = (originalMessage && originalMessage.subject && originalMessage.subject.toLowerCase().startsWith('re:'))
         ? originalMessage.subject
-        : `Re: ${originalMessage.subject || 'Message'}`;
+        : `Re: ${(originalMessage && originalMessage.subject) || 'Message'}`;
+
+      // Get recipient name from header if originalMessage is missing (for new conversations)
+      const headerName = document.getElementById('messagingDetailSenderName')?.textContent || '';
 
       const res = await fetch('/api/messages', {
         method: 'POST',
@@ -6898,8 +7404,9 @@ class DashboardApp {
           subject,
           body: message,
           category: 'farmers',
-          recipient_phone: originalMessage.sender_phone,
-          farmer_id: originalMessage.farmer_id ?? null,
+          recipient_phone: recipientPhone,
+          recipient_name: (originalMessage && (normalize(originalMessage.sender_phone) === target ? originalMessage.sender_name : originalMessage.recipient_name)) || headerName,
+          farmer_id: (originalMessage && originalMessage.farmer_id) ?? null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -6909,29 +7416,73 @@ class DashboardApp {
       const saved = data.message || {};
       const replyData = {
         body: saved.body || message,
-        sender_name: saved.sender_name || 'Admin',
+        sender_name: saved.sender_name || 'Administrator',
+        sender_phone: (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.phone) || '',
+        sender_role: 'admin',
         sender_type: 'admin',
         created_at: saved.created_at || new Date().toISOString(),
       };
 
-      if (!originalMessage.conversation) originalMessage.conversation = [];
-      originalMessage.conversation.push(replyData);
+      let currentMsg = originalMessage;
+      if (!currentMsg) {
+        // Create a new local message object if it doesn't exist
+        currentMsg = {
+          id: saved.id || Date.now(),
+          sender_phone: recipientPhone,
+          sender_name: saved.recipient_name || headerName,
+          body: saved.body || message,
+          created_at: saved.created_at || new Date().toISOString(),
+          conversation: []
+        };
+        this.messagingMessages.push(currentMsg);
+        this.messagingSelectedId = currentMsg.id;
+      }
+
+      if (!currentMsg.conversation) {
+        currentMsg.conversation = [
+          {
+            body: currentMsg.body,
+            sender_name: currentMsg.sender_name,
+            sender_phone: currentMsg.sender_phone,
+            sender_role: 'farmer', // Assume the root is from farmer for new chats
+            created_at: currentMsg.created_at
+          }
+        ];
+      }
+      
+      // Don't push if it's the very first message we just put in the thread above
+      if (currentMsg.conversation.length === 0 || currentMsg.conversation[currentMsg.conversation.length-1].body !== replyData.body) {
+        currentMsg.conversation.push(replyData);
+      }
 
       // Update the conversation view
       const bodyEl = document.getElementById('messagingDetailBody');
       if (bodyEl) {
-        bodyEl.innerHTML = this.renderConversation(originalMessage);
-        bodyEl.scrollTop = bodyEl.scrollHeight;
+        bodyEl.innerHTML = this.renderConversation(currentMsg);
+        setTimeout(() => bodyEl.scrollTop = bodyEl.scrollHeight, 50);
       }
 
-      // Clear the input field
+      this.showNotification('Message sent!', 'success');
+      
+      // Clear the input field locally
+      const inlineReplyInput = document.getElementById('msgInlineReplyInput');
       if (inlineReplyInput) {
         inlineReplyInput.value = '';
-        inlineReplyInput.style.height = 'auto'; // Reset height
+        inlineReplyInput.style.height = 'auto';
       }
 
-      this.showNotification('Reply sent!', 'success');
-      this.loadMessagingFolder();
+      // Refresh list in background without resetting active view
+      this.loadMessagingFolder().then(() => {
+        // After reload, try to find our message again to keep reference fresh
+        const fresh = this.messagingMessages.find(m => {
+          const norm = (p) => String(p || '').replace(/\D/g, '').replace(/^(0|63)/, '');
+          return norm(m.sender_phone) === target || norm(m.recipient_phone) === target;
+        });
+        if (fresh && !fresh.conversation) {
+          // If API didn't return conversation, keep our local one
+          fresh.conversation = currentMsg.conversation;
+        }
+      });
     } catch (err) {
       console.warn('Send reply failed:', err);
       this.showNotification(err.message || 'Could not send reply.', 'error');
@@ -7193,71 +7744,128 @@ class DashboardApp {
     }
   }
 
-  async openMessagingDetail(id) {
+  async openMessagingDetail(id, newContact = null) {
+    this.closeMessagingCompose(); // Close compose if open
     this.messagingSelectedId = id;
+    
     const main = document.getElementById('messagingMain');
     const detail = document.getElementById('messagingDetail');
+    const placeholder = document.getElementById('messagingNoChatSelected');
+    
     if (main) main.classList.add('has-detail');
-    if (detail) detail.classList.add('is-visible');
+    if (placeholder) placeholder.style.display = 'none';
+    if (detail) {
+      detail.style.display = 'flex';
+      detail.classList.add('is-visible');
+    }
+
+    // Find the message to get the phone number
+    let msg = id ? this.messagingMessages.find(m => String(m.id) === String(id)) : null;
 
     // Highlight in list
     document.querySelectorAll('.messaging-item').forEach(el => {
-      el.classList.toggle('is-active', Number(el.getAttribute('data-msg-id')) === id);
+      const elId = el.getAttribute('data-msg-id');
+      const elPhone = el.getAttribute('data-phone');
+      const isActive = id ? String(elId) === String(id) : (newContact && elPhone === newContact.phone);
+      el.classList.toggle('is-active', isActive);
     });
 
     try {
-      // Use local sample data instead of API call for demo
-      let m = this.messagingMessages.find(msg => msg.id === id);
-      
-      // If not found in local data, try API (for production)
-      if (!m) {
+      // If we have a new contact but no ID yet, create a dummy message object for rendering
+      if (!id && newContact) {
+        msg = {
+          sender_phone: newContact.phone,
+          sender_name: newContact.name,
+          body: '',
+          created_at: new Date().toISOString(),
+          conversation: []
+        };
+      }
+
+      // If not found in local data and we have an ID, try API
+      if (!msg && id) {
         const res = await fetch(`/api/messages/${id}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        m = data.message;
-        if (!m) throw new Error('No message data');
+        msg = data.message;
+        if (!msg) throw new Error('No message data');
       }
 
-      if (!m) throw new Error('Message not found');
+      if (!msg) throw new Error('Message not found');
+
+      // Now that we have the message, set the selected phone correctly
+      if (newContact) {
+        this.messagingSelectedPhone = newContact.phone;
+      } else {
+        const myPhoneRaw = (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.phone) || '';
+        const normalize = (p) => String(p || '').replace(/\D/g, '').replace(/^(0|63)/, '');
+        const myPhone = normalize(myPhoneRaw);
+        const senderPhone = normalize(msg.sender_phone);
+        const isSentByMe = (msg.sender_role === 'admin' || msg.sender_type === 'admin') || (myPhone && senderPhone === myPhone);
+        this.messagingSelectedPhone = isSentByMe ? msg.recipient_phone : msg.sender_phone;
+      }
 
       // Populate detail pane
-      const subjectEl = document.getElementById('messagingDetailSubject');
       const avatarEl = document.getElementById('messagingDetailAvatar');
       const nameEl = document.getElementById('messagingDetailSenderName');
       const phoneEl = document.getElementById('messagingDetailSenderPhone');
       const tsEl = document.getElementById('messagingDetailTimestamp');
       const bodyEl = document.getElementById('messagingDetailBody');
 
-      if (subjectEl) subjectEl.textContent = m.subject;
-      if (avatarEl) {
-        avatarEl.textContent = this.getInitials(m.sender_name);
-        avatarEl.className = 'messaging-detail__sender-avatar';
-        // Add farmer-specific avatar styling
-        if (m.category === 'farmers' || m.sender_type === 'farmer') {
-          avatarEl.classList.add('messaging-detail__sender-avatar--farmer');
-        }
-      }
-      if (nameEl) nameEl.textContent = m.sender_name || m.sender_phone;
-      if (phoneEl) phoneEl.textContent = m.sender_phone ? `+63${m.sender_phone}` : '';
-      if (tsEl) {
-        try {
-          const d = new Date(m.created_at);
-          tsEl.textContent = d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-        } catch {
-          tsEl.textContent = m.created_at || '';
-        }
-      }
-      if (bodyEl) bodyEl.innerHTML = this.renderConversation(m);
+      // Determine who to show in the header (the farmer)
+      const myPhoneRaw = (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.phone) || '';
+      const normalize = (p) => String(p || '').replace(/\D/g, '').replace(/^(0|63)/, '');
+      const myPhone = normalize(myPhoneRaw);
+      const senderPhone = normalize(msg.sender_phone);
+      const isSentByMe = (msg.sender_role === 'admin' || msg.sender_type === 'admin') || (myPhone && senderPhone === myPhone);
 
-      // Inline reply is always visible; enable only when replyable
+      const displayPhone = newContact ? newContact.phone : (
+        isSentByMe ? msg.recipient_phone : msg.sender_phone
+      );
+      const rawName = newContact ? newContact.name : (
+        isSentByMe 
+        ? (msg.recipient_name || msg.recipient_phone || 'Unknown Farmer')
+        : (msg.sender_name || msg.sender_phone || 'Unknown Farmer')
+      );
+      
+      const displayName = this.resolveFarmerName(displayPhone, rawName);
+
+      if (avatarEl) {
+        avatarEl.textContent = this.getInitials(displayName);
+        avatarEl.className = 'messaging-detail__sender-avatar messaging-detail__sender-avatar--farmer';
+      }
+      if (nameEl) nameEl.textContent = displayName;
+      if (phoneEl) {
+        let p = displayPhone || '';
+        if (p && !p.startsWith('+') && p !== 'system') p = `+63${p}`;
+        phoneEl.textContent = p;
+      }
+      if (tsEl) {
+        if (newContact && !id) {
+          tsEl.textContent = 'New Conversation';
+        } else {
+          try {
+            const d = new Date(msg.created_at);
+            tsEl.textContent = d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+          } catch {
+            tsEl.textContent = msg.created_at || '';
+          }
+        }
+      }
+      
+      if (bodyEl) {
+        if (newContact && !id) {
+          bodyEl.innerHTML = '<div class="messaging-list-empty"><p>No messages yet. Send a message to start the conversation!</p></div>';
+        } else {
+          bodyEl.innerHTML = this.renderConversation(msg);
+          setTimeout(() => bodyEl.scrollTop = bodyEl.scrollHeight, 50);
+        }
+      }
+
+      // Inline reply is always visible; enable only when we have a recipient
       const inlineReplySection = document.getElementById('messagingConversationReply');
       if (inlineReplySection) {
-        const currentPhone =
-          (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.phone) ||
-          '';
-        const replyable =
-          !!m.sender_phone &&
-          (!currentPhone || String(m.sender_phone) !== String(currentPhone));
+        const replyable = !!this.messagingSelectedPhone;
 
         inlineReplySection.classList.add('messaging-conversation__reply--visible');
 
@@ -7268,12 +7876,12 @@ class DashboardApp {
           inlineReplyInput.disabled = !replyable;
           inlineReplyInput.placeholder = replyable
             ? 'Type your message here...'
-            : 'Open a farmer message to reply...';
+            : 'Select a conversation to reply...';
           if (replyable) inlineReplyInput.focus();
         }
         if (inlineReplySendBtn) {
           inlineReplySendBtn.disabled = !replyable;
-          inlineReplySendBtn.title = replyable ? 'Send message' : 'Cannot reply to this message';
+          inlineReplySendBtn.title = replyable ? 'Send message' : 'Select a conversation to reply';
         }
       }
 
@@ -7294,6 +7902,33 @@ class DashboardApp {
     }
   }
 
+  /**
+   * Navigate to messaging module and open a specific farmer's conversation
+   */
+  async goToFarmerMessage(phone) {
+    if (!phone) return;
+    
+    // Switch to messaging module
+    this.switchModule('messaging');
+    
+    const targetPhone = String(phone).replace(/^\+63|^63|^0/, '');
+    
+    await this.loadMessagingFolder();
+    
+    // Search for a conversation with this farmer
+    const conv = this.messagingConversations.find(c => {
+      const convPhone = String(c.phone || '').replace(/^\+63|^63|^0/, '');
+      return convPhone === targetPhone;
+    });
+    
+    if (conv) {
+      this.openMessagingDetail(conv.latest_message.id);
+    } else {
+      // If no conversation exists, open the compose panel
+      this.openMessagingCompose(phone);
+    }
+  }
+
   closeMessagingDetail() {
     this.messagingSelectedId = null;
     const main = document.getElementById('messagingMain');
@@ -7301,28 +7936,6 @@ class DashboardApp {
     if (main) main.classList.remove('has-detail');
     if (detail) detail.classList.remove('is-visible');
     document.querySelectorAll('.messaging-item').forEach(el => el.classList.remove('is-active'));
-  }
-
-  async toggleMessagingStar(id) {
-    try {
-      const res = await fetch(`/api/messages/${id}/star`, { method: 'POST' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-
-      // Update local data
-      const m = this.messagingMessages.find(x => x.id === id);
-      if (m) m.is_starred = data.is_starred;
-
-      // Update star in list
-      const starBtn = document.querySelector(`.messaging-item__star[data-msg-id="${id}"]`);
-      if (starBtn) {
-        starBtn.classList.toggle('is-starred', data.is_starred);
-        const icon = starBtn.querySelector('i');
-        if (icon) icon.className = data.is_starred ? 'fa-solid fa-star' : 'fa-regular fa-star';
-      }
-    } catch (err) {
-      console.warn('Star toggle failed:', err);
-    }
   }
 
   async toggleMessagingArchive(id) {
@@ -7341,7 +7954,42 @@ class DashboardApp {
   }
 
   async deleteMessagingMessage(id) {
-    if (!confirm('Delete this message permanently?')) return;
+    const modal = document.getElementById('deleteMsgModal');
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+    const cancelBtn = document.getElementById('cancelDeleteBtn');
+    const closeBtn = document.getElementById('closeDeleteModal');
+
+    if (!modal || !confirmBtn) {
+      // Fallback to native confirm if modal is missing
+      if (!confirm('Delete this conversation permanently?')) return;
+      return this._performDelete(id);
+    }
+
+    modal.removeAttribute('hidden');
+
+    // Cleanup helper
+    const hideModal = () => {
+      modal.setAttribute('hidden', '');
+      confirmBtn.onclick = null;
+      cancelBtn.onclick = null;
+      closeBtn.onclick = null;
+    };
+
+    confirmBtn.onclick = async () => {
+      hideModal();
+      await this._performDelete(id);
+    };
+
+    cancelBtn.onclick = hideModal;
+    closeBtn.onclick = hideModal;
+    
+    // Close on overlay click
+    modal.onclick = (e) => {
+      if (e.target === modal) hideModal();
+    };
+  }
+
+  async _performDelete(id) {
     try {
       const res = await fetch(`/api/messages/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -7368,10 +8016,19 @@ class DashboardApp {
   }
 
   openMessagingCompose(recipientPhone = '') {
-    this.populateRecipientDropdown();
     this.populateContactDropdown(); // Initial population
+    
+    // Hide other panes in the detail area
+    const noChatPlaceholder = document.getElementById('messagingNoChatSelected');
+    const detailPane = document.getElementById('messagingDetail');
+    if (noChatPlaceholder) noChatPlaceholder.style.display = 'none';
+    if (detailPane) detailPane.style.display = 'none';
+
     const overlay = document.getElementById('messagingComposeOverlay');
-    if (overlay) overlay.classList.add('is-visible');
+    if (overlay) {
+      overlay.removeAttribute('hidden');
+      overlay.classList.add('is-visible');
+    }
     
     const hiddenRecipient = document.getElementById('msgComposeRecipient');
     const visibleInput = document.getElementById('msgComposeRecipientInput');
@@ -7381,19 +8038,15 @@ class DashboardApp {
       // Try to find the name for this phone number
       const farmer = (this.data || []).find(f => this.getValue(f, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']) === recipientPhone);
       if (farmer) {
-        visibleInput.value = this.getFarmerFullName(farmer);
-      } else {
-        visibleInput.value = recipientPhone;
+        this.selectContact(this.getFarmerFullName(farmer), recipientPhone);
+        return; // selectContact handles opening the detail
       }
-      this.loadComposeConversationHistory(recipientPhone);
     } else if (visibleInput) {
       visibleInput.value = '';
       if (hiddenRecipient) hiddenRecipient.value = '';
-      this.loadComposeConversationHistory('');
     }
 
-    const subjectInput = document.getElementById('msgComposeSubject');
-    if (subjectInput) setTimeout(() => subjectInput.focus(), 100);
+    if (visibleInput) setTimeout(() => visibleInput.focus(), 100);
   }
 
   showContactDropdown() {
@@ -7464,69 +8117,39 @@ class DashboardApp {
   }
 
   selectContact(name, phone) {
-    const visibleInput = document.getElementById('msgComposeRecipientInput');
-    const hiddenInput = document.getElementById('msgComposeRecipient');
-    if (visibleInput) visibleInput.value = name;
-    if (hiddenInput) hiddenInput.value = phone;
-    this.hideContactDropdown();
+    this.closeMessagingCompose();
     
-    // Load conversation history for this contact
-    this.loadComposeConversationHistory(phone);
-    
-    const subjectInput = document.getElementById('msgComposeSubject');
-    if (subjectInput) subjectInput.focus();
-  }
+    // Find if we already have a conversation with this phone
+    const normalize = (p) => String(p || '').replace(/\D/g, '').replace(/^(0|63)/, '');
+    const target = normalize(phone);
+    const existingMsg = this.messagingMessages.find(m => 
+      normalize(m.sender_phone) === target || normalize(m.recipient_phone) === target
+    );
 
-  loadComposeConversationHistory(phone) {
-    const historyEl = document.getElementById('msgComposeConversation');
-    if (!historyEl) return;
-
-    if (!phone) {
-      historyEl.hidden = true;
-      historyEl.innerHTML = '';
-      return;
-    }
-
-    // Search for existing messages with this phone number
-    const existingMsg = this.messagingMessages.find(m => String(m.sender_phone) === String(phone));
-    
-    if (existingMsg && existingMsg.conversation) {
-      historyEl.innerHTML = this.renderConversation(existingMsg);
-      historyEl.hidden = false;
-      // Scroll to bottom
-      setTimeout(() => historyEl.scrollTop = historyEl.scrollHeight, 50);
+    if (existingMsg) {
+      this.openMessagingDetail(existingMsg.id);
     } else {
-      historyEl.hidden = true;
-      historyEl.innerHTML = '';
+      // Open a "virtual" conversation for this new contact
+      this.openMessagingDetail(null, { phone, name });
     }
   }
 
-  populateRecipientDropdown() {
-    const select = document.getElementById('msgComposeRecipient');
-    if (!select) return;
-
-    // Keep "All Farmers" as the first option
-    select.innerHTML = '<option value="">All Farmers</option>';
-
-    if (!this.data || !this.data.length) return;
-
-    // Sort farmers alphabetically by name
-    const sortedFarmers = [...this.data].sort((a, b) => {
-      const nameA = this.getFarmerFullName(a).toLowerCase();
-      const nameB = this.getFarmerFullName(b).toLowerCase();
-      return nameA.localeCompare(nameB);
-    });
-
-    sortedFarmers.forEach(farmer => {
-      const fullName = this.getFarmerFullName(farmer);
-      const phone = this.getValue(farmer, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']);
-      if (fullName && phone) {
-        const option = document.createElement('option');
-        option.value = phone;
-        option.textContent = `${fullName} (${phone})`;
-        select.appendChild(option);
-      }
-    });
+  resolveFarmerName(phone, fallbackName) {
+    if (!phone) return fallbackName || 'Unknown Farmer';
+    
+    const normalize = (p) => String(p || '').replace(/\D/g, '').replace(/^(0|63)/, '');
+    const target = normalize(phone);
+    
+    // Search in the main farmers data (this.data)
+    if (this.data && Array.isArray(this.data)) {
+      const farmer = this.data.find(f => {
+        const fPhone = this.getValue(f, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']);
+        return normalize(fPhone) === target;
+      });
+      if (farmer) return this.getFarmerFullName(farmer);
+    }
+    
+    return fallbackName || phone;
   }
 
   getFarmerFullName(row) {
@@ -7541,19 +8164,33 @@ class DashboardApp {
 
   closeMessagingCompose() {
     const overlay = document.getElementById('messagingComposeOverlay');
-    if (overlay) overlay.classList.remove('is-visible');
+    if (overlay) {
+      overlay.classList.remove('is-visible');
+      overlay.setAttribute('hidden', '');
+    }
+    
+    // Restore the appropriate pane
+    if (this.messagingSelectedId) {
+      const detailPane = document.getElementById('messagingDetail');
+      if (detailPane) detailPane.style.display = 'flex';
+    } else {
+      const noChatPlaceholder = document.getElementById('messagingNoChatSelected');
+      if (noChatPlaceholder) noChatPlaceholder.style.display = 'flex';
+    }
+
     const form = document.getElementById('messagingComposeForm');
     if (form) form.reset();
   }
 
   async sendMessage() {
-    const subject = (document.getElementById('msgComposeSubject')?.value || '').trim();
     const body = (document.getElementById('msgComposeBody')?.value || '').trim();
     const category = document.getElementById('msgComposeCategory')?.value || 'general';
     const recipientPhone = (document.getElementById('msgComposeRecipient')?.value || '').trim();
+    const recipientName = (document.getElementById('msgComposeRecipientInput')?.value || '').trim();
+    const subject = "Message from Admin";
 
-    if (!subject || !body) {
-      this.showNotification('Subject and message body are required.', 'error');
+    if (!body) {
+      this.showNotification('Message body is required.', 'error');
       return;
     }
 
@@ -7567,14 +8204,32 @@ class DashboardApp {
       const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ subject, body, category, recipient_phone: recipientPhone }),
+        body: JSON.stringify({ 
+          subject, 
+          body, 
+          category, 
+          recipient_phone: recipientPhone,
+          recipient_name: recipientName
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
       this.showNotification('Message sent!', 'success');
       this.closeMessagingCompose();
-      this.loadMessagingFolder();
+      
+      // Update selected state so the new conversation is highlighted
+      if (data.message && data.message.id) {
+        this.messagingSelectedId = data.message.id;
+        this.messagingSelectedPhone = recipientPhone;
+      }
+      
+      await this.loadMessagingFolder();
+      
+      // If we have a selected ID, open the detail view
+      if (this.messagingSelectedId) {
+        this.openMessagingDetail(this.messagingSelectedId);
+      }
     } catch (err) {
       console.warn('Send message failed:', err);
       this.showNotification(err.message || 'Could not send message.', 'error');
@@ -7631,7 +8286,7 @@ class DashboardApp {
       // For demo purposes, append the reply to the conversation immediately
       const replyData = {
         body: message,
-        sender_name: "Admin User",
+        sender_name: "Administrator",
         sender_type: "admin",
         created_at: new Date().toISOString()
       };
@@ -7657,7 +8312,6 @@ class DashboardApp {
       //   method: 'POST',
       //   headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       //   body: JSON.stringify({ 
-      //     subject: `Re: ${originalMessage.subject}`,
       //     body: message,
       //     category: 'general',
       //     recipient_phone: originalMessage.sender_phone,

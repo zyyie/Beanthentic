@@ -6,5 +6,9 @@
   "9123456789": {
     "full_name": "Admin User",
     "password_hash": "scrypt:32768:8:1$Pfem1uOe0aHHWd4Q$589194ba952e2af8ce107217f43eaf61b41f8f514e168d00f89bcf267f45425835772e3be29a397b0db6f9dd0dd955a3c54aeeb66ce8bb397cdcaaec25b30f5d"
+  },
+  "0956172947": {
+    "full_name": "Ericka Maynete",
+    "password_hash": "scrypt:32768:8:1$lJ0zOZY7zQWMVlGu$808f4cd82e965e6cfc25f85be1868237e976d40e5e0ad86e4359ee142f6bd67ee14a7b36f7031287a30fda13c9ca755b0e877eb0d9dd8f6192b6613de6078e7f"
   }
 }

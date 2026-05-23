@@ -23,7 +23,6 @@ class Farmer(db.Model):
     first_name = db.Column(db.String(100))
     address_barangay = db.Column(db.String(150))
     birthday = db.Column(db.Date)
-    remarks = db.Column(db.Text)
 
     # Relationships
     affiliation = db.relationship('Affiliation', backref='farmer', uselist=False, cascade='all, delete-orphan')
@@ -33,6 +32,86 @@ class Farmer(db.Model):
     profile_photo = db.Column(db.String(255))
     account_id = db.Column(db.Integer, db.ForeignKey('admin_user.id', ondelete='SET NULL'))
     client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='SET NULL'))
+
+    @property
+    def fa_officer_member(self):
+        return self.affiliation.fa_officer_member if self.affiliation else ""
+
+    @property
+    def rsbsa_registered(self):
+        return self.affiliation.rsbsa_registered if self.affiliation else ""
+
+    @property
+    def rsbsa_number(self):
+        return self.affiliation.rsbsa_number if self.affiliation else ""
+
+    @property
+    def ncfrs(self):
+        return self.affiliation.ncfrs if self.affiliation else ""
+
+    @property
+    def status_ownership(self):
+        if not self.farm_info:
+            return ""
+        statuses = []
+        if self.farm_info.is_landowner: statuses.append("Owner-Operator")
+        if self.farm_info.is_leaseholder: statuses.append("Leaseholder")
+        if self.farm_info.is_cloa_holder: statuses.append("CLOA")
+        if self.farm_info.is_seasonal_farm_worker: statuses.append("Seasonal")
+        if self.farm_info.is_others: statuses.append("Others")
+        return ", ".join(statuses)
+
+    @property
+    def total_area_planted_ha(self):
+        return float(self.farm_info.total_area_planted_ha or 0) if self.farm_info else 0
+
+    @property
+    def liberica_bearing(self):
+        return self.tree_counts.liberica_bearing if self.tree_counts else 0
+
+    @property
+    def liberica_non_bearing(self):
+        return self.tree_counts.liberica_non_bearing if self.tree_counts else 0
+
+    @property
+    def excelsa_bearing(self):
+        return self.tree_counts.excelsa_bearing if self.tree_counts else 0
+
+    @property
+    def excelsa_non_bearing(self):
+        return self.tree_counts.excelsa_non_bearing if self.tree_counts else 0
+
+    @property
+    def robusta_bearing(self):
+        return self.tree_counts.robusta_bearing if self.tree_counts else 0
+
+    @property
+    def robusta_non_bearing(self):
+        return self.tree_counts.robusta_non_bearing if self.tree_counts else 0
+
+    @property
+    def total_bearing(self):
+        return self.tree_counts.total_bearing if self.tree_counts else 0
+
+    @property
+    def total_non_bearing(self):
+        return self.tree_counts.total_non_bearing if self.tree_counts else 0
+
+    @property
+    def total_trees(self):
+        return self.tree_counts.total_trees if self.tree_counts else 0
+
+    @property
+    def liberica_production(self):
+        return float(self.production.liberica_kg or 0) if self.production else 0
+
+    @property
+    def excelsa_production(self):
+        return float(self.production.excelsa_kg or 0) if self.production else 0
+
+    @property
+    def robusta_production(self):
+        return float(self.production.robusta_kg or 0) if self.production else 0
 
     @property
     def name(self):
@@ -53,6 +132,7 @@ class Affiliation(db.Model):
     farmer_id = db.Column(db.Integer, db.ForeignKey('farmers.id', ondelete='CASCADE'))
     fa_officer_member = db.Column(db.String(100))
     rsbsa_registered = db.Column(db.Enum('YES', 'NO'))
+    rsbsa_number = db.Column(db.String(100))
     ncfrs = db.Column(db.String(100))
 
     def __repr__(self):

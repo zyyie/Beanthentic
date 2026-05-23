@@ -60,10 +60,6 @@
               <i class="fa-solid fa-paper-plane"></i>
               <span>Sent</span>
             </li>
-            <li class="messaging-folder-item" data-folder="starred">
-              <i class="fa-solid fa-star"></i>
-              <span>Starred</span>
-            </li>
             <li class="messaging-folder-item" data-folder="archived">
               <i class="fa-solid fa-box-archive"></i>
               <span>Archived</span>
@@ -117,10 +113,6 @@
                   <div class="messaging-detail__timestamp" id="messagingDetailTimestamp"></div>
                 </div>
                 <div class="messaging-detail__actions">
-                  <button type="button" class="messaging-detail__action-btn" id="messagingDetailStarBtn">
-                    <i class="fa-solid fa-star"></i>
-                    <span>Star</span>
-                  </button>
                   <button type="button" class="messaging-detail__action-btn" id="messagingDetailArchiveBtn">
                     <i class="fa-solid fa-archive"></i>
                     <span>Archive</span>
@@ -165,10 +157,6 @@
               <div class="messaging-compose-field">
                 <label for="msgComposeRecipient">Recipient (admin phone)</label>
                 <input type="text" id="msgComposeRecipient" placeholder="Leave blank to send to all admins" autocomplete="off" />
-              </div>
-              <div class="messaging-compose-field">
-                <label for="msgComposeSubject">Subject</label>
-                <input type="text" id="msgComposeSubject" placeholder="Message subject" required autocomplete="off" />
               </div>
               <div class="messaging-compose-field">
                 <label for="msgComposeBody">Message</label>

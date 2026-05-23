@@ -34,7 +34,7 @@
 .hero-title {
   font-size: clamp(2.4rem, 4vw, 3rem);
   line-height: 1.07;
-  color: #2b140a;
+  color: #0f172a;
   margin-bottom: 1rem;
 }
 
@@ -44,7 +44,7 @@
 
 .hero-subtitle {
   font-size: 1rem;
-  color: #5b4b42;
+  color: #475569;
   max-width: 60rem;
   margin-bottom: 1.5rem;
 }
@@ -75,7 +75,7 @@
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.06);
   background: rgba(255, 255, 255, 0.75);
-  box-shadow: 0 16px 34px rgba(61, 33, 16, 0.12);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.08);
 }
 
 .hero-slider-track {
@@ -94,8 +94,8 @@
 }
 
 .hero-slide[data-theme="one"] {
-  background: radial-gradient(circle at 20% 20%, rgba(166, 109, 62, 0.22), rgba(255, 255, 255, 0.2) 45%),
-    linear-gradient(135deg, rgba(61, 28, 11, 0.18), rgba(192, 133, 82, 0.14));
+  background: radial-gradient(circle at 20% 20%, rgba(22, 163, 74, 0.15), rgba(255, 255, 255, 0.2) 45%),
+    linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(187, 247, 208, 0.1));
 }
 
 .hero-slide[data-theme="two"] {
