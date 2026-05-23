@@ -134,23 +134,6 @@ def register_dashboard_routes(app):
         notifications = []
         now = datetime.now()
 
-        # Recent activity notifications
-        recent_activity = ActivityLogEntry.query.filter(
-            ActivityLogEntry.timestamp > now.replace(hour=0, minute=0, second=0, microsecond=0)
-        ).order_by(ActivityLogEntry.timestamp.desc()).limit(5).all()
-
-        for activity in recent_activity:
-            notifications.append(
-                {
-                    "id": f"activity-{activity.id}",
-                    "title": f"Activity: {activity.action}",
-                    "message": activity.details or activity.action,
-                    "timestamp": activity.timestamp.isoformat(),
-                    "type": "activity",
-                    "read": False,
-                }
-            )
-
         # IPOPHL document notifications
         from config.models import DocumentAnalysis
         recent_docs = DocumentAnalysis.query.filter(
@@ -167,6 +150,7 @@ def register_dashboard_routes(app):
                         "timestamp": doc.upload_timestamp.isoformat(),
                         "type": "warning",
                         "read": False,
+                        "target_module": "ipophl-analyzer",
                     }
                 )
             else:
@@ -178,6 +162,7 @@ def register_dashboard_routes(app):
                         "timestamp": doc.upload_timestamp.isoformat(),
                         "type": "success",
                         "read": False,
+                        "target_module": "ipophl-analyzer",
                     }
                 )
 
@@ -188,11 +173,10 @@ def register_dashboard_routes(app):
                     "id": "welcome",
                     "title": "Welcome to Beanthentic",
                     "message": "Upload and analyze IPOPHL files to start readiness tracking.",
-                    "meta": now.isoformat(),
-                    "detail": "Upload and analyze IPOPHL files to start readiness tracking.",
-                    "category": "ipophl-progress",
-                    "category_label": "IPOPHL",
+                    "timestamp": now.isoformat(),
+                    "type": "activity",
                     "read": False,
+                    "target_module": "ipophl-analyzer",
                 }
             )
 

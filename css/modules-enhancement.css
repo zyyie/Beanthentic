@@ -7,8 +7,8 @@
     gap: 8px;
     padding: 6px 14px;
     background: #ffffff;
-    color: #8b4a2b;
-    border: 1px solid #e9dfd6;
+    color: #1e293b;
+    border: 1px solid #e2e8f0;
     border-radius: 8px;
     font-size: 0.85rem;
     font-weight: 700;
@@ -18,9 +18,9 @@
 }
 
 .view-details-btn:hover {
-    background: #fdfaf7;
-    color: #7a3f24;
-    border-color: #dccbc0;
+    background: #f8fafc;
+    color: #0f172a;
+    border-color: #cbd5e1;
     transform: translateX(2px);
 }
 
@@ -33,24 +33,26 @@
 #transactions-module .txn-container {
     background: #ffffff;
     border-radius: 20px;
-    padding: 2rem;
+    padding: 1.5rem;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-    margin: 1.5rem;
+    margin: 0.5rem;
+    display: flex;
+    flex-direction: column;
 }
 
 #transactions-module .txn-header h2 {
     font-size: 1.5rem;
     font-weight: 800;
     color: #1a202c;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
 }
 
 #transactions-module .txn-toolbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 1.5rem;
-    margin-bottom: 2rem;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
     flex-wrap: wrap;
     background: transparent;
     padding: 0;
@@ -141,8 +143,8 @@
 
 #transactions-module .txn-table-wrapper {
     overflow-x: auto;
-    margin: 0 -2rem;
-    padding: 0 2rem;
+    margin: 0 -1.5rem;
+    padding: 0 1.5rem;
 }
 
 #transactions-module .txn-table {
@@ -209,19 +211,28 @@
 }
 
 #transactions-module .txn-footer {
-    margin-top: 2rem;
+    margin-top: 1rem;
     display: flex;
     justify-content: flex-end;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #f1f5f9;
+    background: #fafafa;
+    border-bottom-left-radius: 20px;
+    border-bottom-right-radius: 20px;
+    margin-left: -1.5rem;
+    margin-right: -1.5rem;
+    margin-bottom: -1.5rem;
 }
 
 #transactions-module .txn-pagination {
     display: flex;
     align-items: center;
     gap: 12px;
-    background: #fdfdfd;
-    padding: 10px 16px;
+    background: #ffffff;
+    padding: 8px 16px;
     border-radius: 12px;
-    border: 1px solid #f1f5f9;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 
 #transactions-module .txn-page-label,
@@ -556,7 +567,21 @@
 .widget-card {
     display: flex;
     flex-direction: column;
-    height: 400px;
+    height: 480px; /* Fixed height for consistency */
+    padding: 1.5rem !important; /* Unified padding */
+    margin-bottom: 0;
+}
+
+.calendar-widget {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.registration-chart-wrap {
+    flex: 1;
+    position: relative;
+    min-height: 0;
 }
 
 .widget-header {

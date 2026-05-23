@@ -90,21 +90,21 @@
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    border: 1px solid #e9dfd6;
+    border: 1px solid #e2e8f0;
     background: #ffffff;
-    color: #5b4b42;
+    color: #1e293b;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(61, 33, 16, 0.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .profile-actions-toggle:hover {
-    background: #fdfaf7;
-    border-color: #dccbc0;
-    color: #2b140a;
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #0f172a;
 }
 
 .profile-actions-content {
@@ -205,10 +205,10 @@
 }
 
 .reason-chip.active {
-    background: #31572c;
-    border-color: #31572c;
+    background: #2c7a3e;
+    border-color: #2c7a3e;
     color: #ffffff;
-    box-shadow: 0 2px 8px rgba(49, 87, 44, 0.2);
+    box-shadow: 0 2px 8px rgba(44, 122, 62, 0.2);
 }
 
 .farmer-profile-back {
@@ -217,20 +217,20 @@
     gap: 10px;
     padding: 10px 18px;
     background: #ffffff;
-    color: #5b4b42;
-    border: 1px solid #e9dfd6;
+    color: #1e293b;
+    border: 1px solid #e2e8f0;
     border-radius: 12px;
     font-weight: 700;
     font-size: 0.9rem;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 4px 12px rgba(61, 33, 16, 0.06);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 .farmer-profile-back:hover {
-    background: #fdfaf7;
-    border-color: #dccbc0;
-    color: #2b140a;
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #0f172a;
     transform: translateX(-4px);
 }
 
@@ -254,8 +254,8 @@
 .farmer-unified-profile-card {
     background: #ffffff;
     border-radius: 24px;
-    box-shadow: 0 12px 34px rgba(61, 33, 16, 0.08);
-    border: 1px solid #f3ede7;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e2e8f0;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -265,13 +265,13 @@
     padding: 24px;
     text-align: center;
     background: #ffffff;
-    border-bottom: 1px solid #f3ede7;
+    border-bottom: 1px solid #e2e8f0;
 }
 
 .farmer-profile-avatar-large {
     width: 100px;
     height: 100px;
-    background: #f8fafc;
+    background: rgba(44, 122, 62, 0.05);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -283,21 +283,21 @@
 
 .farmer-profile-avatar-large i {
     font-size: 48px;
-    color: var(--accent-1);
+    color: #2c7a3e;
 }
 
 .farmer-profile-name {
     margin: 0 0 4px;
     font-size: 1.5rem;
     font-weight: 700;
-    color: #2b140a;
+    color: #1e293b;
 }
 
 .farmer-profile-id {
     margin: 0 0 16px;
     font-size: 0.95rem;
     font-weight: 600;
-    color: #7b6a5f;
+    color: #64748b;
 }
 
 .farmer-profile-actions-btns {
@@ -309,12 +309,12 @@
 
 .btn-profile-action {
     background: #ffffff;
-    border: 1px solid #e9dfd6;
+    border: 1px solid #e2e8f0;
     padding: 8px 16px;
     border-radius: 10px;
     font-size: 0.85rem;
     font-weight: 700;
-    color: #5b4b42;
+    color: #1e293b;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -323,9 +323,9 @@
 }
 
 .btn-profile-action:hover {
-    background: #fdfaf7;
-    border-color: #dccbc0;
-    color: #2b140a;
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #0f172a;
     transform: translateY(-1px);
 }
 
@@ -337,7 +337,7 @@
     background: #ffffff;
     padding: 16px;
     border-radius: 16px;
-    border: 1px solid #f3ede7;
+    border: 1px solid #e2e8f0;
 }
 
 .demo-item {
@@ -349,7 +349,7 @@
 .demo-label {
     font-size: 0.75rem;
     font-weight: 600;
-    color: #a08a7c;
+    color: #64748b;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -357,7 +357,7 @@
 .demo-value {
     font-size: 0.95rem;
     font-weight: 600;
-    color: #2b140a;
+    color: #1e293b;
 }
 
 /* Bottom Section: Registration Details */
@@ -386,10 +386,10 @@
 .registration-detail-section h3 {
     font-size: 1rem;
     font-weight: 700;
-    color: var(--accent-ink);
+    color: #1e293b;
     margin: 0 0 12px;
     padding-bottom: 8px;
-    border-bottom: 1px solid #f3ede7;
+    border-bottom: 1px solid #e2e8f0;
 }
 
 .registration-detail-grid {
@@ -407,13 +407,13 @@
 .detail-field label {
     font-size: 0.75rem;
     font-weight: 600;
-    color: #a08a7c;
+    color: #64748b;
 }
 
 .detail-field .bold-value {
     font-size: 0.95rem;
     font-weight: 600;
-    color: #4a3227;
+    color: #1e293b;
 }
 
 /* Tree Counts Grid */
@@ -430,7 +430,7 @@
     padding: 10px 14px;
     background: #ffffff;
     border-radius: 10px;
-    border: 1px solid #f3ede7;
+    border: 1px solid #e2e8f0;
 }
 
 .tree-count-item label {
@@ -438,13 +438,13 @@
     flex-direction: column;
     font-size: 0.85rem;
     font-weight: 700;
-    color: #2b140a;
+    color: #1e293b;
 }
 
 .tree-count-item label span {
     font-size: 0.7rem;
     font-weight: 500;
-    color: #7b6a5f;
+    color: #64748b;
 }
 
 /* See More Button & Overlay */
@@ -464,16 +464,16 @@
     padding: 16px;
     background: #ffffff;
     border: none;
-    border-top: 1px solid #f3ede7;
-    color: var(--accent-1);
+    border-top: 1px solid #e2e8f0;
+    color: #2c7a3e;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .btn-see-more:hover {
-    background: #fdfaf7;
-    color: var(--accent-1-dark);
+    background: #f8fafc;
+    color: #1e5a2a;
 }
 
 /* Right Column: Bean Summary & Transactions */
@@ -487,8 +487,8 @@
     background: #ffffff;
     border-radius: 24px;
     padding: 32px;
-    box-shadow: 0 12px 34px rgba(61, 33, 16, 0.08);
-    border: 1px solid #f3ede7;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e2e8f0;
     position: relative;
 }
 
@@ -508,18 +508,18 @@
     padding: 12px 32px;
     border-radius: 999px;
     border: none;
-    background: #e2e2e2;
+    background: #f1f5f9;
     font-size: 1.1rem;
     font-weight: 700;
-    color: #2d4a22;
+    color: #475569;
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .bean-variety-btn.active {
-    background: #31572c;
+    background: #2c7a3e;
     color: #ffffff;
-    box-shadow: 0 4px 12px rgba(49, 87, 44, 0.2);
+    box-shadow: 0 4px 12px rgba(44, 122, 62, 0.2);
 }
 
 .bean-stats-grid {
@@ -548,14 +548,14 @@
 .bean-stat-title {
     font-size: 1.25rem;
     font-weight: 800;
-    color: #000000;
+    color: #1e293b;
     text-transform: none;
     letter-spacing: -0.02em;
 }
 
 .bean-stat-date {
     font-size: 0.9rem;
-    color: #333333;
+    color: #64748b;
     font-weight: 500;
 }
 
@@ -572,13 +572,14 @@
 }
 
 .bean-stat-card.initial .bean-stat-value {
-    background: #31572c;
+    background: #2c7a3e;
     color: #ffffff;
 }
 
 .bean-stat-card.remaining .bean-stat-value {
-    background: #e8ebef;
-    color: #31572c;
+    background: #f1f5f9;
+    color: #2c7a3e;
+    border: 1px solid #e2e8f0;
 }
 
 .bean-stat-value span {
@@ -589,8 +590,8 @@
 .farmer-transactions-card {
     background: #ffffff;
     border-radius: 24px;
-    box-shadow: 0 12px 34px rgba(61, 33, 16, 0.08);
-    border: 1px solid #f3ede7;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e2e8f0;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -598,7 +599,7 @@
 
 .transactions-card-header {
     padding: 24px 32px;
-    border-bottom: 1px solid #f3ede7;
+    border-bottom: 1px solid #e2e8f0;
 }
 
 .txn-tab {
@@ -606,13 +607,12 @@
     border: none;
     font-size: 1.5rem;
     font-weight: 800;
-    color: #1a1a1a;
+    color: #1e293b;
     padding: 0;
 }
 
 .transactions-table-container {
-    max-height: 480px;
-    overflow-y: auto;
+    overflow-x: auto;
 }
 
 .farmer-txn-table {
@@ -626,16 +626,17 @@
     text-align: left;
     font-size: 0.85rem;
     font-weight: 700;
-    color: #7b6a5f;
+    color: #64748b;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    border-bottom: 1px solid #e2e8f0;
 }
 
 .farmer-txn-table td {
     padding: 20px 32px;
-    border-bottom: 1px solid #f3ede7;
+    border-bottom: 1px solid #e2e8f0;
     font-size: 1rem;
-    color: #444444;
+    color: #1e293b;
 }
 
 /* Pagination */
@@ -644,18 +645,18 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-top: 1px solid #f3ede7;
+    border-top: 1px solid #e2e8f0;
     background: #ffffff;
 }
 
 .txn-page-info {
     font-size: 0.9rem;
     font-weight: 600;
-    color: #7b6a5f;
+    color: #64748b;
 }
 
 .txn-page-info span {
-    color: #2b140a;
+    color: #1e293b;
     font-weight: 800;
 }
 
@@ -671,17 +672,17 @@
     align-items: center;
     justify-content: center;
     border-radius: 10px;
-    border: 1px solid #e9dfd6;
+    border: 1px solid #e2e8f0;
     background: #ffffff;
-    color: #5b4b42;
+    color: #1e293b;
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .txn-page-btn:hover {
-    background: #fdfaf7;
-    border-color: #dccbc0;
-    color: #2b140a;
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #0f172a;
 }
 
 .txn-page-btn:disabled {

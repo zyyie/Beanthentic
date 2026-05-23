@@ -63,15 +63,6 @@ class DashboardApp {
         targetModule: 'farmers',
       },
       {
-        id: 'feed-export-1',
-        icon: 'fa-file-export',
-        title: 'Export completed — Farmer data (Excel)',
-        meta: 'Yesterday · 4:12 PM',
-        detail:
-          'Your export to Excel finished successfully. The file includes the farmer table as shown in the Export module (columns depend on the view you used). Download again anytime from Export Data if you need another copy. Large exports may take a few seconds—wait for the success message before closing the tab.',
-        targetModule: 'export',
-      },
-      {
         id: 'feed-reminder-1',
         icon: 'fa-triangle-exclamation',
         title: 'Reminder: Complete profile details',
@@ -152,7 +143,7 @@ class DashboardApp {
       icon: row.icon || 'fa-bell',
       title: row.title || 'Notification',
       meta: this.formatNotificationMeta(row.meta || row.timestamp),
-      detail: row.detail || '',
+      detail: row.detail || row.message || '',
       category: row.category || '',
       categoryLabel: row.category_label || '',
       targetModule: row.targetModule || row.target_module || '',
@@ -287,6 +278,14 @@ class DashboardApp {
     this.renderNotificationsList();
   }
 
+  deleteNotification(id) {
+    const idx = this.notificationsFeed.findIndex((n) => n.id === id);
+    if (idx === -1) return;
+    this.notificationsFeed.splice(idx, 1);
+    this.persistNotificationReadState();
+    this.renderNotificationsList();
+  }
+
   /**
    * Header Refresh: reload farmer records (saved → seed), reset search & pager,
    * sync overview charts/stats and notification list.
@@ -340,64 +339,7 @@ class DashboardApp {
       } else if (n.targetModule === 'farmers-list' && n.targetPayload?.farmerNo) {
         this.openFarmerProfile(n.targetPayload.farmerNo);
       }
-      
-      // Optional: if you want to also show the detail modal, don't return here.
-      // But typically, navigating is the primary action.
-      return;
     }
-
-    const root = document.getElementById('notificationDetailModal');
-    const titleEl = document.getElementById('notificationDetailTitle');
-    const metaEl = document.getElementById('notificationDetailMeta');
-    const bodyEl = document.getElementById('notificationDetailBody');
-    const iconEl = document.getElementById('notificationDetailIcon');
-    if (!root || !titleEl || !metaEl || !bodyEl || !iconEl) return;
-
-    titleEl.textContent = n.title;
-    metaEl.textContent = n.meta;
-    bodyEl.textContent = n.detail || 'No additional details for this notification.';
-
-    iconEl.className = `fa-solid ${n.icon || 'fa-bell'}`;
-
-    root.removeAttribute('hidden');
-    root.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('confirm-dialog-active');
-
-    const closeBtn = document.getElementById('notificationDetailClose');
-    if (closeBtn) closeBtn.focus();
-  }
-
-  closeNotificationDetail() {
-    const root = document.getElementById('notificationDetailModal');
-    if (root) {
-      root.setAttribute('hidden', '');
-      root.setAttribute('aria-hidden', 'true');
-    }
-    const del = document.getElementById('deleteFarmerConfirmModal');
-    const logoutEl = document.getElementById('logoutConfirmModal');
-    const d2 = document.getElementById('disable2faConfirmModal');
-    if (del?.hasAttribute('hidden') && logoutEl?.hasAttribute('hidden') && d2?.hasAttribute('hidden')) {
-      document.body.classList.remove('confirm-dialog-active');
-    }
-  }
-
-  initNotificationDetailModal() {
-    const root = document.getElementById('notificationDetailModal');
-    const closeBtn = document.getElementById('notificationDetailClose');
-    if (!root || !closeBtn) return;
-
-    const backdrop = root.querySelector('.notification-detail-dialog__backdrop');
-    closeBtn.addEventListener('click', () => this.closeNotificationDetail());
-    if (backdrop) backdrop.addEventListener('click', () => this.closeNotificationDetail());
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape') return;
-      const logoutEl = document.getElementById('logoutConfirmModal');
-      if (logoutEl && !logoutEl.hasAttribute('hidden')) return;
-      if (root.hasAttribute('hidden')) return;
-      e.preventDefault();
-      this.closeNotificationDetail();
-    });
   }
 
   openLogoutConfirmModal() {
@@ -416,9 +358,8 @@ class DashboardApp {
       root.setAttribute('aria-hidden', 'true');
     }
     const del = document.getElementById('deleteFarmerConfirmModal');
-    const nd = document.getElementById('notificationDetailModal');
     const d2 = document.getElementById('disable2faConfirmModal');
-    if (del?.hasAttribute('hidden') && nd?.hasAttribute('hidden') && d2?.hasAttribute('hidden')) {
+    if (del?.hasAttribute('hidden') && d2?.hasAttribute('hidden')) {
       document.body.classList.remove('confirm-dialog-active');
     }
   }
@@ -502,9 +443,8 @@ class DashboardApp {
     this.syncDeleteConfirmRemoveButton();
     this.pendingDeleteRowIndex = null;
     const logoutEl = document.getElementById('logoutConfirmModal');
-    const nd = document.getElementById('notificationDetailModal');
     const d2 = document.getElementById('disable2faConfirmModal');
-    if (logoutEl?.hasAttribute('hidden') && nd?.hasAttribute('hidden') && d2?.hasAttribute('hidden')) {
+    if (logoutEl?.hasAttribute('hidden') && d2?.hasAttribute('hidden')) {
       document.body.classList.remove('confirm-dialog-active');
     }
   }
@@ -543,8 +483,6 @@ class DashboardApp {
       if (e.key !== 'Escape') return;
       const logoutEl = document.getElementById('logoutConfirmModal');
       if (logoutEl && !logoutEl.hasAttribute('hidden')) return;
-      const nd = document.getElementById('notificationDetailModal');
-      if (nd && !nd.hasAttribute('hidden')) return;
       const d2 = document.getElementById('disable2faConfirmModal');
       if (d2 && !d2.hasAttribute('hidden')) return;
       if (root.hasAttribute('hidden')) return;
@@ -607,14 +545,14 @@ class DashboardApp {
   updateNotificationsToolbarState() {
     const markAllBtn = document.getElementById('notificationsMarkAllReadBtn');
     if (!markAllBtn) return;
-    const anyUnread = (this.notificationsFeed || []).some((n) => !n.read);
+    const anyUnread = (this.notificationsFeed || []).some((n) => !n.read && n.targetModule);
     markAllBtn.disabled = !anyUnread;
   }
 
   updateHeaderNotificationBadge() {
     const badge = document.getElementById('headerNotificationBadge');
     if (!badge) return;
-    const unread = (this.notificationsFeed || []).filter((n) => !n.read).length;
+    const unread = (this.notificationsFeed || []).filter((n) => !n.read && n.targetModule).length;
     if (unread <= 0) {
       badge.classList.remove('is-visible');
       badge.textContent = '0';
@@ -638,7 +576,7 @@ class DashboardApp {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
 
-    const rows = this.notificationsFeed || [];
+    const rows = (this.notificationsFeed || []).filter(n => n.targetModule);
     if (!rows.length) {
       list.innerHTML = '<li class="notifications-empty">No notifications yet.</li>';
       this.updateNotificationsToolbarState();
@@ -652,11 +590,6 @@ class DashboardApp {
         const categoryMarkup = n.categoryLabel
           ? `<span class="notification-item-category">${esc(n.categoryLabel)}</span>`
           : '';
-        const actionMarkup = n.read
-          ? '<span class="notification-read-badge" aria-hidden="true">Read</span>'
-          : `<button type="button" class="btn btn-secondary notification-mark-read-btn" data-action="mark-notification-read" data-notification-id="${esc(
-              n.id
-            )}">Mark read</button>`;
         return `<li class="notification-item${readClass}" data-notification-id="${esc(n.id)}" tabindex="0" aria-label="Open details: ${esc(n.title)}">
       <div class="notification-item-icon" aria-hidden="true"><i class="fa-solid ${esc(n.icon)}"></i></div>
       <div class="notification-item-body">
@@ -664,7 +597,6 @@ class DashboardApp {
         ${categoryMarkup}
         <p class="notification-item-meta">${esc(n.meta)}</p>
       </div>
-      <div class="notification-item-actions">${actionMarkup}</div>
     </li>`;
       })
       .join('');
@@ -755,7 +687,7 @@ class DashboardApp {
     }
 
     // Pagination Logic
-    const pageSize = 10;
+    const pageSize = 5;
     this.transactionsTotalPages = Math.ceil(rows.length / pageSize) || 1;
     if (this.transactionsCurrentPage > this.transactionsTotalPages) this.transactionsCurrentPage = this.transactionsTotalPages;
     if (this.transactionsCurrentPage < 1) this.transactionsCurrentPage = 1;
@@ -839,7 +771,6 @@ class DashboardApp {
           <td style="font-weight: 600; color: #111827;">${farmerNo}</td>
           <td style="font-weight: 700;">${farmerName}</td>
           <td>${this.escapeHtml(dateStr)}</td>
-          <td style="color: #111827; font-weight: 600;">${this.escapeHtml(timeStr)}</td>
           <td>${this.escapeHtml(row.buyer_name || '—')}</td>
           <td><span class="txn-product-badge">${this.escapeHtml(variety)}</span></td>
           <td style="font-weight: 700;">${this.escapeHtml(deltaText)}</td>
@@ -1561,14 +1492,6 @@ class DashboardApp {
     const notificationsListEl = document.getElementById('notificationsList');
     if (notificationsListEl) {
       notificationsListEl.addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-action="mark-notification-read"]');
-        if (btn) {
-          e.preventDefault();
-          e.stopPropagation();
-          const id = btn.getAttribute('data-notification-id');
-          if (id) this.markNotificationRead(id);
-          return;
-        }
         const item = e.target.closest('.notification-item');
         if (!item) return;
         const id = item.getAttribute('data-notification-id');
@@ -1576,8 +1499,6 @@ class DashboardApp {
       });
       notificationsListEl.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
-        const btn = e.target.closest('[data-action="mark-notification-read"]');
-        if (btn) return;
         const item = e.target.closest('.notification-item');
         if (!item) return;
         e.preventDefault();
@@ -1586,26 +1507,7 @@ class DashboardApp {
       });
     }
 
-    this.initNotificationDetailModal();
 
-    // Export button
-    const exportBtn = document.getElementById('exportBtn');
-    if (exportBtn) {
-      exportBtn.addEventListener('click', () => {
-        console.log('Export button clicked');
-        this.exportData();
-      });
-    }
-
-    // Export option buttons
-    const exportOptionBtns = document.querySelectorAll('.export-option-btn');
-    exportOptionBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const exportType = btn.textContent.includes('Excel') ? 'excel' : 
-                          btn.textContent.includes('PDF') ? 'pdf' : 'csv';
-        this.handleExport(exportType);
-      });
-    });
 
     // Farmer table search
     const farmerSearch = document.getElementById('farmerSearch');
@@ -1938,8 +1840,6 @@ class DashboardApp {
       if (!m || m.hasAttribute('hidden')) return;
       const logoutEl = document.getElementById('logoutConfirmModal');
       if (logoutEl && !logoutEl.hasAttribute('hidden')) return;
-      const nd = document.getElementById('notificationDetailModal');
-      if (nd && !nd.hasAttribute('hidden')) return;
       const del = document.getElementById('deleteFarmerConfirmModal');
       if (del && !del.hasAttribute('hidden')) return;
       e.preventDefault();
@@ -2072,7 +1972,6 @@ class DashboardApp {
       'profile': 'Profile Actions',
       'analytics': 'Analytics',
       'ipophl': 'IPOPHL',
-      'export': 'Export Data',
       'social-media': 'Social Media',
       'settings': 'Settings',
       'account': 'Account',
@@ -2212,12 +2111,10 @@ class DashboardApp {
     if (input) input.value = '';
     const logoutEl = document.getElementById('logoutConfirmModal');
     const del = document.getElementById('deleteFarmerConfirmModal');
-    const nd = document.getElementById('notificationDetailModal');
     const d2 = document.getElementById('disable2faConfirmModal');
     if (
       logoutEl?.hasAttribute('hidden') &&
       del?.hasAttribute('hidden') &&
-      nd?.hasAttribute('hidden') &&
       d2?.hasAttribute('hidden')
     ) {
       document.body.classList.remove('confirm-dialog-active');
@@ -2622,17 +2519,6 @@ class DashboardApp {
         this.showNotification('2FA feature is currently unavailable.', 'info');
       });
     }
-  }
-
-  handleExport(type) {
-    console.log(`Exporting as ${type}...`);
-    const exportToast = { placement: 'center' };
-    this.showNotification(`Exporting data as ${type.toUpperCase()}...`, 'brown', exportToast);
-
-    // Simulate export process
-    setTimeout(() => {
-      this.showNotification(`Data exported successfully as ${type.toUpperCase()}!`, 'brown', exportToast);
-    }, 2000);
   }
 
   async loadExcelData() {
@@ -3105,8 +2991,9 @@ class DashboardApp {
     // Populate Bean Summary
     this.initBeanVarietyFilters(farmer);
 
-    // Populate Transactions
-    this.populateFarmerTransactions(fullName);
+    // Populate Transactions for this specific farmer
+    const farmerId = this.getValue(farmer, ['farmer_id', 'id', 'NO.', 'NO']);
+    this.populateFarmerTransactions(farmerId, fullName);
 
     // Init See More
     this.initSeeMoreDetails();
@@ -3178,42 +3065,75 @@ class DashboardApp {
     if (remainingDateEl) remainingDateEl.textContent = today.toLocaleDateString('en-US', options);
   }
 
-  populateFarmerTransactions(farmerName) {
+  async populateFarmerTransactions(farmerId, farmerName) {
     const txnBody = document.getElementById('farmerTransactionsBody');
     if (!txnBody) return;
 
-    // Filter transactions for this farmer (mocking some data for now if no global txn data)
-    const mockTxns = [
-      { date: '12/03/2026', type: 'Harvest', desc: 'Coffee cherries harvest from main lot', results: '47.9 kg' },
-      { date: '11/15/2025', type: 'Processing', desc: 'Drying and hulling of Liberica', results: '120.5 kg' },
-      { date: '08/22/2025', type: 'Sale', desc: 'Direct sale to local cooperative', results: '250.0 kg' },
-      { date: '05/10/2025', type: 'Planting', desc: 'New Robusta seedlings added', results: '50 units' },
-      { date: '03/04/2025', type: 'Harvest', desc: 'Late season Excelsa pick', results: '32.1 kg' },
-      { date: '01/15/2025', type: 'Maintenance', desc: 'Pruning and fertilization', results: 'N/A' },
-      { date: '12/20/2024', type: 'Sale', desc: 'Export quality Liberica batch', results: '150.0 kg' },
-      { date: '11/05/2024', type: 'Processing', desc: 'Wet processing method applied', results: '85.2 kg' },
-      { date: '10/12/2024', type: 'Harvest', desc: 'Early Robusta harvest', results: '65.0 kg' },
-      { date: '09/01/2024', type: 'Planting', desc: 'Seedling nursery expansion', results: '200 units' },
-      { date: '07/15/2024', type: 'Maintenance', desc: 'Pest control application', results: 'Success' },
-      { date: '06/20/2024', type: 'Sale', desc: 'Local roaster partnership', results: '45.0 kg' }
-    ];
+    // Loading state
+    txnBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem;">Loading transactions...</td></tr>';
+
+    let transactions = [];
+    
+    try {
+      // Fetch real transactions for this specific farmer from the database
+      const response = await fetch(`/api/farmer-coffee-transactions?farmer_id=${farmerId}&limit=100`);
+      if (response.ok) {
+        const data = await response.json();
+        transactions = Array.isArray(data.items) ? data.items : [];
+      }
+    } catch (error) {
+      console.warn('Could not fetch real transactions:', error);
+    }
+
+    // If no real transactions in DB, use deterministic mock data based on farmerId
+    // This ensures every farmer has unique-looking data that stays the same for them
+    if (transactions.length === 0) {
+      const seed = Number(farmerId) || 0;
+      const products = ['Liberica Cherries', 'Excelsa Beans', 'Robusta Green', 'Liberica Parchment', 'Arabica Batch'];
+      const buyers = ['Local Cooperative', 'Metro Roasters', 'Green Coffee Co.', 'Farmer Market', 'Coffee Export Ltd'];
+      
+      transactions = [];
+      // Generate 15 mock transactions to ensure scrollability
+      for (let i = 0; i < 15; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - (i * 15 + (seed % 10)));
+        transactions.push({
+          recorded_at: date.toISOString(),
+          buyer_name: buyers[(seed + i) % 5],
+          variety: products[(seed + i) % 5],
+          delta_kg: -(40 + (seed * 7.5 + i * 5.2) % 100)
+        });
+      }
+    }
+
+    if (transactions.length === 0) {
+      txnBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: #64748b;">No transactions recorded.</td></tr>';
+      return;
+    }
 
     let txnPage = 1;
     const txnPageSize = 5;
-    const totalPages = Math.ceil(mockTxns.length / txnPageSize);
+    const totalPages = Math.ceil(transactions.length / txnPageSize) || 1;
 
     const renderTxns = (page) => {
       const start = (page - 1) * txnPageSize;
       const end = start + txnPageSize;
-      const pagedTxns = mockTxns.slice(start, end);
+      const pagedTxns = transactions.slice(start, end);
 
-      txnBody.innerHTML = pagedTxns.map(t => `
-        <tr>
-          <td class="txn-date" style="background: #ffffff;">${t.date}</td>
-          <td style="background: #ffffff;">${t.desc}</td>
-          <td style="font-weight:700; background: #ffffff;">${t.results}</td>
-        </tr>
-      `).join('');
+      txnBody.innerHTML = pagedTxns.map(t => {
+        const date = t.recorded_at ? new Date(t.recorded_at).toLocaleDateString('en-US') : '—';
+        const qty = Math.abs(t.delta_kg || 0).toFixed(1);
+        const unit = t.unit || 'kg';
+        
+        return `
+          <tr>
+            <td class="txn-date" style="background: #ffffff;">${date}</td>
+            <td style="background: #ffffff;">${this.escapeHtml(t.buyer_name || 'Direct Sale')}</td>
+            <td style="background: #ffffff;">${this.escapeHtml(t.variety || 'Coffee Beans')}</td>
+            <td style="font-weight:700; background: #ffffff;">${qty} ${unit}</td>
+          </tr>
+        `;
+      }).join('');
 
       // Update pagination UI
       const curPageEl = document.getElementById('txnCurrentPage');
@@ -3224,10 +3144,10 @@ class DashboardApp {
       if (curPageEl) curPageEl.textContent = page;
       if (totalPagesEl) totalPagesEl.textContent = totalPages;
       if (prevBtn) prevBtn.disabled = page === 1;
-      if (nextBtn) nextBtn.disabled = page === totalPages;
+      if (nextBtn) nextBtn.disabled = page >= totalPages || totalPages <= 1;
     };
 
-    // Set up listeners once
+    // Set up listeners
     const prevBtn = document.getElementById('txnPrevBtn');
     const nextBtn = document.getElementById('txnNextBtn');
 
@@ -3367,7 +3287,7 @@ class DashboardApp {
 
     this.initBeanVarietyFilters({});
     this.initSeeMoreDetails();
-    this.populateFarmerTransactions('Full Name');
+    this.populateFarmerTransactions(0, 'Full Name');
 
     const toolbar = document.getElementById('farmersListToolbar');
     if (toolbar) toolbar.style.display = 'none';
@@ -3775,18 +3695,20 @@ class DashboardApp {
   createRSBSAStatusBadge(registeredValue, statusValue) {
     const normalizedReg = String(registeredValue || '').toLowerCase().trim();
     const isNo = normalizedReg === 'no' || normalizedReg === 'n';
+    const isYes = normalizedReg === 'yes' || normalizedReg === 'y';
+
+    let status = String(statusValue || '').toUpperCase().trim();
 
     if (isNo) {
-      // Use provided status or default to "NOT YET APPLIED"
-      let status = String(statusValue || '').toUpperCase().trim();
       if (!status) status = 'NOT YET APPLIED';
-      
-      // Map common status values to standard labels if needed
       if (status.includes('PENDING')) status = 'PENDING RSBSA';
-
+      return `<td><span class="rsbsa-badge rsbsa-pending">${status}</span></td>`;
+    } else if (isYes) {
+      if (!status) status = 'REGISTERED';
       return `<td><span class="rsbsa-badge rsbsa-pending">${status}</span></td>`;
     }
-    return `<td></td>`;
+    
+    return status ? `<td><span class="rsbsa-badge rsbsa-pending">${status}</span></td>` : `<td></td>`;
   }
 
   createOwnershipCell(value) {
@@ -4282,11 +4204,6 @@ class DashboardApp {
     this.showNotification('New farmer row added!', 'success');
   }
 
-  exportData() {
-    console.log('Exporting data...');
-    this.showNotification('Data exported successfully!', 'brown', { placement: 'center' });
-  }
-
   renderPagination() {
     const pagination = document.getElementById('pagination');
     const listPagination = document.getElementById('farmersListPagination');
@@ -4383,10 +4300,10 @@ class DashboardApp {
     );
 
     // Update stat cards
-    document.getElementById('totalFarmers').textContent = totalFarmers.toLocaleString();
-    document.getElementById('totalTrees').textContent = totalTrees.toLocaleString();
-    document.getElementById('totalArea').textContent = totalArea.toFixed(2);
-    document.getElementById('totalProduction').textContent = totalProduction.toLocaleString();
+    this.setText('totalFarmers', totalFarmers.toLocaleString());
+    this.setText('totalTrees', totalTrees.toLocaleString());
+    this.setText('totalArea', totalArea.toFixed(2));
+    this.setText('totalProduction', totalProduction.toLocaleString());
 
     console.log('Stats updated:', { totalFarmers, totalTrees, totalArea, totalProduction });
     this.renderAnalyticsModule();
@@ -4399,7 +4316,9 @@ class DashboardApp {
   }
 
   createTreeDistributionChart() {
-    const ctx = document.getElementById('treeChart').getContext('2d');
+    const canvas = document.getElementById('treeChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
     
     // Calculate tree distribution
     const libericaTrees = this.data.reduce((sum, farmer) => sum + (farmer['LIBERICA BEARING'] || 0) + (farmer['LIBERICA NON-BEARING'] || 0), 0);
@@ -4449,7 +4368,9 @@ class DashboardApp {
   }
 
   createProductionChart() {
-    const ctx = document.getElementById('productionChart').getContext('2d');
+    const canvas = document.getElementById('productionChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
     
     // Calculate production by type
     const libericaProduction = this.data.reduce((sum, farmer) => sum + (farmer['LIBERICA PRODUCTION'] || 0), 0);
@@ -6398,11 +6319,87 @@ class DashboardApp {
   initNewDashboardFeatures() {
     this.initThemeToggle();
     this.initGlobalSearch();
-    this.initDashboardActions();
     this.updateNotificationBadges();
     this.initLastUpdatedTime();
     this.initCalendarWidget();
-    this.initTodoWidget();
+    this.initRegistrationChart();
+  }
+
+  initRegistrationChart() {
+    const ctx = document.getElementById('registrationVolumeChart');
+    if (!ctx) return;
+
+    const data = {
+      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+      datasets: [{
+        label: 'New Registrations',
+        data: [65, 78, 92, 85, 110, 125],
+        backgroundColor: 'rgba(34, 197, 94, 0.2)',
+        borderColor: '#16a34a',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#16a34a',
+        pointRadius: 4,
+        pointHoverRadius: 6
+      }]
+    };
+
+    const config = {
+      type: 'line',
+      data: data,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            backgroundColor: '#ffffff',
+            titleColor: '#0f172a',
+            bodyColor: '#475569',
+            borderColor: '#e2e8f0',
+            borderWidth: 1,
+            padding: 12,
+            displayColors: false,
+            callbacks: {
+              label: (context) => `Registrations: ${context.parsed.y}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              display: false
+            },
+            ticks: {
+              font: {
+                size: 11
+              },
+              color: '#94a3b8'
+            }
+          },
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: '#f1f5f9'
+            },
+            ticks: {
+              stepSize: 20,
+              font: {
+                size: 11
+              },
+              color: '#94a3b8'
+            }
+          }
+        }
+      }
+    };
+
+    this.charts.registrationChart = new Chart(ctx, config);
   }
 
   initCalendarWidget() {
@@ -6441,51 +6438,6 @@ class DashboardApp {
 
     if (prevBtn) prevBtn.onclick = () => { date.setMonth(date.getMonth() - 1); render(); };
     if (nextBtn) nextBtn.onclick = () => { date.setMonth(date.getMonth() + 1); render(); };
-
-    render();
-  }
-
-  initTodoWidget() {
-    const listEl = document.getElementById('todoList');
-    const addBtn = document.getElementById('addTaskBtn');
-    const wrapEl = document.getElementById('todoInputWrap');
-    const inputEl = document.getElementById('todoInput');
-    const saveBtn = document.getElementById('saveTaskBtn');
-    if (!listEl) return;
-
-    let todos = JSON.parse(localStorage.getItem('beanthentic-todos')) || [
-      { text: 'Review new farmer registrations', completed: false },
-      { text: 'Update Liberica stock levels', completed: true },
-      { text: 'Send monthly report to Lipa Coffee', completed: false }
-    ];
-
-    const render = () => {
-      listEl.innerHTML = todos.map((t, i) => `
-        <li class="todo-item ${t.completed ? 'completed' : ''}">
-          <div class="todo-checkbox" onclick="window.dashboardApp.toggleTodo(${i})">
-            <i class="fa-solid fa-check"></i>
-          </div>
-          <span class="todo-text">${this.escapeHtml(t.text)}</span>
-          <i class="fa-solid fa-trash-can todo-delete" onclick="window.dashboardApp.deleteTodo(${i})"></i>
-        </li>
-      `).join('');
-      localStorage.setItem('beanthentic-todos', JSON.stringify(todos));
-    };
-
-    if (addBtn) addBtn.onclick = () => wrapEl.hidden = !wrapEl.hidden;
-    
-    if (saveBtn) saveBtn.onclick = () => {
-      const text = inputEl.value.trim();
-      if (text) {
-        todos.unshift({ text, completed: false });
-        inputEl.value = '';
-        wrapEl.hidden = true;
-        render();
-      }
-    };
-
-    this.toggleTodo = (i) => { todos[i].completed = !todos[i].completed; render(); };
-    this.deleteTodo = (i) => { todos.splice(i, 1); render(); };
 
     render();
   }
@@ -6592,64 +6544,6 @@ class DashboardApp {
   handleSearchSubmit(query) {
     // Handle search submission (navigate to results page)
     console.log('Search submitted:', query);
-  }
-
-  initDashboardActions() {
-    const exportBtn = document.getElementById('exportOverviewBtn');
-    const refreshBtn = document.getElementById('refreshOverviewBtn');
-
-    if (exportBtn) {
-      exportBtn.addEventListener('click', () => {
-        this.exportOverviewReport();
-      });
-    }
-
-    if (refreshBtn) {
-      refreshBtn.addEventListener('click', () => {
-        this.refreshOverviewData();
-      });
-    }
-  }
-
-  exportOverviewReport() {
-    // Export dashboard overview as report
-    const reportData = {
-      totalFarmers: document.getElementById('totalFarmers')?.textContent || '0',
-      totalTrees: document.getElementById('totalTrees')?.textContent || '0',
-      totalArea: document.getElementById('totalArea')?.textContent || '0',
-      totalProduction: document.getElementById('totalProduction')?.textContent || '0',
-      exportDate: new Date().toISOString()
-    };
-
-    // Create and download CSV
-    const csvContent = this.generateOverviewCSV(reportData);
-    this.downloadFile(csvContent, 'dashboard-overview.csv', 'text/csv');
-    
-    this.showNotification('Dashboard overview exported successfully', 'success');
-  }
-
-  generateOverviewCSV(data) {
-    const headers = ['Metric', 'Value', 'Export Date'];
-    const rows = [
-      ['Total Farmers', data.totalFarmers, data.exportDate],
-      ['Total Trees', data.totalTrees, data.exportDate],
-      ['Total Area (hectares)', data.totalArea, data.exportDate],
-      ['Total Production (kilos)', data.totalProduction, data.exportDate]
-    ];
-
-    return [headers, ...rows].map(row => row.join(',')).join('\n');
-  }
-
-  downloadFile(content, filename, contentType) {
-    const blob = new Blob([content], { type: contentType });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
   }
 
   refreshOverviewData() {
@@ -8085,8 +7979,7 @@ class DashboardApp {
         <div class="messaging-contact-dropdown__item" data-phone="${esc(phone)}" data-name="${esc(fullName)}">
           <div class="messaging-contact-dropdown__avatar">${esc(initials)}</div>
           <div class="messaging-contact-dropdown__name">
-            ${esc(fullName)} 
-            <i class="fa-solid fa-circle-check messaging-contact-dropdown__verified"></i>
+            ${esc(fullName)}
           </div>
         </div>
       `;

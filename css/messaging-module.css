@@ -77,7 +77,7 @@
 .messaging-refresh-btn:hover,
 .messaging-compose-icon-btn:hover {
   background: #e5e7eb;
-  color: #16a34a;
+  color: #2c7a3e;
   transform: translateY(-1px);
 }
 
@@ -98,8 +98,8 @@
 
 .messaging-search:focus-within {
   background: #fff;
-  border-color: #16a34a;
-  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.08);
+  border-color: #2c7a3e;
+  box-shadow: 0 0 0 4px rgba(44, 122, 62, 0.08);
 }
 
 .messaging-search i {
@@ -164,7 +164,7 @@
   align-items: center;
   justify-content: center;
   padding: 48px;
-  color: #16a34a;
+  color: #2c7a3e;
   gap: 12px;
   font-size: 14px;
   font-weight: 600;
@@ -186,7 +186,7 @@
 }
 
 .messaging-item.is-active {
-  background: #f0fdf4;
+  background: rgba(44, 122, 62, 0.08);
 }
 
 .messaging-item__avatar {
@@ -200,8 +200,8 @@
   font-weight: 700;
   font-size: 18px;
   color: #fff;
-  background: linear-gradient(135deg, #16a34a, #22c55e);
-  box-shadow: 0 4px 10px rgba(22, 163, 74, 0.2);
+  background: linear-gradient(135deg, #2c7a3e, #38a169);
+  box-shadow: 0 4px 10px rgba(44, 122, 62, 0.2);
 }
 
 .messaging-item__content {
@@ -260,7 +260,7 @@
   transform: translateY(-50%);
   width: 12px;
   height: 12px;
-  background: #16a34a;
+  background: #2c7a3e;
   border-radius: 50%;
   box-shadow: 0 0 0 3px #fff;
 }
@@ -307,8 +307,8 @@
 .messaging-placeholder__icon {
   width: 80px;
   height: 80px;
-  background: #f0fdf4;
-  color: #16a34a;
+  background: rgba(44, 122, 62, 0.08);
+  color: #2c7a3e;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -388,14 +388,14 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #16a34a, #22c55e);
+  background: linear-gradient(135deg, #2c7a3e, #38a169);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   font-weight: 700;
   font-size: 15px;
-  box-shadow: 0 4px 10px rgba(22, 163, 74, 0.15);
+  box-shadow: 0 4px 10px rgba(44, 122, 62, 0.15);
 }
 
 .messaging-detail__sender-name {
@@ -440,7 +440,7 @@
 
 .messaging-detail__dropdown-toggle:hover {
   background: #f3f4f6;
-  color: #16a34a;
+  color: #2c7a3e;
 }
 
 /* ── Conversation Messages ─────────────────────────── */
@@ -503,7 +503,7 @@
 }
 
 .messaging-message--sent .messaging-message__avatar {
-  background: #16a34a; /* Green for admin */
+  background: #2c7a3e; /* Green for admin */
 }
 
 .messaging-message__bubble {
@@ -515,7 +515,7 @@
 }
 
 .messaging-message--sent .messaging-message__bubble {
-  background: #16a34a;
+  background: #2c7a3e;
   color: #fff;
   border-bottom-right-radius: 4px;
 }
@@ -558,8 +558,8 @@
 
 .messaging-reply-input-wrapper:focus-within {
   background: #fff;
-  border-color: #16a34a;
-  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.05);
+  border-color: #2c7a3e;
+  box-shadow: 0 0 0 4px rgba(44, 122, 62, 0.05);
 }
 
 .messaging-reply-input {
@@ -578,7 +578,7 @@
 .messaging-reply-send {
   background: none;
   border: none;
-  color: #16a34a;
+  color: #2c7a3e;
   cursor: pointer;
   font-size: 20px;
   display: flex;
@@ -590,7 +590,7 @@
 
 .messaging-reply-send:hover:not(:disabled) {
   transform: scale(1.1);
-  color: #15803d;
+  color: #276749;
 }
 
 .messaging-reply-send:disabled {
@@ -704,7 +704,7 @@
 }
 
 .messaging-compose-header h2 i {
-  color: #16a34a;
+  color: #2c7a3e;
   font-size: 18px;
 }
 
@@ -767,8 +767,8 @@
 .messaging-compose-field input[type="text"]:focus,
 .messaging-compose-field textarea:focus {
   background: #fff;
-  border-color: #16a34a;
-  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.08);
+  border-color: #2c7a3e;
+  box-shadow: 0 0 0 4px rgba(44, 122, 62, 0.08);
   outline: none;
 }
 
@@ -827,7 +827,7 @@
 }
 
 .messaging-contact-dropdown__item:hover {
-  background: #f0fdf4;
+  background: rgba(44, 122, 62, 0.05);
 }
 
 .messaging-contact-dropdown__avatar {
@@ -850,11 +850,6 @@
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-.messaging-contact-dropdown__name i {
-  color: #3b82f6;
-  font-size: 10px;
 }
 
 .messaging-compose-footer {
@@ -888,7 +883,7 @@
   padding: 12px 28px;
   border: none;
   border-radius: 12px;
-  background: #16a34a;
+  background: #2c7a3e;
   color: #fff;
   font-size: 14px;
   font-weight: 700;
@@ -897,12 +892,12 @@
   align-items: center;
   gap: 10px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.2);
+  box-shadow: 0 4px 12px rgba(44, 122, 62, 0.2);
 }
 
 .messaging-compose-send:hover {
-  background: #15803d;
-  box-shadow: 0 6px 16px rgba(22, 163, 74, 0.3);
+  background: #276749;
+  box-shadow: 0 6px 16px rgba(44, 122, 62, 0.3);
   transform: translateY(-1px);
 }
 

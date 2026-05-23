@@ -348,17 +348,15 @@
                 </div>
                 <div class="chart-card widget-card">
                   <div class="widget-header">
-                    <h3>Tasks & To-do</h3>
-                    <button class="add-task-btn" id="addTaskBtn"><i class="fa-solid fa-plus"></i></button>
-                  </div>
-                  <div class="todo-widget">
-                    <div class="todo-input-wrap" id="todoInputWrap" hidden>
-                      <input type="text" id="todoInput" placeholder="Enter new task..." />
-                      <button id="saveTaskBtn">Add</button>
+                    <h3>Farmer Registration Volume</h3>
+                    <div class="widget-header-actions">
+                      <span class="registration-trend-badge positive">
+                        <i class="fa-solid fa-arrow-up"></i> 12%
+                      </span>
                     </div>
-                    <ul class="todo-list" id="todoList">
-                      <!-- Populated by dashboard.js -->
-                    </ul>
+                  </div>
+                  <div class="registration-chart-wrap" style="position: relative; margin-top: 1rem;">
+                    <canvas id="registrationVolumeChart"></canvas>
                   </div>
                 </div>
               </div>
@@ -416,9 +414,6 @@
                   </div>
                 </div>
                 <div class="toolbar-right farmer-toolbar-actions" role="group" aria-label="Farmer records actions">
-                  <div class="action-buttons">
-                    <button class="add-farmer-btn" id="addFarmerBtn">Add Farmer</button>
-                  </div>
                   <label class="select-field farmer-rows-field" for="pageSizeSelect">
                     <span class="field-label">Rows</span>
                     <select id="pageSizeSelect">
@@ -866,8 +861,9 @@
                           <thead>
                             <tr>
                               <th>DATE</th>
-                              <th>DESCRIPTION</th>
-                              <th>RESULTS</th>
+                              <th>BUYER NAME</th>
+                              <th>PRODUCT</th>
+                              <th>QUANTITY</th>
                             </tr>
                           </thead>
                           <tbody id="farmerTransactionsBody">
@@ -878,7 +874,7 @@
                       
                       <div class="txn-pagination">
                         <div class="txn-page-info">
-                          Page <span id="txnCurrentPage">1</span> of <span id="txnTotalPages">10</span>
+                          Page <span id="txnCurrentPage">1</span> of <span id="txnTotalPages">1</span>
                         </div>
                         <div class="txn-page-controls">
                           <button class="txn-page-btn prev" id="txnPrevBtn" title="Previous Page">
@@ -1048,8 +1044,7 @@
                       <th>NO</th>
                       <th>FARMER NAME</th>
                       <th>DATE</th>
-                      <th>TIME</th>
-                      <th>CLIENT NAME</th>
+                      <th>BUYER NAME</th>
                       <th>PRODUCT</th>
                       <th>QUANTITY</th>
                       <th>AMOUNT</th>
@@ -1806,33 +1801,6 @@
             </section>
           </div>
 
-          <!-- Export Module -->
-          <div class="module hidden" id="export-module" data-module="export">
-            <section class="module-header">
-              <h1>Export Data</h1>
-              <p>Export your data in various formats</p>
-            </section>
-            <div class="export-content">
-              <div class="export-options">
-                <div class="export-card">
-                  <h3><i class="fa-solid fa-file-excel card-heading-icon"></i> Excel Export</h3>
-                  <p>Export farmer data to Excel format</p>
-                  <button class="export-option-btn" onclick="window.location.href='/export/excel'">Export to Excel</button>
-                </div>
-                <div class="export-card">
-                  <h3><i class="fa-solid fa-file-pdf card-heading-icon"></i> PDF Report</h3>
-                  <p>Generate PDF reports</p>
-                  <button class="export-option-btn" onclick="window.location.href='/export/pdf'">Generate PDF</button>
-                </div>
-                <div class="export-card">
-                  <h3><i class="fa-solid fa-file-csv card-heading-icon"></i> CSV Export</h3>
-                  <p>Export data as CSV file</p>
-                  <button class="export-option-btn" onclick="window.location.href='/export/csv'">Export to CSV</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <!-- Social Media Module -->
           <div class="module hidden" id="social-media-module" data-module="social-media">
             <section class="module-header">
@@ -2216,204 +2184,6 @@
         </button>
         <button type="button" class="confirm-dialog__btn confirm-dialog__btn--primary" id="logoutConfirmOk">
           Log out
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Add farmer modal -->
-  <div id="addFarmerModal" class="add-farmer-modal" hidden aria-hidden="true">
-    <div class="add-farmer-modal__backdrop" tabindex="-1"></div>
-    <div class="add-farmer-modal__card" role="dialog" aria-modal="true" aria-labelledby="addFarmerModalTitle">
-      <div class="add-farmer-modal__header">
-        <div>
-          <h2 id="addFarmerModalTitle" class="add-farmer-modal__title">Add Farmer</h2>
-          <p class="add-farmer-modal__subtitle">Fill in farmer registration details</p>
-        </div>
-        <button type="button" class="add-farmer-modal__close" id="addFarmerModalClose" aria-label="Close">
-          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-        </button>
-      </div>
-
-      <form id="addFarmerForm" class="add-farmer-form" novalidate>
-        <p class="add-farmer-form__error" id="addFarmerFormError" role="alert" hidden></p>
-        <div class="add-farmer-form__grid">
-          <section class="add-farmer-form__section">
-            <h3>Personal Information</h3>
-            <div class="add-farmer-form__row">
-              <label>Last Name
-                <input type="text" id="newFarmerLastName" required maxlength="60" pattern="^[A-Za-z][A-Za-z .'-]{0,59}$" />
-                <span class="add-farmer-form__hint">Letters only, max 60 chars.</span>
-              </label>
-              <label>First Name
-                <input type="text" id="newFarmerFirstName" required maxlength="80" pattern="^[A-Za-z][A-Za-z .'-]{0,79}$" />
-                <span class="add-farmer-form__hint">Letters only, max 80 chars.</span>
-              </label>
-            </div>
-            <div class="add-farmer-form__row">
-              <label>Barangay
-                <input type="text" id="newFarmerBarangay" required maxlength="80" />
-                <span class="add-farmer-form__hint">Required, max 80 chars.</span>
-              </label>
-              <label>Birthday
-                <input type="date" id="newFarmerBirthday" min="1900-01-01" />
-                <span class="add-farmer-form__hint">Must not be in the future.</span>
-              </label>
-            </div>
-          </section>
-
-          <section class="add-farmer-form__section">
-            <h3>Affiliation</h3>
-            <div class="add-farmer-form__row">
-              <label>Federation Association
-                <input type="text" id="newFarmerAssociation" maxlength="100" />
-                <span class="add-farmer-form__hint">Optional, max 100 chars.</span>
-              </label>
-              <label>RSBSA Registered
-                <select id="newFarmerRsbsa">
-                  <option value="">Select</option>
-                  <option value="YES">YES</option>
-                  <option value="NO">NO</option>
-                </select>
-                <span class="add-farmer-form__hint">If YES, NCFRS is required.</span>
-              </label>
-            </div>
-            <div class="add-farmer-form__row">
-              <label>RSBSA Number
-                <input type="text" id="newFarmerRsbsaNumber" maxlength="40" />
-                <span class="add-farmer-form__hint">Max 40 chars.</span>
-              </label>
-              <label style="display: none;">RSBSA Status
-                <select id="newFarmerRsbsaStatus">
-                  <option value="">Default</option>
-                  <option value="NOT YET APPLIED">NOT YET APPLIED</option>
-                  <option value="PENDING RSBSA">PENDING RSBSA</option>
-                </select>
-                <span class="add-farmer-form__hint">Only for non-registered.</span>
-              </label>
-              <label>RSBSA Registered Number (NCFRS)
-                <input type="text" id="newFarmerNcfrs" maxlength="40" pattern="^[A-Za-z0-9-]*$" />
-                <span class="add-farmer-form__hint">Letters, numbers, dashes only (max 40).</span>
-              </label>
-            </div>
-          </section>
-
-          <section class="add-farmer-form__section">
-            <h3>Farm Information</h3>
-            <div class="add-farmer-form__row">
-              <label>Status of Ownership
-                <input type="text" id="newFarmerOwnership" placeholder="Landowner / CLOA / Lease / Seasonal / Others" maxlength="60" />
-                <span class="add-farmer-form__hint">Optional, max 60 chars.</span>
-              </label>
-              <label>Total Plant Area (HA.)
-                <input type="number" id="newFarmerArea" min="0" max="10000" step="0.01" value="0" inputmode="decimal" />
-                <span class="add-farmer-form__hint">Number only, range 0 to 10,000.</span>
-              </label>
-            </div>
-          </section>
-
-          <section class="add-farmer-form__section">
-            <h3>Tree Counts</h3>
-            <div class="add-farmer-form__row">
-              <label>Liberica Bearing
-                <input type="number" id="newLibBearing" min="0" max="50000" step="1" value="0" inputmode="numeric" />
-                <span class="add-farmer-form__hint">Whole numbers only (0 to 50,000).</span>
-              </label>
-              <label>Liberica Non-bearing
-                <input type="number" id="newLibNonBearing" min="0" max="50000" step="1" value="0" inputmode="numeric" />
-                <span class="add-farmer-form__hint">Whole numbers only (0 to 50,000).</span>
-              </label>
-            </div>
-            <div class="add-farmer-form__row">
-              <label>Robusta Bearing
-                <input type="number" id="newRobBearing" min="0" max="50000" step="1" value="0" inputmode="numeric" />
-                <span class="add-farmer-form__hint">Whole numbers only (0 to 50,000).</span>
-              </label>
-              <label>Robusta Non-bearing
-                <input type="number" id="newRobNonBearing" min="0" max="50000" step="1" value="0" inputmode="numeric" />
-                <span class="add-farmer-form__hint">Whole numbers only (0 to 50,000).</span>
-              </label>
-            </div>
-            <div class="add-farmer-form__row">
-              <label>Excelsa Bearing
-                <input type="number" id="newExcBearing" min="0" max="50000" step="1" value="0" inputmode="numeric" />
-                <span class="add-farmer-form__hint">Whole numbers only (0 to 50,000).</span>
-              </label>
-              <label>Excelsa Non-bearing
-                <input type="number" id="newExcNonBearing" min="0" max="50000" step="1" value="0" inputmode="numeric" />
-                <span class="add-farmer-form__hint">Whole numbers only (0 to 50,000).</span>
-              </label>
-            </div>
-          </section>
-
-          <section class="add-farmer-form__section">
-            <div class="add-farmer-form__header-with-action">
-              <h3>Production</h3>
-              <div class="add-farmer-form__unit-selector">
-                <label for="newProductionUnit">Unit:</label>
-                <select id="newProductionUnit" class="txn-select">
-                  <option value="kg">kg (Kilograms)</option>
-                  <option value="g">g (Grams)</option>
-                  <option value="lbs">lbs (Pounds)</option>
-                  <option value="mt">mt (Metric Tons)</option>
-                </select>
-              </div>
-            </div>
-            <div class="add-farmer-form__row">
-              <label>Liberica Production
-                <input type="number" id="newLibProduction" min="0" max="1000000" step="0.01" value="0" inputmode="decimal" />
-                <span class="add-farmer-form__hint">Number only, range 0 to 1,000,000.</span>
-              </label>
-              <label>Robusta Production
-                <input type="number" id="newRobProduction" min="0" max="1000000" step="0.01" value="0" inputmode="decimal" />
-                <span class="add-farmer-form__hint">Number only, range 0 to 1,000,000.</span>
-              </label>
-            </div>
-            <div class="add-farmer-form__row">
-              <label>Excelsa Production
-                <input type="number" id="newExcProduction" min="0" max="1000000" step="0.01" value="0" inputmode="decimal" />
-                <span class="add-farmer-form__hint">Number only, range 0 to 1,000,000.</span>
-              </label>
-            </div>
-          </section>
-        </div>
-
-        <div class="add-farmer-form__actions">
-          <button type="button" class="confirm-dialog__btn confirm-dialog__btn--secondary" id="addFarmerCancel">Cancel</button>
-          <button type="submit" class="confirm-dialog__btn confirm-dialog__btn--primary">Add Farmer</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Notification detail (read full alert content) -->
-  <div
-    id="notificationDetailModal"
-    class="notification-detail-dialog"
-    hidden
-    aria-hidden="true"
-  >
-    <div class="notification-detail-dialog__backdrop" tabindex="-1"></div>
-    <div
-      class="notification-detail-dialog__card"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="notificationDetailTitle"
-      aria-describedby="notificationDetailBody"
-    >
-      <div class="notification-detail-dialog__header">
-        <div id="notificationDetailIconWrap" class="notification-detail-dialog__icon-wrap" aria-hidden="true">
-          <i id="notificationDetailIcon" class="fa-solid fa-bell"></i>
-        </div>
-        <div class="notification-detail-dialog__head-text">
-          <h2 id="notificationDetailTitle" class="notification-detail-dialog__title"></h2>
-          <p id="notificationDetailMeta" class="notification-detail-dialog__meta"></p>
-        </div>
-      </div>
-      <div id="notificationDetailBody" class="notification-detail-dialog__body"></div>
-      <div class="notification-detail-dialog__footer">
-        <button type="button" class="confirm-dialog__btn confirm-dialog__btn--primary" id="notificationDetailClose">
-          Close
         </button>
       </div>
     </div>
