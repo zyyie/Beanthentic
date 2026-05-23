@@ -51,7 +51,8 @@ def register_ipophl_routes(app):
                     "ai_score": doc_analysis.ai_score,
                     "ai_status": doc_analysis.ai_status,
                     "detected_features": doc_analysis.detected_features_list,
-                    "missing_requirements": doc_analysis.missing_requirements_list
+                    "missing_requirements": doc_analysis.missing_requirements_list,
+                    "shap_analysis": doc_analysis.shap_analysis
                 }
             })
 
@@ -86,17 +87,23 @@ def register_ipophl_routes(app):
             if file_ext not in allowed_extensions:
                 return jsonify({"error": f"Unsupported file type: {file_ext}"}), 400
 
-            # Save file securely
-            file_path = gi_analyzer.save_uploaded_file(file, file.filename)
-
+            # Use Path for cross-platform compatibility and normalization
+            # gi_analyzer.save_uploaded_file already handles the OS-specific path joining
+            raw_path = gi_analyzer.save_uploaded_file(file, file.filename)
+            file_path_obj = Path(raw_path)
+            
+            # Normalize path for database storage (use as_posix() to always use forward slashes)
+            file_path = file_path_obj.as_posix()
+            
             # Perform AI analysis with task context
-            analysis_result = gi_analyzer.analyze_document(file_path, task_id=task_id)
+            # Convert back to local OS string for the actual analysis function
+            analysis_result = gi_analyzer.analyze_document(str(file_path_obj), task_id=task_id)
 
             if not analysis_result.get('success', False):
                 return jsonify({"error": analysis_result.get('error', 'Analysis failed')}), 500
 
             # Save analysis to database
-            file_uuid = Path(file_path).stem  # UUID without extension
+            file_uuid = file_path_obj.stem  # UUID without extension
 
             # Check if analysis already exists
             existing_analysis = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
@@ -110,7 +117,7 @@ def register_ipophl_routes(app):
                     original_filename=secure_filename(file.filename),
                     file_path=file_path,
                     file_type=file_ext,
-                    file_size=os.path.getsize(file_path),
+                    file_size=os.path.getsize(str(file_path_obj)),
                     ipophl_phase=ipophl_phase,
                     task_id=task_id
                 )
@@ -122,6 +129,7 @@ def register_ipophl_routes(app):
             doc_analysis.set_missing_requirements(analysis_result.get('missing_requirements', []))
             doc_analysis.analysis_method = analysis_result.get('analysis_method', 'rule_based')
             doc_analysis.text_length = analysis_result.get('text_length', 0)
+            doc_analysis.shap_analysis = analysis_result.get('shap_analysis', "")
             doc_analysis.analysis_timestamp = datetime.utcnow()
 
             # Save to database
@@ -148,7 +156,8 @@ def register_ipophl_routes(app):
                     "detected_features": doc_analysis.detected_features_list,
                     "missing_requirements": doc_analysis.missing_requirements_list,
                     "analysis_method": doc_analysis.analysis_method,
-                    "text_length": doc_analysis.text_length
+                    "text_length": doc_analysis.text_length,
+                    "shap_analysis": doc_analysis.shap_analysis
                 },
                 "preview_url": gi_analyzer.get_file_preview_url(file_path),
                 "ipophl_phase": ipophl_phase,
@@ -158,6 +167,36 @@ def register_ipophl_routes(app):
         except Exception as e:
             # Log error
             return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
+
+    @app.route("/api/ipo-delete/<file_uuid>", methods=["DELETE"])
+    def api_delete_ipo_file(file_uuid):
+        """Delete an IPOPHL document."""
+        if not is_authenticated():
+            return jsonify({"error": "Unauthorized"}), 401
+
+        try:
+            doc_analysis = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
+            if not doc_analysis:
+                return jsonify({"error": "Document not found"}), 404
+
+            # Remove from disk
+            if os.path.exists(doc_analysis.file_path):
+                os.remove(doc_analysis.file_path)
+
+            # Remove from database
+            db.session.delete(doc_analysis)
+            db.session.commit()
+
+            # Log activity
+            user_phone = get_current_user_phone()
+            log_activity(user_phone, "IPOPHL_DOCUMENT_DELETED",
+                        f"Deleted {doc_analysis.original_filename}",
+                        request.remote_addr)
+
+            return jsonify({"success": True})
+
+        except Exception as e:
+            return jsonify({"error": f"Deletion failed: {str(e)}"}), 500
 
     @app.route("/api/file-preview/<filename>")
     def api_file_preview(filename):
@@ -170,25 +209,37 @@ def register_ipophl_routes(app):
             file_uuid = filename.rsplit('.', 1)[0] if '.' in filename else filename
             doc_analysis = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
 
+            # Fallback: Search by original_filename or secure version
+            if not doc_analysis:
+                from werkzeug.utils import secure_filename
+                safe_name = secure_filename(file_uuid)
+                doc_analysis = DocumentAnalysis.query.filter(
+                    (DocumentAnalysis.original_filename == filename) |
+                    (DocumentAnalysis.original_filename == file_uuid) |
+                    (DocumentAnalysis.original_filename == safe_name) |
+                    (DocumentAnalysis.original_filename.like(f"{file_uuid}.%")) |
+                    (DocumentAnalysis.original_filename.like(f"{safe_name}.%"))
+                ).first()
+
             if not doc_analysis:
                 return jsonify({"error": "File not found"}), 404
 
+            # Use Path to handle the stored posix path on any OS (Windows/macOS)
             file_path = Path(doc_analysis.file_path)
             if not file_path.exists():
                 return jsonify({"error": "File not found on disk"}), 404
 
             # Determine mimetype for better browser preview
             mimetype = None
-            if file_path.suffix.lower() == '.pdf':
+            suffix = file_path.suffix.lower()
+            if suffix == '.pdf':
                 mimetype = 'application/pdf'
-            elif file_path.suffix.lower() == '.csv':
-                mimetype = 'text/plain'  # Better for previewing in iframe than text/csv which might trigger download
-            elif file_path.suffix.lower() in ['.doc', '.docx']:
-                # Word docs usually can't be previewed in iframe directly without Google Docs viewer or similar
-                # But we can try to serve it and see
+            elif suffix == '.csv':
+                mimetype = 'text/plain'
+            elif suffix in ['.doc', '.docx']:
                 mimetype = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
-            return send_file(file_path, as_attachment=False, mimetype=mimetype)
+            return send_file(str(file_path), as_attachment=False, mimetype=mimetype)
 
         except Exception as e:
             return jsonify({"error": f"Preview failed: {str(e)}"}), 500
@@ -200,13 +251,28 @@ def register_ipophl_routes(app):
             return jsonify({"error": "Unauthorized"}), 401
 
         try:
+            # Try to find by UUID first
             doc_analysis = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
+            
+            # Fallback: Try to find by original filename if file_uuid looks like a filename
+            if not doc_analysis:
+                from werkzeug.utils import secure_filename
+                safe_name = secure_filename(file_uuid)
+                
+                # Search by original_filename, secure version, or prefix
+                doc_analysis = DocumentAnalysis.query.filter(
+                    (DocumentAnalysis.original_filename == file_uuid) | 
+                    (DocumentAnalysis.original_filename == safe_name) |
+                    (DocumentAnalysis.original_filename.like(f"{file_uuid}.%")) |
+                    (DocumentAnalysis.original_filename.like(f"{safe_name}.%"))
+                ).first()
+
             if not doc_analysis:
                 return jsonify({"error": "Document not found"}), 404
 
             return jsonify({
                 "success": True,
-                "file_uuid": file_uuid,
+                "file_uuid": doc_analysis.file_uuid,
                 "filename": doc_analysis.original_filename,
                 "analysis": {
                     "readiness_score": doc_analysis.ai_score,
@@ -215,6 +281,7 @@ def register_ipophl_routes(app):
                     "missing_requirements": doc_analysis.missing_requirements_list,
                     "analysis_method": doc_analysis.analysis_method,
                     "text_length": doc_analysis.text_length,
+                    "shap_analysis": doc_analysis.shap_analysis,
                     "analysis_timestamp": doc_analysis.analysis_timestamp.isoformat() if doc_analysis.analysis_timestamp else None
                 },
                 "ipophl_phase": doc_analysis.ipophl_phase,
@@ -231,21 +298,52 @@ def register_ipophl_routes(app):
             return jsonify({"error": "Unauthorized"}), 401
 
         try:
+            # Try to find by UUID first
             doc_analysis = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
+            
+            # Fallback: Try to find by original filename if file_uuid looks like a filename
+            if not doc_analysis:
+                from werkzeug.utils import secure_filename
+                safe_name = secure_filename(file_uuid)
+                doc_analysis = DocumentAnalysis.query.filter(
+                    (DocumentAnalysis.original_filename == file_uuid) | 
+                    (DocumentAnalysis.original_filename == safe_name) |
+                    (DocumentAnalysis.original_filename.like(f"{file_uuid}.%")) |
+                    (DocumentAnalysis.original_filename.like(f"{safe_name}.%"))
+                ).first()
+
             if not doc_analysis:
                 return jsonify({"error": "Document not found"}), 404
 
             payload = request.get_json(silent=True) or {}
-
-            # Update fields
-            if 'ai_score' in payload:
-                doc_analysis.ai_score = payload['ai_score']
-            if 'ai_status' in payload:
-                doc_analysis.ai_status = payload['ai_status']
-            if 'detected_features' in payload:
-                doc_analysis.set_detected_features(payload['detected_features'])
-            if 'missing_requirements' in payload:
-                doc_analysis.set_missing_requirements(payload['missing_requirements'])
+            
+            # If no payload is provided, re-run the AI analysis
+            if not payload:
+                # Import AI engine
+                from machinelearning.ai_engine import gi_analyzer
+                
+                # Re-run analysis
+                result = gi_analyzer.analyze_document(doc_analysis.file_path, task_id=doc_analysis.task_id)
+                if result.get('success'):
+                    doc_analysis.ai_score = result['readiness_score']
+                    doc_analysis.ai_status = result['status']
+                    doc_analysis.set_detected_features(result['detected_features'])
+                    doc_analysis.set_missing_requirements(result['missing_requirements'])
+                    doc_analysis.analysis_method = result['analysis_method']
+                    doc_analysis.text_length = result['text_length']
+                    doc_analysis.shap_analysis = result.get('shap_analysis', "")
+                else:
+                    return jsonify({"error": f"Re-analysis failed: {result.get('error')}"}), 500
+            else:
+                # Update specific fields from payload
+                if 'ai_score' in payload:
+                    doc_analysis.ai_score = payload['ai_score']
+                if 'ai_status' in payload:
+                    doc_analysis.ai_status = payload['ai_status']
+                if 'detected_features' in payload:
+                    doc_analysis.set_detected_features(payload['detected_features'])
+                if 'missing_requirements' in payload:
+                    doc_analysis.set_missing_requirements(payload['missing_requirements'])
 
             doc_analysis.analysis_timestamp = datetime.utcnow()
             db.session.commit()
@@ -256,7 +354,18 @@ def register_ipophl_routes(app):
                         f"Updated analysis for {doc_analysis.original_filename}",
                         request.remote_addr)
 
-            return jsonify({"success": True})
+            return jsonify({
+                "success": True,
+                "analysis": {
+                    "readiness_score": doc_analysis.ai_score,
+                    "status": doc_analysis.ai_status,
+                    "detected_features": doc_analysis.detected_features_list,
+                    "missing_requirements": doc_analysis.missing_requirements_list,
+                    "analysis_method": doc_analysis.analysis_method,
+                    "text_length": doc_analysis.text_length,
+                    "shap_analysis": doc_analysis.shap_analysis
+                }
+            })
 
         except Exception as e:
             return jsonify({"error": f"Failed to update analysis: {str(e)}"}), 500

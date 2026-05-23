@@ -4574,14 +4574,14 @@ class DashboardApp {
     this.setText('giEligibleCount', metrics.eligible.toLocaleString());
     this.setText('giEligibleRate', `${eligibleRate.toFixed(1)}% of farmers`);
     this.setText('cityGiReadinessRate', `${eligibleRate.toFixed(1)}%`);
-    this.setText('qrGeneratedCount', metrics.qrGenerated.toLocaleString());
-    this.setText('verifiedProfilesCount', metrics.verified.toLocaleString());
-    this.setText('pendingProfilesCount', `${metrics.pending.toLocaleString()} pending`);
+
+    const ipophlSnapshot = this.getIpophlCompletionSnapshot();
+    this.setText('ipophlProgressRate', `${ipophlSnapshot.percentage}%`);
+    this.setText('ipophlProgressSub', `${ipophlSnapshot.completed} of ${ipophlSnapshot.total} groups`);
 
     this.renderTopBarangaysChart(metrics);
-    this.renderCoffeeVarietyChart(metrics);
     this.renderGiGrowthTrendChart(metrics);
-    this.renderVerificationStatusChart(metrics);
+    this.renderIpophlComplianceChart();
   }
 
   renderIpophlModule() {
@@ -4933,6 +4933,13 @@ class DashboardApp {
 
   addFileToList(service, file) {
     const filesContainer = document.getElementById(`${service}-files`);
+    
+    // If it's an IPOPHL phase, let the AI Analyzer handle the rendering and upload
+    if (service.startsWith('phase') && window.ipophlAnalyzer) {
+      window.ipophlAnalyzer.handleFileUpload(file, service, filesContainer);
+      return;
+    }
+
     const fileId = `${service}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     const fileItem = document.createElement('div');
@@ -4949,11 +4956,12 @@ class DashboardApp {
         <span class="file-size">${fileSize}</span>
       </div>
       <div class="file-actions">
-        <button class="file-action-btn preview" title="Preview">
-          <i class="fa-solid fa-eye"></i>
-        </button>
+        ${service.startsWith('phase') ? `
+        <button class="file-action-btn ai-analysis" title="AI Analysis">
+          <i class="fa-solid fa-brain"></i>
+        </button>` : ''}
         <button class="file-action-btn delete" title="Delete">
-          <i class="fa-solid fa-times"></i>
+          <i class="fa-solid fa-trash-can"></i>
         </button>
       </div>
     `;
@@ -4973,9 +4981,29 @@ class DashboardApp {
     });
     
     // Add event listeners
-    fileItem.querySelector('.preview').addEventListener('click', () => {
-      this.previewFile(file);
-    });
+    if (service.startsWith('phase')) {
+      fileItem.querySelector('.ai-analysis').addEventListener('click', () => {
+        if (window.ipophlAnalyzer) {
+          // Use filename stem as UUID for the analysis fetch
+          const filename = file.name;
+          const fileUuid = filename.split('.')[0];
+          
+          const fileData = {
+            file_info: { filename: filename },
+            preview_url: URL.createObjectURL(file),
+            file_uuid: fileUuid
+          };
+          
+          window.ipophlAnalyzer.showFullAIAnalysis(fileData);
+          
+          if (file instanceof File) {
+            window.ipophlAnalyzer.handleFileUpload(file, service, filesContainer);
+          }
+        } else {
+          this.showIpophlNotification('AI Analysis system is not ready.');
+        }
+      });
+    }
     
     fileItem.querySelector('.delete').addEventListener('click', () => {
       this.removeFile(service, fileId);
@@ -4995,7 +5023,7 @@ class DashboardApp {
     linkItem.innerHTML = `
       <a href="${url}" target="_blank" class="link-url">${url}</a>
       <button class="file-action-btn delete" title="Remove">
-        <i class="fa-solid fa-times"></i>
+        <i class="fa-solid fa-trash-can"></i>
       </button>
     `;
     
@@ -5101,77 +5129,6 @@ class DashboardApp {
     aiStatusEl.textContent = aiStatus.label;
     aiStatusEl.classList.remove('gi-status-pill--pending', 'gi-status-pill--pass', 'gi-status-pill--fail');
     aiStatusEl.classList.add(aiStatus.className);
-  }
-
-  previewFile(file) {
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        this.showImagePreview(e.target.result, file.name);
-      };
-      reader.readAsDataURL(file);
-    } else if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf') || 
-               file.type === 'text/csv' || file.name.toLowerCase().endsWith('.csv')) {
-      // Use the simple preview modal for PDFs and CSVs
-      const modal = document.getElementById('simpleFilePreviewModal');
-      if (modal) {
-        // Revoke previous URL if any to prevent memory leaks
-        if (this.currentPreviewUrl) {
-          URL.revokeObjectURL(this.currentPreviewUrl);
-        }
-        
-        this.currentPreviewUrl = URL.createObjectURL(file);
-        
-        document.getElementById('simplePreviewFileName').textContent = file.name;
-        
-        const frame = document.getElementById('simplePreviewFrame');
-        frame.src = this.currentPreviewUrl;
-        frame.style.display = 'block';
-        
-        modal.classList.add('active');
-      } else {
-        // Fallback: Open in new tab
-        const fileUrl = URL.createObjectURL(file);
-        window.open(fileUrl, '_blank');
-      }
-    } else {
-      this.showIpophlNotification(`Preview not available for ${file.type || 'this'} files`);
-    }
-  }
-
-  showImagePreview(src, filename) {
-    const modal = document.createElement('div');
-    modal.className = 'image-preview-modal';
-    modal.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.8);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 2000;
-      cursor: pointer;
-    `;
-    
-    const img = document.createElement('img');
-    img.src = src;
-    img.style.cssText = `
-      max-width: 90%;
-      max-height: 90%;
-      object-fit: contain;
-      border-radius: 8px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-    `;
-    
-    modal.appendChild(img);
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', () => {
-      document.body.removeChild(modal);
-    });
   }
 
   getServiceFromCard(card) {
@@ -5280,7 +5237,7 @@ class DashboardApp {
     this.charts.topBarangaysChart = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: sorted.map(([k]) => k),
+        labels: sorted.map(([k]) => this.formatBarangayLabel(k)),
         datasets: [
           {
             label: 'Coffee farms',
@@ -5388,55 +5345,31 @@ class DashboardApp {
     });
   }
 
-  renderCoffeeVarietyChart(metrics) {
-    const canvas = document.getElementById('coffeeVarietyChart');
+  renderIpophlComplianceChart() {
+    const canvas = document.getElementById('ipophlComplianceChart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    if (this.charts.coffeeVarietyChart) this.charts.coffeeVarietyChart.destroy();
-    this.charts.coffeeVarietyChart = new Chart(ctx, {
+    if (this.charts.ipophlComplianceChart) this.charts.ipophlComplianceChart.destroy();
+    
+    const snapshot = this.getIpophlCompletionSnapshot();
+    const completed = snapshot.completed;
+    const pending = snapshot.total - completed;
+
+    this.charts.ipophlComplianceChart = new Chart(ctx, {
       type: 'doughnut',
       data: {
-        labels: ['Liberica', 'Robusta', 'Excelsa'],
+        labels: ['Completed Groups', 'Pending Groups'],
         datasets: [
           {
-            data: [
-              metrics.varietyTotals.Liberica,
-              metrics.varietyTotals.Robusta,
-              metrics.varietyTotals.Excelsa,
-            ],
+            data: [completed, pending],
             backgroundColor: [
-              'rgba(139, 74, 43, 0.84)',
-              'rgba(62, 166, 66, 0.82)',
-              'rgba(255, 193, 7, 0.84)',
+              'rgba(62, 166, 66, 0.85)',
+              'rgba(230, 233, 237, 1)'
             ],
-            borderWidth: 2,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '60%',
-        plugins: { legend: { position: 'bottom' } },
-      },
-    });
-  }
-
-  renderVerificationStatusChart(metrics) {
-    const canvas = document.getElementById('verificationStatusChart');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (this.charts.verificationStatusChart) this.charts.verificationStatusChart.destroy();
-    this.charts.verificationStatusChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: ['Verified', 'Pending'],
-        datasets: [
-          {
-            label: 'Profiles',
-            data: [metrics.verified, metrics.pending],
-            backgroundColor: ['rgba(62, 166, 66, 0.82)', 'rgba(255, 193, 7, 0.86)'],
-            borderColor: ['rgba(62, 166, 66, 1)', 'rgba(255, 193, 7, 1)'],
+            borderColor: [
+              'rgba(62, 166, 66, 1)',
+              'rgba(230, 233, 237, 1)'
+            ],
             borderWidth: 1.5,
           },
         ],
@@ -5444,8 +5377,23 @@ class DashboardApp {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+        cutout: '72%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              usePointStyle: false,
+              boxWidth: 40,
+              boxHeight: 12,
+              padding: 20
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: (ctxItem) => `${ctxItem.label}: ${ctxItem.raw} groups`,
+            },
+          },
+        },
       },
     });
   }
@@ -8317,30 +8265,12 @@ class DashboardApp {
   }
 
   bindBeanthenticEvents() {
-    // Menu button
-    const menuBtn = document.getElementById('beanthenticMenuBtn');
-    if (menuBtn) {
-      menuBtn.addEventListener('click', () => this.toggleSidebar());
-    }
-
-    // Search functionality
-    const searchInput = document.getElementById('beanthenticSearchInput');
-    if (searchInput) {
-      searchInput.addEventListener('input', (e) => {
-        this.searchTerm = e.target.value.toLowerCase();
-        this.renderContributions();
-      });
-    }
-
-    // Sidebar navigation
-    const sidebarItems = document.querySelectorAll('.beanthentic-sidebar-item');
-    console.log('Found sidebar items:', sidebarItems.length);
-    sidebarItems.forEach((item, index) => {
-      console.log(`Binding item ${index}:`, item.dataset.filter);
-      item.addEventListener('click', (e) => {
+    // Tab navigation
+    const tabs = document.querySelectorAll('.contributions-tab');
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', (e) => {
         e.preventDefault();
-        console.log('Clicked item:', item.dataset.filter);
-        const filter = item.dataset.filter;
+        const filter = tab.dataset.filter;
         if (filter) {
           this.setActiveFilter(filter);
         }
@@ -8430,11 +8360,11 @@ class DashboardApp {
     this.currentFilter = filter;
     
     // Update active state
-    const sidebarItems = document.querySelectorAll('.beanthentic-sidebar-item');
-    sidebarItems.forEach(item => {
-      item.classList.remove('active');
-      if (item.dataset.filter === filter) {
-        item.classList.add('active');
+    const tabs = document.querySelectorAll('.contributions-tab');
+    tabs.forEach(tab => {
+      tab.classList.remove('active');
+      if (tab.dataset.filter === filter) {
+        tab.classList.add('active');
       }
     });
     
@@ -8446,12 +8376,18 @@ class DashboardApp {
 
     // Apply status/category/seen filter
     if (this.currentFilter !== 'all') {
-      filtered = filtered.filter(c => 
-        c.status === this.currentFilter || 
-        c.category === this.currentFilter ||
-        c.seen === (this.currentFilter === 'seen') ||
-        !c.seen === (this.currentFilter === 'unseen')
-      );
+      if (this.currentFilter === 'starred') {
+        filtered = filtered.filter(c => c.starred && c.status !== 'archived');
+      } else if (this.currentFilter === 'approved') {
+        filtered = filtered.filter(c => c.status === 'approved');
+      } else if (this.currentFilter === 'documents' || this.currentFilter === 'images') {
+        filtered = filtered.filter(c => c.category === this.currentFilter && c.status !== 'archived');
+      } else {
+        filtered = filtered.filter(c => c.status === this.currentFilter);
+      }
+    } else {
+      // Inbox filter: active contributions
+      filtered = filtered.filter(c => c.status !== 'archived');
     }
 
     // Apply search filter
@@ -8474,19 +8410,36 @@ class DashboardApp {
     return labels[category] || category;
   }
 
+  updateTabCounts() {
+    const totalInbox = this.contributions.filter(c => c.status !== 'archived').length;
+    const totalStarred = this.contributions.filter(c => c.starred && c.status !== 'archived').length;
+    const totalApproved = this.contributions.filter(c => c.status === 'approved').length;
+
+    this.setText('inboxCountBadge', String(totalInbox));
+    this.setText('starredCountBadge', String(totalStarred));
+    this.setText('approvedCountBadge', String(totalApproved));
+  }
+
   renderContributions() {
     const container = document.getElementById('beanthenticContributionList');
     if (!container) return;
 
+    this.updateTabCounts();
+
     const filtered = this.getFilteredContributions();
+
+    const paginationLabel = document.getElementById('contributionsPaginationLabel');
+    if (paginationLabel) {
+      if (filtered.length > 0) {
+        paginationLabel.textContent = `1-${filtered.length} of ${filtered.length}`;
+      } else {
+        paginationLabel.textContent = `0-0 of 0`;
+      }
+    }
 
     if (filtered.length === 0) {
       container.innerHTML = `
         <div class="beanthentic-contribution-empty" role="status" aria-live="polite">
-          <img
-            src="assets/images/image-3b7ad4d5-6948-477a-98eb-2f613bf8819b.png"
-            alt="Onboarding concept illustration"
-          />
           <h3>No contributions found</h3>
           <p>Submit documents and photos to start building the farmer review queue.</p>
         </div>
@@ -8506,11 +8459,6 @@ class DashboardApp {
         <div class="beanthentic-contribution-subject">
           <span class="beanthentic-contribution-subject-text">${contribution.subject}</span>
           <span class="beanthentic-contribution-preview-inline">${contribution.preview}</span>
-        </div>
-        <div class="beanthentic-contribution-actions">
-          <button type="button" class="view-details-btn">
-            View <i class="fa-solid fa-chevron-right"></i>
-          </button>
         </div>
       </div>
     `).join('');

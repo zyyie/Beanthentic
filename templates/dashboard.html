@@ -1075,221 +1075,71 @@
 
           <!-- Farmer's Contribution Module -->
           <div class="module hidden" id="register-module" data-module="register">
-            <!-- Beanthentic-style Header -->
-            <div class="beanthentic-header">
-              <div class="beanthentic-header-left">
-                <button class="beanthentic-menu-btn" id="beanthenticMenuBtn">
-                  <i class="fa-solid fa-bars"></i>
-                </button>
-                <h1 class="beanthentic-title">Farmer's Contribution</h1>
-              </div>
-              <div class="beanthentic-header-right">
-                <div class="beanthentic-search">
-                  <i class="fa-solid fa-search"></i>
-                  <input type="text" placeholder="Search farmer contributions..." id="beanthenticSearchInput">
+            <section class="module-header">
+              <h1>Farmer's Contribution</h1>
+              <p>Review and manage farmer-submitted document and photo submissions</p>
+            </section>
+
+            <div class="contributions-card">
+              <!-- Tab Bar -->
+              <div class="contributions-tabs-bar">
+                <div class="contributions-tabs-left">
+                  <!-- Kept empty to align tabs to the right -->
+                </div>
+                <div class="contributions-tabs">
+                  <button class="contributions-tab active" data-filter="all">
+                    <i class="fa-solid fa-inbox"></i> Inbox <span class="tab-badge" id="inboxCountBadge">4</span>
+                  </button>
+                  <button class="contributions-tab" data-filter="starred">
+                    <i class="fa-solid fa-star"></i> Starred <span class="tab-badge" id="starredCountBadge">1</span>
+                  </button>
+                  <button class="contributions-tab" data-filter="approved">
+                    <i class="fa-solid fa-circle-check"></i> Approved <span class="tab-badge" id="approvedCountBadge">2</span>
+                  </button>
+                  <button class="contributions-tab" data-filter="archived">
+                    <i class="fa-solid fa-box-archive"></i> Archived
+                  </button>
+                  <div class="tab-separator"></div>
+                  <button class="contributions-tab" data-filter="documents">
+                    <i class="fa-solid fa-file-lines"></i> Documents
+                  </button>
+                  <button class="contributions-tab" data-filter="images">
+                    <i class="fa-solid fa-image"></i> Images
+                  </button>
                 </div>
               </div>
-            </div>
 
-            <!-- Beanthentic-style Layout -->
-            <div class="beanthentic-layout">
-              <div class="beanthentic-dashboard-header-card">
-                <!-- Beanthentic Sidebar -->
-                <aside class="beanthentic-sidebar" id="beanthenticSidebar">
-                  <div class="beanthentic-sidebar-item active" data-filter="all">
-                    <div class="beanthentic-item-content">
-                      <i class="fa-solid fa-coffee"></i>
-                      <div class="beanthentic-item-text">
-                        <span class="beanthentic-item-title">All Contributions</span>
-                        <span class="beanthentic-item-count">12</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div class="beanthentic-sidebar-section">
-                    <h3>View Status</h3>
-                    <div class="beanthentic-sidebar-item" data-filter="seen">
-                      <div class="beanthentic-item-content">
-                        <i class="fa-solid fa-eye"></i>
-                        <div class="beanthentic-item-text">
-                          <span class="beanthentic-item-title">Seen</span>
-                          <span class="beanthentic-item-count">2</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="beanthentic-sidebar-item" data-filter="unseen">
-                      <div class="beanthentic-item-content">
-                        <i class="fa-solid fa-eye-slash"></i>
-                        <div class="beanthentic-item-text">
-                          <span class="beanthentic-item-title">Unseen</span>
-                          <span class="beanthentic-item-count">2</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div class="beanthentic-sidebar-section">
-                    <h3>Categories</h3>
-                    <div class="beanthentic-sidebar-item" data-filter="documents">
-                      <div class="beanthentic-item-content">
-                        <i class="fa-solid fa-file-alt"></i>
-                        <div class="beanthentic-item-text">
-                          <span class="beanthentic-item-title">Documents</span>
-                          <span class="beanthentic-item-count">2</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="beanthentic-sidebar-item" data-filter="images">
-                      <div class="beanthentic-item-content">
-                        <i class="fa-solid fa-image"></i>
-                        <div class="beanthentic-item-text">
-                          <span class="beanthentic-item-title">Images</span>
-                          <span class="beanthentic-item-count">2</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="beanthentic-sidebar-section">
-                    <div class="beanthentic-sidebar-item" data-filter="archived">
-                      <div class="beanthentic-item-content">
-                        <i class="fa-solid fa-archive"></i>
-                        <div class="beanthentic-item-text">
-                          <span class="beanthentic-item-title">Archived</span>
-                          <span class="beanthentic-item-count">0</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="beanthentic-sidebar-item" data-filter="trash">
-                      <div class="beanthentic-item-content">
-                        <i class="fa-solid fa-trash"></i>
-                        <div class="beanthentic-item-text">
-                          <span class="beanthentic-item-title">Trash</span>
-                          <span class="beanthentic-item-count">0</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </aside>
-
-                <!-- Beanthentic Toolbar -->
-                <div class="beanthentic-toolbar">
-                  <div class="beanthentic-toolbar-left">
-                    <input type="checkbox" class="beanthentic-select-all" id="beanthenticSelectAll">
-                    <button class="beanthentic-toolbar-btn" title="Archive">
-                      <i class="fa-solid fa-archive"></i>
+              <!-- Toolbar -->
+              <div class="contributions-toolbar">
+                <div class="contributions-toolbar-left">
+                  <input type="checkbox" class="contributions-select-all" id="beanthenticSelectAll">
+                  <button class="beanthentic-toolbar-btn" title="Refresh">
+                    <i class="fa-solid fa-rotate"></i>
+                  </button>
+                  <button class="beanthentic-toolbar-btn" title="Archive">
+                    <i class="fa-solid fa-box-archive"></i>
+                  </button>
+                  <button class="beanthentic-toolbar-btn" title="Mark as Reviewed">
+                    <i class="fa-solid fa-envelope"></i>
+                  </button>
+                </div>
+                <div class="contributions-toolbar-right">
+                  <span class="contributions-pagination-label" id="contributionsPaginationLabel">1-4 of 4</span>
+                  <div class="contributions-pagination-btns">
+                    <button class="contributions-page-btn" id="contributionsPrevBtn" disabled>
+                      <i class="fa-solid fa-chevron-left"></i>
                     </button>
-                    <button class="beanthentic-toolbar-btn" title="Report Issue">
-                      <i class="fa-solid fa-exclamation-triangle"></i>
-                    </button>
-                    <button class="beanthentic-toolbar-btn" title="Delete">
-                      <i class="fa-solid fa-trash"></i>
-                    </button>
-                    <div class="beanthentic-divider"></div>
-                    <button class="beanthentic-toolbar-btn" title="Mark as Reviewed">
-                      <i class="fa-solid fa-eye"></i>
-                    </button>
-                    <button class="beanthentic-toolbar-btn" title="Mark as New">
-                      <i class="fa-solid fa-envelope"></i>
-                    </button>
-                    <div class="beanthentic-divider"></div>
-                    <button class="beanthentic-toolbar-btn" title="Snooze">
-                      <i class="fa-solid fa-clock"></i>
-                    </button>
-                  </div>
-                  <div class="beanthentic-toolbar-right">
-                    <button class="beanthentic-toolbar-btn" title="Refresh">
-                      <i class="fa-solid fa-sync"></i>
-                    </button>
-                    <button class="beanthentic-toolbar-btn" title="More">
-                      <i class="fa-solid fa-ellipsis-v"></i>
+                    <button class="contributions-page-btn" id="contributionsNextBtn" disabled>
+                      <i class="fa-solid fa-chevron-right"></i>
                     </button>
                   </div>
                 </div>
               </div>
 
-              <!-- Beanthentic Main Content -->
-              <main class="beanthentic-main">
-                <!-- Beanthentic Contribution List -->
-                <div class="beanthentic-contribution-list" id="beanthenticContributionList">
-                  <!-- Sample contribution items - these will be populated by dashboard.js -->
-                  <div class="beanthentic-contribution-item unread" data-id="1">
-                    <div class="beanthentic-contribution-checkbox">
-                      <input type="checkbox">
-                    </div>
-                    <div class="beanthentic-contribution-star">
-                      <i class="fa-regular fa-star"></i>
-                    </div>
-                    <div class="beanthentic-contribution-farmer">Juan Dela Cruz</div>
-                    <div class="beanthentic-contribution-subject">
-                      <span class="beanthentic-contribution-subject-text">GI Certification Application - Farm ID #1234</span>
-                      <span class="beanthentic-contribution-preview-inline">Submitted complete documentation for geographical indication certification including farm ownership papers and coffee variety verification...</span>
-                    </div>
-                    <div class="beanthentic-contribution-actions">
-                      <button type="button" class="view-details-btn">
-                        View <i class="fa-solid fa-chevron-right"></i>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div class="beanthentic-contribution-item" data-id="2">
-                    <div class="beanthentic-contribution-checkbox">
-                      <input type="checkbox">
-                    </div>
-                    <div class="beanthentic-contribution-star">
-                      <i class="fa-regular fa-star"></i>
-                    </div>
-                    <div class="beanthentic-contribution-farmer">Maria Santos</div>
-                    <div class="beanthentic-contribution-subject">
-                      <span class="beanthentic-contribution-subject-text">Farm Photos - Harvest Season 2026</span>
-                      <span class="beanthentic-contribution-preview-inline">High-resolution images of coffee farm during harvest season showing ripe cherries and processing facilities...</span>
-                    </div>
-                    <div class="beanthentic-contribution-actions">
-                      <button type="button" class="view-details-btn">
-                        View <i class="fa-solid fa-chevron-right"></i>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div class="beanthentic-contribution-item unread" data-id="3">
-                    <div class="beanthentic-contribution-checkbox">
-                      <input type="checkbox">
-                    </div>
-                    <div class="beanthentic-contribution-star starred">
-                      <i class="fa-solid fa-star"></i>
-                    </div>
-                    <div class="beanthentic-contribution-farmer">Roberto Reyes</div>
-                    <div class="beanthentic-contribution-subject">
-                      <span class="beanthentic-contribution-subject-text">Land Title Documents</span>
-                      <span class="beanthentic-contribution-preview-inline">Scanned copies of land ownership certificates and property tax receipts for farm verification...</span>
-                    </div>
-                    <div class="beanthentic-contribution-actions">
-                      <button type="button" class="view-details-btn">
-                        View <i class="fa-solid fa-chevron-right"></i>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div class="beanthentic-contribution-item" data-id="4">
-                    <div class="beanthentic-contribution-checkbox">
-                      <input type="checkbox">
-                    </div>
-                    <div class="beanthentic-contribution-star">
-                      <i class="fa-regular fa-star"></i>
-                    </div>
-                    <div class="beanthentic-contribution-farmer">Carmela Lopez</div>
-                    <div class="beanthentic-contribution-subject">
-                      <span class="beanthentic-contribution-subject-text">Coffee Processing Equipment Images</span>
-                      <span class="beanthentic-contribution-preview-inline">Professional photographs of coffee processing equipment including drying beds and milling machines...</span>
-                    </div>
-                    <div class="beanthentic-contribution-actions">
-                      <button type="button" class="view-details-btn">
-                        View <i class="fa-solid fa-chevron-right"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </main>
+              <!-- Main Content -->
+              <div class="contributions-list" id="beanthenticContributionList">
+                <!-- Populated dynamically by dashboard.js -->
+              </div>
             </div>
           </div>
 
@@ -1377,29 +1227,18 @@
                 <p class="analytics-kpi-sub" id="giEligibleRate">0.0% of farmers</p>
               </article>
               <article class="analytics-kpi-card">
-                <h3>Generated QR</h3>
-                <p class="analytics-kpi-value" id="qrGeneratedCount">0</p>
-                <p class="analytics-kpi-sub">Farmers with traceability ID</p>
-              </article>
-              <article class="analytics-kpi-card">
-                <h3>Verified Profiles</h3>
-                <p class="analytics-kpi-value" id="verifiedProfilesCount">0</p>
-                <p class="analytics-kpi-sub" id="pendingProfilesCount">0 pending</p>
+                <h3>IPOPHL Progress</h3>
+                <p class="analytics-kpi-value" id="ipophlProgressRate">0%</p>
+                <p class="analytics-kpi-sub" id="ipophlProgressSub">0 of 13 groups</p>
               </article>
             </section>
 
             <section class="charts-section analytics-charts-section">
-              <div class="charts-grid analytics-grid-2">
+              <div class="charts-grid analytics-grid-3">
                 <div class="chart-card">
                   <h3>Top 5 Barangays with Most Coffee Farms</h3>
                   <div class="chart-container">
                     <canvas id="topBarangaysChart"></canvas>
-                  </div>
-                </div>
-                <div class="chart-card">
-                  <h3>Coffee Variety Distribution</h3>
-                  <div class="chart-container">
-                    <canvas id="coffeeVarietyChart"></canvas>
                   </div>
                 </div>
                 <div class="chart-card">
@@ -1409,9 +1248,9 @@
                   </div>
                 </div>
                 <div class="chart-card">
-                  <h3>QR Verification Status</h3>
+                  <h3>IPOPHL Document Compliance</h3>
                   <div class="chart-container">
-                    <canvas id="verificationStatusChart"></canvas>
+                    <canvas id="ipophlComplianceChart"></canvas>
                   </div>
                 </div>
               </div>
@@ -2236,23 +2075,6 @@
     </div>
   </div>
 
-  <!-- Simple File Preview Modal -->
-  <div class="modal" id="simpleFilePreviewModal">
-    <div class="modal-content wide-modal">
-      <div class="modal-header minimal">
-        <h3 id="simplePreviewFileName">File Preview</h3>
-        <button class="modal-close" onclick="closeSimpleFilePreview()">
-          <i class="fa-solid fa-times"></i>
-        </button>
-      </div>
-      <div class="modal-body">
-        <div class="preview-container">
-          <iframe id="simplePreviewFrame" src="" class="preview-frame"></iframe>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- File Previewer Modal -->
   <div class="modal" id="filePreviewModal">
     <div class="modal-content large">
@@ -2274,6 +2096,13 @@
                 </button>
               </div>
             </div>
+            <div class="preview-tools">
+              <button class="tool-btn" onclick="ipophlAnalyzer.zoomIn()"><i class="fa-solid fa-magnifying-glass-plus"></i> Zoom In</button>
+              <button class="tool-btn" onclick="ipophlAnalyzer.zoomOut()"><i class="fa-solid fa-magnifying-glass-minus"></i> Zoom Out</button>
+              <button class="tool-btn" onclick="ipophlAnalyzer.rotate()"><i class="fa-solid fa-rotate-right"></i> Rotate</button>
+              <button class="tool-btn" onclick="ipophlAnalyzer.downloadCurrent()"><i class="fa-solid fa-download"></i> Download</button>
+              <button class="tool-btn" onclick="ipophlAnalyzer.printCurrent()"><i class="fa-solid fa-print"></i> Print</button>
+            </div>
             <div class="preview-container">
               <iframe id="filePreviewFrame" src="" class="preview-frame"></iframe>
               <div id="previewLoading" class="loading-spinner hidden">
@@ -2291,43 +2120,44 @@
               </div>
             </div>
             
-            <!-- GI Process Indicator -->
-            <div class="gi-progress-indicator">
-              <div class="progress-label">GI Process Readiness</div>
-              <div class="progress-bar-container">
-                <div class="progress-bar" id="giProgressBar" style="width: 0%"></div>
-              </div>
-              <div class="progress-percentage" id="giProgressPercentage">0%</div>
-            </div>
-            
-            <!-- Analysis Results -->
-            <div class="analysis-results" id="analysisResults">
-              <div class="result-section">
-                <h5><i class="fa-solid fa-check-circle text-success"></i> Detected Features</h5>
-                <ul class="feature-list" id="detectedFeaturesList">
-                  <li class="placeholder">No features detected yet...</li>
-                </ul>
+            <div class="analysis-scroll-area">
+              <!-- Document Quality Score Card -->
+              <div class="gi-progress-indicator analysis-card">
+                <div class="progress-label">
+                  <i class="fa-solid fa-gauge-high"></i> Document Quality Score
+                </div>
+                <div class="progress-row">
+                  <div class="progress-bar-container">
+                    <div class="progress-bar" id="giProgressBar" style="width: 0%"></div>
+                  </div>
+                  <div class="progress-percentage" id="giProgressPercentage">0%</div>
+                </div>
               </div>
               
-              <div class="result-section">
-                <h5><i class="fa-solid fa-exclamation-triangle text-warning"></i> Missing Requirements</h5>
-                <ul class="requirement-list" id="missingRequirementsList">
-                  <li class="placeholder">No missing requirements...</li>
-                </ul>
-              </div>
-              
-              <div class="analysis-metadata">
-                <div class="metadata-item">
-                  <span class="metadata-label">Analysis Method:</span>
-                  <span class="metadata-value" id="analysisMethod">-</span>
+              <!-- Analysis Results Cards -->
+              <div class="analysis-results" id="analysisResults">
+                <!-- Information Found Card -->
+                <div class="result-section analysis-card">
+                  <h5><i class="fa-solid fa-circle-check"></i> Information Found</h5>
+                  <ul class="feature-list" id="detectedFeaturesList">
+                    <li class="placeholder">No mandatory sections or information found in this document.</li>
+                  </ul>
                 </div>
-                <div class="metadata-item">
-                  <span class="metadata-label">Text Length:</span>
-                  <span class="metadata-value" id="textLength">-</span>
+                
+                <!-- Missing Information Card -->
+                <div class="result-section analysis-card">
+                  <h5><i class="fa-solid fa-triangle-exclamation"></i> Missing Information for this Document</h5>
+                  <ul class="requirement-list" id="missingRequirementsList">
+                    <li class="placeholder">Checking for missing requirements...</li>
+                  </ul>
                 </div>
-                <div class="metadata-item">
-                  <span class="metadata-label">Last Analyzed:</span>
-                  <span class="metadata-value" id="lastAnalyzed">-</span>
+
+                <!-- What Needs to be Improved Card -->
+                <div class="result-section analysis-card improvement-analysis-section">
+                  <h5><i class="fa-solid fa-wand-magic-sparkles text-primary"></i> What Needs to be Improved</h5>
+                  <div class="improvement-paragraph" id="improvementAnalysisParagraph">
+                    <p class="placeholder">Generating in-depth analysis and improvement recommendations...</p>
+                  </div>
                 </div>
               </div>
             </div>

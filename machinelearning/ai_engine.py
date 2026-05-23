@@ -40,10 +40,14 @@ except ImportError:
 # ML libraries
 try:
     import joblib
+    import pandas as pd
+    import numpy as np
+    import shap
+    import matplotlib.pyplot as plt
     ML_AVAILABLE = True
 except ImportError:
     ML_AVAILABLE = False
-    logging.warning("ML libraries not available, using rule-based analysis")
+    logging.warning("ML libraries (shap, pandas, numpy, etc.) not available, using rule-based analysis")
 
 class GIAnalyzer:
     """AI Engine for IPOPHL GI Registration and Farmer Readiness Analysis"""
@@ -52,40 +56,82 @@ class GIAnalyzer:
         self.uploads_dir = Path(uploads_dir)
         self.uploads_dir.mkdir(exist_ok=True)
 
-        # GI Seal Application Checklist - Updated as per IPOPHL requirements
+        # Comprehensive checklist of GI-related terms for extraction
         self.gi_checklist = {
             "mandatory_terms": [
-                "Application Form", "Manual of Specifications", "MoP",
-                "Geographical Area", "Causal Link", "Production Process",
-                "Quality Control", "Labeling Rules", "Government Certification",
-                "Proof of Payment", "Applicant Name", "Applicant Address",
-                "Legal Entity", "Domicile", "Geographical Origin"
+                "Geographical Indication", "GI", "Manual of Specifications", "MoP", 
+                "Geographical Area", "Causal Link", "Production Process", "Quality Control",
+                "Labeling Rules", "Applicant Entity", "Producers Organization", "LGU",
+                "Official Receipt", "Application Fee", "Registrability", "Publication",
+                "Opposition", "Certificate of Registration", "Compliance", "Technical Validation",
+                "Lipa City", "Batangas", "Barako", "Coffee", "Specifications"
             ],
             "optional_terms": [
-                "Foreign Protection", "Representative Designation", 
-                "Independent Certification", "Industrial Establishment",
-                "Commercial Establishment", "Stakeholders", "Governing Board",
-                "Territorial Boundaries", "Technical Specifications"
+                "Territorial Boundaries", "Soil Composition", "Climate Factors", "Historical Reputation",
+                "Traditional Knowledge", "Processing Method", "Packaging", "Governing Board",
+                "Third-party Observation", "Foreign Protection", "Prior Use", "Distinctive Quality",
+                "Flavor Profile", "Aroma", "Roasting Process", "Farming Practices"
             ]
         }
 
-        # Task-specific checklists based on IPOPHL requirements
+        # Task-specific checklists based on IPOPHL requirements (Total 13 documents)
         self.task_checklists = {
+            # Phase 1: Pre-Application Groundwork
+            "phase1-product": {
+                "mandatory": ["Identify Qualifying Product", "Geographical Origin", "Lipa Barako coffee", "Product Specifications"],
+                "optional": ["Product Photos", "Quality Attributes", "Reputation Evidence"]
+            },
+            "phase1-entity": {
+                "mandatory": ["Applicant Entity", "Producers Organization", "LGU", "Organization Documents"],
+                "optional": ["Certificates", "Bylaws", "Membership List"]
+            },
+            "phase1-stakeholders": {
+                "mandatory": ["Stakeholder Consultations", "Industry Groups", "Consensus", "Governance"],
+                "optional": ["Meeting Minutes", "Attendance Sheets", "Agreement Documents"]
+            },
+            # Phase 2: Preparing Application Documents
             "phase2-mop": {
                 "mandatory": ["Manual of Specifications", "MoP", "Geographical Area", "Causal Link", "Production Process", "Quality Control", "Labeling Rules"],
                 "optional": ["Territorial Boundaries", "Technical Specifications", "Governing Board"]
             },
             "phase2-cert": {
-                "mandatory": ["Government Certification", "Independent Certification"],
+                "mandatory": ["Government Certification", "Independent Certification", "Technical Validation"],
                 "optional": ["Foreign Protection", "Proof of Foreign Registration"]
             },
             "phase2-details": {
                 "mandatory": ["Application Form", "Applicant Name", "Applicant Address", "Legal Entity", "Domicile"],
                 "optional": ["Representative Designation", "Industrial Establishment", "Commercial Establishment"]
             },
+            # Phase 3: Filing with IPOPHL
+            "phase3-filing": {
+                "mandatory": ["File Application", "Bureau of Trademarks", "Application Package", "Cover Letter"],
+                "optional": ["Submission Receipt", "Acknowledgment"]
+            },
             "phase3-payment": {
                 "mandatory": ["Proof of Payment", "Official Receipt", "Application Fee"],
-                "optional": ["Exemption Certificate"]
+                "optional": ["Exemption Certificate", "Bank Transfer Confirmation"]
+            },
+            # Phase 4: Examination and Publication
+            "phase4-exam": {
+                "mandatory": ["Formality Examination", "Substantive Examination", "IP Code Provisions", "Registrability"],
+                "optional": ["Examination Reports", "Clarifications"]
+            },
+            "phase4-response": {
+                "mandatory": ["Deficiency Notices", "Response Letters", "Timeframe Compliance"],
+                "optional": ["Extensions", "Additional Evidence"]
+            },
+            "phase4-pub": {
+                "mandatory": ["Publication for Opposition", "Third-party Observations", "Public Notice Period"],
+                "optional": ["Opposition Filings", "Response to Objections"]
+            },
+            # Phase 5: Registration and Ongoing Compliance
+            "phase5-cert": {
+                "mandatory": ["GI Registration Certificate", "Official Notice", "Registration Number"],
+                "optional": ["Award Ceremony", "Public Announcement"]
+            },
+            "phase5-compliance": {
+                "mandatory": ["Maintain Standards", "Quality Control", "Compliance Audits", "Monitoring Records"],
+                "optional": ["Standards Manual", "Unauthorized Use Prevention"]
             }
         }
 
@@ -93,6 +139,8 @@ class GIAnalyzer:
         self.model = None
         self.vectorizer = None
         self.column_structure = None
+        self.feature_names = None
+        self.explainer = None
         
         if ML_AVAILABLE:
             self._initialize_model()
@@ -105,12 +153,14 @@ class GIAnalyzer:
         model_path = current_dir / "gi_model.joblib"
         vectorizer_path = current_dir / "vectorizer.joblib"
         structure_path = current_dir / "column_structure.json"
+        feature_names_path = current_dir / "feature_names.json"
 
         # Fallback to uploads_dir if not in current directory
         if not model_path.exists():
             model_path = self.uploads_dir / "gi_model.joblib"
             vectorizer_path = self.uploads_dir / "vectorizer.joblib"
             structure_path = self.uploads_dir / "column_structure.json"
+            feature_names_path = self.uploads_dir / "feature_names.json"
 
         if model_path.exists():
             try:
@@ -125,12 +175,77 @@ class GIAnalyzer:
                 if vectorizer_path.exists():
                     self.vectorizer = joblib.load(vectorizer_path)
                     logging.info("Loaded vectorizer")
+
+                if feature_names_path.exists():
+                    with open(feature_names_path, 'r') as f:
+                        self.feature_names = json.load(f)
+                    logging.info("Loaded feature names")
+                else:
+                    # Construct feature names from checklist if not saved
+                    self.feature_names = (['text_length', 'word_count'] + 
+                                        self.gi_checklist["mandatory_terms"] + 
+                                        self.gi_checklist["optional_terms"])
+
+                # Initialize SHAP explainer
+                if hasattr(self.model, 'predict'):
+                    self.explainer = shap.TreeExplainer(self.model)
+                    logging.info("Initialized SHAP TreeExplainer")
                     
             except Exception as e:
-                logging.warning(f"Failed to load model: {e}")
+                logging.warning(f"Failed to load model or initialize SHAP: {e}")
                 self._create_default_model()
         else:
             self._create_default_model()
+
+    def _generate_shap_explanation(self, features: List, readiness_score: int, task_id: str = None) -> str:
+        """Generate an in-depth SHAP analysis in paragraph form with 3 paragraphs"""
+        if not self.explainer or not self.feature_names:
+            return "Detailed AI analysis is currently unavailable. Please ensure all ML dependencies are installed."
+
+        try:
+            # Get SHAP values for the features
+            shap_values = self.explainer.shap_values(np.array([features]))
+            
+            # Link SHAP values with feature names
+            if isinstance(shap_values, list):
+                instance_shap = shap_values[1][0]
+            else:
+                instance_shap = shap_values[0, :, 1] if len(shap_values.shape) == 3 else shap_values[0]
+
+            feature_impact = []
+            for i, val in enumerate(instance_shap):
+                if i < len(self.feature_names):
+                    feature_impact.append({'name': self.feature_names[i], 'impact': val})
+
+            feature_impact.sort(key=lambda x: abs(x['impact']), reverse=True)
+            doc_type = task_id.replace('-', ' ').title() if task_id else "Document"
+            status = "highly compliant" if readiness_score >= 85 else "conditionally sufficient" if readiness_score >= 70 else "insufficient"
+            
+            # Paragraph 1: Executive Summary and Model Reasoning
+            positives = [f['name'] for f in feature_impact if f['impact'] > 0.05][:3]
+            p1 = f"<p>The AI model's comprehensive evaluation of the {doc_type} has determined a status of <strong>{status}</strong>, supported by a calculated readiness score of <strong>{readiness_score}%</strong>. "
+            if positives:
+                p1 += f"The high confidence in this assessment was primarily driven by the explicit presence of {', '.join(positives[:-1])} and {positives[-1]}, which are identified as key statistical anchors for valid Geographical Indication submissions. These elements provide the foundational data required by the system to validate the document's authenticity and technical depth.</p>"
+            else:
+                p1 += "The current assessment reflects a lack of critical terminology and structural requirements that the Random Forest model uses to verify compliance with IPOPHL standards.</p>"
+
+            # Paragraph 2: Technical Gap Analysis
+            negatives = [f['name'] for f in feature_impact if f['impact'] < -0.05][:4]
+            p2 = "<p>A deeper technical analysis of the document's content structure reveals significant variances in expected metadata and descriptive terminology. "
+            if negatives:
+                p2 += f"Specifically, the absence or weak representation of <strong>{', '.join(negatives[:-1])} and {negatives[-1]}</strong> creates a negative impact on the SHAP interpretation values. In the context of GI registration, these missing components are vital for establishing a legally defensible link between the product's quality and its Batangas origin, and their omission suggests that the document may not yet meet the formality examination criteria.</p>"
+            else:
+                p2 += "While no major technical gaps were explicitly flagged, the overall density of domain-specific information could be further optimized to ensure a smoother transition through the substantive examination phase of the registration process.</p>"
+
+            # Paragraph 3: Strategic Recommendations
+            p3 = "<p>To bridge these identified gaps, it is highly recommended to perform a targeted revision focusing on the explicit documentation of technical specifications and the causal relationship between the Lipa Barako flavor profile and the local soil composition. "
+            p3 += "Providing more exhaustive details on the {0} and quality control measures will not only improve the AI readiness score but also significantly reduce the likelihood of receiving deficiency notices from IPOPHL. Once these improvements are integrated, the document should be re-analyzed to verify that all mandatory parameters have been successfully satisfied.</p>".format("production process" if "process" not in [n['name'].lower() for n in feature_impact[:5]] else "labeling rules")
+
+            return p1 + p2 + p3
+
+        except Exception as e:
+            logging.error(f"SHAP explanation generation failed: {e}")
+            return "<p>An error occurred while generating the detailed AI analysis. The basic score and feature detection are still available.</p>"
 
     def _create_default_model(self):
         """Create a default rule-based model"""
@@ -317,7 +432,7 @@ class GIAnalyzer:
             if self.model == "rule_based":
                 return self._rule_based_analysis(text, checklist)
             else:
-                return self._ml_analysis(text, checklist)
+                return self._ml_analysis(text, checklist, task_id)
 
         except Exception as e:
             logging.error(f"Analysis error: {e}")
@@ -370,6 +485,21 @@ class GIAnalyzer:
         # Determine status
         status = "Ready" if readiness_score >= 75 else "Not Ready"
 
+        # Generate structured 2-3 paragraph analysis
+        p1 = f"<p>The rule-based analysis has identified <strong>{len(detected_mandatory)}</strong> out of <strong>{len(checklist['mandatory_terms'])}</strong> mandatory requirements within this document. This results in an initial readiness score of <strong>{readiness_score}%</strong>. "
+        if readiness_score >= 75:
+            p1 += "The document demonstrates strong compliance with IPOPHL standards, showing a consistent use of technical terminology required for Geographical Indication registration.</p>"
+        else:
+            p1 += "Current findings indicate that the document lacks several critical structural elements and key legal terms that are essential for a successful GI application process.</p>"
+
+        p2 = "<p>A detailed review of the missing components reveals that the following areas require immediate attention: "
+        if missing_mandatory:
+            p2 += f"<strong>{', '.join(missing_mandatory[:3])}</strong> and other related technical specifications. "
+        p2 += "The absence of these specific identifiers may lead to formality examination deficiencies, as they are necessary to establish the unique link between Lipa Barako coffee and its geographical origin.</p>"
+
+        p3 = "<p>To improve this document's standing, it is recommended to explicitly integrate the missing mandatory requirements and expand on the production processes unique to the Batangas region. "
+        p3 += "Ensuring that the Manual of Specifications (MoP) is fully detailed will help achieve a higher compliance score and facilitate a smoother approval workflow with IPOPHL.</p>"
+
         return {
             "success": True,
             "readiness_score": readiness_score,
@@ -377,10 +507,11 @@ class GIAnalyzer:
             "detected_features": detected_mandatory + detected_optional,
             "missing_requirements": missing_mandatory,
             "text_length": len(text),
-            "analysis_method": "rule_based"
+            "analysis_method": "rule_based",
+            "shap_analysis": p1 + p2 + p3
         }
 
-    def _ml_analysis(self, text: str, checklist: Dict = None) -> Dict:
+    def _ml_analysis(self, text: str, checklist: Dict = None, task_id: str = None) -> Dict:
         """ML-based analysis using Random Forest"""
         if checklist is None:
             checklist = self.gi_checklist
@@ -403,6 +534,9 @@ class GIAnalyzer:
             # Extract detected and missing terms using the provided checklist for the report
             detected_features, missing_requirements = self._analyze_terms(text, checklist)
 
+            # Generate SHAP explanation
+            shap_analysis = self._generate_shap_explanation(features, readiness_score, task_id)
+
             return {
                 "success": True,
                 "readiness_score": readiness_score,
@@ -410,7 +544,8 @@ class GIAnalyzer:
                 "detected_features": detected_features,
                 "missing_requirements": missing_requirements,
                 "text_length": len(text),
-                "analysis_method": "ml_based"
+                "analysis_method": "ml_based",
+                "shap_analysis": shap_analysis
             }
 
         except Exception as e:

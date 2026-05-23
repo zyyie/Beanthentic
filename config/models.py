@@ -330,6 +330,7 @@ class DocumentAnalysis(db.Model):
     missing_requirements = db.Column(db.Text)  # JSON string
     analysis_method = db.Column(db.String(50), default="rule_based")
     text_length = db.Column(db.Integer, default=0)
+    shap_analysis = db.Column(db.Text)  # In-depth SHAP analysis in paragraph form
 
     # Metadata
     upload_timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
