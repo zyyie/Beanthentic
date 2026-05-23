@@ -59,14 +59,15 @@ class GIAnalyzer:
         # Comprehensive checklist of GI-related terms for extraction
         self.gi_checklist = {
             "mandatory_terms": [
-                "Geographical Indication", "GI", "Manual of Specifications", "MoP", 
-                "Geographical Area", "Causal Link", "Production Process", "Quality Control",
-                "Labeling Rules", "Applicant Entity", "Producers Organization", "LGU",
+                "MoP", "Manual of Specifications", "Causal Link", "Production Process", 
+                "Quality Control", "Labeling Rules", "Applicant Entity", "Producers Organization", 
                 "Official Receipt", "Application Fee", "Registrability", "Publication",
-                "Opposition", "Certificate of Registration", "Compliance", "Technical Validation",
-                "Lipa City", "Batangas", "Barako", "Coffee", "Specifications"
+                "Opposition", "Technical Validation", "Geographical Indication", "GI",
+                "Lipa City", "Batangas", "Barako", "Coffee"
             ],
             "optional_terms": [
+                "Geographical Area", "LGU", "Organization Documents", "Certificates", "Bylaws",
+                "Membership List", "Meeting Minutes", "Attendance Sheets", "Agreement Documents",
                 "Territorial Boundaries", "Soil Composition", "Climate Factors", "Historical Reputation",
                 "Traditional Knowledge", "Processing Method", "Packaging", "Governing Board",
                 "Third-party Observation", "Foreign Protection", "Prior Use", "Distinctive Quality",
@@ -78,60 +79,60 @@ class GIAnalyzer:
         self.task_checklists = {
             # Phase 1: Pre-Application Groundwork
             "phase1-product": {
-                "mandatory": ["Identify Qualifying Product", "Geographical Origin", "Lipa Barako coffee", "Product Specifications"],
-                "optional": ["Product Photos", "Quality Attributes", "Reputation Evidence"]
+                "mandatory": ["Lipa Barako coffee", "Flavor Profile", "Geographical Origin", "Distinctive Quality"],
+                "optional": ["Product Photos", "Aroma", "Roasting Process", "Farming Practices"]
             },
             "phase1-entity": {
-                "mandatory": ["Applicant Entity", "Producers Organization", "LGU", "Organization Documents"],
-                "optional": ["Certificates", "Bylaws", "Membership List"]
+                "mandatory": ["Applicant Entity", "Producers Organization", "Legal Standing", "Membership List"],
+                "optional": ["LGU", "Certificates", "Bylaws", "Organization Structure"]
             },
             "phase1-stakeholders": {
-                "mandatory": ["Stakeholder Consultations", "Industry Groups", "Consensus", "Governance"],
-                "optional": ["Meeting Minutes", "Attendance Sheets", "Agreement Documents"]
+                "mandatory": ["Stakeholder Consultations", "Meeting Minutes", "Consensus", "Governance Board"],
+                "optional": ["Attendance Sheets", "Agreement Documents", "Industry Groups", "Community Support"]
             },
             # Phase 2: Preparing Application Documents
             "phase2-mop": {
-                "mandatory": ["Manual of Specifications", "MoP", "Geographical Area", "Causal Link", "Production Process", "Quality Control", "Labeling Rules"],
-                "optional": ["Territorial Boundaries", "Technical Specifications", "Governing Board"]
+                "mandatory": ["Manual of Specifications", "Causal Link", "Production Process", "Quality Control", "Labeling Rules"],
+                "optional": ["Geographical Area", "Territorial Boundaries", "Soil Composition", "Climate Factors"]
             },
             "phase2-cert": {
-                "mandatory": ["Government Certification", "Independent Certification", "Technical Validation"],
-                "optional": ["Foreign Protection", "Proof of Foreign Registration"]
+                "mandatory": ["Technical Validation", "Government Certification", "Independent Verification"],
+                "optional": ["Foreign Protection", "Proof of Foreign Registration", "Prior Use Evidence"]
             },
             "phase2-details": {
-                "mandatory": ["Application Form", "Applicant Name", "Applicant Address", "Legal Entity", "Domicile"],
-                "optional": ["Representative Designation", "Industrial Establishment", "Commercial Establishment"]
+                "mandatory": ["Application Form", "Applicant Name", "Domicile", "Industrial Establishment"],
+                "optional": ["Representative Designation", "Commercial Establishment", "Contact Details"]
             },
             # Phase 3: Filing with IPOPHL
             "phase3-filing": {
                 "mandatory": ["File Application", "Bureau of Trademarks", "Application Package", "Cover Letter"],
-                "optional": ["Submission Receipt", "Acknowledgment"]
+                "optional": ["Submission Receipt", "Acknowledgment", "Tracking Number"]
             },
             "phase3-payment": {
-                "mandatory": ["Proof of Payment", "Official Receipt", "Application Fee"],
-                "optional": ["Exemption Certificate", "Bank Transfer Confirmation"]
+                "mandatory": ["Official Receipt", "Application Fee", "Proof of Payment"],
+                "optional": ["Exemption Certificate", "Bank Transfer Confirmation", "Payment Date"]
             },
             # Phase 4: Examination and Publication
             "phase4-exam": {
-                "mandatory": ["Formality Examination", "Substantive Examination", "IP Code Provisions", "Registrability"],
-                "optional": ["Examination Reports", "Clarifications"]
+                "mandatory": ["Formality Examination", "Substantive Examination", "IP Code Compliance"],
+                "optional": ["Examination Reports", "Clarifications", "Technical Responses"]
             },
             "phase4-response": {
-                "mandatory": ["Deficiency Notices", "Response Letters", "Timeframe Compliance"],
-                "optional": ["Extensions", "Additional Evidence"]
+                "mandatory": ["Deficiency Notice Response", "Timeframe Compliance", "Corrective Actions"],
+                "optional": ["Extensions", "Additional Evidence", "Revised Documents"]
             },
             "phase4-pub": {
-                "mandatory": ["Publication for Opposition", "Third-party Observations", "Public Notice Period"],
-                "optional": ["Opposition Filings", "Response to Objections"]
+                "mandatory": ["Publication for Opposition", "Public Notice Period", "Opposition Period"],
+                "optional": ["Third-party Observations", "Opposition Filings", "Response to Objections"]
             },
             # Phase 5: Registration and Ongoing Compliance
             "phase5-cert": {
-                "mandatory": ["GI Registration Certificate", "Official Notice", "Registration Number"],
-                "optional": ["Award Ceremony", "Public Announcement"]
+                "mandatory": ["GI Registration Certificate", "Official Notice of Registration", "Registration Number"],
+                "optional": ["Award Ceremony", "Public Announcement", "Marketing Materials"]
             },
             "phase5-compliance": {
-                "mandatory": ["Maintain Standards", "Quality Control", "Compliance Audits", "Monitoring Records"],
-                "optional": ["Standards Manual", "Unauthorized Use Prevention"]
+                "mandatory": ["Maintain Quality Standards", "Regular Compliance Audits", "Monitoring Records"],
+                "optional": ["Standards Manual", "Unauthorized Use Prevention", "Renewal Schedule"]
             }
         }
 
@@ -488,17 +489,17 @@ class GIAnalyzer:
         # Generate structured 2-3 paragraph analysis
         p1 = f"<p>The rule-based analysis has identified <strong>{len(detected_mandatory)}</strong> out of <strong>{len(checklist['mandatory_terms'])}</strong> mandatory requirements within this document. This results in an initial readiness score of <strong>{readiness_score}%</strong>. "
         if readiness_score >= 75:
-            p1 += "The document demonstrates strong compliance with IPOPHL standards, showing a consistent use of technical terminology required for Geographical Indication registration.</p>"
+            p1 += "The document demonstrates strong compliance with IPOPHL standards, showing a consistent use of technical terminology required for this specific registration stage.</p>"
         else:
-            p1 += "Current findings indicate that the document lacks several critical structural elements and key legal terms that are essential for a successful GI application process.</p>"
+            p1 += "Current findings indicate that the document lacks several critical structural elements and key technical terms that are essential for this part of the Geographical Indication application.</p>"
 
         p2 = "<p>A detailed review of the missing components reveals that the following areas require immediate attention: "
         if missing_mandatory:
-            p2 += f"<strong>{', '.join(missing_mandatory[:3])}</strong> and other related technical specifications. "
-        p2 += "The absence of these specific identifiers may lead to formality examination deficiencies, as they are necessary to establish the unique link between Lipa Barako coffee and its geographical origin.</p>"
+            p2 += f"<strong>{', '.join(missing_mandatory[:3])}</strong> and other related identifiers. "
+        p2 += "The absence of these specific requirements may lead to formality examination deficiencies, as they are necessary to validate the document's relevance to the Lipa Barako coffee registration process.</p>"
 
-        p3 = "<p>To improve this document's standing, it is recommended to explicitly integrate the missing mandatory requirements and expand on the production processes unique to the Batangas region. "
-        p3 += "Ensuring that the Manual of Specifications (MoP) is fully detailed will help achieve a higher compliance score and facilitate a smoother approval workflow with IPOPHL.</p>"
+        p3 = "<p>To improve this document's standing, it is recommended to explicitly integrate the missing mandatory requirements identified above. "
+        p3 += "Ensuring that all task-specific details are fully addressed will help achieve a higher compliance score and facilitate a smoother approval workflow with IPOPHL. Once updated, the document should be re-analyzed to verify readiness.</p>"
 
         return {
             "success": True,

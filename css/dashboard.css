@@ -884,22 +884,31 @@ body.dashboard-page {
   display: none;
 }
 
-.module-header {
-  margin: 0;
+.module-header,
+.dashboard-title-section {
+  margin-bottom: 2rem;
+  border-radius: 18px;
+  border: 1px solid rgba(44, 122, 62, 0.25);
+  background: linear-gradient(135deg, rgba(231, 244, 233, 0.95), rgba(244, 250, 245, 0.95));
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.09);
+  padding: 1.1rem 1.2rem; /* Adjusted to match the transactions header padding */
 }
 
-.module-header h1 {
-  margin: 0 0 0.5rem 0;
-  color: #1e293b;
-  font-size: 2rem;
+.module-header h1,
+.dashboard-title {
+  margin: 0 0 0.4rem 0;
+  color: #166534;
+  font-size: 1.65rem;
   font-weight: 700;
   line-height: 1.15;
 }
 
-.module-header p {
+.module-header p,
+.dashboard-subtitle {
   margin: 0;
-  color: #6c757d;
-  font-size: 1.1rem;
+  color: #334155;
+  font-size: 1rem;
+  font-weight: 700;
   line-height: 1.4;
 }
 
@@ -1491,7 +1500,6 @@ select:focus {
 }
 
 #farmers-module .module-header {
-  margin-bottom: 0;
   flex-shrink: 0;
 }
 
@@ -2149,14 +2157,6 @@ select:focus {
 /* IPOPHL Module */
 .ipophl-content {
   padding: 1rem 0;
-}
-
-#ipophl-module .module-header {
-  background: linear-gradient(140deg, #ffffff, #f7f3ee);
-  border: 1px solid rgba(212, 177, 141, 0.3);
-  border-radius: 14px;
-  padding: 1rem 1.1rem;
-  box-shadow: 0 8px 20px rgba(40, 25, 15, 0.06);
 }
 
 .ipophl-header-layout {
@@ -6456,21 +6456,15 @@ body.dashboard-page #maps-module .layer-toggle.is-on::after {
 
 /* IPOPHIL module - green redesign */
 body.dashboard-page #ipophl-module .module-header {
-  border-radius: 18px;
-  border: 1px solid rgba(44, 122, 62, 0.25);
-  background: linear-gradient(135deg, rgba(231, 244, 233, 0.95), rgba(244, 250, 245, 0.95));
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.09);
-  padding: 1.1rem 1.2rem;
+  /* Inherits from global .module-header */
 }
 
 body.dashboard-page #ipophl-module .ipophl-header-copy h1 {
-  color: #166534;
-  font-size: 1.65rem;
+  /* Inherits from global .module-header h1 */
 }
 
 body.dashboard-page #ipophl-module .ipophl-header-copy p {
-  color: #334155;
-  font-weight: 700;
+  /* Inherits from global .module-header p */
 }
 
 body.dashboard-page #ipophl-module .gi-status-card {
@@ -7506,24 +7500,19 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
     0 4px 16px rgba(15, 23, 42, 0.06);
 }
 
+/* Detail Modal styles handled in modules-enhancement.css */
 .beanthentic-detail-dialog {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: 100000; /* Higher z-index to cover everything */
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 20px;
 }
 
 .beanthentic-detail-dialog[hidden] {
-  display: none;
-}
-
-.beanthentic-detail-dialog__backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(2px);
+  display: none !important;
 }
 
 .beanthentic-detail-dialog__card {
@@ -7722,7 +7711,7 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 .beanthentic-confirm-dialog {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: 100001;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -7732,49 +7721,86 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   display: none;
 }
 
+.beanthentic-confirm-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.beanthentic-confirm-modal {
+  position: relative;
+  width: 90%;
+  max-width: 420px;
+  background: #ffffff;
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  z-index: 2;
+  animation: modalScaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 .beanthentic-confirm-header {
-  width: auto;
-  background: #276749;
-  color: #ffffff;
-  border-bottom: 1px solid #1e523a;
-  padding: 12px 20px;
+  padding: 24px 24px 8px;
+  text-align: center;
+}
+
+.beanthentic-confirm-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e293b;
 }
 
 .beanthentic-confirm-body {
-  padding: 20px;
+  padding: 8px 24px 24px;
+  text-align: center;
 }
 
 .beanthentic-confirm-message {
   margin: 0;
-  line-height: 1.5;
-  color: #333333;
+  line-height: 1.6;
+  color: #64748b;
+  font-size: 1rem;
 }
 
 .beanthentic-confirm-footer {
-  padding: 16px 20px;
-  background: #fafafa;
-  border-top: 1px solid #e0e0e0;
+  padding: 0 24px 24px;
   display: flex;
-  justify-content: flex-end;
+  gap: 12px;
 }
 
 .beanthentic-confirm-btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-weight: 600;
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.95rem;
   cursor: pointer;
   border: none;
+  transition: all 0.2s ease;
 }
 
 .beanthentic-confirm-btn--cancel {
-  background: #e5e7eb;
-  color: #374151;
-  margin-right: 12px;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.beanthentic-confirm-btn--cancel:hover {
+  background: #e2e8f0;
+  color: #1e293b;
 }
 
 .beanthentic-confirm-btn--ok {
-  background: #16a34a;
+  background: #ef4444; /* Default to red for delete-like actions */
   color: #ffffff;
+}
+
+.beanthentic-confirm-btn--ok:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
 /* Responsive Design */

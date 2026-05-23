@@ -143,7 +143,7 @@
               Cancel
             </button>
             <button type="button" class="beanthentic-confirm-btn beanthentic-confirm-btn--ok" id="beanthenticConfirmOk">
-              OK
+              Confirm
             </button>
           </div>
         </div>
@@ -1168,24 +1168,25 @@
               </button>
 
               <div class="beanthentic-gmail-header">
-                <h2 id="beanthenticContributionDetailSubject" class="beanthentic-gmail-subject">Contribution Detail</h2>
+                <h2 id="beanthenticContributionDetailSubject" class="beanthentic-gmail-subject">GI Certification Application - Farm ID #1234</h2>
                 <div class="beanthentic-gmail-sender-row">
-                  <div class="beanthentic-gmail-avatar" id="beanthenticContributionAvatar">S</div>
+                  <div class="beanthentic-gmail-avatar" id="beanthenticContributionAvatar">J</div>
                   <div class="beanthentic-gmail-sender-info">
-                    <div class="beanthentic-gmail-sender-name">
-                      <span id="beanthenticContributionDetailFarmer">Farmer Name</span>
+                    <div class="beanthentic-gmail-sender-name-container">
+                      <span class="beanthentic-gmail-sender-name" id="beanthenticContributionDetailFarmer">Juan Dela Cruz</span>
+                      <span class="beanthentic-gmail-email" id="beanthenticContributionDetailEmail">juan.dc@gmail.com</span>
                     </div>
                     <div class="beanthentic-gmail-to-me">
                       to me <i class="fa-solid fa-caret-down"></i>
                     </div>
                   </div>
-                  <div class="beanthentic-gmail-date" id="beanthenticContributionDetailDate">Yesterday</div>
+                  <div class="beanthentic-gmail-date-container" id="beanthenticContributionDetailDate">2:30 PM</div>
                 </div>
               </div>
 
               <div class="beanthentic-gmail-body">
                 <div id="beanthenticContributionDetailPreview" class="beanthentic-gmail-message">
-                  No details available.
+                  Submitted complete documentation for geographical indication certification including farm ownership papers and coffee variety verification...
                 </div>
 
                 <div class="beanthentic-gmail-attachments">
@@ -1195,9 +1196,9 @@
                       • Scanned by Beanthentic <i class="fa-solid fa-circle-info"></i>
                     </span>
                     <div class="beanthentic-gmail-attachment-actions">
-                      <i class="fa-solid fa-download"></i>
-                      <i class="fa-solid fa-file-export"></i>
-                      <span>Add all to Drive</span>
+                      <div class="beanthentic-gmail-action-icon" title="Download all"><i class="fa-solid fa-download"></i></div>
+                      <div class="beanthentic-gmail-action-icon" title="Add all to Drive"><i class="fa-brands fa-google-drive"></i></div>
+                      <div class="beanthentic-gmail-add-drive-btn">Add all to Drive</div>
                     </div>
                   </div>
                   <div class="beanthentic-gmail-attachment-grid" id="beanthenticAttachmentGrid">
@@ -2100,11 +2101,11 @@
               <button class="tool-btn" onclick="ipophlAnalyzer.zoomIn()"><i class="fa-solid fa-magnifying-glass-plus"></i> Zoom In</button>
               <button class="tool-btn" onclick="ipophlAnalyzer.zoomOut()"><i class="fa-solid fa-magnifying-glass-minus"></i> Zoom Out</button>
               <button class="tool-btn" onclick="ipophlAnalyzer.rotate()"><i class="fa-solid fa-rotate-right"></i> Rotate</button>
-              <button class="tool-btn" onclick="ipophlAnalyzer.downloadCurrent()"><i class="fa-solid fa-download"></i> Download</button>
               <button class="tool-btn" onclick="ipophlAnalyzer.printCurrent()"><i class="fa-solid fa-print"></i> Print</button>
             </div>
             <div class="preview-container">
               <iframe id="filePreviewFrame" src="" class="preview-frame"></iframe>
+              <div id="wordPreviewArea" class="word-preview-area hidden"></div>
               <div id="previewLoading" class="loading-spinner hidden">
                 <i class="fa-solid fa-spinner fa-spin"></i> Loading document...
               </div>
@@ -2144,14 +2145,6 @@
                   </ul>
                 </div>
                 
-                <!-- Missing Information Card -->
-                <div class="result-section analysis-card">
-                  <h5><i class="fa-solid fa-triangle-exclamation"></i> Missing Information for this Document</h5>
-                  <ul class="requirement-list" id="missingRequirementsList">
-                    <li class="placeholder">Checking for missing requirements...</li>
-                  </ul>
-                </div>
-
                 <!-- What Needs to be Improved Card -->
                 <div class="result-section analysis-card improvement-analysis-section">
                   <h5><i class="fa-solid fa-wand-magic-sparkles text-primary"></i> What Needs to be Improved</h5>
@@ -2183,6 +2176,7 @@
   <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=visualization&callback=initBeanthenticGoogleMaps"></script>
   {% endif %}
   <!-- JavaScript Files -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="js/main.js"></script>
   <script src="js/navigation.js"></script>
   <script src="js/dashboard.js"></script>

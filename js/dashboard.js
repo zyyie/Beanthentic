@@ -4843,6 +4843,12 @@ class DashboardApp {
       const fileInput = zone.querySelector('.file-input');
       const service = zone.dataset.service;
       
+      // If it's an IPOPHL phase, the ipophl-analyzer.js handles it.
+      // We only attach listeners here for non-phase zones.
+      if (service && service.startsWith('phase')) {
+        return;
+      }
+      
       // Click to upload
       zone.addEventListener('click', (e) => {
         if (e.target !== fileInput) {
@@ -5091,7 +5097,7 @@ class DashboardApp {
       return hasFiles || hasLinks;
     });
 
-    const total = allServices.length;
+    const total = 13; // Explicitly set to 13 document groups
     const completed = completedServices.length;
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
@@ -8449,17 +8455,20 @@ class DashboardApp {
 
     container.innerHTML = filtered.map(contribution => `
       <div class="beanthentic-contribution-item ${contribution.unread ? 'unread' : ''}" data-id="${contribution.id}">
-        <div class="beanthentic-contribution-checkbox">
-          <input type="checkbox" ${this.selectedContributions.has(contribution.id) ? 'checked' : ''}>
+        <div class="beanthentic-contribution-left">
+          <div class="beanthentic-contribution-checkbox">
+            <input type="checkbox" ${this.selectedContributions.has(contribution.id) ? 'checked' : ''}>
+          </div>
+          <div class="beanthentic-contribution-star ${contribution.starred ? 'starred' : ''}">
+            <i class="${contribution.starred ? 'fa-solid' : 'fa-regular'} fa-star"></i>
+          </div>
+          <div class="beanthentic-contribution-farmer">${contribution.farmer}</div>
         </div>
-        <div class="beanthentic-contribution-star ${contribution.starred ? 'starred' : ''}">
-          <i class="${contribution.starred ? 'fa-solid' : 'fa-regular'} fa-star"></i>
-        </div>
-        <div class="beanthentic-contribution-farmer">${contribution.farmer}</div>
         <div class="beanthentic-contribution-subject">
           <span class="beanthentic-contribution-subject-text">${contribution.subject}</span>
           <span class="beanthentic-contribution-preview-inline">${contribution.preview}</span>
         </div>
+        <div class="beanthentic-contribution-date">${contribution.date}</div>
       </div>
     `).join('');
 
@@ -8552,7 +8561,7 @@ class DashboardApp {
   async deleteContributions() {
     const confirmed = await this.showConfirmDialog(
       `Are you sure you want to delete ${this.selectedContributions.size} contribution(s)?`,
-      'Delete Contributions'
+      'Confirm Delete'
     );
     
     if (confirmed) {
@@ -8655,6 +8664,7 @@ class DashboardApp {
 
     if (avatarEl) avatarEl.textContent = (contribution.farmer || 'F').charAt(0);
     if (farmerEl) farmerEl.textContent = contribution.farmer || '—';
+    if (emailEl) emailEl.textContent = emails[contribution.farmer] || 'farmer@email.com';
     if (dateEl) dateEl.textContent = contribution.date || 'Yesterday';
     if (subjectEl) subjectEl.textContent = contribution.subject || 'Contribution Detail';
     

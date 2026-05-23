@@ -40,11 +40,20 @@
     flex-direction: column;
 }
 
+#transactions-module .txn-header {
+    margin-bottom: 2rem;
+    border-radius: 18px;
+    border: 1px solid rgba(44, 122, 62, 0.25);
+    background: linear-gradient(135deg, rgba(231, 244, 233, 0.95), rgba(244, 250, 245, 0.95));
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.09);
+    padding: 1.1rem 1.2rem;
+}
+
 #transactions-module .txn-header h2 {
-    font-size: 1.5rem;
-    font-weight: 800;
-    color: #1a202c;
-    margin-bottom: 1.5rem;
+    margin: 0;
+    color: #166534;
+    font-size: 1.65rem;
+    font-weight: 700;
 }
 
 #transactions-module .txn-toolbar {
@@ -911,6 +920,45 @@
     align-items: center;
 }
 
+#register-module .beanthentic-toolbar-btn {
+    background: transparent;
+    border: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+#register-module .beanthentic-toolbar-btn:hover {
+    background-color: #f1f5f9;
+    color: #0f172a;
+    transform: translateY(-1px);
+}
+
+#register-module .beanthentic-toolbar-btn i {
+    font-size: 1.1rem;
+}
+
+#register-module .beanthentic-toolbar-btn[title="Refresh"]:hover {
+    color: #2c7a3e;
+    background-color: #f0fdf4;
+}
+
+#register-module .beanthentic-toolbar-btn[title="Archive"]:hover {
+    color: #b45309;
+    background-color: #fffbeb;
+}
+
+#register-module .beanthentic-toolbar-btn[title="Mark as Reviewed"]:hover {
+    color: #2563eb;
+    background-color: #eff6ff;
+}
+
 #register-module .beanthentic-contribution-list {
     background: #ffffff;
     border: 1px solid #f0f0f0;
@@ -932,413 +980,470 @@
     display: none;
 }
 
-#register-module .beanthentic-sidebar-item {
-    min-width: auto;
-    padding: 3px 6px; /* Reduced internal padding */
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+/* Farmer's Contribution Tab System */
+.contributions-tabs-container {
     display: flex;
     align-items: center;
-    background: transparent;
+    padding: 8px 16px;
+    gap: 4px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.contributions-tab {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    border-radius: 20px;
     border: none;
-}
-
-#register-module .beanthentic-sidebar-item:hover:not(.active) {
-    background: #f1f5f9;
-}
-
-#register-module .beanthentic-sidebar-item.active {
-    background: #ecfdf5;
-}
-
-#register-module .beanthentic-sidebar-item i {
-    font-size: 1.25rem; /* Larger icon */
-    margin-right: 0;
-    margin-bottom: 0;
-    color: #64748b;
-    width: auto;
-}
-
-#register-module .beanthentic-sidebar-item.active i {
-    color: #059669;
-}
-
-#register-module .beanthentic-item-content {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 0;
-    width: auto;
-}
-
-#register-module .beanthentic-item-text {
-    display: none; /* Hide text by default to make it iconic */
-}
-
-#register-module .beanthentic-sidebar-item:hover .beanthentic-item-text,
-#register-module .beanthentic-sidebar-item.active .beanthentic-item-text {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 4px; /* Reduced gap */
-    margin-left: 6px; /* Reduced margin */
-    animation: slideInLeft 0.2s ease-out;
-}
-
-@keyframes slideInLeft {
-    from { opacity: 0; transform: translateX(-5px); }
-    to { opacity: 1; transform: translateX(0); }
-}
-
-#register-module .beanthentic-item-title {
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: #475569;
+    background: transparent;
+    color: #444746;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    gap: 8px;
     white-space: nowrap;
 }
 
-#register-module .beanthentic-sidebar-item.active .beanthentic-item-title {
-    color: #059669;
-    font-weight: 700;
+.contributions-tab:hover {
+    background: #f1f3f4;
 }
 
-#register-module .beanthentic-item-count {
-    font-size: 0.7rem;
-    font-weight: 700;
-    background: #f1f5f9;
-    color: #64748b;
+.contributions-tab.active {
+    background: #c2e7ff;
+    color: #001d35;
+}
+
+.contributions-tab i {
+    font-size: 1rem;
+    color: inherit;
+}
+
+.tab-badge {
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: #e1e3e1;
+    color: #444746;
     padding: 1px 6px;
     border-radius: 10px;
-    min-width: 18px;
+    margin-left: 4px;
 }
 
-#register-module .beanthentic-sidebar-item.active .beanthentic-item-count {
-    background: #059669;
+.contributions-tab.active .tab-badge {
+    background: #001d35;
     color: #ffffff;
+}
+
+.tab-separator {
+    width: 1px;
+    height: 24px;
+    background: #dadce0;
+    margin: 0 12px;
+}
+
+/* Toolbar Spacing */
+.contributions-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 16px;
+    background: #ffffff;
+}
+
+.contributions-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.contributions-select-all {
+    width: 18px;
+    height: 18px;
+    margin-right: 8px;
+    cursor: pointer;
+    accent-color: #2d6a4f;
 }
 
 #register-module .beanthentic-contribution-item {
     background: #ffffff;
-    border-radius: 12px;
-    padding: 12px 20px;
-    margin-bottom: 8px;
-    border: 1px solid #f0f0f0;
-    transition: all 0.2s ease;
+    padding: 8px 16px; /* Gmail-style tighter padding */
+    border-bottom: 1px solid #f1f5f9; /* Border bottom instead of margin */
+    transition: all 0.1s ease;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 0;
     cursor: pointer;
-}
-
-#register-module .beanthentic-contribution-item.unread {
-    background: #f8fafc;
-    border-left: 4px solid #2d6a4f;
+    position: relative;
+    border-radius: 0;
+    margin-bottom: 0;
+    border-left: none;
+    border-right: none;
+    border-top: none;
 }
 
 #register-module .beanthentic-contribution-item:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    border-color: #2d6a4f;
+    box-shadow: inset 1px 0 0 #dadce0, inset -1px 0 0 #dadce0, 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+    z-index: 1;
 }
 
-#register-module .beanthentic-contribution-farmer {
-    font-weight: 700;
-    color: #1e293b;
-    min-width: 140px;
-    font-size: 0.95rem;
+#register-module .beanthentic-contribution-item.unread {
+    background: #ffffff; /* Unread is still white in Gmail, just bold text */
 }
 
-#register-module .beanthentic-contribution-subject {
+/* Unread Indicator Bar */
+#register-module .beanthentic-contribution-item.unread::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 15%;
+    height: 70%;
+    width: 4px;
+    background: #2d6a4f;
+    border-radius: 10px;
+}
+
+#register-module .beanthentic-contribution-left {
     display: flex;
     align-items: center;
     gap: 12px;
-    flex: 1;
-    overflow: hidden;
+    padding-left: 12px;
+    min-width: 200px; /* Space for checkbox, star, and name */
 }
 
-#register-module .beanthentic-contribution-subject-text {
-    font-weight: 600;
-    color: #334155;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-#register-module .beanthentic-contribution-preview-inline {
-    color: #64748b;
-    font-weight: 400;
-    font-size: 0.9rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-#register-module .beanthentic-contribution-tags {
+#register-module .beanthentic-contribution-checkbox {
     display: flex;
-    gap: 6px;
-    flex-shrink: 0;
+    align-items: center;
+    padding: 0 4px;
+}
+
+#register-module .beanthentic-contribution-checkbox input {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    accent-color: #2d6a4f;
 }
 
 #register-module .beanthentic-contribution-star {
-    color: #cbd5e1;
+    color: #dadce0;
     cursor: pointer;
+    font-size: 1rem;
+    transition: color 0.2s;
+}
+
+#register-module .beanthentic-contribution-star:hover {
+    color: #5f6368;
 }
 
 #register-module .beanthentic-contribution-star.starred {
     color: #f59e0b;
 }
 
-#register-module .beanthentic-contribution-actions {
-    display: none !important;
+#register-module .beanthentic-contribution-farmer {
+    font-weight: 500;
+    color: #202124;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-left: 8px;
 }
 
-#register-module .beanthentic-tag {
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 0.75rem;
+#register-module .beanthentic-contribution-item.unread .beanthentic-contribution-farmer {
     font-weight: 700;
-    text-transform: uppercase;
 }
 
-#register-module .beanthentic-tag--pending { background: #fef3c7; color: #92400e; }
-#register-module .beanthentic-tag--approved { background: #dcfce7; color: #166534; }
-#register-module .beanthentic-tag--documents { background: #dbeafe; color: #1e40af; }
-#register-module .beanthentic-tag--images { background: #f3e8ff; color: #6b21a8; }
-
-/* 3.1 Contribution Detail Modal Fixes */
-.beanthentic-detail-dialog {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 100000;
+#register-module .beanthentic-contribution-subject {
     display: flex;
     align-items: center;
-    justify-content: center;
+    gap: 8px;
+    flex: 1;
+    overflow: hidden;
+    padding: 0 12px;
 }
 
-.beanthentic-detail-dialog[hidden] {
-    display: none !important;
+#register-module .beanthentic-contribution-subject-text {
+    font-weight: 500;
+    color: #202124;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
+#register-module .beanthentic-contribution-item.unread .beanthentic-contribution-subject-text {
+    font-weight: 700;
+}
+
+#register-module .beanthentic-contribution-preview-inline {
+    color: #5f6368;
+    font-weight: 400;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#register-module .beanthentic-contribution-date {
+    min-width: 80px;
+    text-align: right;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #5f6368;
+    padding-right: 16px;
+}
+
+#register-module .beanthentic-contribution-item.unread .beanthentic-contribution-date {
+    font-weight: 700;
+    color: #202124;
+}
+
+/* Modal Improvements */
 .beanthentic-detail-dialog__backdrop {
     position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
-    background: rgba(15, 23, 42, 0.6);
-    backdrop-filter: blur(4px);
+    background: rgba(255, 255, 255, 0.1); /* Almost transparent background */
+    backdrop-filter: blur(10px); /* Clean blur effect */
+    -webkit-backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
 }
 
 .beanthentic-detail-dialog__card {
     position: relative;
-    width: 90%;
-    max-width: 600px; /* Slightly wider for Gmail look */
+    width: 100%;
+    max-width: 850px;
     background: #ffffff;
-    border-radius: 24px;
-    padding: 0; /* Remove padding to handle layout inside */
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    animation: modalSlideUp 0.3s ease-out;
+    border-radius: 28px;
+    padding: 0;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    animation: modalScaleUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     z-index: 2;
     overflow: hidden;
+    /* Card is centered by parent flexbox */
 }
 
-/* Gmail Style Modal */
-.beanthentic-gmail-card {
-    display: flex;
-    flex-direction: column;
+@keyframes modalScaleUp {
+    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .beanthentic-gmail-header {
-    padding: 24px 32px;
-    border-bottom: 1px solid #f1f5f9;
+    padding: 24px 32px 16px;
+    border-bottom: none;
 }
 
 .beanthentic-gmail-subject {
-    font-size: 1.4rem;
-    font-weight: 400;
-    color: #1e293b;
+    font-size: 1.6rem;
+    font-weight: 500;
+    color: #202124;
     margin-bottom: 24px !important;
 }
 
 .beanthentic-gmail-sender-row {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
+    margin-bottom: 24px;
 }
 
 .beanthentic-gmail-avatar {
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
-    background: #8b5e3c; /* Brownish brown color for Beanthentic */
+    background: #8d6e63;
     color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 700;
-    font-size: 1.2rem;
-    flex-shrink: 0;
+    font-weight: 500;
+    font-size: 1.4rem;
 }
 
 .beanthentic-gmail-sender-info {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.beanthentic-gmail-sender-name-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .beanthentic-gmail-sender-name {
     font-weight: 700;
-    color: #1e293b;
-    font-size: 0.95rem;
-    margin-bottom: 2px;
+    color: #202124;
+    font-size: 1rem;
 }
 
 .beanthentic-gmail-email {
-    color: #64748b;
-    font-weight: 400;
+    color: #5f6368;
     font-size: 0.85rem;
-    margin-left: 4px;
 }
 
 .beanthentic-gmail-to-me {
-    font-size: 0.8rem;
-    color: #64748b;
+    font-size: 0.85rem;
+    color: #5f6368;
     display: flex;
     align-items: center;
     gap: 4px;
+    cursor: pointer;
 }
 
-.beanthentic-gmail-date {
-    font-size: 0.8rem;
-    color: #64748b;
+.beanthentic-gmail-to-me:hover {
+    color: #202124;
+}
+
+.beanthentic-gmail-date-container {
+    margin-left: auto;
+    color: #5f6368;
+    font-size: 0.85rem;
 }
 
 .beanthentic-gmail-body {
-    padding: 32px;
-    flex: 1;
-    overflow-y: auto;
+    padding: 0 32px 32px 92px; /* Offset for avatar */
 }
 
 .beanthentic-gmail-message {
-    font-size: 0.95rem;
+    font-size: 1rem;
     line-height: 1.6;
-    color: #334155;
-    margin-bottom: 40px;
+    color: #3c4043;
+    margin-bottom: 32px;
 }
 
 .beanthentic-gmail-attachments {
     border-top: 1px solid #f1f5f9;
     padding-top: 24px;
+    margin-top: 32px;
 }
 
 .beanthentic-gmail-attachments-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 16px;
+    gap: 12px;
+    margin-bottom: 20px;
 }
 
 .beanthentic-gmail-attachment-count {
     font-weight: 700;
-    color: #1e293b;
-    font-size: 0.9rem;
+    color: #202124;
+    font-size: 1rem;
 }
 
 .beanthentic-gmail-scanned {
-    font-size: 0.8rem;
-    color: #64748b;
+    font-size: 0.85rem;
+    color: #5f6368;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
+}
+
+.beanthentic-gmail-scanned i {
+    color: #1a4d33;
 }
 
 .beanthentic-gmail-attachment-actions {
     margin-left: auto;
     display: flex;
     align-items: center;
-    gap: 16px;
-    color: #64748b;
+    gap: 20px;
 }
 
-.beanthentic-gmail-attachment-actions i {
+.beanthentic-gmail-action-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #5f6368;
     cursor: pointer;
-    font-size: 1.1rem;
+    transition: background 0.2s;
 }
 
-.beanthentic-gmail-attachment-actions i:hover {
-    color: #1e293b;
+.beanthentic-gmail-action-icon:hover {
+    background: #f1f3f4;
+    color: #202124;
 }
 
-.beanthentic-gmail-attachment-actions span {
-    font-size: 0.85rem;
-    font-weight: 600;
+.beanthentic-gmail-add-drive-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 18px;
+    color: #5f6368;
+    font-size: 0.9rem;
+    font-weight: 500;
     cursor: pointer;
+    transition: background 0.2s;
+}
+
+.beanthentic-gmail-add-drive-btn:hover {
+    background: #f1f3f4;
+    color: #202124;
 }
 
 .beanthentic-gmail-attachment-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 16px;
 }
 
 .beanthentic-attachment-thumb {
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
+    border: 1px solid #dadce0;
+    border-radius: 12px;
     overflow: hidden;
-    background: #f8fafc;
-    cursor: pointer;
-    transition: all 0.2s;
+    background: #ffffff;
+    transition: box-shadow 0.2s;
 }
 
 .beanthentic-attachment-thumb:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px 0 rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15);
 }
 
 .beanthentic-attachment-img {
     width: 100%;
-    height: 120px;
+    height: 140px;
+    background-color: #f8f9fa;
     background-size: cover;
     background-position: center;
-    border-bottom: 1px solid #e2e8f0;
 }
 
 .beanthentic-attachment-info {
-    padding: 8px 12px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #475569;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.beanthentic-gmail-meta {
-    padding: 16px 32px;
-    background: #f8fafc;
-    border-top: 1px solid #f1f5f9;
-    margin-bottom: 0 !important;
-    border-radius: 0 !important;
+    padding: 12px 16px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #3c4043;
+    border-top: 1px solid #f1f3f4;
 }
 
 .beanthentic-detail-dialog__close {
     position: absolute;
-    right: 20px;
-    top: 20px;
-    width: 32px;
-    height: 32px;
+    right: 24px;
+    top: 24px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     border: none;
-    background: #f1f5f9;
-    color: #64748b;
+    background: transparent;
+    color: #5f6368;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
+    transition: background 0.2s;
+    z-index: 10;
 }
 
 .beanthentic-detail-dialog__close:hover {
-    background: #e2e8f0;
-    color: #1e293b;
+    background: #f1f3f4;
+    color: #202124;
+}
+
+.beanthentic-detail-dialog__close i {
+    font-size: 1.2rem;
 }
 
 .beanthentic-detail-dialog__card h2 {

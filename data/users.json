@@ -10,5 +10,9 @@
   "0956172947": {
     "full_name": "Ericka Maynete",
     "password_hash": "scrypt:32768:8:1$lJ0zOZY7zQWMVlGu$808f4cd82e965e6cfc25f85be1868237e976d40e5e0ad86e4359ee142f6bd67ee14a7b36f7031287a30fda13c9ca755b0e877eb0d9dd8f6192b6613de6078e7f"
+  },
+  "9493380766": {
+    "full_name": "Eliaza Mae Malibiran",
+    "password_hash": "scrypt:32768:8:1$DzTBr61m5Q6gaZIV$e5a6c0a527e456e8db169a16fa3d71fb83f1cdac842a7bf77f9cfc09a47a803a6b10df52482b7ea80b7ee8cac1686328a04c4dd9e18020084b5f2039d426214d"
   }
 }
