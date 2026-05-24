@@ -440,7 +440,12 @@ class FarmerMessagingApp {
   }
 
   async deleteMessage(id) {
-    if (!confirm('Delete this message permanently?')) return;
+    const confirmed = await window.dashboardApp.showConfirmDialog(
+      'Are you sure you want to delete this message permanently?',
+      'Delete Message',
+      'danger'
+    );
+    if (!confirmed) return;
     try {
       const res = await fetch(`/api/messages/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

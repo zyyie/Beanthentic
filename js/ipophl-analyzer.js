@@ -378,8 +378,9 @@ class IPOPHLAnalyzer {
 
     async deleteFile(fileUuid, btn) {
         const confirmed = await window.dashboardApp.showConfirmDialog(
-            'Are you sure you want to delete this document?',
-            'Confirm Delete'
+            'Are you sure you want to delete this document? This action cannot be undone.',
+            'Delete Document',
+            'danger'
         );
         if (!confirmed) return;
         

@@ -8621,7 +8621,8 @@ class DashboardApp {
   async deleteContributions() {
     const confirmed = await this.showConfirmDialog(
       `Are you sure you want to delete ${this.selectedContributions.size} contribution(s)?`,
-      'Confirm Delete'
+      'Delete Contributions',
+      'danger'
     );
     
     if (confirmed) {
@@ -8805,75 +8806,53 @@ class DashboardApp {
   }
 
   // Custom Confirmation Dialog System
-  showConfirmDialog(message, title = 'Confirm Action') {
+  showConfirmDialog(message, title = 'Delete Document') {
     return new Promise((resolve) => {
       const dialog = document.getElementById('beanthenticConfirmDialog');
       const messageEl = document.getElementById('beanthenticConfirmMessage');
-      const titleEl = document.querySelector('.beanthentic-confirm-title');
+      const titleEl = dialog.querySelector('.beanthentic-confirm-title');
       const cancelBtn = document.getElementById('beanthenticConfirmCancel');
       const okBtn = document.getElementById('beanthenticConfirmOk');
       
       if (!dialog || !messageEl || !cancelBtn || !okBtn) {
-        // Fallback to browser confirm if elements are missing
         resolve(window.confirm(message));
         return;
       }
       
-      // Set message and title
       messageEl.textContent = message;
-      if (titleEl) {
-        titleEl.textContent = title;
-      }
+      if (titleEl) titleEl.textContent = title;
       
-      // Show dialog
+      dialog.style.display = 'flex';
       dialog.removeAttribute('hidden');
-      document.body.classList.add('beanthentic-dialog-open');
       
-      // Focus on OK button
-      okBtn.focus();
-      
-      // Handle button clicks
-      const handleCancel = () => {
-        dialog.setAttribute('hidden', '');
-        document.body.classList.remove('beanthentic-dialog-open');
-        cleanup();
-        resolve(false);
+      const cleanup = () => {
+        okBtn.removeEventListener('click', handleOk);
+        cancelBtn.removeEventListener('click', handleCancel);
+        document.removeEventListener('keydown', handleKeydown);
       };
       
       const handleOk = () => {
-        dialog.setAttribute('hidden', '');
-        document.body.classList.remove('beanthentic-dialog-open');
         cleanup();
+        dialog.style.display = 'none';
+        dialog.setAttribute('hidden', '');
         resolve(true);
       };
       
-      const cleanup = () => {
-        cancelBtn.removeEventListener('click', handleCancel);
-        okBtn.removeEventListener('click', handleOk);
-        document.removeEventListener('keydown', handleKeydown);
-        backdrop.removeEventListener('click', handleBackdrop);
+      const handleCancel = () => {
+        cleanup();
+        dialog.style.display = 'none';
+        dialog.setAttribute('hidden', '');
+        resolve(false);
       };
-      
+
       const handleKeydown = (e) => {
-        if (e.key === 'Escape') {
-          handleCancel();
-        } else if (e.key === 'Enter') {
-          handleOk();
-        }
+        if (e.key === 'Escape') handleCancel();
+        if (e.key === 'Enter') handleOk();
       };
       
-      const backdrop = dialog.querySelector('.beanthentic-confirm-backdrop');
-      const handleBackdrop = (e) => {
-        if (e.target === backdrop) {
-          handleCancel();
-        }
-      };
-      
-      // Add event listeners
-      cancelBtn.addEventListener('click', handleCancel);
       okBtn.addEventListener('click', handleOk);
+      cancelBtn.addEventListener('click', handleCancel);
       document.addEventListener('keydown', handleKeydown);
-      backdrop.addEventListener('click', handleBackdrop);
     });
   }
 }
