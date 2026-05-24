@@ -887,11 +887,11 @@ body.dashboard-page {
 .module-header,
 .dashboard-title-section {
   margin-bottom: 2rem;
-  border-radius: 18px;
+  border-radius: 24px; /* Slightly rounder for card look */
   border: 1px solid rgba(44, 122, 62, 0.25);
   background: linear-gradient(135deg, rgba(231, 244, 233, 0.95), rgba(244, 250, 245, 0.95));
   box-shadow: 0 14px 28px rgba(15, 23, 42, 0.09);
-  padding: 1.1rem 1.2rem; /* Adjusted to match the transactions header padding */
+  padding: 2.5rem 3.5rem; /* Significantly increased padding for big card look */
 }
 
 .module-header h1,
@@ -2161,9 +2161,9 @@ select:focus {
 
 .ipophl-header-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.85fr);
-  align-items: stretch;
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
+  align-items: center; /* Better alignment for content vs card */
+  gap: 3rem; /* Increased spacing between title and indicator */
 }
 
 .ipophl-header-copy h1 {
@@ -2178,7 +2178,7 @@ select:focus {
   background: #ffffff;
   border: 1px solid rgba(212, 177, 141, 0.35);
   border-radius: 12px;
-  padding: 0.85rem 0.95rem;
+  padding: 1.25rem 1.5rem; /* Increased internal padding for the indicator card */
   box-shadow: 0 6px 16px rgba(40, 25, 15, 0.06);
   display: grid;
   gap: 0.55rem;
@@ -3052,7 +3052,17 @@ body.dashboard-page #client-report-module .table-container {
 }
 
 body.dashboard-page #client-report-module .table-wrapper {
-  overflow: visible !important;
+  overflow-y: visible !important;
+  max-height: none;
+  position: relative;
+}
+
+body.dashboard-page #client-report-module .data-table thead th {
+  position: relative;
+  top: auto;
+  z-index: 1;
+  background: #f8fafc;
+  text-align: center; /* Ensure headers are centered */
 }
 
 body.dashboard-page #client-report-module .data-table {
@@ -3805,10 +3815,10 @@ body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.ac
   background: #ffffff;
   table-layout: fixed;
   font-size: 13px;
-  min-width: max-content;
   font-family: inherit;
   line-height: 1.4;
   color: #25130c;
+  text-align: center; /* Center align text globally in table */
 }
 
 /* Unified Header Styling */
@@ -3865,6 +3875,7 @@ body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.ac
   line-height: 1.35;
   border-collapse: collapse;
   border-spacing: 0;
+  width: 100%;
 }
 
 /* Row hover scale causes subpixel gaps between columns in some browsers */
@@ -3883,11 +3894,19 @@ body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.ac
   padding: 4px 6px;
   font-size: 12px;
   line-height: 1.3;
+  text-align: center; /* Ensure data is centered */
 }
+
+/* Specific column widths for Basic Info table to make them even and reduce address width */
+#farmerTableBasic th:nth-child(1), #farmerTableBasic td:nth-child(1) { width: 8%; } /* No. */
+#farmerTableBasic th:nth-child(2), #farmerTableBasic td:nth-child(2) { width: 23%; } /* Last Name */
+#farmerTableBasic th:nth-child(3), #farmerTableBasic td:nth-child(3) { width: 23%; } /* First Name */
+#farmerTableBasic th:nth-child(4), #farmerTableBasic td:nth-child(4) { width: 23%; } /* Address - reduced */
+#farmerTableBasic th:nth-child(5), #farmerTableBasic td:nth-child(5) { width: 23%; } /* Birthday */
 
 #farmers-module .data-table td:nth-child(2),
 #farmers-module .data-table td:nth-child(3) {
-  padding-left: 8px;
+  padding-left: 6px; /* Reset padding to maintain centering */
 }
 
 #farmers-module .data-table thead tr:nth-child(2) th {
@@ -6456,15 +6475,25 @@ body.dashboard-page #maps-module .layer-toggle.is-on::after {
 
 /* IPOPHIL module - green redesign */
 body.dashboard-page #ipophl-module .module-header {
-  /* Inherits from global .module-header */
+  padding: 4.5rem 6rem; /* Even bigger padding for a proper card look */
+  background: #f0fdf4; /* Very light green background */
+  border: 1.5px solid #dcfce7; /* Distinct light green border */
+  border-radius: 28px;
+  margin-bottom: 3.5rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
 }
 
-body.dashboard-page #ipophl-module .ipophl-header-copy h1 {
-  /* Inherits from global .module-header h1 */
+body.dashboard-page #ipophl-module .step-title {
+  max-width: 110px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-top: -20px; /* Pull the label significantly closer to the circle */
+  position: relative;
+  z-index: 2;
 }
 
-body.dashboard-page #ipophl-module .ipophl-header-copy p {
-  /* Inherits from global .module-header p */
+body.dashboard-page #ipophl-module .progress-step {
+  gap: 0.15rem; /* Reduce gap between circle and label */
 }
 
 body.dashboard-page #ipophl-module .gi-status-card {
@@ -6518,12 +6547,6 @@ body.dashboard-page #ipophl-module .progress-step.active .step-number {
   background: linear-gradient(135deg, #2c7a3e 0%, #38a169 100%);
   border-color: transparent;
   color: #ffffff;
-}
-
-body.dashboard-page #ipophl-module .step-title {
-  max-width: 110px;
-  font-size: 0.82rem;
-  font-weight: 700;
 }
 
 body.dashboard-page #ipophl-module .phase-header {

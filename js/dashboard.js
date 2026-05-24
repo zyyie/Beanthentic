@@ -45,6 +45,12 @@ class DashboardApp {
     this.transactionsYearFilter = '';
     this.farmerProfileSource = 'profiles';
     
+    // Client Report Pagination
+    this.clientReportCurrentPage = 1;
+    this.clientReportPageSize = 10;
+    this.clientReportTotalPages = 1;
+    this.misconductReportRows = [];
+    
     // Explicitly hide the receipt modal on startup
     this.closeReceipt();
     
@@ -1102,12 +1108,16 @@ class DashboardApp {
     this.clientReportStatusFilter = this.clientReportStatusFilter || '';
 
     const refreshBtn = document.getElementById('clientReportRefreshBtn');
-    if (refreshBtn) refreshBtn.addEventListener('click', () => this.loadMisconductReports());
+    if (refreshBtn) refreshBtn.addEventListener('click', () => {
+      this.clientReportCurrentPage = 1;
+      this.loadMisconductReports();
+    });
 
     const search = document.getElementById('clientReportSearchInput');
     if (search) {
       search.addEventListener('input', (e) => {
         this.clientReportSearchTerm = String((e.target && e.target.value) || '');
+        this.clientReportCurrentPage = 1;
         this.applyClientReportFiltersAndRender();
       });
     }
@@ -1116,9 +1126,45 @@ class DashboardApp {
     if (status) {
       status.addEventListener('change', () => {
         this.clientReportStatusFilter = String(status.value || '');
+        this.clientReportCurrentPage = 1;
         this.applyClientReportFiltersAndRender();
       });
     }
+  }
+
+  renderClientReportPagination() {
+    const paginationEl = document.getElementById('clientReportPagination');
+    if (!paginationEl) return;
+
+    if (this.clientReportTotalPages <= 1) {
+      paginationEl.innerHTML = '';
+      return;
+    }
+
+    let html = '';
+    
+    // Prev button
+    html += `<button class="page-btn" ${this.clientReportCurrentPage === 1 ? 'disabled' : ''} onclick="dashboardApp.changeClientReportPage(${this.clientReportCurrentPage - 1})"><i class="fa-solid fa-chevron-left"></i></button>`;
+
+    // Page numbers
+    const startPage = Math.max(1, this.clientReportCurrentPage - 2);
+    const endPage = Math.min(this.clientReportTotalPages, startPage + 4);
+    const adjustedStart = Math.max(1, endPage - 4);
+
+    for (let i = adjustedStart; i <= endPage; i++) {
+      html += `<button class="page-btn ${i === this.clientReportCurrentPage ? 'active' : ''}" onclick="dashboardApp.changeClientReportPage(${i})">${i}</button>`;
+    }
+
+    // Next button
+    html += `<button class="page-btn" ${this.clientReportCurrentPage === this.clientReportTotalPages ? 'disabled' : ''} onclick="dashboardApp.changeClientReportPage(${this.clientReportCurrentPage + 1})"><i class="fa-solid fa-chevron-right"></i></button>`;
+
+    paginationEl.innerHTML = html;
+  }
+
+  changeClientReportPage(page) {
+    if (page < 1 || page > this.clientReportTotalPages) return;
+    this.clientReportCurrentPage = page;
+    this.applyClientReportFiltersAndRender();
   }
 
   async loadMisconductReports() {
@@ -1165,16 +1211,28 @@ class DashboardApp {
       return hay.includes(term);
     });
 
+    this.clientReportTotalPages = Math.ceil(filtered.length / this.clientReportPageSize);
+    if (this.clientReportCurrentPage > this.clientReportTotalPages) {
+      this.clientReportCurrentPage = Math.max(1, this.clientReportTotalPages);
+    }
+
     if (!filtered.length) {
       tbody.innerHTML = '<tr><td colspan="5" class="transactions-error-cell">No reports found.</td></tr>';
       this.updateClientReportCountLabel(0);
+      this.renderClientReportPagination();
       return;
     }
 
-    tbody.innerHTML = filtered
+    const start = (this.clientReportCurrentPage - 1) * this.clientReportPageSize;
+    const end = start + this.clientReportPageSize;
+    const paged = filtered.slice(start, end);
+
+    tbody.innerHTML = paged
       .map((r) => this.renderClientReportRow(r))
       .join('');
+      
     this.updateClientReportCountLabel(filtered.length);
+    this.renderClientReportPagination();
   }
 
   renderClientReportRow(r) {
@@ -6151,9 +6209,9 @@ class DashboardApp {
     const iconWrap = document.getElementById('farmerActionIconWrap');
     const confirmBtn = document.getElementById('farmerActionConfirm');
     const reasonInput = document.getElementById('farmerActionReason');
-    const chipsContainer = document.getElementById('farmerActionQuickReasons');
+    const reasonSelect = document.getElementById('farmerActionReasonSelect');
 
-    if (!root || !titleEl || !subtitleEl || !iconEl || !iconWrap || !confirmBtn || !chipsContainer) return;
+    if (!root || !titleEl || !subtitleEl || !iconEl || !iconWrap || !confirmBtn || !reasonSelect) return;
 
     if (reasonInput) reasonInput.value = '';
     root.dataset.action = action;
@@ -6175,6 +6233,7 @@ class DashboardApp {
     let reasons = [];
     if (action === 'warning' || action === 'suspend') {
       reasons = [
+        'Select a reason...',
         'Misconduct',
         'Policy Violation',
         'Fraudulent Activity',
@@ -6184,6 +6243,7 @@ class DashboardApp {
       ];
     } else if (action === 'unsuspend') {
       reasons = [
+        'Select a reason...',
         'Issue Resolved',
         'Requirements Met',
         'Suspension Lifted',
@@ -6192,30 +6252,30 @@ class DashboardApp {
       ];
     }
 
-    // Populate chips
-    chipsContainer.innerHTML = reasons.map(r => `
-      <div class="reason-chip" data-reason="${r}">${r}</div>
+    // Populate select
+    reasonSelect.innerHTML = reasons.map(r => `
+      <option value="${r === 'Select a reason...' ? '' : r}">${r}</option>
     `).join('');
 
-    // Add click listeners to chips
-    chipsContainer.querySelectorAll('.reason-chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        chipsContainer.querySelectorAll('.reason-chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-        
-        const selectedReason = chip.dataset.reason;
-        if (selectedReason === 'Other') {
-          reasonInput.value = '';
-          reasonInput.focus();
-        } else {
-          reasonInput.value = selectedReason;
-        }
-      });
+    // Remove previous listener to avoid duplicates
+    const newReasonSelect = reasonSelect.cloneNode(true);
+    reasonSelect.parentNode.replaceChild(newReasonSelect, reasonSelect);
+    
+    newReasonSelect.addEventListener('change', (e) => {
+      const selectedReason = e.target.value;
+      if (selectedReason === 'Other') {
+        reasonInput.value = '';
+        reasonInput.focus();
+      } else if (selectedReason) {
+        reasonInput.value = selectedReason;
+      } else {
+        reasonInput.value = '';
+      }
     });
 
     if (action === 'warning') {
       titleEl.textContent = 'Warning Farmer';
-      subtitleEl.textContent = `Issuing a formal warning to ${farmerName}`;
+      subtitleEl.textContent = ``;
       iconEl.className = 'fa-solid fa-triangle-exclamation';
       iconWrap.style.backgroundColor = '#fffbeb';
       iconEl.style.color = '#b45309';
