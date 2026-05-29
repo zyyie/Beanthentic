@@ -7,6 +7,13 @@
   flex-direction: column;
 }
 
+.login-page main.login-main {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 1.25rem 1.5rem 3.25rem;
+}
+
 .login-main {
   flex: 1;
   width: 100%;
@@ -14,6 +21,7 @@
   align-items: center;
   justify-content: center;
   padding: 1.25rem 1.5rem 3.25rem;
+  overflow-y: auto;
 }
 
 .login-wrap {
@@ -37,16 +45,21 @@
   display: flex;
   align-items: stretch;
   min-height: 0;
+  border-radius: 48px;
+  overflow: hidden;
 }
 
 .login-card-left {
   flex: 1;
   position: relative;
-  background: #f0f0f0;
+  background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem;
+  pointer-events: none;
+  user-select: none;
+  border-radius: 48px 0 0 48px;
 }
 
 .login-card-logo {
@@ -61,8 +74,12 @@
   flex-direction: column;
   justify-content: flex-start;
   min-height: 0;
+  min-width: 0;
   background: #ffffff;
   border-left: 1px solid rgba(0, 0, 0, 0.06);
+  position: relative;
+  z-index: 1;
+  border-radius: 0 48px 48px 0;
 }
 
 .card-header {
@@ -222,7 +239,7 @@
   text-decoration: underline;
 }
 
-.btn {
+.form .btn {
   margin-top: 0.6rem;
   width: 100%;
   padding: 0.85rem 1rem;
@@ -235,16 +252,20 @@
   background: #1a451a;
   color: #ffffff;
   cursor: pointer;
+  position: relative;
+  z-index: 5;
+  pointer-events: auto;
+  flex-shrink: 0;
   transition: transform 0.15s ease-out, filter 0.15s ease-out, box-shadow 0.15s ease-out;
 }
 
-.btn:hover {
+.form .btn:hover {
   transform: translateY(-1px);
   filter: brightness(1.05);
   box-shadow: 0 8px 18px rgba(26, 69, 26, 0.25);
 }
 
-.btn:active {
+.form .btn:active {
   transform: translateY(0);
   filter: brightness(1);
   box-shadow: 0 4px 12px rgba(26, 69, 26, 0.2);
@@ -289,6 +310,14 @@
 
   .login-card-split {
     flex-direction: column;
+  }
+
+  .login-card-left {
+    border-radius: 48px 48px 0 0;
+  }
+
+  .login-card-right {
+    border-radius: 0 0 48px 48px;
   }
 
   .card-header {

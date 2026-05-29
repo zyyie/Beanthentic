@@ -16,6 +16,15 @@ import pymysql
 from pymysql.cursors import DictCursor
 
 from config.models import Message, db
+from config.security import safe_error_message
+from config.validation import (
+    MESSAGE_BODY_MAX,
+    MESSAGE_CATEGORIES,
+    MESSAGE_SUBJECT_MAX,
+    clean_text,
+    validate_enum,
+    validate_positive_int,
+)
 from config.utils import (
     get_current_farmer_phone,
     get_current_user_phone,
@@ -94,6 +103,31 @@ def _ensure_shared_messages_table(conn) -> None:
         )
 
 
+def _parse_message_fields(data: dict) -> tuple[dict | None, str | None]:
+    """Validate compose payload; returns (fields, error_message)."""
+    try:
+        subject = clean_text(data.get("subject"), MESSAGE_SUBJECT_MAX, "Subject", allow_empty=False)
+        body = clean_text(data.get("body"), MESSAGE_BODY_MAX, "Message body", allow_empty=False)
+        recipient_name = clean_text(data.get("recipient_name"), 120, "Recipient name", allow_empty=True) or ""
+    except ValueError as exc:
+        return None, str(exc)
+    category = validate_enum(data.get("category"), MESSAGE_CATEGORIES, "general")
+    farmer_id = data.get("farmer_id")
+    parsed_farmer_id = None
+    if farmer_id is not None and farmer_id != "":
+        ok_fid, fid_err, parsed_farmer_id = validate_positive_int(farmer_id, field="farmer_id", minimum=1)
+        if not ok_fid:
+            return None, fid_err
+    return {
+        "subject": subject,
+        "body": body,
+        "category": category,
+        "recipient_name": recipient_name,
+        "farmer_id": parsed_farmer_id,
+        "recipient_phone_raw": (data.get("recipient_phone") or "").strip(),
+    }, None
+
+
 def _normalize_phone(raw: str) -> str:
     s = (raw or "").strip()
     if not s:
@@ -110,6 +144,54 @@ def _normalize_phone(raw: str) -> str:
     if s.startswith("+"):
         return s
     return s
+
+
+def phone_variants(raw: str) -> list[str]:
+    """All common PH formats for one number (+63, 09…, 639…) — same rules as the mobile app."""
+    out: list[str] = []
+    seen: set[str] = set()
+
+    def add(val: str) -> None:
+        v = (val or "").strip()
+        if not v or v in seen:
+            return
+        seen.add(v)
+        out.append(v)
+
+    add(_normalize_phone(raw))
+    digits = re.sub(r"\D+", "", raw or "")
+    if not digits:
+        return out
+    add(digits)
+    if digits.startswith("0") and len(digits) >= 11:
+        add("+63" + digits[1:])
+        add(digits[1:])
+    if digits.startswith("63") and len(digits) >= 12:
+        add("+63" + digits[2:])
+        add("0" + digits[2:])
+        add(digits[2:])
+    if len(digits) == 10 and digits.startswith("9"):
+        add("+63" + digits)
+        add("0" + digits)
+        add("63" + digits)
+    return out
+
+
+def _normalize_shared_message_row(row: dict) -> dict:
+    """Lowercase roles and ISO-format datetimes for JSON clients."""
+    if not row:
+        return row
+    m = dict(row)
+    for key in ("sender_role", "recipient_role"):
+        if m.get(key) is not None:
+            m[key] = str(m[key]).lower()
+    created = m.get("created_at")
+    if created is not None and hasattr(created, "isoformat"):
+        m["created_at"] = created.isoformat()
+    read_at = m.get("read_at")
+    if read_at is not None and hasattr(read_at, "isoformat"):
+        m["read_at"] = read_at.isoformat()
+    return m
 
 
 def _shared_identity():
@@ -182,8 +264,14 @@ def register_messaging_routes(app):
                             args.append(phone)
                     elif folder == "all":
                         if role == "admin":
-                            # All conversations (sent and received)
-                            where.append("((recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s)) OR (sender_role='admin' AND sender_phone=%s))")
+                            # All farmer↔admin chat rows (matches mobile shared_messages usage)
+                            where.append(
+                                """(
+                                  (recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s))
+                                  OR (sender_role='admin' AND sender_phone=%s)
+                                  OR sender_role='farmer'
+                                )"""
+                            )
                             args.extend([phone, phone])
                         else:
                             where.append("((recipient_role='farmer' AND recipient_phone=%s) OR (sender_role='farmer' AND sender_phone=%s))")
@@ -216,7 +304,7 @@ def register_messaging_routes(app):
                         + " ORDER BY created_at DESC, message_id DESC LIMIT %s",
                         tuple(args + [limit]),
                     )
-                    items = cur.fetchall() or []
+                    items = [_normalize_shared_message_row(m) for m in (cur.fetchall() or [])]
 
                     if search:
                         s = search
@@ -237,7 +325,9 @@ def register_messaging_routes(app):
                             FROM shared_messages
                             WHERE recipient_role='admin'
                               AND (recipient_phone='' OR recipient_phone=%s)
+                              AND sender_role='farmer'
                               AND is_read=0 AND is_archived=0
+                              AND LOWER(category) <> 'announcement'
                             """,
                             (phone,),
                         )
@@ -340,6 +430,90 @@ def register_messaging_routes(app):
 
         return jsonify({"items": items, "unread_count": unread_count})
 
+    @app.route("/api/messages/thread", methods=["GET"])
+    def api_messages_thread():
+        """All messages between the current user and a farmer phone (chat history)."""
+        if not (is_authenticated() or is_farmer_authenticated()):
+            return jsonify({"error": "Unauthorized"}), 401
+
+        farmer_phone = request.args.get("phone", "") or ""
+        variants = phone_variants(farmer_phone)
+        if not variants:
+            return jsonify({"error": "phone is required."}), 400
+
+        if _shared_db_params():
+            role, my_phone, _name = _shared_identity()
+            conn = None
+            try:
+                conn = _shared_connect()
+                ph = ", ".join(["%s"] * len(variants))
+                with conn.cursor() as cur:
+                    # Same thread scope as mobile chat_thread.php
+                    cur.execute(
+                        f"""
+                        SELECT
+                          message_id AS id,
+                          sender_phone, sender_name,
+                          recipient_phone, recipient_name,
+                          subject, body, category, farmer_id,
+                          is_read, is_starred, is_archived,
+                          created_at, read_at,
+                          sender_role, recipient_role
+                        FROM shared_messages
+                        WHERE LOWER(category) <> 'announcement'
+                          AND (
+                            (sender_role='farmer' AND sender_phone IN ({ph}))
+                            OR (recipient_role='farmer' AND recipient_phone IN ({ph}))
+                          )
+                        ORDER BY created_at ASC, message_id ASC
+                        LIMIT 500
+                        """,
+                        tuple(variants + variants),
+                    )
+                    rows = cur.fetchall() or []
+                    if role == "admin":
+                        cur.execute(
+                            f"""
+                            UPDATE shared_messages
+                            SET is_read = 1, read_at = NOW()
+                            WHERE recipient_role = 'admin'
+                              AND (recipient_phone = '' OR recipient_phone = %s)
+                              AND sender_role = 'farmer'
+                              AND sender_phone IN ({ph})
+                              AND is_read = 0
+                              AND LOWER(category) <> 'announcement'
+                            """,
+                            tuple([my_phone] + variants),
+                        )
+                        for row in rows:
+                            if str(row.get("sender_role") or "").lower() == "farmer":
+                                row["is_read"] = 1
+                items = [_normalize_shared_message_row(m) for m in rows]
+                return jsonify({"items": items})
+            except Exception as e:
+                return jsonify({"error": "APP_DB_UNREACHABLE", "detail": str(e)}), 503
+            finally:
+                if conn:
+                    conn.close()
+
+        variant_set = {v.strip() for v in variants if v.strip()}
+
+        def _sqlite_row_in_thread(msg: dict) -> bool:
+            if str(msg.get("category") or "").lower() == "announcement":
+                return False
+            s = (msg.get("sender_phone") or "").strip()
+            r = (msg.get("recipient_phone") or "").strip()
+            return s in variant_set or r in variant_set
+
+        messages = (
+            Message.query.filter(Message.category != "announcement")
+            .order_by(Message.created_at.asc())
+            .limit(1000)
+            .all()
+        )
+        items = [m.to_dict() for m in messages if _sqlite_row_in_thread(m.to_dict())]
+        return jsonify({"items": items})
+
     @app.route("/api/messages", methods=["POST"])
     def api_messages_create():
         """Compose and send a new message."""
@@ -357,27 +531,22 @@ def register_messaging_routes(app):
             )
 
             data = request.get_json(silent=True) or {}
-            subject = (data.get("subject") or "").strip()
-            body = (data.get("body") or "").strip()
-            category = (data.get("category") or "general").strip().lower()
-            recipient_phone_raw = (data.get("recipient_phone") or "").strip()
-            farmer_id = data.get("farmer_id")
-
-            if not subject:
-                return jsonify({"error": "Subject is required."}), 400
-            if not body:
-                return jsonify({"error": "Message body is required."}), 400
-            if category not in ("general", "farmer-update", "farmers", "announcement", "reminder"):
-                category = "general"
+            fields, field_err = _parse_message_fields(data)
+            if field_err:
+                return jsonify({"error": field_err}), 400
+            subject = fields["subject"]
+            body = fields["body"]
+            category = fields["category"]
+            farmer_id = fields["farmer_id"]
+            recipient_phone_raw = fields["recipient_phone_raw"]
+            recipient_name = fields["recipient_name"]
 
             recipient_role = "farmer" if role == "admin" else "admin"
             recipient_phone = _normalize_phone(recipient_phone_raw) if recipient_phone_raw else ""
 
-            # In admin->farmer flow, recipient_phone is required.
             if role == "admin" and not recipient_phone:
                 return jsonify({"error": "recipient_phone is required for admin replies."}), 400
 
-            recipient_name = (data.get("recipient_name") or "").strip()
             if not recipient_name and recipient_phone_raw:
                 recipient = users.get(recipient_phone_raw, {})
                 recipient_name = recipient.get("full_name", "")
@@ -403,10 +572,10 @@ def register_messaging_routes(app):
                             recipient_role,
                             recipient_phone,
                             recipient_name,
-                            subject[:300],
+                            subject,
                             body,
                             category[:30],
-                            int(farmer_id) if farmer_id else None,
+                            farmer_id,
                         ),
                     )
                     mid = cur.lastrowid
@@ -428,21 +597,16 @@ def register_messaging_routes(app):
         )
 
         data = request.get_json(silent=True) or {}
-        subject = (data.get("subject") or "").strip()
-        body = (data.get("body") or "").strip()
-        category = (data.get("category") or "general").strip().lower()
-        recipient_phone = (data.get("recipient_phone") or "").strip()
-        farmer_id = data.get("farmer_id")
+        fields, field_err = _parse_message_fields(data)
+        if field_err:
+            return jsonify({"error": field_err}), 400
+        subject = fields["subject"]
+        body = fields["body"]
+        category = fields["category"]
+        farmer_id = fields["farmer_id"]
+        recipient_phone = fields["recipient_phone_raw"]
+        recipient_name = fields["recipient_name"]
 
-        if not subject:
-            return jsonify({"error": "Subject is required."}), 400
-        if not body:
-            return jsonify({"error": "Message body is required."}), 400
-        if category not in ("general", "farmer-update", "farmers", "announcement", "reminder"):
-            category = "general"
-
-        # Resolve recipient name (admin users live in JSON; farmers may be unknown here)
-        recipient_name = (data.get("recipient_name") or "").strip()
         if not recipient_name and recipient_phone:
             recipient = users.get(recipient_phone, {})
             recipient_name = recipient.get("full_name", "")
@@ -455,7 +619,7 @@ def register_messaging_routes(app):
             subject=subject,
             body=body,
             category=category,
-            farmer_id=int(farmer_id) if farmer_id else None,
+            farmer_id=farmer_id,
             is_read=False,
             is_starred=False,
             is_archived=False,
@@ -676,6 +840,61 @@ def register_messaging_routes(app):
 
         return jsonify({"success": True})
 
+    @app.route("/api/messages/mark-thread-read", methods=["POST"])
+    def api_messages_mark_thread_read():
+        """Mark all farmer→admin messages in a thread as read (opening a chat)."""
+        if not (is_authenticated() or is_farmer_authenticated()):
+            return jsonify({"error": "Unauthorized"}), 401
+
+        farmer_phone = request.args.get("phone", "") or (request.get_json(silent=True) or {}).get("phone", "")
+        variants = phone_variants(farmer_phone)
+        if not variants:
+            return jsonify({"error": "phone is required."}), 400
+
+        if _shared_db_params():
+            role, my_phone, _name = _shared_identity()
+            conn = None
+            try:
+                conn = _shared_connect()
+                ph = ", ".join(["%s"] * len(variants))
+                with conn.cursor() as cur:
+                    if role == "admin":
+                        cur.execute(
+                            f"""
+                            UPDATE shared_messages
+                            SET is_read = 1, read_at = NOW()
+                            WHERE recipient_role = 'admin'
+                              AND (recipient_phone = '' OR recipient_phone = %s)
+                              AND sender_role = 'farmer'
+                              AND sender_phone IN ({ph})
+                              AND is_read = 0
+                              AND LOWER(category) <> 'announcement'
+                            """,
+                            tuple([my_phone] + variants),
+                        )
+                    else:
+                        cur.execute(
+                            f"""
+                            UPDATE shared_messages
+                            SET is_read = 1, read_at = NOW()
+                            WHERE recipient_role = 'farmer'
+                              AND recipient_phone IN ({ph})
+                              AND sender_role = 'admin'
+                              AND is_read = 0
+                              AND LOWER(category) <> 'announcement'
+                            """,
+                            tuple(variants),
+                        )
+                    updated = int(cur.rowcount or 0)
+                return jsonify({"success": True, "updated": updated})
+            except Exception as e:
+                return jsonify({"error": "APP_DB_UNREACHABLE", "detail": str(e)}), 503
+            finally:
+                if conn:
+                    conn.close()
+
+        return jsonify({"success": True, "updated": 0})
+
     @app.route("/api/messages/mark-all-read", methods=["POST"])
     def api_messages_mark_all_read():
         """Mark all inbox messages as read for the current user."""
@@ -801,7 +1020,9 @@ def register_messaging_routes(app):
                             FROM shared_messages
                             WHERE recipient_role='admin'
                               AND (recipient_phone='' OR recipient_phone=%s)
+                              AND sender_role='farmer'
                               AND is_read=0 AND is_archived=0
+                              AND LOWER(category) <> 'announcement'
                             """,
                             (phone,),
                         )

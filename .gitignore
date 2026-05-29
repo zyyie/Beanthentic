@@ -25,4 +25,7 @@ android-app/.idea/shelf/
 
 # Runtime data (avoid git pull conflicts)
 activity_log.json
-instance/beanthentic.db
+data/password_reset_tokens.json
+data/otp_codes.json
+data/profile_photos/
+instance/

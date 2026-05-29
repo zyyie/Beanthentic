@@ -5,12 +5,27 @@ Provides endpoints for notifications, social links, clients, maps, and updates.
 """
 
 from datetime import datetime
+
 from flask import jsonify, request
+
 from config.models import (
-    db, Notification, Social, Client, Map, Update, 
-    GIFarmersContribution, AdminNotification, Farmer
+    GIFarmersContribution,
+    Map,
+    Notification,
+    Social,
+    Update,
+    db,
 )
-from config.utils import is_authenticated, log_activity, get_current_user_phone
+from config.security import api_error
+from config.validation import (
+    NOTIFICATION_MESSAGE_MAX,
+    UPDATE_CONTENT_MAX,
+    UPDATE_TITLE_MAX,
+    clean_text,
+    validate_positive_int,
+    validate_url,
+)
+from config.utils import get_current_user_phone, is_authenticated, log_activity
 
 def register_platform_routes(app):
     """Register platform-related API routes with the Flask app."""
@@ -42,13 +57,26 @@ def register_platform_routes(app):
                 "created_at": n.created_at.isoformat()
             } for n in notifications])
 
-        # POST - Create notification
         payload = request.get_json(silent=True) or {}
+        try:
+            message = clean_text(
+                payload.get("message"), NOTIFICATION_MESSAGE_MAX, "Message", allow_empty=False
+            )
+        except ValueError as exc:
+            return api_error(str(exc), 400)
+        ntype = (payload.get("type") or "info").strip().lower()
+        if ntype not in ("info", "warning", "success", "error"):
+            ntype = "info"
+        account_id = payload.get("account_id")
+        if account_id is not None:
+            ok_aid, aid_err, account_id = validate_positive_int(account_id, field="account_id", minimum=1)
+            if not ok_aid:
+                return api_error(aid_err, 400)
         n = Notification(
-            account_id=payload.get("account_id"),
-            message=payload.get("message"),
-            type=payload.get("type", "info"),
-            created_at=datetime.utcnow()
+            account_id=account_id,
+            message=message,
+            type=ntype,
+            created_at=datetime.utcnow(),
         )
         db.session.add(n)
         db.session.commit()
@@ -58,6 +86,8 @@ def register_platform_routes(app):
     def api_social():
         """Handle social media links."""
         if request.method == "GET":
+            if not is_authenticated():
+                return jsonify({"error": "Unauthorized"}), 401
             account_id = request.args.get("account_id", type=int)
             query = Social.query
             if account_id:
@@ -72,12 +102,16 @@ def register_platform_routes(app):
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
-        # POST - Add/Update social link
         payload = request.get_json(silent=True) or {}
-        s = Social(
-            account_id=payload.get("account_id"),
-            url=payload.get("url")
-        )
+        ok_url, url_err, url = validate_url(payload.get("url"))
+        if not ok_url:
+            return api_error(url_err, 400)
+        account_id = payload.get("account_id")
+        if account_id is not None:
+            ok_aid, aid_err, account_id = validate_positive_int(account_id, field="account_id", minimum=1)
+            if not ok_aid:
+                return api_error(aid_err, 400)
+        s = Social(account_id=account_id, url=url)
         db.session.add(s)
         db.session.commit()
         return jsonify({"success": True, "id": s.id})
@@ -92,6 +126,8 @@ def register_platform_routes(app):
         - POST /api/updates (create a new post)
         """
         if request.method == "GET":
+            if not is_authenticated():
+                return jsonify({"error": "Unauthorized"}), 401
             updates = Update.query.order_by(Update.created_at.desc()).all()
             return jsonify([{
                 "id": u.id,
@@ -106,14 +142,23 @@ def register_platform_routes(app):
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
-        # POST - Create update
         payload = request.get_json(silent=True) or {}
+        try:
+            title = clean_text(payload.get("title"), UPDATE_TITLE_MAX, "Title", allow_empty=False)
+            content = clean_text(payload.get("content"), UPDATE_CONTENT_MAX, "Content", allow_empty=False)
+        except ValueError as exc:
+            return api_error(str(exc), 400)
+        image_url = (payload.get("image_url") or "").strip()
+        if image_url:
+            ok_img, img_err, image_url = validate_url(image_url, required=True)
+            if not ok_img:
+                return api_error(img_err, 400)
         u = Update(
             admin_id=payload.get("admin_id"),
-            title=payload.get("title"),
-            content=payload.get("content"),
-            image_url=payload.get("image_url"),
-            created_at=datetime.utcnow()
+            title=title,
+            content=content,
+            image_url=image_url or None,
+            created_at=datetime.utcnow(),
         )
         db.session.add(u)
         db.session.commit()
@@ -127,6 +172,8 @@ def register_platform_routes(app):
     def api_maps():
         """Handle geographic information."""
         if request.method == "GET":
+            if not is_authenticated():
+                return jsonify({"error": "Unauthorized"}), 401
             farmer_id = request.args.get("farmer_id", type=int)
             query = Map.query
             if farmer_id:
@@ -142,12 +189,25 @@ def register_platform_routes(app):
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
-        # POST - Add map info
         payload = request.get_json(silent=True) or {}
+        ok_fid, fid_err, farmer_id = validate_positive_int(
+            payload.get("farmer_id"), field="farmer_id", minimum=1
+        )
+        if not ok_fid:
+            return api_error(fid_err, 400)
+        try:
+            coffee_variety = clean_text(
+                payload.get("coffee_variety"), 64, "Coffee variety", allow_empty=True
+            )
+            barangay_landmarks = clean_text(
+                payload.get("barangay_landmarks"), 500, "Barangay landmarks", allow_empty=True
+            )
+        except ValueError as exc:
+            return api_error(str(exc), 400)
         m = Map(
-            farmer_id=payload.get("farmer_id"),
-            coffee_variety=payload.get("coffee_variety"),
-            barangay_landmarks=payload.get("barangay_landmarks")
+            farmer_id=farmer_id,
+            coffee_variety=coffee_variety,
+            barangay_landmarks=barangay_landmarks,
         )
         db.session.add(m)
         db.session.commit()
@@ -157,6 +217,8 @@ def register_platform_routes(app):
     def api_gi_contributions():
         """Handle GI contributions."""
         if request.method == "GET":
+            if not is_authenticated():
+                return jsonify({"error": "Unauthorized"}), 401
             farmer_id = request.args.get("farmer_id", type=int)
             query = GIFarmersContribution.query
             if farmer_id:

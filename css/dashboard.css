@@ -259,6 +259,7 @@
 
 /* Wide tables must not grow the page horizontally (keeps sticky header + burger in view) */
 body.dashboard-page {
+  font-family: var(--font-sans);
   overflow-x: hidden;
   max-width: 100%;
 }
@@ -360,7 +361,7 @@ body.dashboard-page {
 
 /* Side Panel */
 .side-panel {
-  width: 260px;
+  width: 280px;
   background: #ffffff;
   color: #2c3e50;
   position: fixed;
@@ -392,7 +393,7 @@ body.dashboard-page {
 }
 
 .side-panel.collapsed {
-  transform: translateX(-260px);
+  transform: translateX(-280px);
 }
 
 .side-panel-header {
@@ -474,11 +475,12 @@ body.dashboard-page {
 
 .nav-link span {
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: unset;
   display: inline-block;
   vertical-align: middle;
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: max-content;
 }
 
 .nav-link:hover {
@@ -593,10 +595,10 @@ body.dashboard-page {
 .submenu .nav-link span {
   display: inline-flex !important;
   align-items: center !important;
-  flex: 0 1 auto !important;
+  flex: 1 1 auto !important;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: unset;
   white-space: nowrap;
   line-height: 1;
   margin: 0;
@@ -707,7 +709,7 @@ body.dashboard-page {
   flex: 1;
   min-width: 0;
   min-height: 0;
-  margin-left: 260px;
+  margin-left: 280px;
   background: #f6f7f9;
   max-width: 100%;
   overflow-x: hidden;
@@ -845,7 +847,10 @@ body.dashboard-page {
 .module-content {
   /* Consistent “frame” under sticky header — extra inline padding when sidebar is open */
   padding-inline: clamp(1.25rem, 3vw, 2.25rem);
-  padding-block: clamp(1rem, 2vw, 1.5rem) clamp(1.25rem, 2.6vw, 2rem);
+  padding-top: clamp(1rem, 2vw, 1.5rem);
+  /* Extra bottom space so cards/charts/tables are not clipped in any module */
+  padding-bottom: max(clamp(3.5rem, 6.5vh, 5.5rem), env(safe-area-inset-bottom, 0px));
+  scroll-padding-bottom: 3.25rem;
   flex: 1;
   min-width: 0;
   max-width: 100%;
@@ -856,6 +861,7 @@ body.dashboard-page {
   overflow-y: auto;
   position: relative;
   min-height: 0;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Farmer Records: keep scroll inside the table wrapper */
@@ -878,6 +884,8 @@ body.dashboard-page {
   gap: clamp(1rem, 2.2vw, 1.5rem);
   flex: 1;
   min-height: 0;
+  /* Trailing spacer so last row/card clears the scroll area in every module */
+  padding-bottom: clamp(1rem, 2.5vh, 1.75rem);
 }
 
 .module.hidden {
@@ -1789,7 +1797,7 @@ select:focus {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
   box-shadow: 0 4px 12px rgba(139, 74, 43, 0.25);
-  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-sans);
   letter-spacing: 0.025em;
   min-height: 44px;
   display: inline-flex;
@@ -1870,7 +1878,7 @@ select:focus {
   outline: none;
   transition: all 0.3s ease;
   font-size: 0.9rem;
-  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-sans);
   box-shadow: 0 2px 8px rgba(59, 33, 7, 0.08);
 }
 
@@ -1900,7 +1908,7 @@ select:focus {
   outline: none;
   font-size: 0.88rem;
   font-weight: 600;
-  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-sans);
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
@@ -2013,6 +2021,10 @@ select:focus {
 /* Charts Section */
 .charts-section {
   margin: 0;
+}
+
+#overview-module .stats-section {
+  margin-bottom: clamp(1rem, 2vw, 1.5rem);
 }
 
 .charts-grid {
@@ -3386,7 +3398,7 @@ body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.ac
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-sans);
 }
 
 .add-farmer-btn {
@@ -3516,7 +3528,7 @@ body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.ac
 /* Responsive Design */
 @media (max-width: 768px) {
   .side-panel {
-    transform: translateX(-260px);
+    transform: translateX(-280px);
   }
   
   .side-panel.mobile-open {
@@ -3738,7 +3750,7 @@ body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.ac
   border-radius: 8px;
   font-size: 0.7rem;
   font-weight: 600;
-  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-sans);
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -4079,7 +4091,7 @@ body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.ac
   transition: all 0.3s ease;
   min-width: 40px;
   min-height: 36px;
-  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-sans);
   box-shadow: 0 2px 6px rgba(59, 33, 7, 0.08);
   display: inline-flex;
   align-items: center;
@@ -4241,7 +4253,7 @@ body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.ac
   align-items: center;
   justify-content: center;
   padding: 1.25rem;
-  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-sans);
 }
 
 .confirm-dialog[hidden] {
@@ -4296,7 +4308,9 @@ body.confirm-dialog-active {
 
 .confirm-dialog__title {
   margin: 0 0 0.65rem;
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-extrabold);
+  letter-spacing: -0.02em;
   font-size: 1.35rem;
   font-weight: 700;
   color: #662e0c;
@@ -4613,7 +4627,7 @@ body.confirm-dialog-active {
   align-items: center;
   justify-content: center;
   padding: 1.25rem;
-  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-sans);
 }
 
 .notification-detail-dialog[hidden] {
@@ -4667,7 +4681,9 @@ body.confirm-dialog-active {
 
 .notification-detail-dialog__title {
   margin: 0 0 0.25rem;
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-extrabold);
+  letter-spacing: -0.02em;
   font-size: 1.22rem;
   font-weight: 700;
   color: #662e0c;
@@ -4707,7 +4723,7 @@ body.confirm-dialog-active {
   border-radius: 12px;
   font-weight: 600;
   font-size: 0.9rem;
-  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-sans);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
   z-index: 10000;
   animation: slideInTop 0.35s ease-out;
@@ -6474,26 +6490,28 @@ body.dashboard-page #maps-module .layer-toggle.is-on::after {
 }
 
 /* IPOPHIL module - green redesign */
+body.dashboard-page #ipophl-module.module {
+  gap: 0.75rem;
+}
+
 body.dashboard-page #ipophl-module .module-header {
-  padding: 4.5rem 6rem; /* Even bigger padding for a proper card look */
-  background: #f0fdf4; /* Very light green background */
-  border: 1.5px solid #dcfce7; /* Distinct light green border */
-  border-radius: 28px;
-  margin-bottom: 3.5rem;
+  padding: 1.1rem 1.2rem;
+  background: #f0fdf4;
+  border: 1.5px solid #dcfce7;
+  border-radius: 18px;
+  margin-bottom: 0;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
 }
 
-body.dashboard-page #ipophl-module .step-title {
-  max-width: 110px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  margin-top: -20px; /* Pull the label significantly closer to the circle */
-  position: relative;
-  z-index: 2;
+body.dashboard-page #ipophl-module .ipophl-content {
+  padding-top: 0;
+  padding-bottom: 1rem;
 }
 
-body.dashboard-page #ipophl-module .progress-step {
-  gap: 0.15rem; /* Reduce gap between circle and label */
+body.dashboard-page #ipophl-module .submission-status-container:empty {
+  margin: 0;
+  padding: 0;
+  min-height: 0;
 }
 
 body.dashboard-page #ipophl-module .gi-status-card {
@@ -6521,22 +6539,39 @@ body.dashboard-page #ipophl-module .gi-status-fill {
 }
 
 body.dashboard-page #ipophl-module .phase-progress {
-  margin: 1.25rem 0 0.9rem;
-  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: start;
+  justify-items: center;
+  margin: 0.35rem 0 0.75rem;
+  padding: 0 0.75rem;
+  gap: 0;
 }
 
 body.dashboard-page #ipophl-module .phase-progress::before {
-  top: 42px;
+  top: 26px;
+  left: 10%;
+  right: 10%;
+  width: auto;
+  height: 2px;
+  transform: none;
   background: rgba(44, 122, 62, 0.22);
 }
 
 body.dashboard-page #ipophl-module .progress-step {
-  gap: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.45rem;
+  width: 100%;
+  min-width: 0;
 }
 
 body.dashboard-page #ipophl-module .step-number {
   width: 52px;
   height: 52px;
+  flex-shrink: 0;
   border: 2px solid rgba(15, 23, 42, 0.12);
   background: #ffffff;
   color: #111827;
@@ -6547,6 +6582,34 @@ body.dashboard-page #ipophl-module .progress-step.active .step-number {
   background: linear-gradient(135deg, #2c7a3e 0%, #38a169 100%);
   border-color: transparent;
   color: #ffffff;
+  transform: none;
+}
+
+body.dashboard-page #ipophl-module .progress-step.completed .step-number {
+  transform: none;
+}
+
+body.dashboard-page #ipophl-module .step-title {
+  margin: 0;
+  width: 100%;
+  max-width: none;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  padding: 0 0.2rem;
+}
+
+@media (max-width: 720px) {
+  body.dashboard-page #ipophl-module .phase-progress {
+    grid-template-columns: repeat(5, minmax(72px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 0.35rem;
+  }
+
+  body.dashboard-page #ipophl-module .step-title {
+    font-size: 0.72rem;
+  }
 }
 
 body.dashboard-page #ipophl-module .phase-header {

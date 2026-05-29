@@ -1,10 +1,11 @@
 {
   "connection": {
-    "app_db_host": "",
+    "app_db_host": "192.168.100.249",
     "app_db_port": 3306,
     "app_db_user": "root",
     "app_db_pass": "",
-    "app_db_name": "beanthentic_app"
+    "app_db_name": "beanthentic_app",
+    "app_server_base": "http://192.168.100.249:8080"
   },
   "notifications": {
     "email_system_events": true,
@@ -21,5 +22,20 @@
     "two_factor_enabled": false,
     "two_factor_secret": null,
     "backup_codes": []
+  },
+  "sms": {
+    "enabled": true,
+    "provider": "sms_gateway",
+    "sender_name": "Beanthentic",
+    "public_base_url": "http://192.168.100.252:5000",
+    "sms_gateway": {
+      "mode": "cloud",
+      "local_base_url": "http://192.168.100.5:8080",
+      "local_path": "/message",
+      "cloud_url": "api.sms-gate.app:443",
+      "username": "UHDZQ6",
+      "password": "jevgeesniyn_tx",
+      "sim_number": 1
+    }
   }
 }

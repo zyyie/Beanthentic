@@ -1,5 +1,92 @@
 {
   "accuracy": 0.82,
-  "cv_mean": 0.828,
-  "timestamp": "2026-05-24T14:41:35.936150"
+  "cv_mean": 0.827,
+  "cv_std": 0.014352700094407304,
+  "best_params": {
+    "max_depth": 12,
+    "max_features": "sqrt",
+    "min_samples_leaf": 1,
+    "min_samples_split": 5,
+    "n_estimators": 200
+  },
+  "classification_report": {
+    "0": {
+      "precision": 0.7916666666666666,
+      "recall": 0.38,
+      "f1-score": 0.5135135135135135,
+      "support": 50.0
+    },
+    "1": {
+      "precision": 0.8238636363636364,
+      "recall": 0.9666666666666667,
+      "f1-score": 0.8895705521472392,
+      "support": 150.0
+    },
+    "accuracy": 0.82,
+    "macro avg": {
+      "precision": 0.8077651515151515,
+      "recall": 0.6733333333333333,
+      "f1-score": 0.7015420328303763,
+      "support": 200.0
+    },
+    "weighted avg": {
+      "precision": 0.8158143939393939,
+      "recall": 0.82,
+      "f1-score": 0.7955562924888078,
+      "support": 200.0
+    }
+  },
+  "confusion_matrix": [
+    [
+      19,
+      31
+    ],
+    [
+      5,
+      145
+    ]
+  ],
+  "training_date": "2026-05-29T23:34:54.672475",
+  "feature_importance_top10": [
+    {
+      "feature": "coffee_species_Liberica",
+      "importance": 0.1132700310199238
+    },
+    {
+      "feature": "defect_count_per_300g",
+      "importance": 0.06654151284951643
+    },
+    {
+      "feature": "soil_pH",
+      "importance": 0.06637692438620675
+    },
+    {
+      "feature": "annual_rainfall_mm",
+      "importance": 0.051511152365541955
+    },
+    {
+      "feature": "years_in_farming",
+      "importance": 0.04997014357946636
+    },
+    {
+      "feature": "elevation_masl",
+      "importance": 0.04687549623667644
+    },
+    {
+      "feature": "moisture_content_pct",
+      "importance": 0.04673761820040621
+    },
+    {
+      "feature": "coffee_species_Robusta",
+      "importance": 0.043672812884785674
+    },
+    {
+      "feature": "non_bearing_trees",
+      "importance": 0.041367854942570614
+    },
+    {
+      "feature": "bearing_trees",
+      "importance": 0.039522662153978066
+    }
+  ]
 }

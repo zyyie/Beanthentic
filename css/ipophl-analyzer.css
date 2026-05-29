@@ -165,7 +165,7 @@
 .rendered-word-content {
     max-width: 800px;
     margin: 0 auto;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: var(--font-sans);
     line-height: 1.6;
     color: #333;
 }

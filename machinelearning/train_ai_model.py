@@ -119,11 +119,11 @@ class GIDocumentTrainer:
 
         # Hyperparameter grid
         param_grid = {
-            'n_estimators': [100, 200],
-            'max_depth': [10, 20, None],
-            'min_samples_split': [2, 5],
-            'min_samples_leaf': [1, 2],
-            'max_features': ['sqrt']
+            "n_estimators": [100, 200],
+            "max_depth": [12, 20, None],
+            "min_samples_split": [2, 5],
+            "min_samples_leaf": [1, 2],
+            "max_features": ["sqrt"],
         }
 
         # Initialize and train model
@@ -482,8 +482,10 @@ class GIDocumentTrainer:
         logger.info("Saving trained model...")
 
         # Save model
-        model_path = self.models_dir / "gi_model.joblib"
+        model_path = self.models_dir / "gi_farmer_model.joblib"
         joblib.dump(results['model'], model_path)
+        legacy_path = self.models_dir / "gi_model.joblib"
+        joblib.dump(results['model'], legacy_path)
 
         # Save feature importance
         results['feature_importance'].to_csv(
@@ -512,9 +514,11 @@ class GIDocumentTrainer:
         logger.info("Evaluating model performance...")
 
         # Load model and data
-        model_path = self.models_dir / "gi_model.joblib"
+        model_path = self.models_dir / "gi_farmer_model.joblib"
         if not model_path.exists():
-            raise FileNotFoundError("Model not found. Train the model first.")
+            model_path = self.models_dir / "gi_model.joblib"
+        if not model_path.exists():
+            raise FileNotFoundError("Model not found. Train the model first: python train_ai_model.py --train-csv")
 
         model = joblib.load(model_path)
 
@@ -605,14 +609,13 @@ def main():
         return
 
     if args.full_pipeline:
-        logger.info("Running full training pipeline...")
-        feature_matrix, labels = trainer.prepare_training_data()
-        results = trainer.train_model(feature_matrix, labels)
+        logger.info("Running full training pipeline (CSV farmer GI model)...")
+        results = trainer.train_model_from_csv()
         trainer.save_model(results)
-        evaluation = trainer.evaluate_model()
         print("\nTraining completed successfully!")
         print(f"Model accuracy: {results['accuracy']:.3f}")
         print(f"Cross-validation score: {results['cv_mean']:.3f} ± {results['cv_std']:.3f}")
+        print(f"Model saved to {trainer.models_dir / 'gi_farmer_model.joblib'}")
         return
 
     if args.prepare_data:

@@ -52,9 +52,10 @@ except ImportError:
 class GIAnalyzer:
     """AI Engine for IPOPHL GI Registration and Farmer Readiness Analysis"""
 
-    def __init__(self, uploads_dir: str = "../uploads"):
-        self.uploads_dir = Path(uploads_dir)
-        self.uploads_dir.mkdir(exist_ok=True)
+    def __init__(self, uploads_dir: str | None = None):
+        self.ml_dir = Path(__file__).resolve().parent
+        self.uploads_dir = Path(uploads_dir) if uploads_dir else (self.ml_dir / "uploads")
+        self.uploads_dir.mkdir(parents=True, exist_ok=True)
 
         # Comprehensive checklist of GI-related terms for extraction
         self.gi_checklist = {
@@ -136,71 +137,81 @@ class GIAnalyzer:
             }
         }
 
-        # Initialize or load ML model
-        self.model = None
-        self.vectorizer = None
+        # Farmer tabular model (GI readiness from farm profile fields)
+        self.farmer_model = None
         self.column_structure = None
-        self.feature_names = None
+        self.farmer_feature_names = None
+
+        # Document analysis uses rules unless a separate document model is added
+        self.document_model = None
+        self.document_feature_names = None
         self.explainer = None
-        
+
         if ML_AVAILABLE:
-            self._initialize_model()
+            self._initialize_models()
 
-    def _initialize_model(self):
-        """Initialize or train the Random Forest model"""
-        # Search for model files in the current directory first (where ai_engine.py is)
-        current_dir = Path(__file__).parent
-        
-        model_path = current_dir / "gi_model.joblib"
-        vectorizer_path = current_dir / "vectorizer.joblib"
-        structure_path = current_dir / "column_structure.json"
-        feature_names_path = current_dir / "feature_names.json"
+    def _model_paths(self) -> list[Path]:
+        names = ("gi_farmer_model.joblib", "gi_model.joblib")
+        paths = [self.ml_dir / n for n in names]
+        paths.extend(self.uploads_dir / n for n in names)
+        return paths
 
-        # Fallback to uploads_dir if not in current directory
-        if not model_path.exists():
-            model_path = self.uploads_dir / "gi_model.joblib"
-            vectorizer_path = self.uploads_dir / "vectorizer.joblib"
-            structure_path = self.uploads_dir / "column_structure.json"
-            feature_names_path = self.uploads_dir / "feature_names.json"
+    def _initialize_models(self):
+        """Load farmer GI readiness model and optional document model."""
+        structure_path = self.ml_dir / "column_structure.json"
+        feature_names_path = self.ml_dir / "feature_names.json"
 
-        if model_path.exists():
+        farmer_model_path = next((p for p in self._model_paths() if p.exists()), None)
+        if farmer_model_path:
             try:
-                self.model = joblib.load(model_path)
-                logging.info("Loaded existing ML model")
-                
+                self.farmer_model = joblib.load(farmer_model_path)
+                logging.info("Loaded farmer ML model from %s", farmer_model_path.name)
                 if structure_path.exists():
-                    with open(structure_path, 'r') as f:
+                    with open(structure_path, encoding="utf-8") as f:
                         self.column_structure = json.load(f)
-                    logging.info("Loaded tabular column structure")
-                
-                if vectorizer_path.exists():
-                    self.vectorizer = joblib.load(vectorizer_path)
-                    logging.info("Loaded vectorizer")
-
                 if feature_names_path.exists():
-                    with open(feature_names_path, 'r') as f:
-                        self.feature_names = json.load(f)
-                    logging.info("Loaded feature names")
-                else:
-                    # Construct feature names from checklist if not saved
-                    self.feature_names = (['text_length', 'word_count'] + 
-                                        self.gi_checklist["mandatory_terms"] + 
-                                        self.gi_checklist["optional_terms"])
-
-                # Initialize SHAP explainer
-                if hasattr(self.model, 'predict'):
-                    self.explainer = shap.TreeExplainer(self.model)
-                    logging.info("Initialized SHAP TreeExplainer")
-                    
+                    with open(feature_names_path, encoding="utf-8") as f:
+                        self.farmer_feature_names = json.load(f)
             except Exception as e:
-                logging.warning(f"Failed to load model or initialize SHAP: {e}")
-                self._create_default_model()
-        else:
-            self._create_default_model()
+                logging.warning("Failed to load farmer ML model: %s", e)
+                self.farmer_model = None
+
+        doc_path = self.ml_dir / "gi_document_model.joblib"
+        if doc_path.exists():
+            try:
+                self.document_model = joblib.load(doc_path)
+                self.document_feature_names = (
+                    ["text_length", "word_count"]
+                    + self.gi_checklist["mandatory_terms"]
+                    + self.gi_checklist["optional_terms"]
+                )
+                if hasattr(self.document_model, "predict_proba"):
+                    self.explainer = shap.TreeExplainer(self.document_model)
+            except Exception as e:
+                logging.warning("Failed to load document ML model: %s", e)
+                self.document_model = None
+
+    def ml_status(self) -> Dict:
+        """Return whether trained models are available."""
+        training_path = self.ml_dir / "training_results.json"
+        meta = {}
+        if training_path.exists():
+            try:
+                with open(training_path, encoding="utf-8") as f:
+                    meta = json.load(f)
+            except Exception:
+                meta = {}
+        return {
+            "farmer_model_loaded": self.farmer_model is not None,
+            "document_model_loaded": self.document_model is not None,
+            "document_analysis_default": "rule_based" if not self.document_model else "ml_based",
+            "training": meta,
+        }
 
     def _generate_shap_explanation(self, features: List, readiness_score: int, task_id: str = None) -> str:
         """Generate an in-depth SHAP analysis in paragraph form with 3 paragraphs"""
-        if not self.explainer or not self.feature_names:
+        feature_names = self.document_feature_names or self.farmer_feature_names
+        if not self.explainer or not feature_names:
             return "Detailed AI analysis is currently unavailable. Please ensure all ML dependencies are installed."
 
         try:
@@ -215,8 +226,8 @@ class GIAnalyzer:
 
             feature_impact = []
             for i, val in enumerate(instance_shap):
-                if i < len(self.feature_names):
-                    feature_impact.append({'name': self.feature_names[i], 'impact': val})
+                if i < len(feature_names):
+                    feature_impact.append({'name': feature_names[i], 'impact': val})
 
             feature_impact.sort(key=lambda x: abs(x['impact']), reverse=True)
             doc_type = task_id.replace('-', ' ').title() if task_id else "Document"
@@ -248,64 +259,97 @@ class GIAnalyzer:
             logging.error(f"SHAP explanation generation failed: {e}")
             return "<p>An error occurred while generating the detailed AI analysis. The basic score and feature detection are still available.</p>"
 
-    def _create_default_model(self):
-        """Create a default rule-based model"""
-        # Simple rule-based classifier using keyword matching
-        self.model = "rule_based"
-        self.vectorizer = None
-        self.column_structure = None
-        logging.info("Using rule-based analysis")
+    def _encode_farmer_profile(self, profile_data: Dict):
+        """Return feature matrix aligned to training columns."""
+        if not self.column_structure:
+            raise ValueError("Column structure not loaded. Train the model first.")
+
+        df = pd.DataFrame([profile_data])
+        for col in self.column_structure["original_cols"]:
+            if col not in df.columns:
+                if col in ("elevation_masl", "soil_pH", "annual_rainfall_mm", "mean_temperature_C", "annual_yield_kg", "moisture_content_pct", "defect_count_per_300g", "years_in_farming", "bearing_trees", "non_bearing_trees"):
+                    df[col] = 0
+                else:
+                    df[col] = "Unknown"
+
+        df_encoded = pd.get_dummies(df, columns=self.column_structure["categorical_cols"])
+        for col in self.column_structure["encoded_cols"]:
+            if col not in df_encoded.columns:
+                df_encoded[col] = 0
+        return df_encoded[self.column_structure["encoded_cols"]]
 
     def analyze_farmer_profile(self, profile_data: Dict) -> Dict:
-        """Analyze a farmer's GI readiness based on profile data"""
-        if self.model == "rule_based" or self.column_structure is None:
+        """Analyze a farmer's GI readiness based on profile / tabular data."""
+        if self.farmer_model is None or self.column_structure is None:
             return {
                 "success": False,
-                "error": "ML model not trained for tabular data analysis"
+                "error": "Farmer ML model not trained. Run: python train_ai_model.py --train-csv",
             }
 
         try:
-            import pandas as pd
-            # Create a DataFrame from the profile data
-            df = pd.DataFrame([profile_data])
-            
-            # Reorder and encode to match training structure
-            # 1. Ensure all original columns are present (fill missing with defaults)
-            for col in self.column_structure['original_cols']:
-                if col not in df.columns:
-                    df[col] = 0 if 'masl' in col or 'pH' in col or 'mm' in col or 'C' in col or 'yield' in col or 'count' in col or 'trees' in col or 'pct' in col or 'years' in col else 'Unknown'
-
-            # 2. One-hot encode categorical columns
-            df_encoded = pd.get_dummies(df, columns=self.column_structure['categorical_cols'])
-            
-            # 3. Align with training encoded columns (add missing columns as 0, drop extra)
-            for col in self.column_structure['encoded_cols']:
-                if col not in df_encoded.columns:
-                    df_encoded[col] = 0
-            
-            df_final = df_encoded[self.column_structure['encoded_cols']]
-            
-            # Make prediction
-            probability = self.model.predict_proba(df_final.values)[0]
-            readiness_score = int(probability[1] * 100)
+            df_final = self._encode_farmer_profile(profile_data)
+            probability = self.farmer_model.predict_proba(df_final.values)[0]
+            ready_prob = float(probability[1]) if len(probability) > 1 else float(probability[0])
+            readiness_score = int(round(ready_prob * 100))
             status = "Ready" if readiness_score >= 75 else "Not Ready"
-            
-            # Determine which features contributed most (simplified)
-            detected_features = []
-            for col, val in profile_data.items():
-                if val == "Yes" or (isinstance(val, (int, float)) and val > 0):
-                    detected_features.append(col)
+            predicted_class = int(self.farmer_model.predict(df_final.values)[0])
+
+            detected_features = [
+                col for col, val in profile_data.items()
+                if val == "Yes" or (isinstance(val, (int, float)) and val > 0)
+            ]
 
             return {
                 "success": True,
                 "readiness_score": readiness_score,
                 "status": status,
+                "gi_ready": bool(predicted_class),
+                "probability_ready": round(ready_prob, 4),
                 "detected_features": detected_features,
-                "analysis_method": "ml_tabular"
+                "analysis_method": "ml_farmer",
             }
         except Exception as e:
-            logging.error(f"Farmer profile analysis failed: {e}")
+            logging.error("Farmer profile analysis failed: %s", e)
             return {"success": False, "error": str(e)}
+
+    def predict_farmers_batch(self, rows: List[Dict]) -> Dict:
+        """Predict GI readiness for many farmer records."""
+        try:
+            from machinelearning.farmer_features import farmer_row_to_ml_features
+        except ImportError:
+            from farmer_features import farmer_row_to_ml_features
+
+        if self.farmer_model is None:
+            return {
+                "success": False,
+                "error": "Farmer ML model not trained. Run: python train_ai_model.py --train-csv",
+                "predictions": [],
+            }
+
+        predictions = []
+        for idx, row in enumerate(rows):
+            features = farmer_row_to_ml_features(row if isinstance(row, dict) else {})
+            result = self.analyze_farmer_profile(features)
+            predictions.append(
+                {
+                    "index": idx,
+                    "farmer_id": row.get("farmer_id") or row.get("NO.") if isinstance(row, dict) else idx,
+                    "readiness_score": result.get("readiness_score", 0),
+                    "status": result.get("status", "Not Ready"),
+                    "gi_ready": result.get("gi_ready", False),
+                    "success": result.get("success", False),
+                }
+            )
+
+        eligible = sum(1 for p in predictions if p.get("gi_ready"))
+        return {
+            "success": True,
+            "analysis_method": "ml_farmer",
+            "total": len(predictions),
+            "eligible": eligible,
+            "not_eligible": len(predictions) - eligible,
+            "predictions": predictions,
+        }
 
     def extract_text_from_file(self, file_path: str) -> str:
         """Extract text from uploaded file"""
@@ -429,11 +473,9 @@ class GIAnalyzer:
                 }
                 logging.info(f"Using task-specific checklist for: {task_id}")
 
-            # Perform analysis
-            if self.model == "rule_based":
-                return self._rule_based_analysis(text, checklist)
-            else:
+            if self.document_model is not None:
                 return self._ml_analysis(text, checklist, task_id)
+            return self._rule_based_analysis(text, checklist)
 
         except Exception as e:
             logging.error(f"Analysis error: {e}")
@@ -523,11 +565,11 @@ class GIAnalyzer:
             features = self._extract_features(text)
 
             # Make prediction
-            if hasattr(self.model, 'predict_proba'):
-                probability = self.model.predict_proba([features])[0]
-                readiness_score = int(probability[1] * 100)  # Probability of "ready" class
+            if hasattr(self.document_model, "predict_proba"):
+                probability = self.document_model.predict_proba([features])[0]
+                readiness_score = int(probability[1] * 100)
             else:
-                readiness_score = 75  # Default fallback
+                readiness_score = 75
 
             # Determine status
             status = "Ready" if readiness_score >= 75 else "Not Ready"

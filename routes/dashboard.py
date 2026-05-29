@@ -5,15 +5,26 @@ Dashboard and settings routes for Beanthentic application.
 import os
 from datetime import datetime
 
-from flask import jsonify, redirect, render_template, request, session, url_for
+from flask import jsonify, redirect, render_template, request, send_file, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from config.models import ActivityLogEntry
+from config.profile_photo import (
+    migrate_profile_photo_key,
+    profile_photo_file,
+    profile_photo_url,
+    save_profile_photo,
+)
+from config.validation import (
+    ALLOWED_PROFILE_PHOTO_EXTENSIONS,
+    validate_full_name,
+    validate_password,
+    validate_phone,
+    validate_profile_photo_upload,
+)
 from config.utils import (
-    get_current_farmer_phone,
     get_current_user_phone,
     is_authenticated,
-    is_farmer_authenticated,
     load_settings,
     load_users,
     log_activity,
@@ -28,19 +39,14 @@ def register_dashboard_routes(app):
 
     @app.route("/dashboard")
     def dashboard():
-        """Main dashboard page."""
-        if not (is_authenticated() or is_farmer_authenticated()):
+        """Main dashboard page (admin only)."""
+        if not is_authenticated():
             return redirect(url_for("login"))
 
-        phone = (get_current_user_phone() or get_current_farmer_phone() or "")
+        phone = get_current_user_phone() or ""
         users = load_users()
         user = users.get(phone, {})
-        full_name = (
-            user.get("full_name")
-            or session.get("user_name")
-            or session.get("farmer_name")
-            or phone
-        )
+        full_name = user.get("full_name") or session.get("user_name") or phone
         google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY", "").strip() or demo_google_maps_api_key
         return render_template(
             "templates/dashboard.html",
@@ -90,17 +96,27 @@ def register_dashboard_routes(app):
         sec = settings.get("security", {})
         tf_enabled = bool(sec.get("two_factor_enabled"))
 
+        photo_url = profile_photo_url(user_phone) if user_phone else None
+        full_name = user.get("full_name") or session.get("user_name", "")
+        first_name = (user.get("first_name") or "").strip()
+        last_name = (user.get("last_name") or "").strip()
+        if not first_name and full_name:
+            parts = full_name.split(None, 1)
+            first_name = parts[0] if parts else ""
+            last_name = parts[1] if len(parts) > 1 else ""
         return jsonify(
             {
                 "notifications": notifications,
                 "security": {
                     "two_factor_enabled": tf_enabled,
-                    "totp_secret": (sec.get("two_factor_secret") if tf_enabled else None),
-                    "backup_codes": (sec.get("backup_codes") if tf_enabled else None),
                 },
                 "user": {
                     "phone": user_phone,
-                    "full_name": user.get("full_name") or session.get("user_name", ""),
+                    "full_name": full_name,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "profile_photo_url": photo_url,
+                    "deactivated": bool(user.get("deactivated")),
                 },
             }
         )
@@ -211,11 +227,9 @@ def register_dashboard_routes(app):
                 log_activity(user_phone, "PASSWORD_CHANGE_FAILED", "Incorrect current password", request.remote_addr)
                 return jsonify({"error": "Current password is incorrect"})
 
-            if new_password != confirm_password:
-                return jsonify({"error": "New passwords do not match"})
-
-            if len(new_password) < 8:
-                return jsonify({"error": "Password must be at least 8 characters long"})
+            ok_pwd, pwd_err = validate_password(new_password, confirm_password)
+            if not ok_pwd:
+                return jsonify({"error": pwd_err})
 
             users[user_phone]["password_hash"] = generate_password_hash(new_password)
             save_users(users)
@@ -259,9 +273,19 @@ def register_dashboard_routes(app):
         settings = load_settings()
         notifications = settings.setdefault("notifications", {})
 
-        # Update notification settings from form data
+        allowed_keys = {
+            "email_system_events",
+            "email_user_registrations",
+            "email_security_breaches",
+            "sms_system_events",
+            "sms_user_registrations",
+            "sms_security_breaches",
+            "in_app_system_events",
+            "in_app_user_registrations",
+            "in_app_security_breaches",
+        }
         for key in request.form:
-            if key.startswith("email_") or key.startswith("sms_") or key.startswith("in_app_"):
+            if key in allowed_keys:
                 notifications[key] = request.form.get(key) == "true"
 
         save_settings(settings)
@@ -271,21 +295,185 @@ def register_dashboard_routes(app):
 
     @app.route("/settings/profile", methods=["POST"])
     def settings_profile():
-        """Handle profile settings changes."""
+        """Handle profile settings changes and profile photo uploads."""
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
-        full_name = (request.form.get("full_name") or request.form.get("fullName") or "").strip()
-        if not full_name:
-            return jsonify({"error": "Full name is required"}), 400
+        action = (request.form.get("action") or "").strip().lower()
+        if action == "upload_profile_photo":
+            return _upload_profile_photo()
 
-        user_phone = get_current_user_phone()
+        photo_file = request.files.get("photo")
+        if photo_file and (
+            (photo_file.filename or "").strip()
+            or (photo_file.mimetype or "").lower().startswith("image/")
+        ):
+            return _upload_profile_photo()
+
+        first_name = (request.form.get("first_name") or "").strip()
+        last_name = (request.form.get("last_name") or "").strip()
+        raw_name = request.form.get("full_name") or request.form.get("fullName") or ""
+        combined = f"{first_name} {last_name}".strip() or raw_name.strip()
+        ok_name, name_err, full_name = validate_full_name(combined)
+        if not ok_name:
+            return jsonify({"error": name_err}), 400
+
+        user_phone = get_current_user_phone() or ""
         users = load_users()
-        if user_phone in users:
-            users[user_phone]["full_name"] = full_name
-            save_users(users)
+        if user_phone not in users:
+            return jsonify({"error": "Account not found"}), 404
+
+        phone_in = (request.form.get("phone") or "").strip()
+        new_phone = user_phone
+        if phone_in:
+            ok_phone, phone_err, new_phone = validate_phone(phone_in)
+            if not ok_phone:
+                return jsonify({"error": phone_err}), 400
+
+        if new_phone != user_phone:
+            if new_phone in users:
+                return jsonify({"error": "Phone number is already registered."}), 400
+            record = users.pop(user_phone)
+            users[new_phone] = record
+            migrate_profile_photo_key(user_phone, new_phone)
+            user_phone = new_phone
+            session["user_phone"] = new_phone
+
+        user = users[user_phone]
+        user["full_name"] = full_name
+        user["first_name"] = first_name or full_name.split(None, 1)[0]
+        user["last_name"] = last_name or (
+            full_name.split(None, 1)[1] if len(full_name.split(None, 1)) > 1 else ""
+        )
+        save_users(users)
 
         session["user_name"] = full_name
         log_activity(user_phone, "PROFILE_UPDATED", f"Profile updated: {full_name}", request.remote_addr)
 
-        return jsonify({"success": "Profile updated successfully"})
+        return jsonify(
+            {
+                "success": "Profile updated successfully",
+                "user": {
+                    "phone": user_phone,
+                    "full_name": full_name,
+                    "first_name": user.get("first_name", ""),
+                    "last_name": user.get("last_name", ""),
+                },
+            }
+        )
+
+    def _uploaded_photo_size(file) -> int:
+        try:
+            pos = file.stream.tell()
+            file.stream.seek(0, 2)
+            size = int(file.stream.tell())
+            file.stream.seek(pos)
+            return size
+        except Exception:
+            return int(request.content_length or 0)
+
+    def _infer_profile_photo_ext(file) -> str:
+        name = (file.filename or "").strip()
+        if name and "." in name:
+            from pathlib import Path
+
+            ext = Path(name).suffix.lower()
+            if ext in ALLOWED_PROFILE_PHOTO_EXTENSIONS:
+                return ext
+        mime = (file.mimetype or "").lower().split(";")[0].strip()
+        mime_map = {
+            "image/jpeg": ".jpg",
+            "image/jpg": ".jpg",
+            "image/png": ".png",
+            "image/webp": ".webp",
+            "image/gif": ".gif",
+        }
+        return mime_map.get(mime, ".jpg")
+
+    def _serve_profile_photo():
+        if not is_authenticated():
+            return jsonify({"error": "Unauthorized"}), 401
+
+        user_phone = get_current_user_phone() or ""
+        path = profile_photo_file(user_phone)
+        if not path:
+            return jsonify({"error": "No profile photo"}), 404
+
+        return send_file(path, mimetype=None, conditional=True)
+
+    def _upload_profile_photo():
+        """Upload or replace profile photo (multipart field: photo)."""
+        if not is_authenticated():
+            return jsonify({"error": "Unauthorized"}), 401
+
+        user_phone = get_current_user_phone() or ""
+        users = load_users()
+        if user_phone not in users:
+            return jsonify({"error": "Account not found"}), 404
+
+        file = request.files.get("photo")
+        if not file or not (
+            (file.filename or "").strip()
+            or (file.mimetype or "").lower().startswith("image/")
+        ):
+            return jsonify({"error": "Choose a photo to upload."}), 400
+
+        size = _uploaded_photo_size(file)
+        ext = _infer_profile_photo_ext(file)
+        raw_name = (file.filename or "").strip()
+        validate_name = raw_name if raw_name.lower().endswith(tuple(ALLOWED_PROFILE_PHOTO_EXTENSIONS)) else f"profile{ext}"
+
+        ok, err, ext = validate_profile_photo_upload(validate_name, size)
+        if not ok:
+            return jsonify({"error": err}), 400
+
+        try:
+            save_profile_photo(user_phone, file, ext=ext)
+        except Exception as exc:
+            return jsonify({"error": f"Could not save photo: {exc}"}), 500
+
+        log_activity(user_phone, "PROFILE_PHOTO_UPDATED", "Profile photo updated", request.remote_addr)
+        return jsonify(
+            {
+                "success": "Profile photo updated.",
+                "profile_photo_url": profile_photo_url(user_phone),
+            }
+        )
+
+    @app.route("/settings/profile-photo", methods=["GET", "POST"])
+    @app.route("/api/admin-profile-photo", methods=["GET", "POST"])
+    def admin_profile_photo():
+        if request.method == "GET":
+            return _serve_profile_photo()
+        return _upload_profile_photo()
+
+    @app.route("/api/admin-account/deactivate", methods=["POST"])
+    def api_admin_account_deactivate():
+        """Deactivate the current admin account (requires password confirmation)."""
+        if not is_authenticated():
+            return jsonify({"error": "Unauthorized"}), 401
+
+        user_phone = get_current_user_phone() or ""
+        users = load_users()
+        user = users.get(user_phone)
+        if not user:
+            return jsonify({"error": "Account not found"}), 404
+
+        if user.get("deactivated"):
+            return jsonify({"error": "This account is already deactivated."}), 400
+
+        password = (request.form.get("password") or "").strip()
+        if not password:
+            return jsonify({"error": "Enter your password to confirm deactivation."}), 400
+
+        if not check_password_hash(user.get("password_hash", ""), password):
+            log_activity(user_phone, "ACCOUNT_DEACTIVATE_FAILED", "Wrong password", request.remote_addr)
+            return jsonify({"error": "Password is incorrect."}), 403
+
+        user["deactivated"] = True
+        user["deactivated_at"] = datetime.utcnow().isoformat(timespec="seconds")
+        save_users(users)
+        log_activity(user_phone, "ACCOUNT_DEACTIVATED", "Admin deactivated own account", request.remote_addr)
+
+        session.clear()
+        return jsonify({"success": "Account deactivated. You have been signed out.", "redirect": url_for("login")})

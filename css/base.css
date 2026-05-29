@@ -1,12 +1,23 @@
-/* Base styles and reset */
+/* Base styles and reset — Inter (matches dashboard headings e.g. Calendar) */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;500;600;700;800&display=swap");
+
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 :root {
+  /* Typography */
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
+  --font-weight-thin: 100;
+  --font-weight-light: 300;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
   /* Global green accent (match dashboard sidebar) */
   --accent-1: #2c7a3e;
   --accent-2: #38a169;
@@ -16,10 +27,86 @@
   --accent-ink: #1a3a1f;
 }
 
+html {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 body {
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-regular);
   color: #1e293b;
   background: #f8fafc;
   line-height: 1.6;
+}
+
+/* Type scale by importance */
+h1,
+.card-title,
+.module-header h1 {
+  font-weight: var(--font-weight-extrabold);
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+h2,
+.section-heading,
+.stat-number {
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.015em;
+  color: #0f172a;
+}
+
+h3,
+.widget-header h3,
+.label,
+.stat-content h3 {
+  font-weight: var(--font-weight-semibold);
+  color: #0f172a;
+}
+
+h4,
+h5,
+h6 {
+  font-weight: var(--font-weight-semibold);
+}
+
+p,
+.card-desc,
+.input,
+textarea,
+select {
+  font-weight: var(--font-weight-regular);
+}
+
+small,
+.fineprint,
+.stat-label,
+.field-hint,
+.breadcrumb-item {
+  font-weight: var(--font-weight-light);
+}
+
+button,
+.btn,
+.btn-primary {
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-bold);
+}
+
+th {
+  font-weight: var(--font-weight-semibold);
+}
+
+td {
+  font-weight: var(--font-weight-regular);
+}
+
+code,
+pre,
+.mono {
+  font-family: var(--font-mono);
 }
 
 a {
@@ -41,12 +128,12 @@ section {
 .section-heading {
   font-size: 1.55rem;
   margin-bottom: 0.75rem;
-  color: #0f172a;
 }
 
 .section-intro {
   max-width: 40rem;
   font-size: 0.96rem;
+  font-weight: var(--font-weight-regular);
   color: #475569;
   margin-bottom: 1.75rem;
 }

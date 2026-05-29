@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Beanthentic | Enter Verification Code</title>
+    <link rel="stylesheet" href="../css/base.css" />
+    <link rel="stylesheet" href="../css/layout.css" />
+    <link rel="stylesheet" href="../css/components.css" />
+    <link rel="stylesheet" href="../css/responsive.css" />
+    <link rel="stylesheet" href="../css/forgot-password.css" />
+  </head>
+  <body class="login-page">
+    <main id="main" class="login-main">
+      <div class="login-wrap">
+        <section class="card login-card-split" aria-label="Verify OTP and reset password">
+          <div class="login-card-left" aria-hidden="true">
+            <img src="../assets/images/logo.png" alt="Beanthentic logo" class="login-card-logo" />
+          </div>
+
+          <div class="login-card-right">
+            <div class="card-header">
+              <h2 class="card-title">Enter Code</h2>
+              <p class="card-desc">Enter the 6-digit code sent to <strong>{{ phone_display }}</strong>, then choose a new password.</p>
+            </div>
+
+            <form class="form" action="{{ url_for('farmer_verify_reset_otp') }}" method="post">
+              {% if error %}
+              <p class="fineprint form-alert form-alert-error">{{ error }}</p>
+              {% endif %}
+
+              <div class="field">
+                <label class="label" for="otp">Verification code:</label>
+                <input
+                  class="input"
+                  id="otp"
+                  name="otp"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  placeholder="123456"
+                  maxlength="6"
+                  required
+                />
+              </div>
+
+              <div class="field">
+                <label class="label" for="newPassword">New password:</label>
+                <input
+                  class="input"
+                  id="newPassword"
+                  name="newPassword"
+                  type="password"
+                  autocomplete="new-password"
+                  required
+                />
+              </div>
+
+              <div class="field">
+                <label class="label" for="confirmPassword">Confirm password:</label>
+                <input
+                  class="input"
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  autocomplete="new-password"
+                  required
+                />
+              </div>
+
+              <p class="fineprint">At least 8 characters with a letter and a number.</p>
+
+              <button class="btn" type="submit">UPDATE PASSWORD</button>
+
+              <div class="login-form-footer">
+                <p class="fineprint">
+                  <a class="link" href="{{ url_for('farmer_forgot_password') }}">Request a new code</a>
+                  ·
+                  <a class="link" href="{{ url_for('farmer_login') }}">Back to Login</a>
+                </p>
+              </div>
+            </form>
+          </div>
+        </section>
+      </div>
+    </main>
+    <script>
+      (function () {
+        const otpInput = document.getElementById("otp");
+        if (!otpInput) return;
+        otpInput.addEventListener("input", function (e) {
+          e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -12,17 +12,34 @@ from flask import jsonify, request, send_file
 from werkzeug.utils import secure_filename
 
 from config.models import DocumentAnalysis, db
+from config.security import api_error, safe_error_message
+from config.validation import (
+    MAX_UPLOAD_BYTES,
+    validate_enum,
+    validate_filename_extension,
+    validate_uuid_like,
+    IPOPHL_PHASES,
+)
 from config.utils import get_current_user_phone, is_authenticated, log_activity
 
 
 def register_ipophl_routes(app):
     """Register IPOPHL document analysis routes with the Flask app."""
 
+    def _guard_uuid(file_uuid: str):
+        ok, err = validate_uuid_like(file_uuid)
+        if not ok:
+            return api_error(err, 400)
+        return None
+
     @app.route("/api/ipo-preview/<file_uuid>")
     def api_ipo_file_preview(file_uuid):
         """Preview a specific uploaded file in the IPOPHL module."""
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
+        guard = _guard_uuid(file_uuid)
+        if guard:
+            return guard
 
         try:
             # Find document record
@@ -57,7 +74,7 @@ def register_ipophl_routes(app):
             })
 
         except Exception as e:
-            return jsonify({"error": f"Preview failed: {str(e)}"}), 500
+            return jsonify({"error": safe_error_message(e, public="Preview failed.")}), 500
 
     @app.route("/api/ipo-analyze", methods=["POST"])
     def api_ipo_analyze():
@@ -77,15 +94,20 @@ def register_ipophl_routes(app):
             if file.filename == '':
                 return jsonify({"error": "No file selected"}), 400
 
-            # Get additional metadata
-            ipophl_phase = request.form.get('phase', 'unknown')
-            task_id = request.form.get('task_id', 'unknown')
+            if request.content_length and request.content_length > MAX_UPLOAD_BYTES:
+                return api_error(
+                    f"File too large. Maximum size is {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
+                    400,
+                )
 
-            # Validate file type
-            allowed_extensions = {'.pdf', '.doc', '.docx', '.txt', '.md', '.csv'}
-            file_ext = Path(file.filename).suffix.lower()
-            if file_ext not in allowed_extensions:
-                return jsonify({"error": f"Unsupported file type: {file_ext}"}), 400
+            ok_name, name_err, file_ext = validate_filename_extension(file.filename)
+            if not ok_name:
+                return api_error(name_err, 400)
+
+            ipophl_phase = validate_enum(
+                request.form.get("phase", "unknown"), IPOPHL_PHASES, "unknown"
+            )
+            task_id = secure_filename((request.form.get("task_id") or "unknown")[:64])
 
             # Use Path for cross-platform compatibility and normalization
             # gi_analyzer.save_uploaded_file already handles the OS-specific path joining
@@ -165,14 +187,16 @@ def register_ipophl_routes(app):
             })
 
         except Exception as e:
-            # Log error
-            return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
+            return jsonify({"error": safe_error_message(e, public="Analysis failed.")}), 500
 
     @app.route("/api/ipo-delete/<file_uuid>", methods=["DELETE"])
     def api_delete_ipo_file(file_uuid):
         """Delete an IPOPHL document."""
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
+        guard = _guard_uuid(file_uuid)
+        if guard:
+            return guard
 
         try:
             doc_analysis = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
@@ -196,7 +220,7 @@ def register_ipophl_routes(app):
             return jsonify({"success": True})
 
         except Exception as e:
-            return jsonify({"error": f"Deletion failed: {str(e)}"}), 500
+            return jsonify({"error": safe_error_message(e, public="Deletion failed.")}), 500
 
     @app.route("/api/file-preview/<filename>")
     def api_file_preview(filename):
@@ -204,9 +228,15 @@ def register_ipophl_routes(app):
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
+        safe_name = secure_filename(filename)
+        if not safe_name or safe_name != filename.replace("\\", "/").split("/")[-1]:
+            return jsonify({"error": "Invalid file name."}), 400
+
         try:
-            # Find document record
-            file_uuid = filename.rsplit('.', 1)[0] if '.' in filename else filename
+            file_uuid = safe_name.rsplit(".", 1)[0] if "." in safe_name else safe_name
+            ok_uuid, uuid_err = validate_uuid_like(file_uuid)
+            if not ok_uuid:
+                return jsonify({"error": uuid_err}), 400
             doc_analysis = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
 
             # Fallback: Search by original_filename or secure version
@@ -242,13 +272,16 @@ def register_ipophl_routes(app):
             return send_file(str(file_path), as_attachment=False, mimetype=mimetype)
 
         except Exception as e:
-            return jsonify({"error": f"Preview failed: {str(e)}"}), 500
+            return jsonify({"error": safe_error_message(e, public="Preview failed.")}), 500
 
     @app.route("/api/ipo-analysis/<file_uuid>", methods=["GET"])
     def api_get_ipo_analysis(file_uuid):
         """Get analysis results for a specific document."""
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
+        guard = _guard_uuid(file_uuid)
+        if guard:
+            return guard
 
         try:
             # Try to find by UUID first
@@ -289,13 +322,16 @@ def register_ipophl_routes(app):
             })
 
         except Exception as e:
-            return jsonify({"error": f"Failed to retrieve analysis: {str(e)}"}), 500
+            return jsonify({"error": safe_error_message(e, public="Failed to retrieve analysis.")}), 500
 
     @app.route("/api/ipo-analysis/<file_uuid>", methods=["POST"])
     def api_update_ipo_analysis(file_uuid):
-        """Update analysis results for a specific document."""
+        """Re-run AI analysis for a document (no manual score override from client)."""
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
+        guard = _guard_uuid(file_uuid)
+        if guard:
+            return guard
 
         try:
             # Try to find by UUID first
@@ -316,34 +352,25 @@ def register_ipophl_routes(app):
                 return jsonify({"error": "Document not found"}), 404
 
             payload = request.get_json(silent=True) or {}
-            
-            # If no payload is provided, re-run the AI analysis
-            if not payload:
-                # Import AI engine
-                from machinelearning.ai_engine import gi_analyzer
-                
-                # Re-run analysis
-                result = gi_analyzer.analyze_document(doc_analysis.file_path, task_id=doc_analysis.task_id)
-                if result.get('success'):
-                    doc_analysis.ai_score = result['readiness_score']
-                    doc_analysis.ai_status = result['status']
-                    doc_analysis.set_detected_features(result['detected_features'])
-                    doc_analysis.set_missing_requirements(result['missing_requirements'])
-                    doc_analysis.analysis_method = result['analysis_method']
-                    doc_analysis.text_length = result['text_length']
-                    doc_analysis.shap_analysis = result.get('shap_analysis', "")
-                else:
-                    return jsonify({"error": f"Re-analysis failed: {result.get('error')}"}), 500
+            if payload:
+                return api_error(
+                    "Manual analysis overrides are not allowed. Send an empty body to re-run analysis.",
+                    400,
+                )
+
+            from machinelearning.ai_engine import gi_analyzer
+
+            result = gi_analyzer.analyze_document(doc_analysis.file_path, task_id=doc_analysis.task_id)
+            if result.get("success"):
+                doc_analysis.ai_score = result["readiness_score"]
+                doc_analysis.ai_status = result["status"]
+                doc_analysis.set_detected_features(result["detected_features"])
+                doc_analysis.set_missing_requirements(result["missing_requirements"])
+                doc_analysis.analysis_method = result["analysis_method"]
+                doc_analysis.text_length = result["text_length"]
+                doc_analysis.shap_analysis = result.get("shap_analysis", "")
             else:
-                # Update specific fields from payload
-                if 'ai_score' in payload:
-                    doc_analysis.ai_score = payload['ai_score']
-                if 'ai_status' in payload:
-                    doc_analysis.ai_status = payload['ai_status']
-                if 'detected_features' in payload:
-                    doc_analysis.set_detected_features(payload['detected_features'])
-                if 'missing_requirements' in payload:
-                    doc_analysis.set_missing_requirements(payload['missing_requirements'])
+                return jsonify({"error": "Re-analysis failed."}), 500
 
             doc_analysis.analysis_timestamp = datetime.utcnow()
             db.session.commit()
@@ -368,7 +395,7 @@ def register_ipophl_routes(app):
             })
 
         except Exception as e:
-            return jsonify({"error": f"Failed to update analysis: {str(e)}"}), 500
+            return jsonify({"error": safe_error_message(e, public="Failed to update analysis.")}), 500
 
     @app.route("/api/ipo-documents", methods=["GET"])
     def api_list_ipo_documents():
@@ -377,10 +404,9 @@ def register_ipophl_routes(app):
             return jsonify({"error": "Unauthorized"}), 401
 
         try:
-            # Get query parameters
-            phase = request.args.get('phase')
-            task_id = request.args.get('task_id')
-            limit = request.args.get('limit', 50, type=int)
+            phase = request.args.get("phase")
+            task_id = request.args.get("task_id")
+            limit = min(max(request.args.get("limit", 50, type=int) or 50, 1), 200)
 
             query = DocumentAnalysis.query
             if phase:
@@ -407,4 +433,4 @@ def register_ipophl_routes(app):
             return jsonify({"items": items, "count": len(items)})
 
         except Exception as e:
-            return jsonify({"error": f"Failed to list documents: {str(e)}"}), 500
+            return jsonify({"error": safe_error_message(e, public="Failed to list documents.")}), 500

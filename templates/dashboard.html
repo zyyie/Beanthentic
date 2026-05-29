@@ -5,12 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Beanthentic Coffee - Dashboard</title>
   
-  <!-- Google Fonts for distinctive typography -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
-  
-  <!-- CSS Files -->
+  <!-- CSS Files (Inter loaded via base.css) -->
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/layout.css">
   <link rel="stylesheet" href="css/dashboard.css">
@@ -153,74 +148,87 @@
       <div id="txnReceiptModal" class="txn-receipt-modal" hidden aria-hidden="true" inert onclick="if(event.target === this || event.target.classList.contains('txn-receipt-backdrop')) { window.dashboardApp.closeReceipt(); }">
         <div class="txn-receipt-backdrop"></div>
         
-        <div class="txn-receipt-card" onclick="event.stopPropagation()">
+        <div class="txn-receipt-card txn-receipt-card--app-style" onclick="event.stopPropagation()">
           <button type="button" class="txn-receipt-close" id="txnReceiptClose" aria-label="Close receipt" onclick="window.dashboardApp.closeReceipt(); event.stopPropagation();">
             <i class="fa-solid fa-xmark"></i>
           </button>
-          
-          <div class="receipt-content">
-            <div class="receipt-header">
-              <img src="assets/images/logo.png" alt="Beanthentic Logo" class="receipt-logo" style="width: 80px; height: auto; margin-bottom: 10px;">
-              <p style="font-size: 1rem; font-weight: 600; color: #64748b; margin: 0;">Official transaction receipt</p>
+
+          <div id="txn-receipt-print-area" class="txn-rcpt-print-area">
+            <div class="txn-rcpt-brand">
+              <img class="txn-rcpt-logo" src="assets/images/logo.png" alt="Beanthentic" width="128" height="128" />
+              <h2 class="txn-rcpt-brand-title">Beanthentic Coffee</h2>
+              <p class="txn-rcpt-brand-sub">Official Transaction Receipt</p>
             </div>
-            
-            <div class="receipt-divider"></div>
-            
-            <div class="receipt-body">
-              <div class="receipt-row">
-                <span class="receipt-label">Transaction ID</span>
-                <span class="receipt-value" id="receiptId">#TXN-0001</span>
+            <hr class="txn-rcpt-rule txn-rcpt-rule--solid" aria-hidden="true" />
+
+            <div class="txn-rcpt-rows" aria-label="Transaction summary">
+              <div class="txn-rcpt-row">
+                <span class="txn-rcpt-label">Ref. No.</span>
+                <span id="receiptRef" class="txn-rcpt-value">-</span>
               </div>
-              <div class="receipt-row">
-                <span class="receipt-label">Date</span>
-                <span class="receipt-value" id="receiptDate">May 10, 2026</span>
+              <div class="txn-rcpt-row">
+                <span class="txn-rcpt-label">Date</span>
+                <span id="receiptDate" class="txn-rcpt-value">-</span>
               </div>
-              <div class="receipt-row">
-                <span class="receipt-label">Time</span>
-                <span class="receipt-value" id="receiptTime">10:30 AM</span>
+              <div class="txn-rcpt-row">
+                <span class="txn-rcpt-label">Time</span>
+                <span id="receiptTime" class="txn-rcpt-value">-</span>
               </div>
-              
-              <div class="receipt-divider dashed"></div>
-              
-              <div class="receipt-section">
-                <h4>FARMER DETAILS</h4>
-                <div class="receipt-row">
-                  <span class="receipt-label">Name</span>
-                  <span class="receipt-value" id="receiptFarmerName">Juan Dela Cruz</span>
-                </div>
-                <div class="receipt-row">
-                  <span class="receipt-label">Farmer No.</span>
-                  <span class="receipt-value" id="receiptFarmerNo">#12</span>
-                </div>
-              </div>
-              
-              <div class="receipt-section">
-                <h4>BUYER DETAILS</h4>
-                <div class="receipt-row">
-                  <span class="receipt-label">Buyer Name</span>
-                  <span class="receipt-value" id="receiptBuyerName">Lipa Coffee Trading</span>
-                </div>
-              </div>
-              
-              <div class="receipt-divider dashed"></div>
-              
-              <div class="receipt-section">
-                <h4>PRODUCT INFO</h4>
-                <div class="receipt-row">
-                  <span class="receipt-label" id="receiptProductLabel">Liberica Coffee</span>
-                  <span class="receipt-value" id="receiptWeight">25.50 kg</span>
-                </div>
-                <div class="receipt-row" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #f1f5f9;">
-                  <span class="receipt-label" style="font-weight: 700; color: #1e293b;">Total Amount</span>
-                  <span class="receipt-value" id="receiptAmount" style="font-weight: 800; color: #16a34a; font-size: 1.1rem;">₱0.00</span>
+            </div>
+
+            <hr class="txn-rcpt-rule txn-rcpt-rule--dash" aria-hidden="true" />
+
+            <div class="txn-rcpt-section">
+              <p class="txn-rcpt-section-title">Buyer Details</p>
+              <div class="txn-rcpt-rows">
+                <div class="txn-rcpt-row">
+                  <span class="txn-rcpt-label">Buyer Name</span>
+                  <span id="receiptBuyerName" class="txn-rcpt-value">-</span>
                 </div>
               </div>
             </div>
-            
-            <div class="receipt-footer">
+
+            <hr class="txn-rcpt-rule txn-rcpt-rule--dash" aria-hidden="true" />
+
+            <div class="txn-rcpt-section">
+              <p class="txn-rcpt-section-title">Product Info</p>
+              <div class="txn-rcpt-product-line">
+                <span id="receiptProduct" class="txn-rcpt-product-name">-</span>
+                <span id="receiptQty" class="txn-rcpt-product-qty">-</span>
+              </div>
             </div>
+
+            <hr class="txn-rcpt-rule txn-rcpt-rule--dash" aria-hidden="true" />
+
+            <div class="txn-rcpt-section">
+              <p class="txn-rcpt-section-title">Payment Details</p>
+              <div class="txn-rcpt-rows">
+                <div class="txn-rcpt-row">
+                  <span class="txn-rcpt-label">Amount</span>
+                  <span id="receiptAmount" class="txn-rcpt-value">0.00</span>
+                </div>
+                <div class="txn-rcpt-row">
+                  <span class="txn-rcpt-label">Payment</span>
+                  <span id="receiptPayment" class="txn-rcpt-value">Cash</span>
+                </div>
+                <div class="txn-rcpt-row">
+                  <span class="txn-rcpt-label">Payment Amt</span>
+                  <span id="receiptPaymentAmount" class="txn-rcpt-value">0.00</span>
+                </div>
+                <div class="txn-rcpt-row">
+                  <span class="txn-rcpt-label">Total</span>
+                  <span id="receiptTotal" class="txn-rcpt-value">0.00</span>
+                </div>
+                <div class="txn-rcpt-row">
+                  <span class="txn-rcpt-label">Change</span>
+                  <span id="receiptChange" class="txn-rcpt-value">0.00</span>
+                </div>
+              </div>
+            </div>
+
+            <p class="txn-rcpt-thanks">Thank you for using Beanthentic!</p>
           </div>
-          
+
           <div class="receipt-actions">
             <button type="button" class="btn-receipt-print" id="receiptPrintBtn">
               <i class="fa-solid fa-print"></i> Print Receipt
@@ -321,22 +329,28 @@
             <!-- Charts Section (Now Calendar & Todo) -->
             <section class="charts-section">
               <div class="charts-grid">
-                <div class="chart-card widget-card">
-                  <div class="widget-header">
+                <div class="chart-card widget-card calendar-card">
+                  <div class="widget-header calendar-widget-header">
                     <h3>Calendar</h3>
                     <div class="calendar-controls">
-                      <span id="calendarMonth">May 2026</span>
-                      <div class="calendar-nav">
-                        <button id="prevMonth"><i class="fa-solid fa-chevron-left"></i></button>
-                        <button id="nextMonth"><i class="fa-solid fa-chevron-right"></i></button>
+                      <span id="calendarMonth" class="calendar-month-pill">May 2026</span>
+                      <div class="calendar-nav" role="group" aria-label="Change month">
+                        <button type="button" id="prevMonth" aria-label="Previous month"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+                        <button type="button" id="nextMonth" aria-label="Next month"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
                       </div>
                     </div>
                   </div>
                   <div class="calendar-widget" id="calendarWidget">
-                    <div class="calendar-weekdays">
-                      <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                    <div class="calendar-weekdays" aria-hidden="true">
+                      <span class="calendar-weekday">Sun</span>
+                      <span class="calendar-weekday">Mon</span>
+                      <span class="calendar-weekday">Tue</span>
+                      <span class="calendar-weekday">Wed</span>
+                      <span class="calendar-weekday">Thu</span>
+                      <span class="calendar-weekday">Fri</span>
+                      <span class="calendar-weekday">Sat</span>
                     </div>
-                    <div class="calendar-days" id="calendarDays">
+                    <div class="calendar-days" id="calendarDays" role="grid" aria-label="Calendar days">
                       <!-- Populated by dashboard.js -->
                     </div>
                   </div>
@@ -1770,10 +1784,22 @@
               <!-- Header Card -->
               <div class="profile-header-card">
                 <div class="profile-avatar-section">
-                  <div class="profile-avatar">
-                    <i class="fa-solid fa-user"></i>
-                    <button class="avatar-edit-btn" title="Change photo">
-                      <i class="fa-solid fa-camera"></i>
+                  <div class="profile-avatar" id="accountProfileAvatar">
+                    <img
+                      id="accountProfileAvatarImg"
+                      class="profile-avatar-img"
+                      alt=""
+                      hidden
+                    />
+                    <i class="fa-solid fa-user profile-avatar-placeholder" id="accountProfileAvatarPlaceholder" aria-hidden="true"></i>
+                    <button
+                      type="button"
+                      class="avatar-edit-btn"
+                      id="accountAvatarEditBtn"
+                      title="Change photo"
+                      aria-label="Change profile photo"
+                    >
+                      <i class="fa-solid fa-camera" aria-hidden="true"></i>
                     </button>
                   </div>
                 </div>
@@ -1784,84 +1810,193 @@
               </div>
 
               <!-- Personal Information Card -->
-              <div class="profile-info-card">
-                <div class="card-header">
-                  <h3>Personal Information</h3>
-                  <button type="button" class="btn-edit" id="openEditProfileModalBtn">
+              <div class="profile-info-card personal-info-card">
+                <div class="personal-info-card__header">
+                  <div class="personal-info-card__header-icon" aria-hidden="true">
+                    <i class="fa-solid fa-id-card"></i>
+                  </div>
+                  <div class="personal-info-card__header-text">
+                    <h3>Personal Information</h3>
+                    <p>Your name and login phone number</p>
+                  </div>
+                  <button type="button" class="personal-info-card__edit-btn" id="openEditProfileModalBtn">
+                    <i class="fa-solid fa-pen" aria-hidden="true"></i>
                     <span>Edit</span>
-                    <i class="fa-solid fa-pen"></i>
                   </button>
                 </div>
-                <div class="card-grid">
-                  <div class="info-group">
-                    <label>First Name</label>
-                    <p id="accountFirstName">Loading...</p>
-                  </div>
-                  <div class="info-group">
-                    <label>Last Name</label>
-                    <p id="accountLastName">Loading...</p>
-                  </div>
-                  <div class="info-group">
-                    <label>Phone Number</label>
-                    <p id="accountPhone">Loading...</p>
+
+                <div class="personal-info-card__body">
+                  <p class="personal-info-card__section-label">Profile details</p>
+                  <div class="personal-info-card__fields">
+                    <div class="personal-info-field">
+                      <span class="personal-info-field__icon personal-info-field__icon--name" aria-hidden="true">
+                        <i class="fa-solid fa-user"></i>
+                      </span>
+                      <div class="personal-info-field__content">
+                        <span class="personal-info-field__label">First name</span>
+                        <span class="personal-info-field__value" id="accountFirstName">Loading...</span>
+                      </div>
+                    </div>
+                    <div class="personal-info-field">
+                      <span class="personal-info-field__icon personal-info-field__icon--name" aria-hidden="true">
+                        <i class="fa-solid fa-user-tag"></i>
+                      </span>
+                      <div class="personal-info-field__content">
+                        <span class="personal-info-field__label">Last name</span>
+                        <span class="personal-info-field__value" id="accountLastName">Loading...</span>
+                      </div>
+                    </div>
+                    <div class="personal-info-field">
+                      <span class="personal-info-field__icon personal-info-field__icon--phone" aria-hidden="true">
+                        <i class="fa-solid fa-mobile-screen"></i>
+                      </span>
+                      <div class="personal-info-field__content">
+                        <span class="personal-info-field__label">Phone number</span>
+                        <span class="personal-info-field__value" id="accountPhone">Loading...</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <!-- Security Card -->
-              <div class="profile-info-card">
-                <div class="security-card-content">
-                  <h3>Security</h3>
-                  <div class="card-actions-vertical">
-                    <button type="button" class="btn-secondary" id="manageSettingsBtn">
-                      <i class="fa-solid fa-sliders"></i>
-                      <span>Advanced Settings</span>
-                    </button>
-                    <button type="button" class="btn-logout-alt" id="logoutBtn">
-                      <i class="fa-solid fa-right-from-bracket"></i>
-                      <span>Log out</span>
-                    </button>
+              <div class="profile-info-card security-card">
+                <div class="security-card__header">
+                  <div class="security-card__header-icon" aria-hidden="true">
+                    <i class="fa-solid fa-shield-halved"></i>
+                  </div>
+                  <div class="security-card__header-text">
+                    <h3>Security</h3>
+                    <p>Session, settings, and account access</p>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
 
-          <!-- Edit Profile Modal -->
-          <div id="editProfileModal" class="profile-modal" hidden aria-hidden="true">
-            <div class="profile-modal-backdrop"></div>
-            <div class="profile-modal-card" role="dialog" aria-modal="true">
-              <div class="profile-modal-header">
-                <h2>Edit Personal Information</h2>
-                <button type="button" class="profile-modal-close" id="closeEditProfileModalBtn">
-                  <i class="fa-solid fa-xmark"></i>
-                </button>
+                <div class="security-card__grid">
+                  <div class="security-card__col security-card__col--session">
+                    <p class="security-card__col-label">Session &amp; settings</p>
+                    <div class="security-card__actions">
+                      <button type="button" class="security-action" id="manageSettingsBtn">
+                        <span class="security-action__icon security-action__icon--settings">
+                          <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                        </span>
+                        <span class="security-action__body">
+                          <span class="security-action__title">Advanced settings</span>
+                          <span class="security-action__desc">Password, notifications, and preferences</span>
+                        </span>
+                        <i class="fa-solid fa-chevron-right security-action__chevron" aria-hidden="true"></i>
+                      </button>
+
+                      <button type="button" class="security-action" id="logoutBtn">
+                        <span class="security-action__icon security-action__icon--logout">
+                          <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+                        </span>
+                        <span class="security-action__body">
+                          <span class="security-action__title">Log out</span>
+                          <span class="security-action__desc">End this session on this device</span>
+                        </span>
+                        <i class="fa-solid fa-chevron-right security-action__chevron" aria-hidden="true"></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="security-card__col security-card__col--danger">
+                    <div class="security-card__danger">
+                      <p class="security-card__danger-label">Danger zone</p>
+                      <button type="button" class="security-action security-action--danger" id="deactivateAccountBtn">
+                        <span class="security-action__icon security-action__icon--danger">
+                          <i class="fa-solid fa-user-slash" aria-hidden="true"></i>
+                        </span>
+                        <span class="security-action__body">
+                          <span class="security-action__title">Deactivate account</span>
+                          <span class="security-action__desc">You will not be able to sign in until restored</span>
+                        </span>
+                        <i class="fa-solid fa-chevron-right security-action__chevron" aria-hidden="true"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <form id="accountQuickProfileForm" class="profile-modal-form">
-                <div class="modal-form-row">
-                  <div class="modal-form-group">
-                    <label for="accountEditFirstName">First Name</label>
-                    <input type="text" id="accountEditFirstName" value="Natashia" required />
-                  </div>
-                  <div class="modal-form-group">
-                    <label for="accountEditLastName">Last Name</label>
-                    <input type="text" id="accountEditLastName" value="Khaleira" required />
-                  </div>
-                </div>
-                <div class="modal-form-group">
-                  <label for="accountEditPhone">Phone Number</label>
-                  <input type="text" id="accountEditPhone" value="(+62) 821 2554-5846" />
-                </div>
-                <div class="modal-form-footer">
-                  <button type="submit" class="btn-save-changes">Save Changes</button>
-                </div>
-              </form>
             </div>
           </div>
         </div>
       </div>
     </div>
   </main>
+
+  <!-- Profile photo modal (outside .module so it is not clipped) -->
+  <div id="profilePhotoModal" class="profile-modal profile-photo-modal" hidden aria-hidden="true">
+    <div class="profile-modal-backdrop" id="profilePhotoModalBackdrop"></div>
+    <div class="profile-modal-card profile-photo-modal-card" role="dialog" aria-modal="true" aria-labelledby="profilePhotoModalTitle">
+      <div class="profile-modal-header">
+        <h2 id="profilePhotoModalTitle">Profile photo</h2>
+        <button type="button" class="profile-modal-close" id="closeProfilePhotoModalBtn" aria-label="Close">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <p class="profile-photo-modal-hint">Upload an image or use your camera. JPEG, PNG, or WebP up to 5&nbsp;MB.</p>
+      <div class="profile-photo-actions">
+        <button type="button" class="profile-photo-action-btn" id="profilePhotoUploadBtn">
+          <i class="fa-solid fa-upload" aria-hidden="true"></i>
+          <span>Upload photo</span>
+        </button>
+        <button type="button" class="profile-photo-action-btn" id="profilePhotoTakeBtn">
+          <i class="fa-solid fa-camera" aria-hidden="true"></i>
+          <span>Take a picture</span>
+        </button>
+      </div>
+      <input
+        type="file"
+        id="profilePhotoFileInput"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        hidden
+      />
+      <div id="profilePhotoCameraPanel" class="profile-photo-camera-panel" hidden>
+        <p id="profilePhotoCameraHint" class="profile-photo-camera-hint" hidden></p>
+        <label class="profile-photo-camera-select-label" for="profilePhotoCameraSelect" id="profilePhotoCameraSelectLabel" hidden>Camera</label>
+        <select id="profilePhotoCameraSelect" class="profile-photo-camera-select" hidden></select>
+        <video id="profilePhotoVideo" class="profile-photo-video" autoplay playsinline muted></video>
+        <div class="profile-photo-camera-actions">
+          <button type="button" class="btn-save-changes" id="profilePhotoCaptureBtn">Capture</button>
+          <button type="button" class="btn-edit-secondary" id="profilePhotoCancelCameraBtn">Cancel camera</button>
+        </div>
+      </div>
+      <canvas id="profilePhotoCanvas" hidden aria-hidden="true"></canvas>
+    </div>
+  </div>
+
+  <!-- Edit personal information modal -->
+  <div id="editProfileModal" class="profile-modal" hidden aria-hidden="true">
+    <div class="profile-modal-backdrop" id="editProfileModalBackdrop"></div>
+    <div class="profile-modal-card" role="dialog" aria-modal="true" aria-labelledby="editProfileModalTitle">
+      <div class="profile-modal-header">
+        <h2 id="editProfileModalTitle">Edit Personal Information</h2>
+        <button type="button" class="profile-modal-close" id="closeEditProfileModalBtn" aria-label="Close">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <form id="accountQuickProfileForm" class="profile-modal-form">
+        <div class="modal-form-row">
+          <div class="modal-form-group">
+            <label for="accountEditFirstName">First Name</label>
+            <input type="text" id="accountEditFirstName" name="first_name" autocomplete="given-name" required />
+          </div>
+          <div class="modal-form-group">
+            <label for="accountEditLastName">Last Name</label>
+            <input type="text" id="accountEditLastName" name="last_name" autocomplete="family-name" required />
+          </div>
+        </div>
+        <div class="modal-form-group">
+          <label for="accountEditPhone">Phone Number</label>
+          <input type="tel" id="accountEditPhone" name="phone" inputmode="numeric" autocomplete="tel" placeholder="10-digit mobile number" />
+          <p class="modal-form-hint">Used to sign in. Changing it updates your login number.</p>
+        </div>
+        <div class="modal-form-footer modal-form-footer--split">
+          <button type="button" class="btn-edit-secondary" id="cancelEditProfileModalBtn">Cancel</button>
+          <button type="submit" class="btn-save-changes" id="saveEditProfileModalBtn">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- Remove farmer row: in-app confirm (replaces browser dialog) -->
   <div
@@ -1951,6 +2086,42 @@
        </div>
      </div>
    </div>
+
+   <!-- Deactivate account confirmation -->
+  <div id="deactivateAccountConfirmModal" class="confirm-dialog" hidden aria-hidden="true">
+    <div class="confirm-dialog__backdrop" tabindex="-1"></div>
+    <div
+      class="confirm-dialog__card"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="deactivateAccountConfirmTitle"
+      aria-describedby="deactivateAccountConfirmMessage"
+    >
+      <div class="confirm-dialog__icon-wrap confirm-dialog__icon-wrap--danger" aria-hidden="true">
+        <i class="fa-solid fa-user-slash"></i>
+      </div>
+      <h2 id="deactivateAccountConfirmTitle" class="confirm-dialog__title">Deactivate your account?</h2>
+      <p id="deactivateAccountConfirmMessage" class="confirm-dialog__message">
+        You will be signed out immediately and will not be able to sign in again until another administrator restores your account.
+      </p>
+      <label class="confirm-dialog__password-label" for="deactivateAccountPassword">Confirm with your password</label>
+      <input
+        type="password"
+        id="deactivateAccountPassword"
+        class="confirm-dialog__password-input"
+        autocomplete="current-password"
+        placeholder="Your password"
+      />
+      <div class="confirm-dialog__actions">
+        <button type="button" class="confirm-dialog__btn confirm-dialog__btn--secondary" id="deactivateAccountConfirmCancel">
+          Cancel
+        </button>
+        <button type="button" class="confirm-dialog__btn confirm-dialog__btn--danger" id="deactivateAccountConfirmOk">
+          Deactivate account
+        </button>
+      </div>
+    </div>
+  </div>
 
    <!-- Log out confirmation (replaces browser confirm) -->
   <div id="logoutConfirmModal" class="confirm-dialog" hidden aria-hidden="true">
@@ -2112,6 +2283,7 @@
   </div>
 
   <script>
+    window.__BEANTHENTIC_API_BASE__ = {{ request.script_root|tojson }};
     window.__BEANTHENTIC_USER__ = { phone: "{{ user_phone }}", full_name: "{{ user_full_name }}" };
     window.__GOOGLE_MAPS_API_KEY__ = "{{ google_maps_api_key }}";
   </script>
@@ -2130,6 +2302,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="js/main.js"></script>
   <script src="js/navigation.js"></script>
+  <script src="js/beanthentic_datetime.js?v=20260524-msgshort"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/ipophl-analyzer.js"></script>
   

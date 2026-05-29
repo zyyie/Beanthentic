@@ -7,6 +7,14 @@
   flex-direction: column;
 }
 
+/* Override base.css main constraints on auth pages */
+.login-page main.login-main {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 1.25rem 1.5rem 3.25rem;
+}
+
 .login-main {
   flex: 1;
   width: 100%;
@@ -14,6 +22,7 @@
   align-items: center;
   justify-content: center;
   padding: 1.25rem 1.5rem 3.25rem;
+  overflow-y: auto;
 }
 
 .login-wrap {
@@ -22,7 +31,7 @@
   width: 100%;
 }
 
-.card {
+.login-page .card {
   width: 820px;
   max-width: 100%;
   background: #ffffff;
@@ -30,22 +39,30 @@
   border-radius: 48px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.15);
   overflow: hidden;
+  max-height: calc(100vh - 2.5rem);
 }
 
 /* Split card layout: left illustration/logo, right form */
 .signup-card-split {
   display: flex;
-  min-height: 380px;
+  align-items: stretch;
+  min-height: 0;
+  max-height: calc(100vh - 2.5rem);
+  border-radius: 48px;
+  overflow: hidden;
 }
 
 .signup-card-left {
   flex: 1;
   position: relative;
-  background: #f0f0f0;
+  background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem;
+  pointer-events: none;
+  user-select: none;
+  border-radius: 48px 0 0 48px;
 }
 
 .signup-card-logo {
@@ -58,8 +75,14 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  min-width: 0;
   background: #ffffff;
   border-left: 1px solid rgba(0, 0, 0, 0.06);
+  overflow-y: auto;
+  position: relative;
+  z-index: 1;
+  border-radius: 0 48px 48px 0;
 }
 
 .card-header {
@@ -82,9 +105,12 @@
 }
 
 .form {
+  flex: 0 0 auto;
   padding: 1.2rem 2.5rem 2rem;
   display: grid;
   gap: 0.9rem;
+  position: relative;
+  z-index: 2;
 }
 
 .field {
@@ -207,7 +233,7 @@
   border-radius: 3px;
 }
 
-.btn {
+.form .btn {
   margin-top: 0.6rem;
   width: 100%;
   padding: 0.85rem 1rem;
@@ -220,16 +246,27 @@
   background: #1a451a;
   color: #ffffff;
   cursor: pointer;
+  position: relative;
+  z-index: 5;
+  pointer-events: auto;
+  flex-shrink: 0;
   transition: transform 0.15s ease-out, filter 0.15s ease-out, box-shadow 0.15s ease-out;
 }
 
-.btn:hover {
+.form .btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.form .btn:hover:not(:disabled) {
   transform: translateY(-1px);
   filter: brightness(1.05);
   box-shadow: 0 8px 18px rgba(26, 69, 26, 0.25);
 }
 
-.btn:active {
+.form .btn:active:not(:disabled) {
   transform: translateY(0);
   filter: brightness(1);
   box-shadow: 0 4px 12px rgba(26, 69, 26, 0.2);
@@ -252,6 +289,18 @@
   font-size: 0.85rem;
 }
 
+.field .fineprint {
+  margin-top: 0.25rem;
+  text-align: left;
+}
+
+.field-hint {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: #666666;
+  line-height: 1.35;
+}
+
 /* logo on login/signup */
 .logo-img {
   height: 70px;
@@ -264,6 +313,20 @@
 
   .signup-card-split {
     flex-direction: column;
+    max-height: none;
+  }
+
+  .login-page .card {
+    max-height: none;
+  }
+
+  .signup-card-left {
+    border-radius: 48px 48px 0 0;
+  }
+
+  .signup-card-right {
+    overflow-y: visible;
+    border-radius: 0 0 48px 48px;
   }
 
   .card-header {

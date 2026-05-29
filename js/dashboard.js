@@ -1,6 +1,43 @@
 // Dashboard functionality for coffee database
 const NOTIFICATIONS_READ_STORAGE_KEY = 'beanthentic_dashboard_notification_read';
 
+/** Prefix for API paths when the app is mounted under a subpath (e.g. /Beanthentic). */
+function beanthenticApiUrl(path) {
+  const base = (typeof window.__BEANTHENTIC_API_BASE__ === 'string' ? window.__BEANTHENTIC_API_BASE__ : '').replace(/\/$/, '');
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return base ? `${base}${normalized}` : normalized;
+}
+
+/** Parse fetch responses; avoid opaque JSON errors when the server returns HTML. */
+async function beanthenticParseJsonResponse(res) {
+  const text = await res.text();
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+  const trimmed = text.trim();
+  if (!contentType.includes('application/json')) {
+    if (trimmed.toLowerCase().startsWith('<!doctype') || trimmed.startsWith('<html')) {
+      if (res.status === 404) {
+        throw new Error(
+          'Profile photo endpoint was not found. Restart the server (python web.py) and open the dashboard at the same address (e.g. http://127.0.0.1:5000/dashboard).'
+        );
+      }
+      if (res.status === 405) {
+        throw new Error(
+          'Photo upload was blocked (HTTP 405). Stop the server, run python web.py again, then hard-refresh the dashboard (Ctrl+F5).'
+        );
+      }
+      throw new Error(
+        `Server returned a web page instead of JSON (HTTP ${res.status}). Use http://127.0.0.1:5000/dashboard if you are running python web.py.`
+      );
+    }
+    throw new Error(trimmed.slice(0, 240) || `Request failed (HTTP ${res.status}).`);
+  }
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error('Server returned invalid JSON.');
+  }
+}
+
 class DashboardApp {
   constructor() {
     this.data = [];
@@ -35,6 +72,7 @@ class DashboardApp {
     this.pendingDeleteRowIndex = null;
     this.currentFarmerNo = null;
     this.transactionsRows = [];
+    this.transactionsDataSource = '';
     this.transactionsSearchTerm = '';
     this.transactionsFarmerFilterId = null;
     this.transactionsVarietyFilter = '';
@@ -363,11 +401,367 @@ class DashboardApp {
       root.setAttribute('hidden', '');
       root.setAttribute('aria-hidden', 'true');
     }
-    const del = document.getElementById('deleteFarmerConfirmModal');
-    const d2 = document.getElementById('disable2faConfirmModal');
-    if (del?.hasAttribute('hidden') && d2?.hasAttribute('hidden')) {
+    this.syncConfirmDialogBodyClass();
+  }
+
+  syncConfirmDialogBodyClass() {
+    const ids = ['deleteFarmerConfirmModal', 'disable2faConfirmModal', 'logoutConfirmModal', 'deactivateAccountConfirmModal'];
+    const anyOpen = ids.some((id) => {
+      const el = document.getElementById(id);
+      return el && !el.hasAttribute('hidden');
+    });
+    if (!anyOpen) {
       document.body.classList.remove('confirm-dialog-active');
     }
+  }
+
+  applyAccountProfilePhoto(photoUrl, displayName) {
+    const avatar = document.getElementById('accountProfileAvatar');
+    const img = document.getElementById('accountProfileAvatarImg');
+    const placeholder = document.getElementById('accountProfileAvatarPlaceholder');
+    if (!avatar || !img) return;
+
+    if (photoUrl) {
+      const resolved = beanthenticApiUrl(photoUrl.split('?')[0]);
+      const query = photoUrl.includes('?') ? photoUrl.slice(photoUrl.indexOf('?')) : '';
+      const cacheBust = query ? `${resolved}${query}&t=${Date.now()}` : `${resolved}?t=${Date.now()}`;
+      img.src = cacheBust;
+      img.alt = displayName ? `${displayName} profile photo` : 'Profile photo';
+      img.removeAttribute('hidden');
+      avatar.classList.add('has-photo');
+      if (placeholder) placeholder.style.display = 'none';
+    } else {
+      img.removeAttribute('src');
+      img.setAttribute('hidden', '');
+      avatar.classList.remove('has-photo');
+      if (placeholder) placeholder.style.display = '';
+    }
+  }
+
+  openProfilePhotoModal() {
+    const root = document.getElementById('profilePhotoModal');
+    if (!root) return;
+    root.removeAttribute('hidden');
+    root.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('confirm-dialog-active');
+    document.getElementById('profilePhotoUploadBtn')?.focus();
+  }
+
+  closeProfilePhotoModal() {
+    this.stopProfilePhotoCamera();
+    const root = document.getElementById('profilePhotoModal');
+    if (root) {
+      root.setAttribute('hidden', '');
+      root.setAttribute('aria-hidden', 'true');
+    }
+    const fileInput = document.getElementById('profilePhotoFileInput');
+    if (fileInput) fileInput.value = '';
+    const panel = document.getElementById('profilePhotoCameraPanel');
+    if (panel) panel.setAttribute('hidden', '');
+    document.getElementById('profilePhotoCameraHint')?.setAttribute('hidden', '');
+    const cameraSelect = document.getElementById('profilePhotoCameraSelect');
+    if (cameraSelect) {
+      cameraSelect.innerHTML = '';
+      cameraSelect.setAttribute('hidden', '');
+    }
+    document.getElementById('profilePhotoCameraSelectLabel')?.setAttribute('hidden', '');
+    const logoutEl = document.getElementById('logoutConfirmModal');
+    const deactivateEl = document.getElementById('deactivateAccountConfirmModal');
+    const del = document.getElementById('deleteFarmerConfirmModal');
+    const d2 = document.getElementById('disable2faConfirmModal');
+    if (
+      logoutEl?.hasAttribute('hidden') &&
+      deactivateEl?.hasAttribute('hidden') &&
+      del?.hasAttribute('hidden') &&
+      d2?.hasAttribute('hidden')
+    ) {
+      document.body.classList.remove('confirm-dialog-active');
+    }
+  }
+
+  stopProfilePhotoCamera() {
+    if (this._profilePhotoStream) {
+      this._profilePhotoStream.getTracks().forEach((track) => track.stop());
+      this._profilePhotoStream = null;
+    }
+    const video = document.getElementById('profilePhotoVideo');
+    if (video) video.srcObject = null;
+  }
+
+  /** Labels that usually mean a virtual / idle webcam (e.g. DroidCam waiting screen). */
+  isLikelyVirtualOrIdleCamera(label) {
+    const text = (label || '').toLowerCase();
+    return /droidcam|obs virtual|virtual camera|manycam|snap camera|epoccam|iriun|nvidia broadcast|xsplit/.test(text);
+  }
+
+  pickPreferredProfilePhotoDevice(devices) {
+    if (!devices?.length) return null;
+    const withLabels = devices.filter((d) => (d.label || '').trim());
+    const physical = (withLabels.length ? withLabels : devices).filter(
+      (d) => !this.isLikelyVirtualOrIdleCamera(d.label)
+    );
+    return physical[0] || devices[0];
+  }
+
+  async listProfilePhotoCameras() {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter((d) => d.kind === 'videoinput');
+  }
+
+  async populateProfilePhotoCameraSelect(devices, selectedDeviceId) {
+    const select = document.getElementById('profilePhotoCameraSelect');
+    const label = document.getElementById('profilePhotoCameraSelectLabel');
+    if (!select) return;
+
+    select.innerHTML = '';
+    devices.forEach((device, index) => {
+      const opt = document.createElement('option');
+      opt.value = device.deviceId;
+      opt.textContent = (device.label || '').trim() || `Camera ${index + 1}`;
+      select.appendChild(opt);
+    });
+
+    const preferred = selectedDeviceId || this.pickPreferredProfilePhotoDevice(devices)?.deviceId;
+    if (preferred) select.value = preferred;
+
+    const showPicker = devices.length > 1;
+    if (showPicker) {
+      select.removeAttribute('hidden');
+      label?.removeAttribute('hidden');
+    } else {
+      select.setAttribute('hidden', '');
+      label?.setAttribute('hidden', '');
+    }
+  }
+
+  updateProfilePhotoCameraHint(activeLabel) {
+    const hint = document.getElementById('profilePhotoCameraHint');
+    if (!hint) return;
+    if (this.isLikelyVirtualOrIdleCamera(activeLabel)) {
+      hint.textContent =
+        'This camera is DroidCam (or similar) and is not streaming yet. Open the DroidCam app on your phone and connect, or pick your built-in webcam from the list above.';
+      hint.removeAttribute('hidden');
+    } else {
+      hint.setAttribute('hidden', '');
+      hint.textContent = '';
+    }
+  }
+
+  async startProfilePhotoCamera(deviceId) {
+    const panel = document.getElementById('profilePhotoCameraPanel');
+    const video = document.getElementById('profilePhotoVideo');
+    const select = document.getElementById('profilePhotoCameraSelect');
+    if (!panel || !video) return;
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      this.showNotification('Camera is not supported in this browser.', 'error');
+      return;
+    }
+
+    try {
+      this.stopProfilePhotoCamera();
+      panel.removeAttribute('hidden');
+
+      let cameras = await this.listProfilePhotoCameras();
+      const needsPermission = cameras.every((d) => !(d.label || '').trim());
+      if (needsPermission) {
+        const bootstrap = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        bootstrap.getTracks().forEach((track) => track.stop());
+        cameras = await this.listProfilePhotoCameras();
+      }
+
+      const chosenId =
+        deviceId ||
+        select?.value ||
+        this.pickPreferredProfilePhotoDevice(cameras)?.deviceId ||
+        cameras[0]?.deviceId;
+
+      await this.populateProfilePhotoCameraSelect(cameras, chosenId);
+
+      const videoConstraints = chosenId
+        ? { deviceId: { exact: chosenId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: videoConstraints,
+        audio: false,
+      });
+      this._profilePhotoStream = stream;
+      video.srcObject = stream;
+      await video.play();
+
+      const active = cameras.find((d) => d.deviceId === chosenId);
+      this.updateProfilePhotoCameraHint(active?.label || stream.getVideoTracks()[0]?.label || '');
+    } catch (err) {
+      this.showNotification('Could not access the camera. Check permissions and try again.', 'error');
+      console.error(err);
+    }
+  }
+
+  async uploadProfilePhotoBlob(blob, filename) {
+    if (!blob) {
+      this.showNotification('No photo to upload.', 'error');
+      return;
+    }
+    const fd = new FormData();
+    const uploadName =
+      filename ||
+      (blob.type === 'image/png' ? 'profile.png' : blob.type === 'image/webp' ? 'profile.webp' : 'profile.jpg');
+    fd.append('action', 'upload_profile_photo');
+    fd.append('photo', blob, uploadName);
+    try {
+      const res = await fetch(beanthenticApiUrl('/api/admin-profile-photo'), {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin',
+      });
+      const result = await beanthenticParseJsonResponse(res);
+      if (!res.ok || result.error) throw new Error(result.error || 'Could not update profile photo.');
+      const heroName = document.getElementById('accountHeroName')?.textContent || 'Admin';
+      this.applyAccountProfilePhoto(result.profile_photo_url, heroName);
+      this.showNotification(result.success || 'Profile photo updated.', 'success');
+      this.closeProfilePhotoModal();
+    } catch (err) {
+      this.showNotification(err.message || 'Could not update profile photo.', 'error');
+    }
+  }
+
+  async captureProfilePhotoFromCamera() {
+    const video = document.getElementById('profilePhotoVideo');
+    const canvas = document.getElementById('profilePhotoCanvas');
+    if (!video || !canvas || !video.videoWidth) {
+      this.showNotification('Camera is not ready yet.', 'error');
+      return;
+    }
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+    if (!blob) {
+      this.showNotification('Could not capture photo.', 'error');
+      return;
+    }
+    await this.uploadProfilePhotoBlob(blob, 'camera-profile.jpg');
+  }
+
+  initProfilePhotoModal() {
+    const editBtn = document.getElementById('accountAvatarEditBtn');
+    const closeBtn = document.getElementById('closeProfilePhotoModalBtn');
+    const backdrop = document.getElementById('profilePhotoModalBackdrop');
+    const uploadBtn = document.getElementById('profilePhotoUploadBtn');
+    const takeBtn = document.getElementById('profilePhotoTakeBtn');
+    const fileInput = document.getElementById('profilePhotoFileInput');
+    const captureBtn = document.getElementById('profilePhotoCaptureBtn');
+    const cancelCameraBtn = document.getElementById('profilePhotoCancelCameraBtn');
+    const root = document.getElementById('profilePhotoModal');
+
+    if (editBtn) editBtn.addEventListener('click', () => this.openProfilePhotoModal());
+    if (closeBtn) closeBtn.addEventListener('click', () => this.closeProfilePhotoModal());
+    if (backdrop) backdrop.addEventListener('click', () => this.closeProfilePhotoModal());
+
+    if (uploadBtn && fileInput) {
+      uploadBtn.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', async () => {
+        const file = fileInput.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+          this.showNotification('Please choose an image file.', 'error');
+          fileInput.value = '';
+          return;
+        }
+        await this.uploadProfilePhotoBlob(file, file.name);
+        fileInput.value = '';
+      });
+    }
+
+    if (takeBtn) takeBtn.addEventListener('click', () => this.startProfilePhotoCamera());
+    const cameraSelect = document.getElementById('profilePhotoCameraSelect');
+    if (cameraSelect) {
+      cameraSelect.addEventListener('change', () => {
+        this.startProfilePhotoCamera(cameraSelect.value);
+      });
+    }
+    if (captureBtn) captureBtn.addEventListener('click', () => this.captureProfilePhotoFromCamera());
+    if (cancelCameraBtn) {
+      cancelCameraBtn.addEventListener('click', () => {
+        this.stopProfilePhotoCamera();
+        document.getElementById('profilePhotoCameraPanel')?.setAttribute('hidden', '');
+      });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (!root || root.hasAttribute('hidden')) return;
+      e.preventDefault();
+      this.closeProfilePhotoModal();
+    });
+  }
+
+  openDeactivateAccountModal() {
+    const root = document.getElementById('deactivateAccountConfirmModal');
+    const pwd = document.getElementById('deactivateAccountPassword');
+    if (!root) return;
+    if (pwd) pwd.value = '';
+    root.removeAttribute('hidden');
+    root.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('confirm-dialog-active');
+    pwd?.focus();
+  }
+
+  closeDeactivateAccountModal() {
+    const root = document.getElementById('deactivateAccountConfirmModal');
+    const pwd = document.getElementById('deactivateAccountPassword');
+    if (root) {
+      root.setAttribute('hidden', '');
+      root.setAttribute('aria-hidden', 'true');
+    }
+    if (pwd) pwd.value = '';
+    this.syncConfirmDialogBodyClass();
+  }
+
+  async confirmDeactivateAccount() {
+    const pwd = (document.getElementById('deactivateAccountPassword')?.value || '').trim();
+    if (!pwd) {
+      this.showNotification('Enter your password to deactivate your account.', 'error');
+      return;
+    }
+    const okBtn = document.getElementById('deactivateAccountConfirmOk');
+    if (okBtn) okBtn.disabled = true;
+    const fd = new FormData();
+    fd.append('password', pwd);
+    try {
+      const res = await fetch('/api/admin-account/deactivate', { method: 'POST', body: fd });
+      const result = await res.json();
+      if (!res.ok || result.error) throw new Error(result.error || 'Could not deactivate account.');
+      this.closeDeactivateAccountModal();
+      this.showNotification(result.success || 'Account deactivated.', 'success');
+      window.location.href = result.redirect || '/login';
+    } catch (err) {
+      this.showNotification(err.message || 'Could not deactivate account.', 'error');
+    } finally {
+      if (okBtn) okBtn.disabled = false;
+    }
+  }
+
+  initDeactivateAccountModal() {
+    const root = document.getElementById('deactivateAccountConfirmModal');
+    const cancelBtn = document.getElementById('deactivateAccountConfirmCancel');
+    const okBtn = document.getElementById('deactivateAccountConfirmOk');
+    const backdrop = root?.querySelector('.confirm-dialog__backdrop');
+    if (!root || !cancelBtn || !okBtn) return;
+
+    cancelBtn.addEventListener('click', () => this.closeDeactivateAccountModal());
+    okBtn.addEventListener('click', () => this.confirmDeactivateAccount());
+    if (backdrop) backdrop.addEventListener('click', () => this.closeDeactivateAccountModal());
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (root.hasAttribute('hidden')) return;
+      e.preventDefault();
+      this.closeDeactivateAccountModal();
+    });
   }
 
   initLogoutConfirmModal() {
@@ -448,11 +842,7 @@ class DashboardApp {
     if (ack) ack.checked = false;
     this.syncDeleteConfirmRemoveButton();
     this.pendingDeleteRowIndex = null;
-    const logoutEl = document.getElementById('logoutConfirmModal');
-    const d2 = document.getElementById('disable2faConfirmModal');
-    if (logoutEl?.hasAttribute('hidden') && d2?.hasAttribute('hidden')) {
-      document.body.classList.remove('confirm-dialog-active');
-    }
+    this.syncConfirmDialogBodyClass();
   }
 
   confirmPendingDeleteFarmer() {
@@ -619,6 +1009,33 @@ class DashboardApp {
       .replace(/"/g, '&quot;');
   }
 
+  /** User-facing message from API error payloads (never show raw pymysql tuples). */
+  formatAppLoadError(dataOrMessage, fallback) {
+    let msg = '';
+    if (dataOrMessage && typeof dataOrMessage === 'object') {
+      msg =
+        dataOrMessage.message ||
+        dataOrMessage.detail ||
+        dataOrMessage.error ||
+        dataOrMessage.hint ||
+        '';
+    } else {
+      msg = String(dataOrMessage || '');
+    }
+    msg = String(msg || fallback || 'Could not load data.').trim();
+    const low = msg.toLowerCase();
+    if (low.includes('mysql:') && low.includes('access denied')) {
+      return (
+        'MySQL login failed. Set app_db_host to your XAMPP PC LAN IP and the correct ' +
+        'app_db_pass in settings.json (Connection Settings).'
+      );
+    }
+    if (low.startsWith('mysql:') || low.includes('pymysql.err')) {
+      return fallback || 'Could not connect to the app database. Check settings.json.';
+    }
+    return msg;
+  }
+
   varietyLabel(variety) {
     const v = String(variety || '').toLowerCase();
     if (v === 'liberica') return 'Liberica';
@@ -745,7 +1162,14 @@ class DashboardApp {
     if (!tbody) return;
 
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 3rem; color: #94a3b8; font-weight: 500;">No client transactions available</td></tr>';
+      const emptyMsg =
+        this.transactionsDataSource === 'app_mysql' || this.transactionsDataSource === 'app_server_http'
+          ? 'No approved transactions yet. Approve in the farmer app Record page — they will appear here and in app History.'
+          : 'No client transactions available';
+      tbody.innerHTML =
+        '<tr><td colspan="9" style="text-align: center; padding: 3rem; color: #94a3b8; font-weight: 500;">' +
+        emptyMsg +
+        '</td></tr>';
       return;
     }
 
@@ -769,9 +1193,10 @@ class DashboardApp {
         }
 
         const deltaText = row.delta_kg != null ? `${Math.abs(row.delta_kg).toFixed(2)} kg` : '0.00 kg';
-        const amountText = row.amount != null ? `₱${Number(row.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '₱0.00';
+        const amountVal = row.amount != null ? Number(row.amount) : row.total != null ? Number(row.total) : 0;
+        const amountText = `₱${this.formatReceiptMoney(amountVal)}`;
         const variety = this.varietyLabel(row.variety) || '—';
-        const txnId = row.id || `TXN-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+        const txnId = String(row.id || row.customer_transaction_id || '');
 
         return `<tr>
           <td style="font-weight: 600; color: #111827;">${farmerNo}</td>
@@ -796,22 +1221,38 @@ class DashboardApp {
     tbody.innerHTML = '<tr><td colspan="9" class="transactions-loading-cell">Loading...</td></tr>';
 
     try {
-      const res = await fetch('/api/farmer-coffee-transactions?limit=500');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      this.transactionsRows = Array.isArray(data.items) ? data.items : [];
-      
-      // Fallback to example data for demo purposes if API returns nothing
-      if (this.transactionsRows.length === 0) {
-        this.transactionsRows = this.getExampleTransactions();
+      const res = await fetch('/api/transactions-list?limit=500');
+      const data = await res.json().catch(() => ({}));
+      if (data && data.ok === false) {
+        throw new Error(
+          this.formatAppLoadError(data, 'Could not load transactions.')
+        );
       }
-      
+      if (!Array.isArray(data.items)) {
+        if (!res.ok) {
+          throw new Error(
+            (data && data.detail) ||
+              (data && data.error) ||
+              'HTTP ' + res.status + ' — restart admin web (python web.py) after update.'
+          );
+        }
+        throw new Error('Invalid response from server.');
+      }
+      this.transactionsRows = data.items;
+      this.transactionsDataSource = data.source || '';
       this.applyTransactionsFiltersAndRender();
     } catch (e) {
       console.warn('Transactions load failed:', e);
-      // Fallback to example data for demo purposes if API fails
-      this.transactionsRows = this.getExampleTransactions();
-      this.applyTransactionsFiltersAndRender();
+      this.transactionsRows = [];
+      this.transactionsDataSource = '';
+      const msg = this.escapeHtml(String(e.message || e));
+      if (tbody) {
+        tbody.innerHTML =
+          '<tr><td colspan="9" style="text-align:center;padding:2rem 1.5rem;color:#94a3b8;font-weight:500;line-height:1.5;">' +
+          'Could not load transactions.<br><span style="font-size:0.9rem;font-weight:600;">' +
+          msg +
+          '</span><br><span style="font-size:0.85rem;">Check <code>app_db_host</code> / <code>app_server_base</code> in settings.json and that XAMPP MySQL is running.</span></td></tr>';
+      }
     }
   }
 
@@ -877,62 +1318,89 @@ class DashboardApp {
     ];
   }
 
+  formatReceiptMoney(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '0.00';
+    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  formatReceiptDateTime(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) {
+      return { date: '-', time: '-' };
+    }
+    return {
+      date: d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }),
+      time: d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+    };
+  }
+
+  findTransactionRow(txnId) {
+    const key = String(txnId || '');
+    return (this.transactionsRows || []).find(
+      (r) => String(r.id) === key || String(r.customer_transaction_id) === key
+    );
+  }
+
   openReceipt(txnId) {
-    const row = this.transactionsRows.find(r => r.id === txnId) || 
-                this.getExampleTransactions().find(r => r.id === txnId);
+    const row = this.findTransactionRow(txnId);
     if (!row) return;
 
     const modal = document.getElementById('txnReceiptModal');
     if (!modal) return;
 
-    // Store current focus to return it later
     this.__previousFocus = document.activeElement;
 
-    // Populate data... (keeping existing population logic)
-    const idEl = document.getElementById('receiptId');
-    const dateEl = document.getElementById('receiptDate');
-    const timeEl = document.getElementById('receiptTime');
-    const farmerNameEl = document.getElementById('receiptFarmerName');
-    const farmerNoEl = document.getElementById('receiptFarmerNo');
-    const buyerNameEl = document.getElementById('receiptBuyerName');
-    const productLabelEl = document.getElementById('receiptProductLabel');
-    const weightEl = document.getElementById('receiptWeight');
+    const amountNum =
+      row.amount != null
+        ? Number(row.amount)
+        : row.total != null
+          ? Number(row.total)
+          : 0;
+    const paymentAmtNum =
+      row.payment_amount != null
+        ? Number(row.payment_amount)
+        : row.paymentAmount != null
+          ? Number(row.paymentAmount)
+          : 0;
+    const totalNum = row.total != null ? Number(row.total) : amountNum;
+    const changeNum =
+      row.change != null
+        ? Number(row.change)
+        : Math.max(0, paymentAmtNum - totalNum);
+    const paymentText = (row.payment_method || row.payment || 'Cash').toString().trim() || 'Cash';
+    const productText =
+      (row.product || this.varietyLabel(row.variety) || row.variety || '-').toString();
+    const qtyVal = row.qty != null ? row.qty : row.delta_kg;
+    const qtyStr =
+      qtyVal != null && String(qtyVal) !== ''
+        ? `${qtyVal}${row.unit ? String(row.unit).toUpperCase() : 'KG'}`
+        : '-';
+    const ref = (row.reference_no || row.ref || '').toString().trim();
+    const dt = this.formatReceiptDateTime(row.recorded_at);
 
-    if (idEl) idEl.textContent = txnId.startsWith('ex-') ? `#TXN-${txnId.split('-')[1].padStart(4, '0')}` : `#${txnId}`;
-    
-    if (row.recorded_at) {
-      try {
-        const d = new Date(row.recorded_at);
-        if (!Number.isNaN(d.getTime())) {
-          if (dateEl) dateEl.textContent = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-          if (timeEl) timeEl.textContent = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
-        }
-      } catch {
-        if (dateEl) dateEl.textContent = String(row.recorded_at);
-      }
-    }
+    const setText = (id, text) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    };
 
-    if (farmerNameEl) farmerNameEl.textContent = row.farmer_name || '—';
-    if (farmerNoEl) farmerNoEl.textContent = row.farmer_no ? `#${row.farmer_no}` : '—';
-    if (buyerNameEl) buyerNameEl.textContent = row.buyer_name || '—';
-    
-    const variety = this.varietyLabel(row.variety);
-    if (productLabelEl) productLabelEl.textContent = `${variety} Coffee`;
-    if (weightEl) weightEl.textContent = row.delta_kg != null ? `${Math.abs(row.delta_kg).toFixed(2)} kg` : '0.00 kg';
+    setText('receiptRef', ref ? `#${ref}` : '-');
+    setText('receiptDate', dt.date);
+    setText('receiptTime', dt.time);
+    setText('receiptBuyerName', row.buyer_name || row.buyer || '-');
+    setText('receiptProduct', productText);
+    setText('receiptQty', qtyStr);
+    setText('receiptAmount', this.formatReceiptMoney(amountNum));
+    setText('receiptPayment', paymentText);
+    setText('receiptPaymentAmount', this.formatReceiptMoney(paymentAmtNum));
+    setText('receiptTotal', this.formatReceiptMoney(totalNum));
+    setText('receiptChange', this.formatReceiptMoney(changeNum));
 
-    const amountEl = document.getElementById('receiptAmount');
-    if (amountEl) {
-      const amount = row.amount != null ? Number(row.amount) : 0;
-      amountEl.textContent = `₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    }
-
-    // Show modal and handle focus
     modal.removeAttribute('hidden');
     modal.removeAttribute('aria-hidden');
     modal.removeAttribute('inert');
     document.body.classList.add('confirm-dialog-active');
-    
-    // Focus the close button for accessibility
+
     const closeBtn = document.getElementById('txnReceiptClose');
     if (closeBtn) setTimeout(() => closeBtn.focus(), 100);
   }
@@ -1173,15 +1641,32 @@ class DashboardApp {
     tbody.innerHTML = '<tr><td colspan="5" class="transactions-loading-cell">Loading...</td></tr>';
 
     try {
-      const res = await fetch('/api/misconduct-reports?limit=1000');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      this.misconductReportRows = Array.isArray(data.items) ? data.items : [];
+      const res = await fetch('/api/client-reports-list?limit=1000', { credentials: 'same-origin' });
+      const data = await res.json().catch(() => ({}));
+      if (data && data.ok === false) {
+        throw new Error(
+          this.formatAppLoadError(data, 'Could not load reports.')
+        );
+      }
+      if (!Array.isArray(data.items)) {
+        if (!res.ok) {
+          throw new Error(
+            (data && data.detail) ||
+              (data && data.error) ||
+              'HTTP ' + res.status + ' — restart admin web (python web.py) after update.'
+          );
+        }
+        throw new Error('Invalid response from server.');
+      }
+      this.misconductReportRows = data.items;
       this.applyClientReportFiltersAndRender();
     } catch (e) {
       console.warn('Misconduct reports load failed:', e);
+      const msg = this.escapeHtml(String(e.message || e));
       tbody.innerHTML =
-        '<tr><td colspan="5" class="transactions-error-cell">Could not load reports. Try Refresh.</td></tr>';
+        '<tr><td colspan="5" class="transactions-error-cell">Could not load reports.<br>' +
+        msg +
+        '</td></tr>';
       this.misconductReportRows = [];
       this.showNotification('Could not load misconduct reports.', 'error');
       this.updateClientReportCountLabel(0);
@@ -1648,7 +2133,7 @@ class DashboardApp {
           
           if (idx !== -1) {
             if (action === 'warning') {
-              this.handleWarningFarmer(idx, 'Administrative Warning');
+              this.openFarmerActionModal('warning', idx);
             } else if (action === 'unsuspend') {
               // Unsuspend directly without modal
               this.handleUnblockFarmer(idx, 'Manual Unsuspend');
@@ -1870,11 +2355,11 @@ class DashboardApp {
       if (!this.data[idx]) return;
 
       if (action === 'warning-farmer') {
-        this.handleWarningFarmer(idx);
+        this.openFarmerActionModal('warning', idx);
       } else if (action === 'block-farmer') {
-        this.handleBlockFarmer(idx);
+        this.openFarmerActionModal('suspend', idx);
       } else if (action === 'unblock-farmer') {
-        this.handleUnblockFarmer(idx);
+        this.handleUnblockFarmer(idx, 'Manual Unsuspend');
       } else if (action === 'delete-farmer') {
         this.openDeleteFarmerConfirm(idx);
       }
@@ -1882,6 +2367,8 @@ class DashboardApp {
 
     this.initDeleteFarmerConfirmModal();
     this.initLogoutConfirmModal();
+    this.initProfilePhotoModal();
+    this.initDeactivateAccountModal();
 
     const settingsBackBtn = document.getElementById('settingsBackToOverviewBtn');
     if (settingsBackBtn) {
@@ -2083,6 +2570,7 @@ class DashboardApp {
     }
     if (resolvedModuleName === 'register') {
       this.renderRegisterModule();
+      this.loadContributionsFromApi();
     }
     if (resolvedModuleName === 'transactions') {
       this.loadTransactionsPage();
@@ -2587,12 +3075,40 @@ class DashboardApp {
       // are immediately reflected on the website.
       const response = await fetch('/api/farmer-data');
       console.log('API response status:', response.status);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch farmer data: HTTP ${response.status}`);
+      let apiData;
+      try {
+        apiData = await response.json();
+      } catch (_parseErr) {
+        apiData = null;
       }
-      const apiData = await response.json();
-      console.log('Received data length:', apiData.length);
-      this.data = Array.isArray(apiData) ? apiData.slice(0, this.maxFarmers) : [];
+
+      if (!response.ok) {
+        const detail =
+          apiData && typeof apiData === 'object' && apiData.detail
+            ? String(apiData.detail)
+            : apiData && typeof apiData === 'object' && apiData.error
+              ? String(apiData.error)
+              : `HTTP ${response.status}`;
+        throw new Error(detail || 'Failed to fetch farmer data from database');
+      }
+
+      if (apiData && typeof apiData === 'object' && !Array.isArray(apiData)) {
+        if (apiData.error) {
+          throw new Error(String(apiData.detail || apiData.error));
+        }
+      }
+
+      console.log('Received data length:', Array.isArray(apiData) ? apiData.length : 0);
+      this.data = Array.isArray(apiData)
+        ? apiData.slice(0, this.maxFarmers).map((row) => this.applyOwnershipFlags(row))
+        : [];
+
+      if (this.data.length === 0) {
+        this.showNotification(
+          'Walang farmer records mula sa database (0 rows). Check app_db_host sa settings.json at XAMPP MySQL.',
+          'brown'
+        );
+      }
       
       this.filteredData = [...this.data];
       this.totalRecords = this.data.length;
@@ -3133,35 +3649,18 @@ class DashboardApp {
     let transactions = [];
     
     try {
-      // Fetch real transactions for this specific farmer from the database
-      const response = await fetch(`/api/farmer-coffee-transactions?farmer_id=${farmerId}&limit=100`);
-      if (response.ok) {
-        const data = await response.json();
-        transactions = Array.isArray(data.items) ? data.items : [];
+      const response = await fetch(
+        `/api/transactions-list?farmer_id=${encodeURIComponent(farmerId)}&limit=100`
+      );
+      const data = await response.json().catch(() => ({}));
+      if (data && data.ok === false) {
+        throw new Error(data.detail || data.error || 'Could not load transactions');
+      }
+      if (response.ok && Array.isArray(data.items)) {
+        transactions = data.items;
       }
     } catch (error) {
       console.warn('Could not fetch real transactions:', error);
-    }
-
-    // If no real transactions in DB, use deterministic mock data based on farmerId
-    // This ensures every farmer has unique-looking data that stays the same for them
-    if (transactions.length === 0) {
-      const seed = Number(farmerId) || 0;
-      const products = ['Liberica Cherries', 'Excelsa Beans', 'Robusta Green', 'Liberica Parchment', 'Arabica Batch'];
-      const buyers = ['Local Cooperative', 'Metro Roasters', 'Green Coffee Co.', 'Farmer Market', 'Coffee Export Ltd'];
-      
-      transactions = [];
-      // Generate 15 mock transactions to ensure scrollability
-      for (let i = 0; i < 15; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() - (i * 15 + (seed % 10)));
-        transactions.push({
-          recorded_at: date.toISOString(),
-          buyer_name: buyers[(seed + i) % 5],
-          variety: products[(seed + i) % 5],
-          delta_kg: -(40 + (seed * 7.5 + i * 5.2) % 100)
-        });
-      }
     }
 
     if (transactions.length === 0) {
@@ -3627,80 +4126,125 @@ class DashboardApp {
     }
   }
 
+  getFarmerDbId(farmer) {
+    if (!farmer) return 0;
+    const fid = Number(farmer.farmer_id ?? farmer['farmer_id'] ?? 0);
+    if (Number.isFinite(fid) && fid > 0) return fid;
+    // Only use NO. when row came from live DB (has user_id); sample/backup rows must not use NO.
+    if (Object.prototype.hasOwnProperty.call(farmer, 'user_id') && farmer.user_id != null) {
+      const no = Number(farmer['NO.'] ?? farmer.NO ?? 0);
+      if (Number.isFinite(no) && no > 0) return no;
+    }
+    return 0;
+  }
+
+  applyFarmerAccountStatusToRow(farmer, status) {
+    if (!farmer || !status) return;
+    farmer.is_blocked = !!status.is_suspended;
+    if (status.suspended_until) {
+      const dt = new Date(String(status.suspended_until).replace(' ', 'T'));
+      farmer.suspended_until = Number.isNaN(dt.getTime()) ? null : dt.getTime();
+    } else {
+      farmer.suspended_until = null;
+    }
+    farmer.suspension_reason = status.suspension_reason || '';
+    farmer.warning_count = Number(status.warning_count || 0);
+    farmer.last_warning_reason = status.last_warning_reason || '';
+  }
+
+  async postFarmerAccountAction(farmerId, action, reason, days) {
+    const res = await fetch('/api/farmer-account-action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        farmer_id: farmerId,
+        action,
+        reason,
+        days: days || 3,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok !== true) {
+      throw new Error(data.error || data.detail || `HTTP ${res.status}`);
+    }
+    return data;
+  }
+
   async handleWarningFarmer(idx, reason) {
     const farmer = this.data[idx];
     if (!farmer) return;
-    
+
+    const farmerId = this.getFarmerDbId(farmer);
+    if (!farmerId) {
+      this.showNotification('Farmer ID missing — reload farmer list from database.', 'error');
+      return;
+    }
+
     try {
-      // Simulate API call to record warning
-      console.log(`Warning issued to ${farmer['NAME OF FARMER']} for reason: ${reason}`);
-      this.showNotification(`Warning recorded for ${farmer['NAME OF FARMER']}`, 'success');
-      
-      // Optionally log this as an activity
-      if (this.logActivity) {
-        this.logActivity('ADMIN', 'WARNING_ISSUED', `Reason: ${reason} - Farmer: ${farmer['NAME OF FARMER']}`);
+      const data = await this.postFarmerAccountAction(farmerId, 'warning', reason);
+      this.applyFarmerAccountStatusToRow(farmer, data.account_status);
+      this.showNotification(
+        `Warning sent to ${farmer['NAME OF FARMER']}. Popup appears on their app homepage after login.`,
+        'success'
+      );
+      if (this.currentFarmerNo === farmerId) {
+        this.updateProfileStatusButtons(!!farmer.is_blocked);
       }
+      this.renderFarmersListCards();
+      this.renderTableBody();
     } catch (err) {
       console.error('Failed to record warning:', err);
-      this.showNotification('Could not record warning.', 'error');
+      this.showNotification(err.message || 'Could not record warning.', 'error');
     }
   }
 
   async handleBlockFarmer(idx, reason) {
     const farmer = this.data[idx];
     if (!farmer) return;
-    
-    try {
-      const now = new Date();
-      const liftDate = new Date();
-      liftDate.setDate(now.getDate() + 3);
 
-      // Simulate API call to suspend
-      console.log(`Farmer suspended for 3 days: ${farmer['NAME OF FARMER']} for reason: ${reason}`);
-      farmer.is_blocked = true;
-      farmer.suspended_until = liftDate.getTime();
-      
-      this.showNotification(`${farmer['NAME OF FARMER']} has been suspended for 3 days.`, 'success');
-      
-      this.saveFarmers(); // Persist the suspension state
-      
-      if (this.logActivity) {
-        this.logActivity('ADMIN', 'FARMER_SUSPENDED', `Duration: 3 Days - Reason: ${reason} - Farmer: ${farmer['NAME OF FARMER']}`);
+    const farmerId = this.getFarmerDbId(farmer);
+    if (!farmerId) {
+      this.showNotification('Farmer ID missing — reload farmer list from database.', 'error');
+      return;
+    }
+
+    try {
+      const data = await this.postFarmerAccountAction(farmerId, 'suspend', reason, 3);
+      this.applyFarmerAccountStatusToRow(farmer, data.account_status);
+      this.showNotification(`${farmer['NAME OF FARMER']} suspended for 3 days.`, 'success');
+      if (this.currentFarmerNo === farmerId) {
+        this.updateProfileStatusButtons(true);
       }
+      this.renderFarmersListCards();
+      this.renderTableBody();
     } catch (err) {
       console.error('Failed to suspend farmer:', err);
-      this.showNotification('Could not suspend farmer.', 'error');
+      this.showNotification(err.message || 'Could not suspend farmer.', 'error');
     }
   }
 
   async handleUnblockFarmer(idx, reason) {
     const farmer = this.data[idx];
     if (!farmer) return;
-    
+
+    const farmerId = this.getFarmerDbId(farmer);
+    if (!farmerId) {
+      this.showNotification('Farmer ID missing — reload farmer list from database.', 'error');
+      return;
+    }
+
     try {
-      // Simulate API call to unsuspend
-      console.log(`Farmer unsuspended: ${farmer['NAME OF FARMER']} for reason: ${reason}`);
-      farmer.is_blocked = false;
-      delete farmer.suspended_until;
-      
+      const data = await this.postFarmerAccountAction(farmerId, 'unsuspend', reason);
+      this.applyFarmerAccountStatusToRow(farmer, data.account_status);
       this.showNotification(`${farmer['NAME OF FARMER']} access has been restored.`, 'success');
-      
-      this.saveFarmers(); // Persist the change
-      
-      // Update UI if on profile view
-      if (this.currentFarmerNo === Number(farmer['NO.'] || farmer.no || farmer.No)) {
+      if (this.currentFarmerNo === farmerId) {
         this.updateProfileStatusButtons(false);
       }
-      
       this.renderFarmersListCards();
       this.renderTableBody();
-      
-      if (this.logActivity) {
-        this.logActivity('ADMIN', 'FARMER_UNSUSPENDED', `Reason: ${reason} - Farmer: ${farmer['NAME OF FARMER']}`);
-      }
     } catch (err) {
       console.error('Failed to unsuspend farmer:', err);
-      this.showNotification('Could not unsuspend farmer.', 'error');
+      this.showNotification(err.message || 'Could not unsuspend farmer.', 'error');
     }
   }
 
@@ -4146,6 +4690,36 @@ class DashboardApp {
     } catch {
       return null;
     }
+  }
+
+  applyOwnershipFlags(row) {
+    if (!row || typeof row !== 'object') return row;
+    const status = String(
+      this.getValue(row, ['STATUS OF OWNERSHIP', 'Status Ownership', 'ownership_status']) || ''
+    )
+      .trim()
+      .toLowerCase();
+    const map = {
+      landowner: { LANDOWNER: 'X' },
+      cloa_holder: { CLOA: 'X' },
+      'cloa holder': { CLOA: 'X' },
+      list_holder: { LEASE: 'X' },
+      'list holder': { LEASE: 'X' },
+      sessional_farm_worker: { SEASONAL: 'X' },
+      'sessional farm worker': { SEASONAL: 'X' },
+      others: { OTHERS: 'X' },
+      owner: { LANDOWNER: 'X' },
+      owned: { LANDOWNER: 'X' },
+      tenant: { SEASONAL: 'X' },
+      lessee: { LEASE: 'X' },
+      'co-owner': { CLOA: 'X' },
+      co_owner: { CLOA: 'X' },
+      coowner: { CLOA: 'X' },
+      other: { OTHERS: 'X' },
+    };
+    const flags = map[status];
+    if (!flags) return row;
+    return { ...row, ...flags };
   }
 
   getValue(row, possibleKeys) {
@@ -4620,17 +5194,18 @@ class DashboardApp {
     if (el) el.textContent = text;
   }
 
-  renderAnalyticsModule() {
+  async renderAnalyticsModule() {
     const analyticsRoot = document.getElementById('analytics-module');
     if (!analyticsRoot || analyticsRoot.classList.contains('hidden')) return;
     if (!window.Chart) return;
 
-    const metrics = this.computeGiAnalytics();
+    const metrics = await this.computeGiAnalyticsAsync();
     const total = Math.max(metrics.total, 1);
     const eligibleRate = (metrics.eligible / total) * 100;
+    const mlNote = metrics.mlEnabled ? ' · ML' : '';
 
     this.setText('giEligibleCount', metrics.eligible.toLocaleString());
-    this.setText('giEligibleRate', `${eligibleRate.toFixed(1)}% of farmers`);
+    this.setText('giEligibleRate', `${eligibleRate.toFixed(1)}% of farmers${mlNote}`);
     this.setText('cityGiReadinessRate', `${eligibleRate.toFixed(1)}%`);
 
     const ipophlSnapshot = this.getIpophlCompletionSnapshot();
@@ -4640,6 +5215,66 @@ class DashboardApp {
     this.renderTopBarangaysChart(metrics);
     this.renderGiGrowthTrendChart(metrics);
     this.renderIpophlComplianceChart();
+  }
+
+  async computeGiAnalyticsAsync() {
+    const base = this.computeGiAnalytics();
+    const rows = Array.isArray(this.data) ? this.data : [];
+    if (!rows.length) {
+      return { ...base, mlEnabled: false };
+    }
+
+    try {
+      const res = await fetch(beanthenticApiUrl('/api/ml/farmer-readiness'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ farmers: rows }),
+      });
+      const data = await beanthenticParseJsonResponse(res);
+      if (!res.ok || !data.success || !Array.isArray(data.predictions)) {
+        return { ...base, mlEnabled: false };
+      }
+
+      let eligible = 0;
+      const eligibilityByIndex = data.predictions.map((p) => {
+        const ready = !!p.gi_ready;
+        if (ready) eligible += 1;
+        return ready;
+      });
+      const notEligible = rows.length - eligible;
+
+      const trendWindow = 6;
+      const bucketSize = Math.max(1, Math.ceil(rows.length / trendWindow));
+      const trendLabels = [];
+      const trendValues = [];
+      const now = new Date();
+      let cumulativeReady = 0;
+      for (let i = 0; i < rows.length; i++) {
+        if (eligibilityByIndex[i]) cumulativeReady += 1;
+        const bucketEnd = i === rows.length - 1 || (i + 1) % bucketSize === 0;
+        if (bucketEnd) {
+          const step = trendValues.length;
+          const d = new Date(now.getFullYear(), now.getMonth() - (trendWindow - 1 - step), 1);
+          trendLabels.push(d.toLocaleString(undefined, { month: 'short', year: '2-digit' }));
+          trendValues.push(cumulativeReady);
+        }
+      }
+
+      return {
+        ...base,
+        eligible,
+        notEligible,
+        eligibilityByIndex,
+        trendLabels,
+        trendValues,
+        mlEnabled: true,
+        analysisMethod: data.analysis_method || 'ml_farmer',
+      };
+    } catch (err) {
+      console.warn('ML analytics fallback to rules:', err);
+      return { ...base, mlEnabled: false };
+    }
   }
 
   renderIpophlModule() {
@@ -6184,10 +6819,17 @@ class DashboardApp {
       if (Number.isNaN(idx)) return;
 
       if (action === 'warning') {
-        this.handleWarningFarmer(idx, reason);
-      } else if (action === 'suspend') {
-        this.handleBlockFarmer(idx, reason);
-        this.updateProfileStatusButtons(true);
+        this.handleWarningFarmer(idx, reason).then(() => this.closeFarmerActionModal());
+        return;
+      }
+      if (action === 'suspend') {
+        this.handleBlockFarmer(idx, reason).then(() => {
+          this.updateProfileStatusButtons(true);
+          this.renderFarmersListCards();
+          this.renderTableBody();
+          this.closeFarmerActionModal();
+        });
+        return;
       }
 
       this.renderFarmersListCards();
@@ -6423,35 +7065,65 @@ class DashboardApp {
     const nextBtn = document.getElementById('nextMonth');
     if (!daysEl) return;
 
-    let date = new Date(2026, 4); // May 2026
+    const today = new Date();
+    let viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    let selectedDay = null;
 
     const render = () => {
-      const year = date.getFullYear();
-      const month = date.getMonth();
+      const year = viewDate.getFullYear();
+      const month = viewDate.getMonth();
       const firstDay = new Date(year, month, 1).getDay();
       const daysInMonth = new Date(year, month + 1, 0).getDate();
-      
+
       if (monthEl) {
-        monthEl.textContent = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        monthEl.textContent = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       }
 
       daysEl.innerHTML = '';
-      
-      // Empty days before month starts
+
       for (let i = 0; i < firstDay; i++) {
-        daysEl.innerHTML += '<div class="calendar-day empty"></div>';
+        daysEl.insertAdjacentHTML('beforeend', '<div class="calendar-day empty" aria-hidden="true"></div>');
       }
 
-      // Actual days
-      const today = new Date();
       for (let d = 1; d <= daysInMonth; d++) {
-        const isToday = today.getDate() === d && today.getMonth() === month && today.getFullYear() === year;
-        daysEl.innerHTML += `<div class="calendar-day ${isToday ? 'today' : ''}">${d}</div>`;
+        const cellDate = new Date(year, month, d);
+        const dow = cellDate.getDay();
+        const isToday =
+          today.getDate() === d && today.getMonth() === month && today.getFullYear() === year;
+        const isWeekend = dow === 0 || dow === 6;
+        const isSelected = selectedDay === d;
+        const classes = ['calendar-day'];
+        if (isToday) classes.push('today');
+        if (isWeekend) classes.push('weekend');
+        if (isSelected) classes.push('selected');
+
+        const cell = document.createElement('div');
+        cell.className = classes.join(' ');
+        cell.textContent = String(d);
+        cell.setAttribute('role', 'gridcell');
+        if (isToday) cell.setAttribute('aria-current', 'date');
+        cell.addEventListener('click', () => {
+          selectedDay = d;
+          render();
+        });
+        daysEl.appendChild(cell);
       }
     };
 
-    if (prevBtn) prevBtn.onclick = () => { date.setMonth(date.getMonth() - 1); render(); };
-    if (nextBtn) nextBtn.onclick = () => { date.setMonth(date.getMonth() + 1); render(); };
+    if (prevBtn) {
+      prevBtn.onclick = () => {
+        viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
+        selectedDay = null;
+        render();
+      };
+    }
+    if (nextBtn) {
+      nextBtn.onclick = () => {
+        viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
+        selectedDay = null;
+        render();
+      };
+    }
 
     render();
   }
@@ -6634,36 +7306,143 @@ class DashboardApp {
 
   // Legacy duplicate methods removed: main switchModule() above is the source of truth.
 
+  splitAccountDisplayName(user) {
+    const u = user || {};
+    const first = (u.first_name || '').trim();
+    const last = (u.last_name || '').trim();
+    if (first || last) {
+      return {
+        firstName: first,
+        lastName: last,
+        fullName: `${first} ${last}`.trim() || (u.full_name || 'Admin'),
+      };
+    }
+    const fullName = (u.full_name || 'Admin').trim();
+    const parts = fullName.split(/\s+/);
+    return {
+      firstName: parts[0] || '',
+      lastName: parts.slice(1).join(' ') || '',
+      fullName,
+    };
+  }
+
+  applyAccountPersonalInfo(user) {
+    const { firstName, lastName, fullName } = this.splitAccountDisplayName(user);
+    const phone = user?.phone || '—';
+
+    const heroNameEl = document.getElementById('accountHeroName');
+    const firstNameEl = document.getElementById('accountFirstName');
+    const lastNameEl = document.getElementById('accountLastName');
+    const phoneEl = document.getElementById('accountPhone');
+    const editFirstNameEl = document.getElementById('accountEditFirstName');
+    const editLastNameEl = document.getElementById('accountEditLastName');
+    const editPhoneEl = document.getElementById('accountEditPhone');
+    const settingsNameEl = document.getElementById('accountSettingsDisplayName');
+    const settingsPhoneEl = document.getElementById('accountSettingsPhone');
+
+    if (heroNameEl) heroNameEl.textContent = fullName;
+    if (firstNameEl) firstNameEl.textContent = firstName || '—';
+    if (lastNameEl) lastNameEl.textContent = lastName || '—';
+    if (phoneEl) phoneEl.textContent = phone;
+    if (editFirstNameEl) editFirstNameEl.value = firstName;
+    if (editLastNameEl) editLastNameEl.value = lastName;
+    if (editPhoneEl) editPhoneEl.value = phone === '—' ? '' : phone;
+    if (settingsNameEl) settingsNameEl.textContent = fullName;
+    if (settingsPhoneEl) settingsPhoneEl.textContent = phone;
+
+    if (window.__BEANTHENTIC_USER__) {
+      window.__BEANTHENTIC_USER__.full_name = fullName;
+      window.__BEANTHENTIC_USER__.phone = phone === '—' ? '' : phone;
+    }
+  }
+
+  openEditProfileModal() {
+    const editProfileModal = document.getElementById('editProfileModal');
+    if (!editProfileModal) return;
+    editProfileModal.removeAttribute('hidden');
+    editProfileModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('confirm-dialog-active');
+    document.getElementById('accountEditFirstName')?.focus();
+  }
+
+  closeEditProfileModal() {
+    const editProfileModal = document.getElementById('editProfileModal');
+    if (editProfileModal) {
+      editProfileModal.setAttribute('hidden', '');
+      editProfileModal.setAttribute('aria-hidden', 'true');
+    }
+    const photoModal = document.getElementById('profilePhotoModal');
+    const logoutEl = document.getElementById('logoutConfirmModal');
+    const deactivateEl = document.getElementById('deactivateAccountConfirmModal');
+    const del = document.getElementById('deleteFarmerConfirmModal');
+    const d2 = document.getElementById('disable2faConfirmModal');
+    if (
+      photoModal?.hasAttribute('hidden') &&
+      logoutEl?.hasAttribute('hidden') &&
+      deactivateEl?.hasAttribute('hidden') &&
+      del?.hasAttribute('hidden') &&
+      d2?.hasAttribute('hidden')
+    ) {
+      document.body.classList.remove('confirm-dialog-active');
+    }
+  }
+
+  async saveAccountPersonalInfo() {
+    const firstName = (document.getElementById('accountEditFirstName')?.value || '').trim();
+    const lastName = (document.getElementById('accountEditLastName')?.value || '').trim();
+    const phone = (document.getElementById('accountEditPhone')?.value || '').trim();
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    if (!fullName) {
+      this.showNotification('First and last name are required.', 'error');
+      return;
+    }
+    if (!phone) {
+      this.showNotification('Phone number is required.', 'error');
+      return;
+    }
+
+    const saveBtn = document.getElementById('saveEditProfileModalBtn');
+    if (saveBtn) saveBtn.disabled = true;
+
+    const fd = new FormData();
+    fd.append('first_name', firstName);
+    fd.append('last_name', lastName);
+    fd.append('full_name', fullName);
+    fd.append('phone', phone);
+
+    try {
+      const res = await fetch(beanthenticApiUrl('/settings/profile'), {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin',
+      });
+      const result = await beanthenticParseJsonResponse(res);
+      if (!res.ok || result.error) throw new Error(result.error || 'Could not update profile.');
+
+      if (result.user) {
+        this.applyAccountPersonalInfo(result.user);
+      }
+      await this.loadAccountData();
+
+      this.showNotification(result.success || 'Profile updated successfully.', 'success');
+      this.closeEditProfileModal();
+    } catch (err) {
+      this.showNotification(err.message || 'Could not update profile.', 'error');
+    } finally {
+      if (saveBtn) saveBtn.disabled = false;
+    }
+  }
+
   async loadAccountData() {
     try {
-      const response = await fetch('/settings/state');
+      const response = await fetch(beanthenticApiUrl('/settings/state'), { credentials: 'same-origin' });
       if (!response.ok) throw new Error('Failed to load user data');
-      const data = await response.json();
-      
-      const displayName = data.user?.full_name || 'Admin';
-      const phone = data.user?.phone || '—';
-      
-      const heroNameEl = document.getElementById('accountHeroName');
-      const firstNameEl = document.getElementById('accountFirstName');
-      const lastNameEl = document.getElementById('accountLastName');
-      const phoneEl = document.getElementById('accountPhone');
+      const data = await beanthenticParseJsonResponse(response);
 
-      const editFirstNameEl = document.getElementById('accountEditFirstName');
-      const editLastNameEl = document.getElementById('accountEditLastName');
-      const editPhoneEl = document.getElementById('accountEditPhone');
-      
-      const nameParts = displayName.split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
-
-      if (heroNameEl) heroNameEl.textContent = displayName;
-      if (firstNameEl) firstNameEl.textContent = firstName;
-      if (lastNameEl) lastNameEl.textContent = lastName;
-      if (phoneEl) phoneEl.textContent = phone;
-
-      if (editFirstNameEl) editFirstNameEl.value = firstName;
-      if (editLastNameEl) editLastNameEl.value = lastName;
-      if (editPhoneEl) editPhoneEl.value = phone;
+      const user = data.user || {};
+      this.applyAccountPersonalInfo(user);
+      this.applyAccountProfilePhoto(user.profile_photo_url || null, user.full_name || 'Admin');
     } catch (error) {
       console.error('Failed to load account data:', error);
       const heroNameEl = document.getElementById('accountHeroName');
@@ -6686,32 +7465,24 @@ class DashboardApp {
     const passwordToggles = document.querySelectorAll('.password-toggle[data-target]');
     const openEditModalBtn = document.getElementById('openEditProfileModalBtn');
     const closeEditModalBtn = document.getElementById('closeEditProfileModalBtn');
-    const editProfileModal = document.getElementById('editProfileModal');
+    const cancelEditModalBtn = document.getElementById('cancelEditProfileModalBtn');
+    const editProfileModalBackdrop = document.getElementById('editProfileModalBackdrop');
 
-    if (openEditModalBtn && editProfileModal) {
-      openEditModalBtn.addEventListener('click', () => {
-        editProfileModal.removeAttribute('hidden');
-        editProfileModal.setAttribute('aria-hidden', 'false');
-        document.body.classList.add('confirm-dialog-active');
+    if (openEditModalBtn) {
+      openEditModalBtn.addEventListener('click', async () => {
+        await this.loadAccountData();
+        this.openEditProfileModal();
       });
     }
 
-    if (closeEditModalBtn && editProfileModal) {
-      closeEditModalBtn.addEventListener('click', () => {
-        editProfileModal.setAttribute('hidden', '');
-        editProfileModal.setAttribute('aria-hidden', 'true');
-        document.body.classList.remove('confirm-dialog-active');
-      });
+    if (closeEditModalBtn) {
+      closeEditModalBtn.addEventListener('click', () => this.closeEditProfileModal());
     }
-
-    // Close modal on backdrop click
-    const modalBackdrop = editProfileModal?.querySelector('.profile-modal-backdrop');
-    if (modalBackdrop && editProfileModal) {
-      modalBackdrop.addEventListener('click', () => {
-        editProfileModal.setAttribute('hidden', '');
-        editProfileModal.setAttribute('aria-hidden', 'true');
-        document.body.classList.remove('confirm-dialog-active');
-      });
+    if (cancelEditModalBtn) {
+      cancelEditModalBtn.addEventListener('click', () => this.closeEditProfileModal());
+    }
+    if (editProfileModalBackdrop) {
+      editProfileModalBackdrop.addEventListener('click', () => this.closeEditProfileModal());
     }
     
     if (manageSettingsBtn) {
@@ -6727,6 +7498,11 @@ class DashboardApp {
       logoutBtn.addEventListener('click', () => {
         this.openLogoutConfirmModal();
       });
+    }
+
+    const deactivateBtn = document.getElementById('deactivateAccountBtn');
+    if (deactivateBtn) {
+      deactivateBtn.addEventListener('click', () => this.openDeactivateAccountModal());
     }
 
     passwordToggles.forEach((toggleBtn) => {
@@ -6747,37 +7523,17 @@ class DashboardApp {
     if (quickProfileForm) {
       quickProfileForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const firstName = (document.getElementById('accountEditFirstName')?.value || '').trim();
-        const lastName = (document.getElementById('accountEditLastName')?.value || '').trim();
-        const fullName = `${firstName} ${lastName}`.trim();
-        
-        if (!fullName) {
-          this.showNotification('Full name is required.', 'error');
-          return;
-        }
-        const fd = new FormData();
-        fd.append('full_name', fullName);
-        try {
-          const res = await fetch('/settings/profile', { method: 'POST', body: fd });
-          const result = await res.json();
-          if (!res.ok || result.error) throw new Error(result.error || 'Could not update profile.');
-          
-          this.showNotification(result.success || 'Profile updated successfully.', 'success');
-          
-          // Close modal
-          const editProfileModal = document.getElementById('editProfileModal');
-          if (editProfileModal) {
-            editProfileModal.setAttribute('hidden', '');
-            editProfileModal.setAttribute('aria-hidden', 'true');
-            document.body.classList.remove('confirm-dialog-active');
-          }
-          
-          this.loadAccountData();
-        } catch (err) {
-          this.showNotification(err.message || 'Could not update profile.', 'error');
-        }
+        await this.saveAccountPersonalInfo();
       });
     }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const editProfileModal = document.getElementById('editProfileModal');
+      if (!editProfileModal || editProfileModal.hasAttribute('hidden')) return;
+      e.preventDefault();
+      this.closeEditProfileModal();
+    });
 
     if (quickPasswordForm) {
       quickPasswordForm.addEventListener('submit', async (e) => {
@@ -7032,7 +7788,7 @@ class DashboardApp {
 
     try {
       // Unified Messenger view: Fetch all messages for the current admin
-      let url = `/api/messages?folder=all`;
+      let url = `/api/messages?folder=all&limit=500`;
       if (this.messagingSearchTerm) url += `&search=${encodeURIComponent(this.messagingSearchTerm)}`;
 
       const res = await fetch(url);
@@ -7042,60 +7798,57 @@ class DashboardApp {
       
       // Handle both {items: []} and [] formats
       const allMessages = Array.isArray(data) ? data : (data.items || []);
-      
+
+      // Normalize read flag (MySQL may return 0/1)
+      allMessages.forEach((m) => {
+        m.is_read = m.is_read === true || m.is_read === 1 || m.is_read === '1';
+      });
+
       // Update local storage of messages
       this.messagingMessages = allMessages;
 
-      // Group messages by farmer (the other party in the conversation)
+      // Group by farmer phone (same roles as mobile chat_thread.php)
       const conversations = new Map();
 
-      // Normalize helper
-      const normalize = (p) => {
-        if (!p) return '';
-        let d = String(p).replace(/\D/g, '');
-        if (d.startsWith('0')) d = d.substring(1);
-        if (d.startsWith('63')) d = d.substring(2);
-        return d;
-      };
+      allMessages.forEach((m) => {
+        if (this.isAnnouncementMessage(m)) return;
 
-      const myPhoneRaw = (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.phone) || '';
-      const myPhone = normalize(myPhoneRaw);
-
-      allMessages.forEach(m => {
-        const senderPhone = normalize(m.sender_phone);
-        const recipientPhone = normalize(m.recipient_phone);
-        
-        const isSentByMe = (m.sender_role === 'admin' || m.sender_type === 'admin') || 
-                           (myPhone && senderPhone === myPhone);
-        
-        // The "other party" is the one who isn't me
-        let otherPhoneRaw = isSentByMe ? m.recipient_phone : m.sender_phone;
-        let otherName = isSentByMe ? m.recipient_name : m.sender_name;
-        
-        // Fallback for announcements/broadcasts
-        if (!otherPhoneRaw) {
-          otherPhoneRaw = 'system';
-          otherName = 'Announcement';
+        const role = String((m.sender_role || m.sender_type) || '').toLowerCase();
+        let farmerPhoneRaw = '';
+        let farmerName = '';
+        if (role === 'farmer') {
+          farmerPhoneRaw = m.sender_phone;
+          farmerName = m.sender_name;
+        } else if (role === 'admin') {
+          farmerPhoneRaw = m.recipient_phone;
+          farmerName = m.recipient_name;
+        } else {
+          return;
         }
 
-        const otherPhone = normalize(otherPhoneRaw) || otherPhoneRaw;
-        const resolvedName = this.resolveFarmerName(otherPhoneRaw, otherName);
+        const key = this.messagingPhoneTail(farmerPhoneRaw);
+        if (!key || key === 'system') return;
 
-        if (!conversations.has(otherPhone) || new Date(m.created_at) > new Date(conversations.get(otherPhone).latest_message.created_at)) {
-          conversations.set(otherPhone, {
-            phone: otherPhoneRaw,
-            name: resolvedName,
+        if (!conversations.has(key)) {
+          conversations.set(key, {
+            phone: farmerPhoneRaw,
+            name: this.resolveFarmerName(farmerPhoneRaw, farmerName),
             latest_message: m,
-            unread_count: (!m.is_read && !isSentByMe) ? 1 : 0
+            unread_count: 0,
           });
-        } else if (!m.is_read && !isSentByMe) {
-          conversations.get(otherPhone).unread_count++;
         }
       });
 
-      this.messagingConversations = Array.from(conversations.values()).sort((a, b) => 
-        new Date(b.latest_message.created_at) - new Date(a.latest_message.created_at)
-      );
+      this.refreshConversationsLatest(conversations, allMessages);
+
+      this.messagingConversations = Array.from(conversations.values())
+        .filter((c) => {
+          const p = this.messagingPhoneTail(c.phone);
+          return p && p !== 'system' && !this.isAnnouncementMessage(c.latest_message);
+        })
+        .sort((a, b) => 
+          new Date(b.latest_message.created_at) - new Date(a.latest_message.created_at)
+        );
 
       // Ensure detail view is hidden if no conversation is selected
       if (!this.messagingSelectedId) {
@@ -7147,10 +7900,9 @@ class DashboardApp {
       
       const displayName = c.name;
       const initials = this.getInitials(displayName);
-      const timeStr = this.formatMessageTime(m.created_at);
+      const timeStr = this.formatChatListTime(m.created_at);
       
-      const isSentByMe = m.sender_role === 'admin' || m.sender_type === 'admin';
-      const prefix = isSentByMe ? 'You: ' : '';
+      const prefix = this.isAdminMessage(m) ? 'You: ' : '';
       const preview = prefix + (m.body || '').substring(0, 60);
 
       return `<li class="messaging-item${unreadClass}${activeClass}" data-phone="${esc(c.phone)}" data-msg-id="${m.id}">
@@ -7220,40 +7972,193 @@ class DashboardApp {
     }).join('');
   }
 
+  messagingNormalizePhone(p) {
+    if (!p) return '';
+    let d = String(p).replace(/\D/g, '');
+    if (d.startsWith('0')) d = d.substring(1);
+    if (d.startsWith('63')) d = d.substring(2);
+    return d;
+  }
+
+  messagingPhoneTail(p) {
+    const d = this.messagingNormalizePhone(p);
+    return d.length >= 10 ? d.slice(-10) : d;
+  }
+
+  /** Admin UI: admin = sent (right), farmer = received (left) — same rule as the farmer app. */
+  isAdminMessage(m) {
+    if (!m) return false;
+    const role = String((m.sender_role || m.sender_type) || '').toLowerCase();
+    if (role === 'admin') return true;
+    if (role === 'farmer') return false;
+    const myPhone = this.messagingPhoneTail(
+      (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.phone) || ''
+    );
+    if (!myPhone) return false;
+    return this.messagingPhoneTail(m.sender_phone) === myPhone;
+  }
+
+  /** Match shared_messages thread scope (chat_thread.php). */
+  messageBelongsToFarmerPhone(m, farmerPhoneRaw) {
+    if (!m || this.isAnnouncementMessage(m)) return false;
+    const tail = this.messagingPhoneTail(farmerPhoneRaw);
+    if (!tail) return false;
+    const role = String((m.sender_role || m.sender_type) || '').toLowerCase();
+    if (role === 'farmer' && this.messagingPhoneTail(m.sender_phone) === tail) return true;
+    if (String(m.recipient_role || '').toLowerCase() === 'farmer' && this.messagingPhoneTail(m.recipient_phone) === tail) {
+      return true;
+    }
+    return false;
+  }
+
+  isMessageUnread(m) {
+    if (!m || this.isAdminMessage(m)) return false;
+    const read = m.is_read === true || m.is_read === 1 || m.is_read === '1';
+    return !read;
+  }
+
+  refreshConversationsLatest(conversations, allMessages) {
+    for (const conv of conversations.values()) {
+      let latest = null;
+      let unread = 0;
+      for (const m of allMessages) {
+        if (!this.messageBelongsToFarmerPhone(m, conv.phone)) continue;
+        if (!latest || new Date(m.created_at) > new Date(latest.created_at)) latest = m;
+        if (this.isMessageUnread(m)) unread += 1;
+      }
+      if (latest) conv.latest_message = latest;
+      conv.unread_count = unread;
+    }
+  }
+
+  async markConversationRead(farmerPhoneRaw) {
+    if (!farmerPhoneRaw) return;
+    const tail = this.messagingPhoneTail(farmerPhoneRaw);
+
+    try {
+      await fetch(
+        `/api/messages/mark-thread-read?phone=${encodeURIComponent(String(farmerPhoneRaw))}`,
+        { method: 'POST', headers: { Accept: 'application/json' } }
+      );
+    } catch (_err) {
+      /* thread GET may have already marked read */
+    }
+
+    (this.messagingMessages || []).forEach((m) => {
+      if (this.messageBelongsToFarmerPhone(m, farmerPhoneRaw) && !this.isAdminMessage(m)) {
+        m.is_read = true;
+      }
+    });
+
+    if (this.messagingConversations) {
+      for (const c of this.messagingConversations) {
+        if (this.messagingPhoneTail(c.phone) === tail) {
+          c.unread_count = 0;
+          if (c.latest_message && !this.isAdminMessage(c.latest_message)) {
+            c.latest_message.is_read = true;
+          }
+        }
+      }
+    }
+
+    document.querySelectorAll('.messaging-item').forEach((el) => {
+      const p = el.getAttribute('data-phone');
+      if (p && this.messagingPhoneTail(p) === tail) {
+        el.classList.remove('is-unread');
+      }
+    });
+
+    await this.updateMessagingBadge();
+  }
+
+  isAnnouncementMessage(m) {
+    if (!m) return true;
+    const cat = String(m.category || '').toLowerCase();
+    if (cat === 'announcement') return true;
+    const s = String(m.sender_phone || '').trim().toLowerCase();
+    const r = String(m.recipient_phone || '').trim().toLowerCase();
+    if (s === 'system' || r === 'system') return true;
+    if (!s && !r) return true;
+    return false;
+  }
+
+  buildConversationThreadForPhone(farmerPhoneRaw) {
+    if (!farmerPhoneRaw || this.messagingPhoneTail(farmerPhoneRaw) === 'system') return [];
+
+    const rows = (this.messagingMessages || []).filter((m) =>
+      this.messageBelongsToFarmerPhone(m, farmerPhoneRaw)
+    );
+
+    return this.mapMessagesToThread(rows);
+  }
+
+  mapMessagesToThread(rows) {
+    return (rows || [])
+      .map((m) => {
+        const role = String((m.sender_role || m.sender_type) || '').toLowerCase();
+        return {
+          id: m.id,
+          body: m.body,
+          sender_name: m.sender_name,
+          sender_phone: m.sender_phone,
+          sender_role: role,
+          sender_type: role,
+          recipient_role: String(m.recipient_role || '').toLowerCase(),
+          recipient_phone: m.recipient_phone,
+          recipient_name: m.recipient_name,
+          created_at: m.created_at,
+        };
+      })
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  }
+
+  async fetchConversationThread(farmerPhoneRaw) {
+    if (!farmerPhoneRaw) return [];
+    try {
+      const res = await fetch(
+        `/api/messages/thread?phone=${encodeURIComponent(String(farmerPhoneRaw))}`,
+        { headers: { Accept: 'application/json' } }
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      const items = Array.isArray(data.items) ? data.items : [];
+      return this.mapMessagesToThread(items);
+    } catch (_err) {
+      return [];
+    }
+  }
+
   renderConversation(message) {
     const esc = (s) => this.escapeHtml(s);
-    
-    // Normalize helper for identification
-    const normalize = (p) => String(p || '').replace(/\D/g, '').replace(/^(0|63)/, '');
-    const myPhoneRaw = (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.phone) || '';
-    const myPhone = normalize(myPhoneRaw);
 
-    // Build the full thread
     let thread = [];
     if (message.conversation && Array.isArray(message.conversation) && message.conversation.length > 0) {
       thread = message.conversation;
-    } else if (message.body) {
-      thread = [message];
+    } else {
+      const phoneForThread = this.messagingSelectedPhone || message.sender_phone || message.recipient_phone;
+      const built = this.buildConversationThreadForPhone(phoneForThread);
+      if (built.length > 0) {
+        thread = built;
+      } else if (message.body) {
+        thread = [message];
+      }
     }
 
     if (thread.length === 0) return '';
 
-    return thread.map(msg => {
-      const senderPhone = normalize(msg.sender_phone);
-      const isSentByMe = (msg.sender_role === 'admin' || msg.sender_type === 'admin') || 
-                         (myPhone && senderPhone === myPhone);
-      
+    return thread.map((msg) => {
+      const isSentByMe = this.isAdminMessage(msg);
       const direction = isSentByMe ? 'sent' : 'received';
       const senderName = isSentByMe ? 'Administrator' : (msg.sender_name || 'Farmer');
       const avatarInitials = isSentByMe ? 'AD' : this.getInitials(senderName);
-      const timeStr = this.formatMessageTime(msg.created_at);
-      
+      const timeStr = this.bubbleTimestamp(msg.created_at);
+
       return `
         <div class="messaging-message messaging-message--${direction}">
           <div class="messaging-message__avatar">${esc(avatarInitials)}</div>
           <div class="messaging-message__content">
             <div class="messaging-message__bubble">${esc(msg.body)}</div>
-            <div class="messaging-message__timestamp">${esc(timeStr)}</div>
+            <div class="messaging-message__timestamp" aria-label="Message time">${esc(timeStr)}</div>
           </div>
         </div>
       `;
@@ -7379,16 +8284,10 @@ class DashboardApp {
         inlineReplyInput.style.height = 'auto';
       }
 
-      // Refresh list in background without resetting active view
+      // Refresh list and re-render full thread
       this.loadMessagingFolder().then(() => {
-        // After reload, try to find our message again to keep reference fresh
-        const fresh = this.messagingMessages.find(m => {
-          const norm = (p) => String(p || '').replace(/\D/g, '').replace(/^(0|63)/, '');
-          return norm(m.sender_phone) === target || norm(m.recipient_phone) === target;
-        });
-        if (fresh && !fresh.conversation) {
-          // If API didn't return conversation, keep our local one
-          fresh.conversation = currentMsg.conversation;
+        if (this.messagingSelectedId) {
+          this.openMessagingDetail(this.messagingSelectedId);
         }
       });
     } catch (err) {
@@ -7628,28 +8527,75 @@ class DashboardApp {
     return `<span class="messaging-item__category-tag ${cssClass}">${this.escapeHtml(label)}</span>`;
   }
 
-  formatMessageTime(isoStr) {
-    if (!isoStr) return '';
-    try {
-      const d = new Date(isoStr);
-      if (isNaN(d.getTime())) return isoStr;
-      const now = new Date();
-      const diffMs = now - d;
-      const diffH = diffMs / 3600000;
-      if (diffH < 1) {
-        const mins = Math.floor(diffMs / 60000);
-        return mins <= 1 ? 'Just now' : `${mins}m ago`;
-      }
-      if (diffH < 24 && d.getDate() === now.getDate()) {
-        return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
-      }
-      if (diffH < 168) {
-        return d.toLocaleDateString(undefined, { weekday: 'short' });
-      }
-      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    } catch {
-      return isoStr;
+  /** Same datetime helpers as Beanthentic app (js/beanthentic_datetime.js). */
+  parseMessageDate(isoStr) {
+    const DT = window.BeanthenticDateTime;
+    if (DT && typeof DT.parseAppDateTime === 'function') {
+      return DT.parseAppDateTime(isoStr);
     }
+    return null;
+  }
+
+  deviceSqlDateTime() {
+    const DT = window.BeanthenticDateTime;
+    if (DT && typeof DT.deviceSqlDateTime === 'function') {
+      return DT.deviceSqlDateTime();
+    }
+    return '';
+  }
+
+  formatMessageTime(isoStr) {
+    const DT = window.BeanthenticDateTime;
+    if (DT && typeof DT.formatHomeDateTime === 'function') {
+      const fmt = DT.formatHomeDateTime(isoStr);
+      if (fmt) return fmt;
+    }
+    const raw = String(isoStr || '').trim().replace(/\s+GMT\s*$/i, '').replace(/\s+UTC\s*$/i, '');
+    const m = raw.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+    if (!m) return '';
+    const y = +m[1];
+    const mo = +m[2];
+    const d = +m[3];
+    const h = +m[4];
+    const mi = +m[5];
+    const cal = new Date(y, mo - 1, d);
+    const dow = cal.toLocaleDateString('en-US', { weekday: 'short' });
+    const month = cal.toLocaleDateString('en-US', { month: 'short' });
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${dow} - ${month} ${d}, ${y} · ${h12}:${pad(mi)} ${ampm}`;
+  }
+
+  formatChatListTime(isoStr) {
+    const DT = window.BeanthenticDateTime;
+    if (DT && typeof DT.formatChatListTime === 'function') {
+      const fmt = DT.formatChatListTime(isoStr);
+      if (fmt) return fmt;
+    }
+    return this.formatMessageTime(isoStr);
+  }
+
+  sameMessageMinute(a, b) {
+    const DT = window.BeanthenticDateTime;
+    if (DT && typeof DT.sameWallClockMinute === 'function') {
+      return DT.sameWallClockMinute(a, b);
+    }
+    return false;
+  }
+
+  /** Short timestamp under chat bubble (Messenger-style). */
+  bubbleTimestamp(createdAt) {
+    const DT = window.BeanthenticDateTime;
+    if (DT && typeof DT.formatChatBubbleTime === 'function') {
+      const t = DT.formatChatBubbleTime(createdAt);
+      if (t) return t;
+    }
+    return this.formatMessageTime(createdAt);
+  }
+
+  formatMessageDateTime(isoStr) {
+    return this.bubbleTimestamp(isoStr);
   }
 
   async openMessagingDetail(id, newContact = null) {
@@ -7705,11 +8651,7 @@ class DashboardApp {
       if (newContact) {
         this.messagingSelectedPhone = newContact.phone;
       } else {
-        const myPhoneRaw = (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.phone) || '';
-        const normalize = (p) => String(p || '').replace(/\D/g, '').replace(/^(0|63)/, '');
-        const myPhone = normalize(myPhoneRaw);
-        const senderPhone = normalize(msg.sender_phone);
-        const isSentByMe = (msg.sender_role === 'admin' || msg.sender_type === 'admin') || (myPhone && senderPhone === myPhone);
+        const isSentByMe = this.isAdminMessage(msg);
         this.messagingSelectedPhone = isSentByMe ? msg.recipient_phone : msg.sender_phone;
       }
 
@@ -7721,11 +8663,7 @@ class DashboardApp {
       const bodyEl = document.getElementById('messagingDetailBody');
 
       // Determine who to show in the header (the farmer)
-      const myPhoneRaw = (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.phone) || '';
-      const normalize = (p) => String(p || '').replace(/\D/g, '').replace(/^(0|63)/, '');
-      const myPhone = normalize(myPhoneRaw);
-      const senderPhone = normalize(msg.sender_phone);
-      const isSentByMe = (msg.sender_role === 'admin' || msg.sender_type === 'admin') || (myPhone && senderPhone === myPhone);
+      const isSentByMe = this.isAdminMessage(msg);
 
       const displayPhone = newContact ? newContact.phone : (
         isSentByMe ? msg.recipient_phone : msg.sender_phone
@@ -7765,6 +8703,14 @@ class DashboardApp {
         if (newContact && !id) {
           bodyEl.innerHTML = '<div class="messaging-list-empty"><p>No messages yet. Send a message to start the conversation!</p></div>';
         } else {
+          let thread = await this.fetchConversationThread(this.messagingSelectedPhone);
+          if (!thread.length) {
+            thread = this.buildConversationThreadForPhone(this.messagingSelectedPhone);
+          }
+          thread.forEach((t) => {
+            if (!this.isAdminMessage(t)) t.is_read = true;
+          });
+          msg.conversation = thread;
           bodyEl.innerHTML = this.renderConversation(msg);
           setTimeout(() => bodyEl.scrollTop = bodyEl.scrollHeight, 50);
         }
@@ -7793,15 +8739,9 @@ class DashboardApp {
         }
       }
 
-      // Mark as read in list UI
-      const listItem = document.querySelector(`.messaging-item[data-msg-id="${id}"]`);
-      if (listItem) listItem.classList.remove('is-unread');
-
-      // Update unread count in local data
-      const local = this.messagingMessages.find(x => x.id === id);
-      if (local && !local.is_read) {
-        local.is_read = true;
-        this.updateMessagingBadge();
+      if (this.messagingSelectedPhone && !newContact) {
+        await this.markConversationRead(this.messagingSelectedPhone);
+        this.renderMessagingList();
       }
     } catch (err) {
       console.warn('Failed to load message detail:', err);
@@ -8271,63 +9211,103 @@ class DashboardApp {
 
   // Farmer's Contribution Module Functionality
   initBeanthenticContributions() {
-    this.contributions = [
-      {
-        id: 1,
-        farmer: 'Juan Dela Cruz',
-        subject: 'GI Certification Application - Farm ID #1234',
-        preview: 'Submitted complete documentation for geographical indication certification including farm ownership papers and coffee variety verification...',
-        date: '2:30 PM',
-        status: 'pending',
-        category: 'documents',
-        starred: false,
-        unread: true,
-        seen: false
-      },
-      {
-        id: 2,
-        farmer: 'Maria Santos',
-        subject: 'Farm Photos - Harvest Season 2026',
-        preview: 'High-resolution images of coffee farm during harvest season showing ripe cherries and processing facilities...',
-        date: 'Yesterday',
-        status: 'approved',
-        category: 'images',
-        starred: false,
-        unread: false,
-        seen: true
-      },
-      {
-        id: 3,
-        farmer: 'Roberto Reyes',
-        subject: 'Land Title Documents',
-        preview: 'Scanned copies of land ownership certificates and property tax receipts for farm verification...',
-        date: 'Mar 15',
-        status: 'pending',
-        category: 'documents',
-        starred: true,
-        unread: true,
-        seen: false
-      },
-      {
-        id: 4,
-        farmer: 'Carmela Lopez',
-        subject: 'Coffee Processing Equipment Images',
-        preview: 'Professional photographs of coffee processing equipment including drying beds and milling machines...',
-        date: 'Mar 14',
-        status: 'approved',
-        category: 'images',
-        starred: false,
-        unread: false,
-        seen: true
-      }
-    ];
-
+    this.contributions = [];
+    this.contributionsLoading = false;
+    this.contributionsLoadError = '';
     this.currentFilter = 'all';
     this.searchTerm = '';
     this.selectedContributions = new Set();
-    
+
     this.bindBeanthenticEvents();
-    this.renderContributions();
+    this.loadContributionsFromApi();
+  }
+
+  formatContributionDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso);
+    const now = new Date();
+    if (d.toDateString() === now.toDateString()) {
+      return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    }
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  mapGiContributionItem(item) {
+    const status = String(item.upload_status || item.status || 'pending').toLowerCase();
+    return {
+      id: Number(item.gi_update_id || item.id || 0),
+      farmer_id: Number(item.farmer_id || 0),
+      farmer: String(item.farmer_name || item.farmer || 'Farmer'),
+      farmer_email: String(item.farmer_email || ''),
+      subject: String(item.title || item.subject || 'GI Update'),
+      preview: String(item.preview || item.content || '').replace(/\s+/g, ' ').trim(),
+      content: String(item.content || ''),
+      date: this.formatContributionDate(item.created_at),
+      status: status === 'archived' ? 'archived' : (status === 'approved' ? 'approved' : 'pending'),
+      category: String(item.category || 'general'),
+      starred: !!(item.is_starred || item.starred),
+      unread: item.unread != null ? !!item.unread : !item.is_read_admin,
+      seen: !!(item.is_read_admin || item.seen),
+      attachments: Array.isArray(item.attachments) ? item.attachments : [],
+    };
+  }
+
+  async loadContributionsFromApi() {
+    if (this.contributionsLoading) return;
+    this.contributionsLoading = true;
+    this.contributionsLoadError = '';
+    try {
+      const res = await fetch('/api/gi-contributions-list?limit=500', { credentials: 'same-origin' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        throw new Error(
+          this.formatAppLoadError(data, `Could not load contributions (HTTP ${res.status}).`)
+        );
+      }
+      if (!Array.isArray(data.items)) {
+        throw new Error('Invalid response from server.');
+      }
+      this.contributions = data.items.map((item) => this.mapGiContributionItem(item));
+    } catch (err) {
+      this.contributionsLoadError =
+        err && err.message
+          ? this.formatAppLoadError(err.message, 'Could not load contributions.')
+          : 'Could not load contributions.';
+      console.warn('GI contributions load failed:', err);
+    } finally {
+      this.contributionsLoading = false;
+      this.renderContributions();
+    }
+  }
+
+  async patchGiContribution(id, fields) {
+    const res = await fetch(`/api/gi-contributions/${id}`, {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fields),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || `Update failed (${res.status})`);
+    }
+    return data;
+  }
+
+  async deleteGiContribution(id) {
+    const res = await fetch(`/api/gi-contributions/${id}`, {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || `Delete failed (${res.status})`);
+    }
+    return data;
   }
 
   bindBeanthenticEvents() {
@@ -8503,11 +9483,31 @@ class DashboardApp {
       }
     }
 
+    if (this.contributionsLoading) {
+      container.innerHTML = `
+        <div class="beanthentic-contribution-empty" role="status" aria-live="polite">
+          <h3>Loading contributions…</h3>
+        </div>
+      `;
+      return;
+    }
+
     if (filtered.length === 0) {
+      let extra = '<p>When farmers send GI updates from the mobile app, they will appear here.</p>';
+      if (this.contributionsLoadError) {
+        const safeMsg = this.escapeHtml(
+          this.formatAppLoadError(this.contributionsLoadError, 'Could not load contributions.')
+        );
+        extra =
+          `<p style="color:#b91c1c;line-height:1.5;">${safeMsg}</p>` +
+          '<p style="color:#64748b;font-size:0.9rem;margin-top:0.5rem;">' +
+          'Check <code>app_db_host</code>, <code>app_db_pass</code>, and <code>app_server_base</code> in ' +
+          '<code>settings.json</code> or open <a href="/connection-settings">Connection Settings</a>.</p>';
+      }
       container.innerHTML = `
         <div class="beanthentic-contribution-empty" role="status" aria-live="polite">
           <h3>No contributions found</h3>
-          <p>Submit documents and photos to start building the farmer review queue.</p>
+          ${extra}
         </div>
       `;
       return;
@@ -8536,15 +9536,17 @@ class DashboardApp {
     this.bindContributionItemEvents();
   }
 
-  toggleStar(id) {
+  async toggleStar(id) {
     const contribution = this.contributions.find(c => c.id === id);
-    if (contribution) {
-      contribution.starred = !contribution.starred;
+    if (!contribution) return;
+    const next = !contribution.starred;
+    try {
+      await this.patchGiContribution(id, { is_starred: next });
+      contribution.starred = next;
       this.renderContributions();
-      this.showNotification(
-        contribution.starred ? 'Contribution starred' : 'Contribution unstarred',
-        'success'
-      );
+      this.showNotification(next ? 'Contribution starred' : 'Contribution unstarred', 'success');
+    } catch (err) {
+      this.showNotification(err.message || 'Could not update star.', 'error');
     }
   }
 
@@ -8605,17 +9607,20 @@ class DashboardApp {
     }
   }
 
-  archiveContributions() {
+  async archiveContributions() {
     const selected = Array.from(this.selectedContributions);
-    selected.forEach(id => {
-      const contribution = this.contributions.find(c => c.id === id);
-      if (contribution) {
-        contribution.status = 'archived';
-      }
-    });
-    this.selectedContributions.clear();
-    this.renderContributions();
-    this.showNotification(`${selected.length} contribution(s) archived`, 'success');
+    try {
+      await Promise.all(selected.map((id) => this.patchGiContribution(id, { upload_status: 'archived' })));
+      selected.forEach((id) => {
+        const contribution = this.contributions.find(c => c.id === id);
+        if (contribution) contribution.status = 'archived';
+      });
+      this.selectedContributions.clear();
+      this.renderContributions();
+      this.showNotification(`${selected.length} contribution(s) archived`, 'success');
+    } catch (err) {
+      this.showNotification(err.message || 'Archive failed.', 'error');
+    }
   }
 
   async deleteContributions() {
@@ -8623,40 +9628,56 @@ class DashboardApp {
       `Are you sure you want to delete ${this.selectedContributions.size} contribution(s)?`,
       'Confirm Delete'
     );
-    
-    if (confirmed) {
-      const selected = Array.from(this.selectedContributions);
-      this.contributions = this.contributions.filter(c => !this.selectedContributions.has(c.id));
+
+    if (!confirmed) return;
+    const selected = Array.from(this.selectedContributions);
+    try {
+      await Promise.all(selected.map((id) => this.deleteGiContribution(id)));
+      this.contributions = this.contributions.filter(c => !selected.includes(c.id));
       this.selectedContributions.clear();
       this.renderContributions();
       this.showNotification(`${selected.length} contribution(s) deleted`, 'success');
+    } catch (err) {
+      this.showNotification(err.message || 'Delete failed.', 'error');
     }
   }
 
-  markAsReviewed() {
+  async markAsReviewed() {
     const selected = Array.from(this.selectedContributions);
-    selected.forEach(id => {
-      const contribution = this.contributions.find(c => c.id === id);
-      if (contribution) {
-        contribution.unread = false;
-      }
-    });
-    this.selectedContributions.clear();
-    this.renderContributions();
-    this.showNotification(`${selected.length} contribution(s) marked as reviewed`, 'success');
+    try {
+      await Promise.all(selected.map((id) => this.patchGiContribution(id, { is_read_admin: true })));
+      selected.forEach((id) => {
+        const contribution = this.contributions.find(c => c.id === id);
+        if (contribution) {
+          contribution.unread = false;
+          contribution.seen = true;
+        }
+      });
+      this.selectedContributions.clear();
+      this.renderContributions();
+      this.showNotification(`${selected.length} contribution(s) marked as reviewed`, 'success');
+    } catch (err) {
+      this.showNotification(err.message || 'Update failed.', 'error');
+    }
   }
 
-  markAsNew() {
+  async markAsNew() {
     const selected = Array.from(this.selectedContributions);
-    selected.forEach(id => {
-      const contribution = this.contributions.find(c => c.id === id);
-      if (contribution) {
-        contribution.unread = true;
-      }
-    });
-    this.selectedContributions.clear();
-    this.renderContributions();
-    this.showNotification(`${selected.length} contribution(s) marked as new`, 'success');
+    try {
+      await Promise.all(selected.map((id) => this.patchGiContribution(id, { is_read_admin: false })));
+      selected.forEach((id) => {
+        const contribution = this.contributions.find(c => c.id === id);
+        if (contribution) {
+          contribution.unread = true;
+          contribution.seen = false;
+        }
+      });
+      this.selectedContributions.clear();
+      this.renderContributions();
+      this.showNotification(`${selected.length} contribution(s) marked as new`, 'success');
+    } catch (err) {
+      this.showNotification(err.message || 'Update failed.', 'error');
+    }
   }
 
   snoozeContributions() {
@@ -8665,9 +9686,9 @@ class DashboardApp {
     this.renderContributions();
   }
 
-  refreshContributions() {
+  async refreshContributions() {
+    await this.loadContributionsFromApi();
     this.showNotification('Contributions refreshed', 'success');
-    this.renderContributions();
   }
 
   reportIssues() {
@@ -8678,14 +9699,19 @@ class DashboardApp {
     this.showNotification('More options menu', 'info');
   }
 
-  openContribution(id) {
+  async openContribution(id) {
     const contribution = this.contributions.find(c => c.id === id);
-    if (contribution) {
+    if (!contribution) return;
+    try {
+      await this.patchGiContribution(id, { is_read_admin: true });
       contribution.unread = false;
       contribution.seen = true;
-      this.renderContributions();
-      this.openContributionDetailModal(contribution);
+    } catch (_e) {
+      contribution.unread = false;
+      contribution.seen = true;
     }
+    this.renderContributions();
+    this.openContributionDetailModal(contribution);
   }
 
   openContributionDetailModal(contribution) {
@@ -8705,40 +9731,41 @@ class DashboardApp {
     const attachCountEl = document.getElementById('beanthenticAttachmentCount');
     const attachGridEl = document.getElementById('beanthenticAttachmentGrid');
 
-    // Sample emails based on farmer names
-    const emails = {
-      'Juan Dela Cruz': 'juan.dc@gmail.com',
-      'Maria Santos': 'maria.santos@yahoo.com',
-      'Roberto Reyes': 'roberto.reyes@gmail.com',
-      'Carmela Lopez': 'carmela.l@outlook.com'
-    };
-
-    // Sample attachments based on category
-    const attachments = contribution.category === 'images' ? [
-      { name: 'Farm_Photo_1.jpg', type: 'img' },
-      { name: 'Processing_Area.jpg', type: 'img' }
-    ] : [
-      { name: 'Document_Verification.pdf', type: 'doc' },
-      { name: 'Registration_Form.pdf', type: 'doc' }
-    ];
+    const attachments = Array.isArray(contribution.attachments) ? contribution.attachments : [];
 
     if (avatarEl) avatarEl.textContent = (contribution.farmer || 'F').charAt(0);
     if (farmerEl) farmerEl.textContent = contribution.farmer || '—';
-    if (emailEl) emailEl.textContent = emails[contribution.farmer] || 'farmer@email.com';
-    if (dateEl) dateEl.textContent = contribution.date || 'Yesterday';
+    if (emailEl) emailEl.textContent = contribution.farmer_email || '—';
+    if (dateEl) dateEl.textContent = contribution.date || '—';
     if (subjectEl) subjectEl.textContent = contribution.subject || 'Contribution Detail';
-    
-    if (previewEl) previewEl.textContent = contribution.preview || 'No details available.';
 
-    // Populate Attachments
-    if (attachCountEl) attachCountEl.textContent = `${attachments.length} Attachments`;
+    if (previewEl) previewEl.textContent = contribution.content || contribution.preview || 'No details available.';
+
+    if (attachCountEl) {
+      attachCountEl.textContent = attachments.length
+        ? `${attachments.length} Attachment${attachments.length === 1 ? '' : 's'}`
+        : 'No attachments';
+    }
     if (attachGridEl) {
-      attachGridEl.innerHTML = attachments.map(a => `
-        <div class="beanthentic-attachment-thumb">
-          <div class="beanthentic-attachment-img" style="background-image: url('assets/images/${a.type === 'img' ? 'sample-farm.jpg' : 'document-icon.png'}')"></div>
-          <div class="beanthentic-attachment-info">${a.name}</div>
-        </div>
-      `).join('');
+      if (!attachments.length) {
+        attachGridEl.innerHTML = '<p class="beanthentic-attachment-empty">No files attached.</p>';
+      } else {
+        attachGridEl.innerHTML = attachments.map((a) => {
+          const name = String(a.name || 'file');
+          const url = String(a.url || a.path || '#');
+          const mime = String(a.mime || '').toLowerCase();
+          const isImg = mime.indexOf('image/') === 0 || /\.(jpe?g|png|gif|webp)$/i.test(name);
+          const preview = isImg
+            ? `<img src="${url}" alt="${name}" style="max-width:100%;max-height:120px;object-fit:cover;border-radius:8px;">`
+            : `<div class="beanthentic-attachment-doc-icon"><i class="fa-solid fa-file-lines"></i></div>`;
+          return `
+            <a class="beanthentic-attachment-thumb" href="${url}" target="_blank" rel="noopener">
+              ${preview}
+              <div class="beanthentic-attachment-info">${name}</div>
+            </a>
+          `;
+        }).join('');
+      }
     }
 
     modal.removeAttribute('hidden');

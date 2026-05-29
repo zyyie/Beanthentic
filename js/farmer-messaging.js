@@ -116,25 +116,52 @@ class FarmerMessagingApp {
   }
 
   formatMessageTime(isoStr) {
-    if (!isoStr) return '';
-    try {
-      const d = new Date(isoStr);
-      if (isNaN(d.getTime())) return isoStr;
-      const now = new Date();
-      const diffMs = now - d;
-      const diffH = diffMs / 3600000;
-      if (diffH < 1) {
-        const mins = Math.floor(diffMs / 60000);
-        return mins <= 1 ? 'Just now' : `${mins}m ago`;
-      }
-      if (diffH < 24 && d.getDate() === now.getDate()) {
-        return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
-      }
-      if (diffH < 168) return d.toLocaleDateString(undefined, { weekday: 'short' });
-      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    } catch {
-      return isoStr;
+    const DT = window.BeanthenticDateTime;
+    if (DT && typeof DT.formatHomeDateTime === 'function') {
+      const fmt = DT.formatHomeDateTime(isoStr);
+      if (fmt) return fmt;
     }
+    const raw = String(isoStr || '').trim().replace(/\s+GMT\s*$/i, '').replace(/\s+UTC\s*$/i, '');
+    const m = raw.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+    if (!m) return '';
+    const y = +m[1];
+    const mo = +m[2];
+    const d = +m[3];
+    const h = +m[4];
+    const mi = +m[5];
+    const cal = new Date(y, mo - 1, d);
+    const dow = cal.toLocaleDateString('en-US', { weekday: 'short' });
+    const month = cal.toLocaleDateString('en-US', { month: 'short' });
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${dow} - ${month} ${d}, ${y} · ${h12}:${pad(mi)} ${ampm}`;
+  }
+
+  formatChatListTime(isoStr) {
+    const DT = window.BeanthenticDateTime;
+    if (DT && typeof DT.formatChatListTime === 'function') {
+      const fmt = DT.formatChatListTime(isoStr);
+      if (fmt) return fmt;
+    }
+    return this.formatMessageTime(isoStr);
+  }
+
+  sameMessageMinute(a, b) {
+    const DT = window.BeanthenticDateTime;
+    if (DT && typeof DT.sameWallClockMinute === 'function') {
+      return DT.sameWallClockMinute(a, b);
+    }
+    return false;
+  }
+
+  bubbleTimestamp(createdAt) {
+    const DT = window.BeanthenticDateTime;
+    if (DT && typeof DT.formatChatBubbleTime === 'function') {
+      const t = DT.formatChatBubbleTime(createdAt);
+      if (t) return t;
+    }
+    return this.formatMessageTime(createdAt);
   }
 
   renderList() {
@@ -155,7 +182,7 @@ class FarmerMessagingApp {
         const unreadClass = m.is_read ? '' : ' is-unread';
         const activeClass = m.id === this.selectedId ? ' is-active' : '';
         const initials = this.getInitials(m.sender_name);
-        const timeStr = this.formatMessageTime(m.created_at);
+        const timeStr = this.formatChatListTime(m.created_at);
         const preview = (m.body || '').substring(0, 100);
 
         return `<li class="messaging-item${unreadClass}${activeClass}" data-msg-id="${m.id}">
@@ -184,7 +211,7 @@ class FarmerMessagingApp {
           const adminClass = isAdmin ? ' messaging-message--admin' : '';
           const senderName = isSentByMe ? (msg.sender_name || 'Me') : 'Administrator';
           const avatarInitials = isSentByMe ? this.getInitials(senderName) : 'AD';
-          const timeStr = this.formatMessageTime(msg.created_at);
+          const timeStr = this.bubbleTimestamp(msg.created_at);
           return `
           <div class="messaging-message messaging-message--${direction}${adminClass}">
             <div class="messaging-message__avatar">${esc(avatarInitials)}</div>
@@ -205,7 +232,7 @@ class FarmerMessagingApp {
     const adminClass = isAdmin ? ' messaging-message--admin' : '';
     const senderName = isSentByMe ? (message.sender_name || 'Me') : 'Administrator';
     const avatarInitials = isSentByMe ? this.getInitials(senderName) : 'AD';
-    const timeStr = this.formatMessageTime(message.created_at);
+    const timeStr = this.bubbleTimestamp(message.created_at);
     return `
       <div class="messaging-message messaging-message--${direction}${adminClass}">
         <div class="messaging-message__avatar">${esc(avatarInitials)}</div>

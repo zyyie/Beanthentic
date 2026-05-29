@@ -32,6 +32,25 @@ def load_users() -> dict:
         return {}
 
 
+def resolve_user_phone_key(users: dict, phone_digits: str) -> str | None:
+    """
+    Find the users.json key for a normalized 10-digit PH mobile number.
+    Handles legacy keys like 09XXXXXXXXX.
+    """
+    from config.validation import validate_phone
+
+    target = (phone_digits or "").strip()
+    if not target:
+        return None
+    if target in users:
+        return target
+    for key in users:
+        ok, _, normalized = validate_phone(str(key))
+        if ok and normalized == target:
+            return str(key)
+    return None
+
+
 def save_users(users: dict) -> None:
     """Save users to JSON file."""
     USER_DB.write_text(json.dumps(users, indent=2), encoding="utf-8")
@@ -101,6 +120,21 @@ def load_settings() -> dict:
             "two_factor_enabled": False,
             "two_factor_secret": None,
             "backup_codes": [],
+        },
+        "sms": {
+            "enabled": True,
+            "provider": "sms_gateway",
+            "sender_name": "Beanthentic",
+            "public_base_url": "http://127.0.0.1:5000",
+            "sms_gateway": {
+                "mode": "local",
+                "local_base_url": "",
+                "local_path": "/message",
+                "cloud_url": "https://api.sms-gate.app/3rdparty/v1/messages",
+                "username": "",
+                "password": "",
+                "sim_number": 1,
+            },
         },
     }
 

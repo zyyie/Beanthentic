@@ -13,6 +13,16 @@
   },
   "9493380766": {
     "full_name": "Eliaza Mae Malibiran",
-    "password_hash": "scrypt:32768:8:1$DzTBr61m5Q6gaZIV$e5a6c0a527e456e8db169a16fa3d71fb83f1cdac842a7bf77f9cfc09a47a803a6b10df52482b7ea80b7ee8cac1686328a04c4dd9e18020084b5f2039d426214d"
+    "password_hash": "scrypt:32768:8:1$qdVvuiKkVV67UU94$713931535439d934bdad37fbbf2ca93f62e6acb0cae5ba918c46c039e107063676239e8262c8db3e0dfb880c9f531ae91fd649816f57bf90034ec139f7ef27c8",
+    "first_name": "Eliaza",
+    "last_name": "Mae Malibiran"
+  },
+  "9920993078": {
+    "full_name": "Nyco Alec Balaogan",
+    "password_hash": "scrypt:32768:8:1$sR2cVeW4U8TwyrrH$3315b1ebcc072bdb58a64f54b1decbc3bfec05489fbe4d8132d53f7ffd7b70d97bc104fb8657066eab96ec91093a026c6b072d6ed935c9f5699528279d47b70b"
+  },
+  "9296476200": {
+    "full_name": "Eliaza Mae Malibiran",
+    "password_hash": "scrypt:32768:8:1$XaCyuE9PxDXlud5F$6bf78e841626f9689182a38a1b42d87b08762d1f88753d92c7e4132b19d146d55bba21698ccd326bf495713d2ca00eb10d72c45d41d501744c8f3abd129c236a"
   }
 }
