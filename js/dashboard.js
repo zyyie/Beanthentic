@@ -6343,6 +6343,77 @@ class DashboardApp {
     pill.textContent = this.formatCoordinatePill(lat, lng);
   }
 
+  getMapVarietyLabel(variety) {
+    const key = (variety || this.mapVarietyFilter || 'liberica').toString().trim().toLowerCase();
+    if (key === 'robusta') return 'Robusta';
+    if (key === 'excelsa') return 'Excelsa';
+    return 'Liberica';
+  }
+
+  buildMapInfoWindowHtml(point) {
+    const variety = (this.mapVarietyFilter || 'liberica').toString().trim().toLowerCase();
+    const varietyLabel = this.getMapVarietyLabel(variety);
+    const title = this.escapeHtml(point.barangay || 'Unknown');
+    const farmers = Number(point.count || 0);
+    const coords = this.escapeHtml(this.formatCoordinatePill(point.lat, point.lng));
+    const areaHa = Number(point.areaHa);
+    const productionKg = Number(point.productionKg);
+    const totalFarmers = Number(point.totalFarmers);
+
+    const stats = [
+      {
+        icon: 'fa-users',
+        value: farmers.toLocaleString(),
+        label: farmers === 1 ? 'Farmer' : 'Farmers',
+      },
+    ];
+    if (Number.isFinite(areaHa) && areaHa > 0) {
+      stats.push({
+        icon: 'fa-chart-area',
+        value: areaHa.toLocaleString(undefined, { maximumFractionDigits: 2 }),
+        label: 'Area (ha)',
+      });
+    }
+    if (Number.isFinite(productionKg) && productionKg > 0) {
+      stats.push({
+        icon: 'fa-seedling',
+        value: productionKg.toLocaleString(),
+        label: 'Production (kg)',
+      });
+    } else if (Number.isFinite(totalFarmers) && totalFarmers > farmers) {
+      stats.push({
+        icon: 'fa-user-group',
+        value: totalFarmers.toLocaleString(),
+        label: 'Total farmers',
+      });
+    }
+
+    const statsHtml = stats
+      .map(
+        (stat) => `<div class="map-info-popup__stat">
+          <span class="map-info-popup__stat-icon" aria-hidden="true"><i class="fa-solid ${stat.icon}"></i></span>
+          <span class="map-info-popup__stat-value">${this.escapeHtml(stat.value)}</span>
+          <span class="map-info-popup__stat-label">${this.escapeHtml(stat.label)}</span>
+        </div>`
+      )
+      .join('');
+
+    return `<div class="map-info-popup map-info-popup--${this.escapeHtml(variety)}" role="dialog" aria-label="${title} barangay details">
+      <div class="map-info-popup__header">
+        <span class="map-info-popup__pin" aria-hidden="true"><i class="fa-solid fa-location-dot"></i></span>
+        <div class="map-info-popup__heading">
+          <h3 class="map-info-popup__title">${title}</h3>
+          <p class="map-info-popup__subtitle">Barangay · Lipa City, Batangas</p>
+        </div>
+      </div>
+      <div class="map-info-popup__stats">${statsHtml}</div>
+      <div class="map-info-popup__footer">
+        <span class="map-info-popup__variety"><i class="fa-solid fa-mug-hot" aria-hidden="true"></i> ${this.escapeHtml(varietyLabel)}</span>
+        <span class="map-info-popup__coords" title="Coordinates"><i class="fa-solid fa-crosshairs" aria-hidden="true"></i> ${coords}</span>
+      </div>
+    </div>`;
+  }
+
   isLipaPdfBarangay(name) {
     return !!this.getCanonicalLipaBarangay(name);
   }
@@ -6629,7 +6700,7 @@ class DashboardApp {
         ? []
         : [{ featureType: 'road', elementType: 'all', stylers: [{ visibility: 'off' }] }],
     });
-    this.googleInfoWindow = new window.google.maps.InfoWindow();
+    this.googleInfoWindow = new window.google.maps.InfoWindow({ maxWidth: 300 });
     this.drawLipaCityBoundary();
   }
 
@@ -6661,14 +6732,7 @@ class DashboardApp {
       marker.addListener('click', () => {
         if (!this.googleInfoWindow) return;
         this.updateMapCoordPill(point.lat, point.lng);
-        this.googleInfoWindow.setContent(
-          `<div style="min-width:190px"><strong>${point.barangay}</strong><br/>Farmers: ${point.count}<br/>Coordinates: ${this.formatCoordinatePill(
-            point.lat,
-            point.lng
-          )}<br/>Variety: ${(
-            this.mapVarietyFilter || 'liberica'
-          ).toUpperCase()}</div>`
-        );
+        this.googleInfoWindow.setContent(this.buildMapInfoWindowHtml(point));
         this.googleInfoWindow.open(this.googleMap, marker);
       });
       this.googleMapMarkers.push(marker);
