@@ -1,6 +1,4 @@
-/* Base styles and reset — Inter (matches dashboard headings e.g. Calendar) */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;500;600;700;800&display=swap");
-
+/* Base styles and reset */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -9,7 +7,7 @@
 
 :root {
   /* Typography */
-  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
   --font-weight-thin: 100;
   --font-weight-light: 300;
