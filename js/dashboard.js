@@ -5901,23 +5901,9 @@ class DashboardApp {
   }
 
   showIpophlNotification(message) {
-    // Create a simple notification for IPOPHL actions
     const notification = document.createElement('div');
     notification.className = 'ipophl-notification';
     notification.textContent = message;
-    notification.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: #8B4A2B;
-      color: white;
-      padding: 15px 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      z-index: 1000;
-      max-width: 300px;
-    `;
-    
     document.body.appendChild(notification);
     
     setTimeout(() => {
