@@ -43,6 +43,8 @@ from config.validation import (
     validate_uuid_like,
 )
 from config.utils import get_current_user_phone, is_authenticated, log_activity
+from api.gi_contributions_api import publish_ipophl_registration_to_gi_updates
+from config.ipophl_store import list_documents
 
 
 def _is_db_error(exc: BaseException) -> bool:
@@ -639,3 +641,77 @@ def register_ipophl_routes(app):
 
         except Exception as e:
             return jsonify({"error": safe_error_message(e, public="Failed to list documents.")}), 500
+
+    @app.route("/api/ipophl/complete-registration", methods=["POST"])
+    def api_ipophl_complete_registration():
+        """Publish Phase 5 IPOPHL files to all farmers' GI Updates (mobile app)."""
+        if not is_authenticated():
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+        body = request.get_json(silent=True) or {}
+        if not isinstance(body, dict):
+            body = {}
+
+        file_uuids: list[str] = []
+        raw_uuids = body.get("file_uuids")
+        if isinstance(raw_uuids, list):
+            file_uuids = [str(u).strip() for u in raw_uuids if str(u).strip()]
+
+        if not file_uuids:
+            task_ids = body.get("task_ids")
+            if not isinstance(task_ids, list) or not task_ids:
+                task_ids = ["phase5-cert", "phase5-compliance"]
+            seen: set[str] = set()
+            for task_id in task_ids:
+                tid = str(task_id or "").strip()
+                if not tid:
+                    continue
+                for record in list_documents(task_id=tid, limit=50):
+                    uid = str(record.get("file_uuid") or "").strip()
+                    if uid and uid not in seen:
+                        seen.add(uid)
+                        file_uuids.append(uid)
+
+        if not file_uuids:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "No registration files found. Upload Phase 5 documents first.",
+                }
+            ), 400
+
+        title = str(body.get("title") or "").strip() or None
+        content = str(body.get("content") or "").strip() or None
+        category = str(body.get("category") or "ipophl_registration").strip() or "ipophl_registration"
+
+        try:
+            result = publish_ipophl_registration_to_gi_updates(
+                file_uuids=file_uuids,
+                title=title,
+                content=content,
+                category=category,
+            )
+            try:
+                user_phone = get_current_user_phone()
+                sent = int(result.get("sent_count") or len(result.get("gi_update_ids") or []))
+                log_activity(
+                    user_phone,
+                    "IPOPHL_REGISTRATION_PUBLISHED",
+                    f"Published {len(file_uuids)} file(s) to GI Updates ({sent} farmer inbox(es))",
+                    request.remote_addr,
+                )
+            except Exception:
+                pass
+            return jsonify({"ok": True, "file_count": len(file_uuids), **result})
+        except ValueError as e:
+            return jsonify({"ok": False, "error": str(e)}), 400
+        except Exception as e:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": safe_error_message(
+                        e,
+                        public="Could not publish to GI Updates. Check app_server_base in settings.json.",
+                    ),
+                }
+            ), 503

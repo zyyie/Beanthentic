@@ -33,6 +33,7 @@ GI_ALLOWED_EXTENSIONS = frozenset(
 )
 GI_MAX_FILE_BYTES = 15 * 1024 * 1024
 GI_MAX_FILES = 5
+IPOPHL_GI_MAX_FILES = 10
 
 
 def _gi_http_bases() -> list[str]:
@@ -99,6 +100,164 @@ def _upload_files_for_http(uploads) -> list[tuple[str, str, bytes, str | None]]:
     return out
 
 
+def _multipart_files_from_disk(disk_files: list[tuple[str, Path]]) -> list[tuple[str, str, bytes, str | None]]:
+    """Build HTTP multipart file tuples from files on disk (e.g. IPOPHL uploads on admin web.py)."""
+    out: list[tuple[str, str, bytes, str | None]] = []
+    for original, path in disk_files[:IPOPHL_GI_MAX_FILES]:
+        if not path.is_file():
+            continue
+        ext = path.suffix.lower()
+        if ext not in GI_ALLOWED_EXTENSIONS:
+            continue
+        size = path.stat().st_size
+        if size <= 0 or size > GI_MAX_FILE_BYTES:
+            continue
+        name = secure_filename(original) or path.name
+        mime = mimetypes.guess_type(name)[0]
+        out.append(("files", name, path.read_bytes(), mime))
+    return out
+
+
+def _load_ipophl_disk_files(file_uuids: list[str]) -> list[tuple[str, Path]]:
+    from config.ipophl_store import get_document, resolve_file_path
+
+    out: list[tuple[str, Path]] = []
+    seen: set[str] = set()
+    for raw in file_uuids:
+        file_uuid = str(raw or "").strip()
+        if not file_uuid or file_uuid in seen:
+            continue
+        seen.add(file_uuid)
+        record = get_document(file_uuid)
+        hint = str(record.get("original_filename") or "") if record else None
+        path = resolve_file_path(file_uuid, filename_hint=hint or None)
+        if not path or not path.is_file():
+            continue
+        name = str((record or {}).get("original_filename") or path.name)
+        out.append((name, path))
+        if len(out) >= IPOPHL_GI_MAX_FILES:
+            break
+    return out
+
+
+def _save_gi_attachments_from_paths(disk_files: list[tuple[str, Path]]) -> list[dict]:
+    GI_CONTRIB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    base_url = _public_base_url()
+    attachments: list[dict] = []
+    for original, path in disk_files[:IPOPHL_GI_MAX_FILES]:
+        if not path.is_file():
+            continue
+        ext = path.suffix.lower()
+        if ext not in GI_ALLOWED_EXTENSIONS:
+            continue
+        size = path.stat().st_size
+        if size <= 0 or size > GI_MAX_FILE_BYTES:
+            continue
+        name = secure_filename(original) or path.name
+        stored = f"{uuid.uuid4().hex}{ext}"
+        dest = GI_CONTRIB_UPLOAD_DIR / stored
+        dest.write_bytes(path.read_bytes())
+        rel = f"uploads/gi_contributions/{stored}"
+        url = f"{base_url.rstrip('/')}/{rel}" if base_url else rel
+        mime = mimetypes.guess_type(name)[0] or ""
+        attachments.append(
+            {
+                "name": name,
+                "filename": name,
+                "path": rel,
+                "url": url,
+                "mime": mime,
+                "type": mime,
+                "size": size,
+            }
+        )
+    return attachments
+
+
+def publish_ipophl_registration_to_gi_updates(
+    *,
+    file_uuids: list[str],
+    title: str | None = None,
+    content: str | None = None,
+    category: str = "ipophl_registration",
+) -> dict:
+    """
+    Broadcast IPOPHL Phase 5 registration files to all farmers' GI Updates inbox (mobile app).
+    Uses HTTP bridge to app_server_base when admin web.py runs on a different device than MySQL.
+    """
+    disk_files = _load_ipophl_disk_files(file_uuids)
+    if not disk_files:
+        raise ValueError(
+            "No registration files found. Upload documents in Phase 5 before completing registration."
+        )
+
+    doc_title = (title or "GI Registration — IPOPHL Documents").strip()[:255]
+    names = ", ".join(n for n, _ in disk_files)
+    doc_content = (content or "").strip()
+    if not doc_content:
+        doc_content = (
+            "Official IPOPHL GI registration documents are now available in GI Updates.\n\n"
+            f"Attached files: {names}\n\n"
+            f"Published: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC"
+        )
+    sender_name = "IPOPHL Administrator"
+
+    http_err: Exception | None = None
+    mysql_err: Exception | None = None
+
+    if _prefer_http_for_gi_send() and _gi_http_bases():
+        try:
+            data = _send_gi_via_http(
+                send_to_all=True,
+                farmer_id=0,
+                title=doc_title,
+                content=doc_content,
+                category=category[:64],
+                sender_name=sender_name[:255],
+                uploads=[],
+                disk_files=disk_files,
+            )
+            data["source"] = "app_server_http"
+            return data
+        except Exception as e:
+            http_err = e
+
+    try:
+        attachments = _save_gi_attachments_from_paths(disk_files)
+        farmer_ids = _list_active_farmer_ids()
+        if not farmer_ids:
+            raise RuntimeError("No farmers found in the database.")
+        created_ids: list[int] = []
+        for fid in farmer_ids:
+            created_ids.append(
+                _insert_admin_submission(
+                    farmer_id=fid,
+                    title=doc_title,
+                    content=doc_content,
+                    category=category[:64],
+                    attachments=attachments,
+                    sender_name=sender_name[:255],
+                )
+            )
+        return {
+            "ok": True,
+            "broadcast": True,
+            "sent_count": len(created_ids),
+            "gi_update_ids": created_ids,
+            "attachments": attachments,
+            "source": "app_mysql",
+        }
+    except Exception as e:
+        mysql_err = e
+
+    detail = friendly_load_failure(
+        module_label="IPOPHL registration → GI Updates",
+        mysql_error=mysql_err,
+        http_error=http_err,
+    )
+    raise RuntimeError(detail)
+
+
 def _send_gi_via_http(
     *,
     send_to_all: bool,
@@ -108,6 +267,7 @@ def _send_gi_via_http(
     category: str,
     sender_name: str,
     uploads,
+    disk_files: list[tuple[str, Path]] | None = None,
 ) -> dict:
     fields = {
         "send_to_all": "1" if send_to_all else "0",
@@ -119,6 +279,9 @@ def _send_gi_via_http(
     if not send_to_all and farmer_id > 0:
         fields["farmer_id"] = str(farmer_id)
     files = _upload_files_for_http(uploads)
+    files.extend(_multipart_files_from_disk(disk_files or []))
+    if len(files) > IPOPHL_GI_MAX_FILES:
+        files = files[:IPOPHL_GI_MAX_FILES]
     last_err: Exception | None = None
     for base in _gi_http_bases():
         try:

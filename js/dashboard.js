@@ -5471,29 +5471,107 @@ class DashboardApp {
     return hasAttachments;
   }
 
-  completeRegistration() {
-    // Collect all phase data (no validation required since users can navigate freely)
+  collectPhase5FileUuids() {
+    const services = ['phase5-cert', 'phase5-compliance'];
+    const uuids = [];
+    const seen = new Set();
+    services.forEach((service) => {
+      const files = this.ipophlFiles?.[service] || [];
+      files.forEach((f) => {
+        const id = f.id || f.file_uuid;
+        if (id && !seen.has(id)) {
+          seen.add(id);
+          uuids.push(id);
+        }
+      });
+    });
+    return uuids;
+  }
+
+  async completeRegistration() {
     const allAttachments = this.collectAllPhaseData();
-    
-    // Check if there's any data at all
-    const hasAnyData = Object.values(allAttachments).some(phase => 
-      (phase.files && phase.files.length > 0) || (phase.links && phase.links.length > 0)
+    let fileUuids = this.collectPhase5FileUuids();
+
+    if (fileUuids.length === 0) {
+      const phase5 = allAttachments.phase5;
+      if (phase5?.files?.length) {
+        phase5.files.forEach((f) => {
+          const id = f.id || f.file_uuid;
+          if (id) fileUuids.push(id);
+        });
+      }
+    }
+
+    const hasAnyData = Object.values(allAttachments).some(
+      (phase) =>
+        (phase.files && phase.files.length > 0) || (phase.links && phase.links.length > 0)
     );
-    
-    if (!hasAnyData) {
-      this.showIpophlNotification('Please upload at least one file or add one link before completing registration.');
+
+    if (!fileUuids.length && !hasAnyData) {
+      this.showIpophlNotification(
+        'Please upload at least one registration document in Phase 5 before completing.'
+      );
       return;
     }
-    
-    // Send email with registration data
-    this.sendRegistrationEmail(allAttachments);
-    
-    this.showIpophlNotification('GI Registration completed! Email sent to IPOPHL.');
-    
-    console.log('Completed GI Registration:', {
-      phases: allAttachments,
-      completedAt: new Date().toISOString()
-    });
+
+    const phase5TaskIds = ['phase5-cert', 'phase5-compliance'];
+
+    const completeBtn = document.querySelector('#ipophl-module .complete-btn');
+    const prevLabel = completeBtn?.textContent || 'Complete Registration';
+    if (completeBtn) {
+      completeBtn.disabled = true;
+      completeBtn.textContent = 'Publishing to GI Updates…';
+    }
+
+    try {
+      const res = await fetch('/api/ipophl/complete-registration', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file_uuids: fileUuids,
+          task_ids: phase5TaskIds,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) {
+        const err =
+          data.error ||
+          data.message ||
+          data.detail ||
+          'Could not send files to farmers\' GI Updates page.';
+        throw new Error(err);
+      }
+      const sent = data.sent_count || (data.gi_update_ids && data.gi_update_ids.length) || 0;
+      this.showIpophlNotification(
+        sent
+          ? `GI Registration complete! Documents published to GI Updates for ${sent} farmer(s).`
+          : 'GI Registration complete! Documents published to GI Updates.'
+      );
+
+      if (hasAnyData) {
+        this.sendRegistrationEmail(allAttachments);
+        this.showIpophlNotification('Opening Gmail to notify IPOPHL…');
+      }
+
+      console.log('Completed GI Registration:', {
+        fileUuids,
+        completedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('Complete registration failed:', err);
+      let msg = err.message || 'Failed to publish to GI Updates.';
+      if (msg === 'Failed to fetch') {
+        msg =
+          'Could not reach the admin server. Restart web.py and confirm settings.json app_server_base points to the app device (port 8080).';
+      }
+      this.showIpophlNotification(msg);
+    } finally {
+      if (completeBtn) {
+        completeBtn.disabled = false;
+        completeBtn.textContent = prevLabel;
+      }
+    }
   }
 
   sendRegistrationEmail(registrationData) {
