@@ -6092,6 +6092,32 @@ body.dashboard-page #maps-module #mapsSearchInput:focus {
   box-shadow: 0 0 0 4px rgba(44, 122, 62, 0.1);
 }
 
+body.dashboard-page #maps-module .maps-api-key-banner {
+  margin: 0 0 1rem;
+  padding: 1rem 1.15rem;
+  border-radius: 12px;
+  border: 1px solid #fcd34d;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  color: #78350f;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+body.dashboard-page #maps-module .maps-api-key-banner p {
+  margin: 0 0 0.5rem;
+}
+
+body.dashboard-page #maps-module .maps-api-key-banner p:last-child {
+  margin-bottom: 0;
+}
+
+body.dashboard-page #maps-module .maps-api-key-banner code {
+  font-size: 0.82rem;
+  background: rgba(255, 255, 255, 0.65);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
 body.dashboard-page #maps-module .maps-toolbar__variety {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -6445,13 +6471,28 @@ body.dashboard-page #maps-module .trees-mini-grid span {
   color: #62544a;
 }
 
-body.dashboard-page #maps-module .map-layers-list li {
+body.dashboard-page #maps-module .map-layers-list li,
+body.dashboard-page #maps-module .map-layer-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: 0.95rem;
   font-weight: 700;
   color: #4a5568;
+  border-radius: 12px;
+  padding: 0.65rem 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  user-select: none;
+}
+
+body.dashboard-page #maps-module .map-layer-row:hover {
+  background: #f0fdf4;
+}
+
+body.dashboard-page #maps-module .map-layer-row:focus-visible {
+  outline: 2px solid #2c7a3e;
+  outline-offset: 2px;
 }
 
 body.dashboard-page #maps-module .layer-toggle {
@@ -6548,8 +6589,8 @@ body.dashboard-page .gm-ui-hover-effect > span {
 }
 
 .map-info-popup {
-  min-width: 240px;
-  max-width: 280px;
+  min-width: 260px;
+  max-width: 320px;
   font-family: var(--font-sans);
   color: #1e293b;
   overflow: hidden;
@@ -6749,12 +6790,17 @@ body.dashboard-page #ipophl-module .gi-status-card {
   background: #ffffff;
 }
 
+body.dashboard-page #ipophl-module .phase-progress-panel {
+  margin: 0.5rem 0 2.5rem;
+  padding-bottom: 0.25rem;
+}
+
 body.dashboard-page #ipophl-module .phase-progress {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   align-items: start;
   justify-items: center;
-  margin: 0.35rem 0 0.75rem;
+  margin: 0;
   padding: 0 0.75rem;
   gap: 0;
 }
@@ -6779,25 +6825,47 @@ body.dashboard-page #ipophl-module .progress-step {
   min-width: 0;
 }
 
-body.dashboard-page #ipophl-module .step-number {
+body.dashboard-page #ipophl-module .step-icon {
   width: 52px;
   height: 52px;
   flex-shrink: 0;
+  border-radius: 50%;
   border: 2px solid rgba(15, 23, 42, 0.12);
   background: #ffffff;
-  color: #111827;
+  color: #475569;
   box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
 }
 
-body.dashboard-page #ipophl-module .progress-step.active .step-number {
+body.dashboard-page #ipophl-module .step-icon__done {
+  display: none;
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+body.dashboard-page #ipophl-module .progress-step.completed .step-icon__phase {
+  display: none;
+}
+
+body.dashboard-page #ipophl-module .progress-step.completed .step-icon__done {
+  display: block;
+}
+
+body.dashboard-page #ipophl-module .progress-step.active .step-icon {
   background: linear-gradient(135deg, #2c7a3e 0%, #38a169 100%);
   border-color: transparent;
   color: #ffffff;
-  transform: none;
 }
 
-body.dashboard-page #ipophl-module .progress-step.completed .step-number {
-  transform: none;
+body.dashboard-page #ipophl-module .progress-step.completed .step-icon {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #ffffff;
 }
 
 body.dashboard-page #ipophl-module .step-title {
@@ -6823,30 +6891,10 @@ body.dashboard-page #ipophl-module .step-title {
   }
 }
 
-body.dashboard-page #ipophl-module .phase-header {
-  margin-bottom: 1rem;
-  border-radius: 16px;
-  border: 1px solid rgba(44, 122, 62, 0.3);
-  border-left: 8px solid #2c7a3e;
-  background: linear-gradient(135deg, rgba(240, 248, 241, 0.95), rgba(255, 255, 255, 0.95));
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
-}
-
-body.dashboard-page #ipophl-module .phase-header h2 {
-  color: #1b4332;
-  font-size: 1.05rem;
-  font-weight: 900;
-}
-
-body.dashboard-page #ipophl-module .phase-header p {
-  color: #334155;
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
 body.dashboard-page #ipophl-module .phase-tasks {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
+  margin-top: 0.25rem;
 }
 
 body.dashboard-page #ipophl-module .task-card {
@@ -6901,6 +6949,60 @@ body.dashboard-page #ipophl-module .file-upload-zone {
 
 body.dashboard-page #ipophl-module .file-upload-zone i {
   color: #2c7a3e;
+}
+
+body.dashboard-page #ipophl-module .attached-files .file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+body.dashboard-page #ipophl-module .attached-files .file-status-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+body.dashboard-page #ipophl-module .attached-files .file-actions {
+  display: flex;
+  gap: 6px;
+}
+
+body.dashboard-page #ipophl-module .attached-files .file-action-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding: 0;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+body.dashboard-page #ipophl-module .attached-files .file-action-btn.ai-analysis {
+  color: #15803d;
+}
+
+body.dashboard-page #ipophl-module .attached-files .file-action-btn.delete {
+  color: #dc2626;
+}
+
+body.dashboard-page #ipophl-module .attached-files .file-action-btn {
+  pointer-events: auto !important;
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
+}
+
+body.dashboard-page #ipophl-module .attached-files .file-status-actions {
+  position: relative;
+  z-index: 2;
 }
 
 body.dashboard-page #ipophl-module .phase-actions {

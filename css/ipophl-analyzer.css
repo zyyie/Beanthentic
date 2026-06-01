@@ -13,10 +13,18 @@
     -webkit-backdrop-filter: blur(10px);
 }
 
+.modal[hidden] {
+    display: none !important;
+}
+
 .modal.active {
-    display: flex;
+    display: flex !important;
     align-items: center;
     justify-content: center;
+}
+
+body.modal-open {
+    overflow: hidden;
 }
 
 .modal-content {

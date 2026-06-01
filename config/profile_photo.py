@@ -5,9 +5,18 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from config.validation import ALLOWED_PROFILE_PHOTO_EXTENSIONS
+from config.validation import ALLOWED_PROFILE_PHOTO_EXTENSIONS, validate_phone
 
 PROFILE_PHOTOS_DIR = Path(__file__).resolve().parents[1] / "data" / "profile_photos"
+
+
+def normalize_profile_phone_key(phone: str) -> str:
+    """Use a stable 10-digit key for profile photo filenames."""
+    raw = str(phone or "").strip()
+    if not raw:
+        return ""
+    ok, _, normalized = validate_phone(raw)
+    return normalized if ok else raw
 
 
 def ensure_profile_photos_dir() -> None:
@@ -16,7 +25,7 @@ def ensure_profile_photos_dir() -> None:
 
 def profile_photo_file(phone: str) -> Path | None:
     """Return existing profile photo path for phone, if any."""
-    key = str(phone or "").strip()
+    key = normalize_profile_phone_key(phone)
     if not key:
         return None
     for ext in ALLOWED_PROFILE_PHOTO_EXTENSIONS:
@@ -34,8 +43,8 @@ def profile_photo_url(phone: str) -> str | None:
 
 def migrate_profile_photo_key(old_phone: str, new_phone: str) -> None:
     """Rename stored profile photo when admin phone key changes."""
-    old_key = str(old_phone or "").strip()
-    new_key = str(new_phone or "").strip()
+    old_key = normalize_profile_phone_key(old_phone)
+    new_key = normalize_profile_phone_key(new_phone)
     if not old_key or not new_key or old_key == new_key:
         return
     path = profile_photo_file(old_key)
@@ -53,7 +62,7 @@ def migrate_profile_photo_key(old_phone: str, new_phone: str) -> None:
 def save_profile_photo(phone: str, file_storage, *, ext: str) -> Path:
     """Save uploaded bytes for phone; removes other extensions first."""
     ensure_profile_photos_dir()
-    key = str(phone or "").strip()
+    key = normalize_profile_phone_key(phone)
     if not key:
         raise ValueError("Invalid user.")
 

@@ -2,6 +2,7 @@
 Dashboard and settings routes for Beanthentic application.
 """
 
+import json
 import os
 from datetime import datetime
 
@@ -9,6 +10,7 @@ from flask import jsonify, redirect, render_template, request, send_file, sessio
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from config.models import ActivityLogEntry
+from config.google_maps import get_google_maps_api_key, google_maps_key_is_production
 from config.profile_photo import (
     migrate_profile_photo_key,
     profile_photo_file,
@@ -23,11 +25,13 @@ from config.validation import (
     validate_profile_photo_upload,
 )
 from config.utils import (
+    get_current_admin_account,
     get_current_user_phone,
     is_authenticated,
     load_settings,
     load_users,
     log_activity,
+    resolve_user_phone_key,
     save_settings,
     save_users,
 )
@@ -35,8 +39,6 @@ from config.utils import (
 
 def register_dashboard_routes(app):
     """Register dashboard and settings routes with the Flask app."""
-    demo_google_maps_api_key = "AIzaSyDC_FHQoHhtZA883eOefAbbzKYs58qElhg"
-
     @app.route("/dashboard")
     def dashboard():
         """Main dashboard page (admin only)."""
@@ -47,12 +49,13 @@ def register_dashboard_routes(app):
         users = load_users()
         user = users.get(phone, {})
         full_name = user.get("full_name") or session.get("user_name") or phone
-        google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY", "").strip() or demo_google_maps_api_key
+        google_maps_api_key = get_google_maps_api_key()
         return render_template(
             "templates/dashboard.html",
             user_phone=phone,
             user_full_name=full_name,
             google_maps_api_key=google_maps_api_key,
+            google_maps_key_is_production=google_maps_key_is_production(google_maps_api_key),
         )
 
     @app.route("/settings")
@@ -89,35 +92,77 @@ def register_dashboard_routes(app):
             return jsonify({"error": "Unauthorized"}), 401
 
         settings = load_settings()
-        user_phone = get_current_user_phone() or ""
-        users = load_users()
-        user = users.get(user_phone, {})
+        account = get_current_admin_account()
+        user = account["user"]
         notifications = settings.get("notifications", {})
         sec = settings.get("security", {})
         tf_enabled = bool(sec.get("two_factor_enabled"))
+        storage_phone = (
+            account["storage_phone"]
+            or account["display_phone"]
+            or account["phone_key"]
+            or (get_current_user_phone() or "")
+        ).strip()
+        app_cfg = settings.get("app") if isinstance(settings.get("app"), dict) else {}
 
-        photo_url = profile_photo_url(user_phone) if user_phone else None
-        full_name = user.get("full_name") or session.get("user_name", "")
-        first_name = (user.get("first_name") or "").strip()
-        last_name = (user.get("last_name") or "").strip()
-        if not first_name and full_name:
-            parts = full_name.split(None, 1)
-            first_name = parts[0] if parts else ""
-            last_name = parts[1] if len(parts) > 1 else ""
+        photo_url = profile_photo_url(storage_phone) if storage_phone else None
         return jsonify(
             {
                 "notifications": notifications,
                 "security": {
                     "two_factor_enabled": tf_enabled,
                 },
+                "app": {
+                    "version": str(app_cfg.get("version") or "1.0.0"),
+                    "release_label": str(app_cfg.get("release_label") or ""),
+                },
                 "user": {
-                    "phone": user_phone,
-                    "full_name": full_name,
-                    "first_name": first_name,
-                    "last_name": last_name,
+                    "phone": account["display_phone"],
+                    "full_name": account["full_name"],
+                    "first_name": account["first_name"],
+                    "last_name": account["last_name"],
                     "profile_photo_url": photo_url,
                     "deactivated": bool(user.get("deactivated")),
                 },
+            }
+        )
+
+    @app.route("/api/app/version", methods=["GET"])
+    def api_app_version():
+        """Current app version (for Account → Check for updates)."""
+        if not is_authenticated():
+            return jsonify({"error": "Unauthorized"}), 401
+
+        settings = load_settings()
+        app_cfg = settings.get("app") if isinstance(settings.get("app"), dict) else {}
+        version = str(app_cfg.get("version") or "1.0.0").strip()
+        release_label = str(app_cfg.get("release_label") or "").strip()
+        remote_url = str(app_cfg.get("update_check_url") or "").strip()
+
+        latest_version = version
+        update_available = False
+        release_notes = ""
+
+        if remote_url.startswith(("http://", "https://")):
+            try:
+                import urllib.request
+
+                with urllib.request.urlopen(remote_url, timeout=8) as resp:
+                    payload = json.loads(resp.read().decode("utf-8"))
+                if isinstance(payload, dict):
+                    latest_version = str(payload.get("version") or latest_version).strip()
+                    release_notes = str(payload.get("notes") or payload.get("message") or "").strip()
+                    update_available = latest_version != version
+            except Exception:
+                pass
+
+        return jsonify(
+            {
+                "version": version,
+                "latest_version": latest_version,
+                "release_label": release_label,
+                "update_available": update_available,
+                "release_notes": release_notes,
             }
         )
 
@@ -318,26 +363,34 @@ def register_dashboard_routes(app):
         if not ok_name:
             return jsonify({"error": name_err}), 400
 
-        user_phone = get_current_user_phone() or ""
+        account = get_current_admin_account()
         users = load_users()
-        if user_phone not in users:
-            return jsonify({"error": "Account not found"}), 404
+        user_phone = account["phone_key"]
+        if not account["has_users_record"]:
+            return jsonify(
+                {
+                    "error": "Account record is missing. Sign out and sign in again, or contact an administrator.",
+                }
+            ), 404
 
         phone_in = (request.form.get("phone") or "").strip()
-        new_phone = user_phone
+        new_phone = account["storage_phone"] or user_phone
         if phone_in:
             ok_phone, phone_err, new_phone = validate_phone(phone_in)
             if not ok_phone:
                 return jsonify({"error": phone_err}), 400
 
-        if new_phone != user_phone:
-            if new_phone in users:
+        resolved_current = resolve_user_phone_key(users, user_phone) or user_phone
+        if new_phone != resolved_current and new_phone != account["storage_phone"]:
+            if new_phone in users or resolve_user_phone_key(users, new_phone):
                 return jsonify({"error": "Phone number is already registered."}), 400
-            record = users.pop(user_phone)
+            record = users.pop(resolved_current, users.get(user_phone, {}))
             users[new_phone] = record
-            migrate_profile_photo_key(user_phone, new_phone)
+            migrate_profile_photo_key(resolved_current, new_phone)
             user_phone = new_phone
             session["user_phone"] = new_phone
+        else:
+            user_phone = resolved_current
 
         user = users[user_phone]
         user["full_name"] = full_name
@@ -363,14 +416,35 @@ def register_dashboard_routes(app):
         )
 
     def _uploaded_photo_size(file) -> int:
+        """Return upload size; camera captures often report 0 until the stream is read."""
         try:
-            pos = file.stream.tell()
-            file.stream.seek(0, 2)
-            size = int(file.stream.tell())
-            file.stream.seek(pos)
-            return size
+            stream = getattr(file, "stream", None) or file
+            pos = stream.tell()
+            stream.seek(0, 2)
+            size = int(stream.tell())
+            stream.seek(0)
+            if size > 0:
+                return size
         except Exception:
-            return int(request.content_length or 0)
+            pass
+        try:
+            pos = file.tell()
+        except Exception:
+            pos = 0
+        try:
+            data = file.read()
+            try:
+                file.seek(pos)
+            except Exception:
+                try:
+                    file.stream.seek(pos)
+                except Exception:
+                    pass
+            if data:
+                return len(data)
+        except Exception:
+            pass
+        return int(request.content_length or 0)
 
     def _infer_profile_photo_ext(file) -> str:
         name = (file.filename or "").strip()
@@ -394,8 +468,14 @@ def register_dashboard_routes(app):
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
-        user_phone = get_current_user_phone() or ""
-        path = profile_photo_file(user_phone)
+        account = get_current_admin_account()
+        storage_phone = (
+            account["storage_phone"]
+            or account["display_phone"]
+            or account["phone_key"]
+            or (get_current_user_phone() or "")
+        ).strip()
+        path = profile_photo_file(storage_phone)
         if not path:
             return jsonify({"error": "No profile photo"}), 404
 
@@ -406,10 +486,15 @@ def register_dashboard_routes(app):
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
-        user_phone = get_current_user_phone() or ""
-        users = load_users()
-        if user_phone not in users:
-            return jsonify({"error": "Account not found"}), 404
+        account = get_current_admin_account()
+        storage_phone = (
+            account["storage_phone"]
+            or account["display_phone"]
+            or account["phone_key"]
+            or (get_current_user_phone() or "")
+        ).strip()
+        if not storage_phone:
+            return jsonify({"error": "Not signed in."}), 401
 
         file = request.files.get("photo")
         if not file or not (
@@ -428,15 +513,20 @@ def register_dashboard_routes(app):
             return jsonify({"error": err}), 400
 
         try:
-            save_profile_photo(user_phone, file, ext=ext)
+            save_profile_photo(storage_phone, file, ext=ext)
         except Exception as exc:
             return jsonify({"error": f"Could not save photo: {exc}"}), 500
 
-        log_activity(user_phone, "PROFILE_PHOTO_UPDATED", "Profile photo updated", request.remote_addr)
+        log_activity(
+            account["phone_key"] or storage_phone,
+            "PROFILE_PHOTO_UPDATED",
+            "Profile photo updated",
+            request.remote_addr,
+        )
         return jsonify(
             {
                 "success": "Profile photo updated.",
-                "profile_photo_url": profile_photo_url(user_phone),
+                "profile_photo_url": profile_photo_url(storage_phone),
             }
         )
 
@@ -453,9 +543,10 @@ def register_dashboard_routes(app):
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
-        user_phone = get_current_user_phone() or ""
+        account = get_current_admin_account()
         users = load_users()
-        user = users.get(user_phone)
+        user_phone = account["phone_key"]
+        user = account["user"]
         if not user:
             return jsonify({"error": "Account not found"}), 404
 

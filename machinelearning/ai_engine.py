@@ -11,6 +11,7 @@ import re
 import uuid
 import json
 from pathlib import Path
+from urllib.parse import quote
 from typing import Dict, List, Tuple
 
 # Text extraction libraries
@@ -366,6 +367,8 @@ class GIAnalyzer:
             text = self._extract_from_docx(file_path)
         elif file_path.suffix.lower() in ['.txt', '.md']:
             text = file_path.read_text(encoding='utf-8', errors='ignore')
+        elif file_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
+            text = self._extract_from_image(file_path)
         else:
             raise ValueError(f"Unsupported file type: {file_path.suffix}")
 
@@ -418,6 +421,18 @@ class GIAnalyzer:
             logging.error(f"OCR error: {e}")
 
         return text
+
+    def _extract_from_image(self, file_path: Path) -> str:
+        """Extract text from product photos via OCR when available."""
+        if not OCR_AVAILABLE:
+            logging.warning("OCR not available for image %s", file_path.name)
+            return ""
+        try:
+            img = Image.open(file_path)
+            return pytesseract.image_to_string(img) or ""
+        except Exception as e:
+            logging.error("Image OCR error: %s", e)
+            return ""
 
     def _extract_from_docx(self, file_path: Path) -> str:
         """Extract text from Word document"""
@@ -478,23 +493,28 @@ class GIAnalyzer:
             return self._rule_based_analysis(text, checklist)
 
         except Exception as e:
-            logging.error(f"Analysis error: {e}")
-            
-            # Fallback checklist
+            logging.error("Analysis error: %s", e)
             checklist = self.gi_checklist
             if task_id in self.task_checklists:
                 checklist = {
                     "mandatory_terms": self.task_checklists[task_id]["mandatory"],
-                    "optional_terms": self.task_checklists[task_id]["optional"]
+                    "optional_terms": self.task_checklists[task_id]["optional"],
                 }
-                
+            note = (
+                f"<p>Automatic text extraction failed ({e}). "
+                "The file was saved but could not be scored. "
+                "Use a searchable PDF or Word document, or install Tesseract OCR for scanned files and images.</p>"
+            )
             return {
-                "success": False,
-                "error": str(e),
+                "success": True,
                 "readiness_score": 0,
                 "status": "Not Ready",
                 "detected_features": [],
-                "missing_requirements": checklist["mandatory_terms"]
+                "missing_requirements": list(checklist["mandatory_terms"]),
+                "text_length": 0,
+                "analysis_method": "extraction_failed",
+                "shap_analysis": note,
+                "extraction_error": str(e),
             }
 
     def _rule_based_analysis(self, text: str, checklist: Dict = None) -> Dict:
@@ -654,7 +674,7 @@ class GIAnalyzer:
 
     def get_file_preview_url(self, file_path: str) -> str:
         """Get URL for file preview"""
-        return f"/api/file-preview/{Path(file_path).name}"
+        return f"/api/file-preview/{quote(Path(file_path).name, safe='')}"
 
 # Global instance
 gi_analyzer = GIAnalyzer()

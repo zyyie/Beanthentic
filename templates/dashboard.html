@@ -868,6 +868,12 @@
 
           <!-- Maps Module -->
           <div class="module hidden" id="maps-module" data-module="maps">
+            {% if not google_maps_key_is_production %}
+            <div class="maps-api-key-banner" role="status">
+              <p><strong>Google Maps API key required</strong> to load the interactive map.</p>
+              <p>Add your key in <code>settings.json</code> → <code>maps.google_api_key</code>, or set <code>GOOGLE_MAPS_API_KEY</code>. Enable billing and <strong>Maps JavaScript API</strong> in Google Cloud.</p>
+            </div>
+            {% endif %}
             <section class="maps-toolbar" aria-label="Map filters">
               <div class="maps-toolbar-container">
                 <label class="maps-toolbar__search" for="mapsSearchInput">
@@ -939,11 +945,23 @@
 
                 <article class="maps-panel">
                   <h2>Map Layers</h2>
-                  <ul class="map-layers-list">
-                    <li><span>Farmer Locations</span><span id="toggleFarmerLocations" class="layer-toggle is-on" aria-hidden="true"></span></li>
-                    <li><span>Farm Boundaries</span><span id="toggleFarmBoundaries" class="layer-toggle is-on" aria-hidden="true"></span></li>
-                    <li><span>Density Heatmap</span><span id="toggleDensityHeatmap" class="layer-toggle" aria-hidden="true"></span></li>
-                    <li><span>Road Network</span><span id="toggleRoadNetwork" class="layer-toggle" aria-hidden="true"></span></li>
+                  <ul class="map-layers-list" id="mapLayersList">
+                    <li class="map-layer-row" data-map-layer="farmerLocations" role="button" tabindex="0" aria-pressed="true">
+                      <span>Farmer Locations</span>
+                      <span id="toggleFarmerLocations" class="layer-toggle is-on" aria-hidden="true"></span>
+                    </li>
+                    <li class="map-layer-row" data-map-layer="farmBoundaries" role="button" tabindex="0" aria-pressed="true">
+                      <span>Farm Boundaries</span>
+                      <span id="toggleFarmBoundaries" class="layer-toggle is-on" aria-hidden="true"></span>
+                    </li>
+                    <li class="map-layer-row" data-map-layer="densityHeatmap" role="button" tabindex="0" aria-pressed="false">
+                      <span>Density Heatmap</span>
+                      <span id="toggleDensityHeatmap" class="layer-toggle" aria-hidden="true"></span>
+                    </li>
+                    <li class="map-layer-row" data-map-layer="roadNetwork" role="button" tabindex="0" aria-pressed="false">
+                      <span>Road Network</span>
+                      <span id="toggleRoadNetwork" class="layer-toggle" aria-hidden="true"></span>
+                    </li>
                   </ul>
                 </article>
               </aside>
@@ -1303,36 +1321,48 @@
                 <!-- Submission status will be displayed here -->
               </div>
               
-              <div class="phase-progress">
-                <div class="progress-step active" data-phase="1">
-                  <div class="step-number">1</div>
-                  <div class="step-title">Pre-Application</div>
-                </div>
-                <div class="progress-step" data-phase="2">
-                  <div class="step-number">2</div>
-                  <div class="step-title">Documents</div>
-                </div>
-                <div class="progress-step" data-phase="3">
-                  <div class="step-number">3</div>
-                  <div class="step-title">Filing</div>
-                </div>
-                <div class="progress-step" data-phase="4">
-                  <div class="step-number">4</div>
-                  <div class="step-title">Examination</div>
-                </div>
-                <div class="progress-step" data-phase="5">
-                  <div class="step-number">5</div>
-                  <div class="step-title">Registration</div>
+              <div class="phase-progress-panel">
+                <div class="phase-progress" id="giPhaseProgress">
+                  <div class="progress-step active" data-phase="1" aria-label="Phase 1: Pre-Application">
+                    <div class="step-icon" aria-hidden="true">
+                      <i class="fa-solid fa-map-marked-alt step-icon__phase"></i>
+                      <i class="fa-solid fa-check step-icon__done"></i>
+                    </div>
+                    <div class="step-title">Pre-Application</div>
+                  </div>
+                  <div class="progress-step" data-phase="2" aria-label="Phase 2: Documents">
+                    <div class="step-icon" aria-hidden="true">
+                      <i class="fa-solid fa-file-alt step-icon__phase"></i>
+                      <i class="fa-solid fa-check step-icon__done"></i>
+                    </div>
+                    <div class="step-title">Documents</div>
+                  </div>
+                  <div class="progress-step" data-phase="3" aria-label="Phase 3: Filing">
+                    <div class="step-icon" aria-hidden="true">
+                      <i class="fa-solid fa-paper-plane step-icon__phase"></i>
+                      <i class="fa-solid fa-check step-icon__done"></i>
+                    </div>
+                    <div class="step-title">Filing</div>
+                  </div>
+                  <div class="progress-step" data-phase="4" aria-label="Phase 4: Examination">
+                    <div class="step-icon" aria-hidden="true">
+                      <i class="fa-solid fa-search-plus step-icon__phase"></i>
+                      <i class="fa-solid fa-check step-icon__done"></i>
+                    </div>
+                    <div class="step-title">Examination</div>
+                  </div>
+                  <div class="progress-step" data-phase="5" aria-label="Phase 5: Registration">
+                    <div class="step-icon" aria-hidden="true">
+                      <i class="fa-solid fa-award step-icon__phase"></i>
+                      <i class="fa-solid fa-check step-icon__done"></i>
+                    </div>
+                    <div class="step-title">Registration</div>
+                  </div>
                 </div>
               </div>
 
               <!-- Phase 1: Pre-Application Groundwork -->
               <div class="phase-section active" id="phase-1">
-                <div class="phase-header">
-                  <h2><i class="fa-solid fa-map-marked-alt"></i> Phase 1: Pre-Application Groundwork</h2>
-                  <p>Establish the foundation for your GI application</p>
-                </div>
-                
                 <div class="phase-tasks">
                   <div class="task-card">
                     <h3><i class="fa-solid fa-coffee"></i> 1. Identify Qualifying Product</h3>
@@ -1387,11 +1417,6 @@
 
               <!-- Phase 2: Preparing Application Documents -->
               <div class="phase-section" id="phase-2">
-                <div class="phase-header">
-                  <h2><i class="fa-solid fa-file-alt"></i> Phase 2: Preparing Application Documents</h2>
-                  <p>Compile all required primary application documents and certifications</p>
-                </div>
-                
                 <div class="phase-tasks">
                   <div class="task-card">
                     <h3><i class="fa-solid fa-book"></i> 4. Manual of Specifications (MOP)</h3>
@@ -1447,11 +1472,6 @@
 
               <!-- Phase 3: Filing with IPOPHL -->
               <div class="phase-section" id="phase-3">
-                <div class="phase-header">
-                  <h2><i class="fa-solid fa-paper-plane"></i> Phase 3: Filing with IPOPHL</h2>
-                  <p>Submit your application and proof of payment to IPOPHL</p>
-                </div>
-                
                 <div class="phase-tasks">
                   <div class="task-card">
                     <h3><i class="fa-solid fa-file-import"></i> 7. File Application</h3>
@@ -1492,11 +1512,6 @@
 
               <!-- Phase 4: Examination and Publication -->
               <div class="phase-section" id="phase-4">
-                <div class="phase-header">
-                  <h2><i class="fa-solid fa-search-plus"></i> Phase 4: Examination and Publication</h2>
-                  <p>Application review and public notice period</p>
-                </div>
-                
                 <div class="phase-tasks">
                   <div class="task-card">
                     <h3><i class="fa-solid fa-clipboard-check"></i> 9. Formality & Substantive Examination</h3>
@@ -1552,11 +1567,6 @@
 
               <!-- Phase 5: Registration and Ongoing Compliance -->
               <div class="phase-section" id="phase-5">
-                <div class="phase-header">
-                  <h2><i class="fa-solid fa-award"></i> Phase 5: Registration and Ongoing Compliance</h2>
-                  <p>Final registration and maintenance requirements</p>
-                </div>
-                
                 <div class="phase-tasks">
                   <div class="task-card">
                     <h3><i class="fa-solid fa-trophy"></i> 12. GI Registration Certificate</h3>
@@ -1895,6 +1905,44 @@
                   </div>
                 </div>
               </div>
+
+              <!-- Software updates (layout matches Session & settings) -->
+              <div class="profile-info-card security-card account-updates-card">
+                <div class="security-card__header">
+                  <div class="security-card__header-icon" aria-hidden="true">
+                    <i class="fa-solid fa-cloud-arrow-down"></i>
+                  </div>
+                  <div class="security-card__header-text">
+                    <h3>Software updates</h3>
+                    <p>Beanthentic dashboard version and release checks</p>
+                  </div>
+                </div>
+
+                <div class="security-card__grid account-updates-card__grid">
+                  <div class="security-card__col account-updates-card__col">
+                    <p class="security-card__col-label">Version &amp; updates</p>
+                    <div class="security-card__actions account-updates-card__actions">
+                      <div class="security-action security-action--static account-updates-card__version-row" aria-live="polite">
+                        <span class="security-action__icon security-action__icon--version">
+                          <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                        </span>
+                        <span class="security-action__body">
+                          <span class="security-action__title">Installed version</span>
+                          <span class="security-action__desc">
+                            <span id="accountAppVersion">v1.0.0</span><span id="accountAppReleaseLabel"></span>
+                          </span>
+                        </span>
+                      </div>
+
+                      <button type="button" class="account-updates-card__btn" id="accountCheckUpdatesBtn">
+                        <i class="fa-solid fa-rotate" id="accountCheckUpdatesIcon" aria-hidden="true"></i>
+                        <span>Check for updates</span>
+                      </button>
+                    </div>
+                    <p class="account-updates-card__status" id="accountUpdateStatus" role="status" aria-live="polite"></p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1935,7 +1983,7 @@
         <select id="profilePhotoCameraSelect" class="profile-photo-camera-select" hidden></select>
         <video id="profilePhotoVideo" class="profile-photo-video" autoplay playsinline muted></video>
         <div class="profile-photo-camera-actions">
-          <button type="button" class="btn-save-changes" id="profilePhotoCaptureBtn">Capture</button>
+          <button type="button" class="btn-save-changes" id="profilePhotoCaptureBtn">Save to profile</button>
           <button type="button" class="btn-edit-secondary" id="profilePhotoCancelCameraBtn">Cancel camera</button>
         </div>
       </div>
@@ -2177,88 +2225,6 @@
     </div>
   </div>
 
-  <!-- File Previewer Modal -->
-  <div class="modal" id="filePreviewModal">
-    <div class="modal-content large">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-file-alt"></i> Document Preview & AI Analysis</h3>
-        <button class="modal-close" onclick="closeFilePreview()">
-          <i class="fa-solid fa-times"></i>
-        </button>
-      </div>
-      <div class="modal-body">
-        <div class="file-preview-layout">
-          <!-- File Preview Section -->
-          <div class="preview-section">
-            <div class="preview-header">
-              <h4 id="previewFileName">Document Preview</h4>
-              <div class="preview-controls">
-                <button class="btn btn-sm btn-secondary" onclick="refreshAnalysis()" id="refreshBtn">
-                  <i class="fa-solid fa-sync-alt"></i> Refresh Analysis
-                </button>
-              </div>
-            </div>
-            <div class="preview-tools">
-              <button class="tool-btn" onclick="ipophlAnalyzer.zoomIn()"><i class="fa-solid fa-magnifying-glass-plus"></i> Zoom In</button>
-              <button class="tool-btn" onclick="ipophlAnalyzer.zoomOut()"><i class="fa-solid fa-magnifying-glass-minus"></i> Zoom Out</button>
-              <button class="tool-btn" onclick="ipophlAnalyzer.rotate()"><i class="fa-solid fa-rotate-right"></i> Rotate</button>
-              <button class="tool-btn" onclick="ipophlAnalyzer.printCurrent()"><i class="fa-solid fa-print"></i> Print</button>
-            </div>
-            <div class="preview-container">
-              <iframe id="filePreviewFrame" src="" class="preview-frame"></iframe>
-              <div id="wordPreviewArea" class="word-preview-area hidden"></div>
-              <div id="previewLoading" class="loading-spinner hidden">
-                <i class="fa-solid fa-spinner fa-spin"></i> Loading document...
-              </div>
-            </div>
-          </div>
-          
-          <!-- AI Analysis Panel -->
-          <div class="analysis-section">
-            <div class="analysis-header">
-              <h4><i class="fa-solid fa-brain"></i> AI Analysis Results</h4>
-              <div class="analysis-status">
-                <span class="status-badge" id="analysisStatusBadge">Analyzing...</span>
-              </div>
-            </div>
-            
-            <div class="analysis-scroll-area">
-              <!-- Document Quality Score Card -->
-              <div class="gi-progress-indicator analysis-card">
-                <div class="progress-label">
-                  <i class="fa-solid fa-gauge-high"></i> Document Quality Score
-                </div>
-                <div class="progress-row">
-                  <div class="progress-bar-container">
-                    <div class="progress-bar" id="giProgressBar" style="width: 0%"></div>
-                  </div>
-                  <div class="progress-percentage" id="giProgressPercentage">0%</div>
-                </div>
-              </div>
-              
-              <!-- Analysis Results Cards -->
-              <div class="analysis-results" id="analysisResults">
-                <!-- Information Found Card -->
-                <div class="result-section analysis-card">
-                  <h5><i class="fa-solid fa-circle-check"></i> Information Found</h5>
-                  <ul class="feature-list" id="detectedFeaturesList">
-                    <li class="placeholder">No mandatory sections or information found in this document.</li>
-                  </ul>
-                </div>
-                
-                <!-- What Needs to be Improved Card -->
-                <div class="result-section analysis-card improvement-analysis-section">
-                  <h5><i class="fa-solid fa-wand-magic-sparkles text-primary"></i> What Needs to be Improved</h5>
-                  <div class="improvement-paragraph" id="improvementAnalysisParagraph">
-                    <p class="placeholder">Generating in-depth analysis and improvement recommendations...</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div> <!-- end module-content -->
 </div> <!-- end main-content -->
 </div> <!-- end dashboard-layout -->
@@ -2267,7 +2233,7 @@
   <script>
     window.__BEANTHENTIC_API_BASE__ = {{ request.script_root|tojson }};
     window.__BEANTHENTIC_USER__ = { phone: "{{ user_phone }}", full_name: "{{ user_full_name }}" };
-    window.__GOOGLE_MAPS_API_KEY__ = "{{ google_maps_api_key }}";
+    window.__GOOGLE_MAPS_API_KEY__ = {{ google_maps_api_key|tojson }};
   </script>
   <script>
     window.initBeanthenticGoogleMaps = function initBeanthenticGoogleMaps() {
@@ -2285,8 +2251,8 @@
   <script src="js/main.js"></script>
   <script src="js/navigation.js"></script>
   <script src="js/beanthentic_datetime.js?v=20260524-msgshort"></script>
-  <script src="js/dashboard.js"></script>
-  <script src="js/ipophl-analyzer.js"></script>
+  <script src="js/dashboard.js?v=20260602p"></script>
+  <script src="js/ipophl-analyzer.js?v=20260602p"></script>
   
   <!-- Delete Confirmation Modal -->
   <div class="messaging-modal-overlay" id="deleteMsgModal" hidden>
@@ -2399,6 +2365,80 @@
       color: white !important;
     }
   </style>
+
+  <!-- File Previewer Modal (body-level so it is not clipped by module scroll) -->
+  <div class="modal" id="filePreviewModal" hidden aria-hidden="true">
+    <div class="modal-content large">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-file-alt"></i> Document Preview &amp; AI Analysis</h3>
+        <button type="button" class="modal-close" onclick="closeFilePreview()">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="file-preview-layout">
+          <div class="preview-section">
+            <div class="preview-header">
+              <h4 id="previewFileName">Document Preview</h4>
+              <div class="preview-controls">
+                <button type="button" class="btn btn-sm btn-secondary" onclick="refreshAnalysis()" id="refreshBtn">
+                  <i class="fa-solid fa-sync-alt"></i> Refresh Analysis
+                </button>
+              </div>
+            </div>
+            <div class="preview-tools">
+              <button type="button" class="tool-btn" onclick="window.ipophlAnalyzer?.zoomIn()"><i class="fa-solid fa-magnifying-glass-plus"></i> Zoom In</button>
+              <button type="button" class="tool-btn" onclick="window.ipophlAnalyzer?.zoomOut()"><i class="fa-solid fa-magnifying-glass-minus"></i> Zoom Out</button>
+              <button type="button" class="tool-btn" onclick="window.ipophlAnalyzer?.rotate()"><i class="fa-solid fa-rotate-right"></i> Rotate</button>
+              <button type="button" class="tool-btn" onclick="window.ipophlAnalyzer?.printCurrent()"><i class="fa-solid fa-print"></i> Print</button>
+            </div>
+            <div class="preview-container">
+              <iframe id="filePreviewFrame" src="" class="preview-frame" title="Document preview"></iframe>
+              <div id="wordPreviewArea" class="word-preview-area hidden"></div>
+              <div id="previewLoading" class="loading-spinner hidden">
+                <i class="fa-solid fa-spinner fa-spin"></i> Loading document...
+              </div>
+            </div>
+          </div>
+          <div class="analysis-section">
+            <div class="analysis-header">
+              <h4><i class="fa-solid fa-brain"></i> AI Analysis Results</h4>
+              <div class="analysis-status">
+                <span class="status-badge" id="analysisStatusBadge">Analyzing...</span>
+              </div>
+            </div>
+            <div class="analysis-scroll-area">
+              <div class="gi-progress-indicator analysis-card">
+                <div class="progress-label">
+                  <i class="fa-solid fa-gauge-high"></i> Document Quality Score
+                </div>
+                <div class="progress-row">
+                  <div class="progress-bar-container">
+                    <div class="progress-bar" id="giProgressBar" style="width: 0%"></div>
+                  </div>
+                  <div class="progress-percentage" id="giProgressPercentage">0%</div>
+                </div>
+              </div>
+              <div class="analysis-results" id="analysisResults">
+                <div class="result-section analysis-card">
+                  <h5><i class="fa-solid fa-circle-check"></i> Information Found</h5>
+                  <ul class="feature-list" id="detectedFeaturesList">
+                    <li class="placeholder">No mandatory sections or information found in this document.</li>
+                  </ul>
+                </div>
+                <div class="result-section analysis-card improvement-analysis-section">
+                  <h5><i class="fa-solid fa-wand-magic-sparkles text-primary"></i> What Needs to be Improved</h5>
+                  <div class="improvement-paragraph" id="improvementAnalysisParagraph">
+                    <p class="placeholder">Generating in-depth analysis and improvement recommendations...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Custom Confirmation Dialog (Moved to absolute bottom for fixed positioning) -->
   <div id="beanthenticConfirmDialog" class="beanthentic-confirm-dialog" hidden>

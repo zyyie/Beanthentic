@@ -1,0 +1,32 @@
+{
+  "beanthentic_synthetic_dataset_1000 (1)": {
+    "file_uuid": "beanthentic_synthetic_dataset_1000 (1)",
+    "original_filename": "beanthentic_synthetic_dataset_1000_1.csv",
+    "file_path": "C:/xampp/htdocs/Beanthentic-20260529T043941Z-3-001/Beanthentic/machinelearning/uploads/beanthentic_synthetic_dataset_1000 (1).csv",
+    "file_type": ".csv",
+    "file_size": 127565,
+    "ipophl_phase": "phase1",
+    "task_id": "phase1-product",
+    "ai_score": 25,
+    "ai_status": "Not Ready",
+    "detected_features": [
+      "elevation_masl",
+      "soil_pH",
+      "annual_rainfall_mm",
+      "mean_temperature_C",
+      "years_in_farming",
+      "bearing_trees",
+      "non_bearing_trees",
+      "annual_yield_kg",
+      "moisture_content_pct",
+      "selective_picking_practiced",
+      "cooperative_member"
+    ],
+    "missing_requirements": [],
+    "analysis_method": "ml_farmer",
+    "text_length": 0,
+    "shap_analysis": "",
+    "upload_timestamp": "2026-06-01T12:13:20.456775Z",
+    "updated_at": "2026-06-01T12:13:20.458064Z"
+  }
+}

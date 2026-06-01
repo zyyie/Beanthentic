@@ -7,6 +7,7 @@ function beanthenticApiUrl(path) {
   const normalized = path.startsWith('/') ? path : `/${path}`;
   return base ? `${base}${normalized}` : normalized;
 }
+window.beanthenticApiUrl = beanthenticApiUrl;
 
 /** Parse fetch responses; avoid opaque JSON errors when the server returns HTML. */
 async function beanthenticParseJsonResponse(res) {
@@ -37,6 +38,7 @@ async function beanthenticParseJsonResponse(res) {
     throw new Error('Server returned invalid JSON.');
   }
 }
+window.beanthenticParseJsonResponse = beanthenticParseJsonResponse;
 
 class DashboardApp {
   constructor() {
@@ -415,6 +417,13 @@ class DashboardApp {
     }
   }
 
+  _revokeProfilePhotoPreview() {
+    if (this._profilePhotoPreviewUrl) {
+      URL.revokeObjectURL(this._profilePhotoPreviewUrl);
+      this._profilePhotoPreviewUrl = null;
+    }
+  }
+
   applyAccountProfilePhoto(photoUrl, displayName) {
     const avatar = document.getElementById('accountProfileAvatar');
     const img = document.getElementById('accountProfileAvatarImg');
@@ -422,15 +431,24 @@ class DashboardApp {
     if (!avatar || !img) return;
 
     if (photoUrl) {
-      const resolved = beanthenticApiUrl(photoUrl.split('?')[0]);
-      const query = photoUrl.includes('?') ? photoUrl.slice(photoUrl.indexOf('?')) : '';
-      const cacheBust = query ? `${resolved}${query}&t=${Date.now()}` : `${resolved}?t=${Date.now()}`;
-      img.src = cacheBust;
+      const isBlob = String(photoUrl).startsWith('blob:');
+      if (!isBlob || (this._profilePhotoPreviewUrl && photoUrl !== this._profilePhotoPreviewUrl)) {
+        this._revokeProfilePhotoPreview();
+      }
+      const src = isBlob
+        ? photoUrl
+        : (() => {
+            const resolved = beanthenticApiUrl(photoUrl.split('?')[0]);
+            const query = photoUrl.includes('?') ? photoUrl.slice(photoUrl.indexOf('?')) : '';
+            return query ? `${resolved}${query}&t=${Date.now()}` : `${resolved}?t=${Date.now()}`;
+          })();
+      img.src = src;
       img.alt = displayName ? `${displayName} profile photo` : 'Profile photo';
       img.removeAttribute('hidden');
       avatar.classList.add('has-photo');
       if (placeholder) placeholder.style.display = 'none';
     } else {
+      this._revokeProfilePhotoPreview();
       img.removeAttribute('src');
       img.setAttribute('hidden', '');
       avatar.classList.remove('has-photo');
@@ -438,17 +456,30 @@ class DashboardApp {
     }
   }
 
-  openProfilePhotoModal() {
+  previewAccountProfilePhoto(blob, displayName) {
+    if (!blob) return;
+    this._revokeProfilePhotoPreview();
+    this._profilePhotoPreviewUrl = URL.createObjectURL(blob);
+    this.applyAccountProfilePhoto(this._profilePhotoPreviewUrl, displayName);
+  }
+
+  openProfilePhotoModal(options = {}) {
     const root = document.getElementById('profilePhotoModal');
     if (!root) return;
     root.removeAttribute('hidden');
     root.setAttribute('aria-hidden', 'false');
     document.body.classList.add('confirm-dialog-active');
-    document.getElementById('profilePhotoUploadBtn')?.focus();
+    if (options.startCamera) {
+      void this.startProfilePhotoCamera();
+    } else {
+      document.getElementById('profilePhotoUploadBtn')?.focus();
+    }
   }
 
   closeProfilePhotoModal() {
     this.stopProfilePhotoCamera();
+    this._revokeProfilePhotoPreview();
+    document.querySelector('.profile-photo-actions')?.removeAttribute('hidden');
     const root = document.getElementById('profilePhotoModal');
     if (root) {
       root.setAttribute('hidden', '');
@@ -561,6 +592,7 @@ class DashboardApp {
     try {
       this.stopProfilePhotoCamera();
       panel.removeAttribute('hidden');
+      document.querySelector('.profile-photo-actions')?.setAttribute('hidden', '');
 
       let cameras = await this.listProfilePhotoCameras();
       const needsPermission = cameras.every((d) => !(d.label || '').trim());
@@ -598,17 +630,30 @@ class DashboardApp {
     }
   }
 
-  async uploadProfilePhotoBlob(blob, filename) {
+  async uploadProfilePhotoBlob(blob, filename, { preview = true } = {}) {
     if (!blob) {
       this.showNotification('No photo to upload.', 'error');
-      return;
+      return false;
     }
-    const fd = new FormData();
+    const heroName = document.getElementById('accountHeroName')?.textContent || 'Admin';
+    if (preview) {
+      this.previewAccountProfilePhoto(blob, heroName);
+    }
+
     const uploadName =
       filename ||
       (blob.type === 'image/png' ? 'profile.png' : blob.type === 'image/webp' ? 'profile.webp' : 'profile.jpg');
-    fd.append('action', 'upload_profile_photo');
-    fd.append('photo', blob, uploadName);
+    const mime = blob.type || 'image/jpeg';
+    const file = blob instanceof File ? blob : new File([blob], uploadName, { type: mime });
+    const fd = new FormData();
+    fd.append('photo', file, uploadName);
+
+    const captureBtn = document.getElementById('profilePhotoCaptureBtn');
+    if (captureBtn) {
+      captureBtn.disabled = true;
+      captureBtn.textContent = 'Saving…';
+    }
+
     try {
       const res = await fetch(beanthenticApiUrl('/api/admin-profile-photo'), {
         method: 'POST',
@@ -617,12 +662,18 @@ class DashboardApp {
       });
       const result = await beanthenticParseJsonResponse(res);
       if (!res.ok || result.error) throw new Error(result.error || 'Could not update profile photo.');
-      const heroName = document.getElementById('accountHeroName')?.textContent || 'Admin';
       this.applyAccountProfilePhoto(result.profile_photo_url, heroName);
-      this.showNotification(result.success || 'Profile photo updated.', 'success');
+      this.showNotification(result.success || 'Profile photo saved.', 'success');
       this.closeProfilePhotoModal();
+      return true;
     } catch (err) {
       this.showNotification(err.message || 'Could not update profile photo.', 'error');
+      return false;
+    } finally {
+      if (captureBtn) {
+        captureBtn.disabled = false;
+        captureBtn.textContent = 'Save to profile';
+      }
     }
   }
 
@@ -630,7 +681,7 @@ class DashboardApp {
     const video = document.getElementById('profilePhotoVideo');
     const canvas = document.getElementById('profilePhotoCanvas');
     if (!video || !canvas || !video.videoWidth) {
-      this.showNotification('Camera is not ready yet.', 'error');
+      this.showNotification('Camera is not ready yet. Wait for the preview or allow camera access.', 'error');
       return;
     }
     canvas.width = video.videoWidth;
@@ -643,6 +694,7 @@ class DashboardApp {
       this.showNotification('Could not capture photo.', 'error');
       return;
     }
+    this.stopProfilePhotoCamera();
     await this.uploadProfilePhotoBlob(blob, 'camera-profile.jpg');
   }
 
@@ -657,7 +709,9 @@ class DashboardApp {
     const cancelCameraBtn = document.getElementById('profilePhotoCancelCameraBtn');
     const root = document.getElementById('profilePhotoModal');
 
-    if (editBtn) editBtn.addEventListener('click', () => this.openProfilePhotoModal());
+    if (editBtn) {
+      editBtn.addEventListener('click', () => this.openProfilePhotoModal({ startCamera: true }));
+    }
     if (closeBtn) closeBtn.addEventListener('click', () => this.closeProfilePhotoModal());
     if (backdrop) backdrop.addEventListener('click', () => this.closeProfilePhotoModal());
 
@@ -688,6 +742,7 @@ class DashboardApp {
       cancelCameraBtn.addEventListener('click', () => {
         this.stopProfilePhotoCamera();
         document.getElementById('profilePhotoCameraPanel')?.setAttribute('hidden', '');
+        document.querySelector('.profile-photo-actions')?.removeAttribute('hidden');
       });
     }
 
@@ -2580,6 +2635,9 @@ class DashboardApp {
     }
     if (resolvedModuleName === 'ipophl') {
       this.renderIpophlModule();
+      if (window.ipophlAnalyzer?.rebindAllFileCards) {
+        window.ipophlAnalyzer.rebindAllFileCards();
+      }
     }
     if (resolvedModuleName === 'messaging') {
       this.initMessagingModule();
@@ -5298,8 +5356,8 @@ class DashboardApp {
     // Initialize current phase
     if (!this.currentPhase) this.currentPhase = 1;
     
-    // Show initial phase
     this.showPhase(this.currentPhase);
+    this.updateProgress(this.currentPhase);
   }
 
   initializeProgressSteps() {
@@ -5365,18 +5423,33 @@ class DashboardApp {
     }
   }
 
+  isIpophlServiceComplete(service) {
+    const hasFiles = Boolean(this.ipophlFiles?.[service]?.length);
+    const hasLinks = Boolean(this.ipophlLinks?.[service]?.length);
+    if (hasFiles || hasLinks) return true;
+
+    const container = document.getElementById(`${service}-files`);
+    return Boolean(container?.querySelector('.file-item'));
+  }
+
+  isIpophlPhaseComplete(phaseNum) {
+    const services = this.getIpophlServicesByPhase()[phaseNum];
+    if (!services?.length) return false;
+    return services.every((service) => this.isIpophlServiceComplete(service));
+  }
+
   updateProgress(phaseNum) {
-    const progressSteps = document.querySelectorAll('.progress-step');
-    
-    progressSteps.forEach((step, index) => {
-      const stepNum = index + 1;
-      step.classList.remove('active', 'completed');
-      
-      if (stepNum === phaseNum) {
-        step.classList.add('active');
-      } else if (stepNum < phaseNum) {
-        step.classList.add('completed');
-      }
+    const progressSteps = document.querySelectorAll('#giPhaseProgress .progress-step');
+
+    progressSteps.forEach((step) => {
+      const stepNum = parseInt(step.dataset.phase, 10);
+      const isComplete = this.isIpophlPhaseComplete(stepNum);
+      const isActive = stepNum === phaseNum;
+      const baseLabel = step.getAttribute('aria-label')?.replace(/, completed$/i, '') || `Phase ${stepNum}`;
+
+      step.classList.toggle('active', isActive);
+      step.classList.toggle('completed', isComplete);
+      step.setAttribute('aria-label', isComplete ? `${baseLabel}, completed` : baseLabel);
     });
   }
 
@@ -5828,6 +5901,8 @@ class DashboardApp {
     aiStatusEl.textContent = aiStatus.label;
     aiStatusEl.classList.remove('gi-status-pill--pending', 'gi-status-pill--pass', 'gi-status-pill--fail');
     aiStatusEl.classList.add(aiStatus.className);
+
+    this.updateProgress(this.currentPhase || 1);
   }
 
   getServiceFromCard(card) {
@@ -6103,23 +6178,47 @@ class DashboardApp {
   }
 
   initMapLayerToggles() {
-    const toggles = [
-      { id: 'toggleFarmerLocations', layer: 'farmerLocations' },
-      { id: 'toggleFarmBoundaries', layer: 'farmBoundaries' },
-      { id: 'toggleDensityHeatmap', layer: 'densityHeatmap' },
-      { id: 'toggleRoadNetwork', layer: 'roadNetwork' },
-    ];
+    const list = document.getElementById('mapLayersList');
+    if (!list || list.dataset.bound === '1') return;
+    list.dataset.bound = '1';
 
-    toggles.forEach(({ id, layer }) => {
-      const el = document.getElementById(id);
-      if (el) {
-        el.addEventListener('click', (e) => {
-          e.preventDefault();
-          this.mapLayers[layer] = !this.mapLayers[layer];
-          el.classList.toggle('is-on', this.mapLayers[layer]);
-          this.updateMapLayers();
-        });
-      }
+    const toggleLayer = (layerKey) => {
+      if (!layerKey || !(layerKey in this.mapLayers)) return;
+      this.mapLayers[layerKey] = !this.mapLayers[layerKey];
+      this.syncMapLayerToggleUi();
+      this.updateMapLayers();
+    };
+
+    list.addEventListener('click', (e) => {
+      const row = e.target.closest('.map-layer-row[data-map-layer]');
+      if (!row) return;
+      e.preventDefault();
+      toggleLayer(row.dataset.mapLayer);
+    });
+
+    list.addEventListener('keydown', (e) => {
+      const row = e.target.closest('.map-layer-row[data-map-layer]');
+      if (!row || (e.key !== 'Enter' && e.key !== ' ')) return;
+      e.preventDefault();
+      toggleLayer(row.dataset.mapLayer);
+    });
+
+    this.syncMapLayerToggleUi();
+  }
+
+  syncMapLayerToggleUi() {
+    const layers = [
+      { id: 'toggleFarmerLocations', key: 'farmerLocations' },
+      { id: 'toggleFarmBoundaries', key: 'farmBoundaries' },
+      { id: 'toggleDensityHeatmap', key: 'densityHeatmap' },
+      { id: 'toggleRoadNetwork', key: 'roadNetwork' },
+    ];
+    layers.forEach(({ id, key }) => {
+      const toggle = document.getElementById(id);
+      const row = document.querySelector(`.map-layer-row[data-map-layer="${key}"]`);
+      const on = !!this.mapLayers[key];
+      if (toggle) toggle.classList.toggle('is-on', on);
+      if (row) row.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
   }
 
@@ -6166,15 +6265,18 @@ class DashboardApp {
       })
       .filter(Boolean);
 
+    const heatmapMap = this.mapLayers.densityHeatmap ? this.googleMap : null;
     if (!this.googleHeatmap) {
       this.googleHeatmap = new window.google.maps.visualization.HeatmapLayer({
         data: heatmapData,
-        map: this.googleMap,
+        map: heatmapMap,
         radius: 30,
+        dissipating: true,
+        opacity: 0.65,
       });
     } else {
       this.googleHeatmap.setData(heatmapData);
-      this.googleHeatmap.setMap(this.googleMap);
+      this.googleHeatmap.setMap(heatmapMap);
     }
   }
 
@@ -6786,11 +6888,8 @@ class DashboardApp {
       window.google.maps.event.trigger(this.googleMap, 'resize');
     }
     this.renderGoogleMapMarkers(points);
-    if (this.mapLayers.densityHeatmap) {
-      this.showDensityHeatmap();
-    } else if (this.googleHeatmap) {
-      this.googleHeatmap.setMap(null);
-    }
+    this.syncMapLayerToggleUi();
+    this.updateMapLayers();
   }
 
   getRegisterDocuments() {
@@ -7498,6 +7597,55 @@ class DashboardApp {
     }
   }
 
+  applyAccountAppVersion(appInfo) {
+    const versionEl = document.getElementById('accountAppVersion');
+    const labelEl = document.getElementById('accountAppReleaseLabel');
+    const version = String(appInfo?.version || '1.0.0').trim();
+    const displayVersion = version.startsWith('v') ? version : `v${version}`;
+    if (versionEl) versionEl.textContent = displayVersion;
+    if (labelEl) {
+      const release = String(appInfo?.release_label || '').trim();
+      labelEl.textContent = release ? ` · ${release}` : '';
+    }
+  }
+
+  async checkForAppUpdates() {
+    const btn = document.getElementById('accountCheckUpdatesBtn');
+    const statusEl = document.getElementById('accountUpdateStatus');
+    if (!btn || !statusEl) return;
+
+    btn.disabled = true;
+    btn.classList.add('is-checking');
+    statusEl.textContent = 'Checking for updates…';
+    statusEl.classList.remove('account-updates-card__status--success', 'account-updates-card__status--warn');
+
+    try {
+      const res = await fetch(beanthenticApiUrl('/api/app/version'), { credentials: 'same-origin' });
+      const data = await beanthenticParseJsonResponse(res);
+      if (!res.ok) throw new Error(data.error || 'Could not check for updates.');
+
+      this.applyAccountAppVersion(data);
+      const current = String(data.version || '').trim();
+      const latest = String(data.latest_version || current).trim();
+
+      if (data.update_available && latest !== current) {
+        statusEl.textContent = data.release_notes
+          ? `Update available: v${latest}. ${data.release_notes}`
+          : `A newer version is available (v${latest}). Contact your administrator to deploy the update.`;
+        statusEl.classList.add('account-updates-card__status--warn');
+      } else {
+        statusEl.textContent = `You're on the latest version (v${current}).`;
+        statusEl.classList.add('account-updates-card__status--success');
+      }
+    } catch (err) {
+      statusEl.textContent = err.message || 'Could not check for updates.';
+      statusEl.classList.add('account-updates-card__status--warn');
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('is-checking');
+    }
+  }
+
   async loadAccountData() {
     try {
       const response = await fetch(beanthenticApiUrl('/settings/state'), { credentials: 'same-origin' });
@@ -7507,6 +7655,7 @@ class DashboardApp {
       const user = data.user || {};
       this.applyAccountPersonalInfo(user);
       this.applyAccountProfilePhoto(user.profile_photo_url || null, user.full_name || 'Admin');
+      this.applyAccountAppVersion(data.app || {});
     } catch (error) {
       console.error('Failed to load account data:', error);
       const heroNameEl = document.getElementById('accountHeroName');
@@ -7567,6 +7716,11 @@ class DashboardApp {
     const deactivateBtn = document.getElementById('deactivateAccountBtn');
     if (deactivateBtn) {
       deactivateBtn.addEventListener('click', () => this.openDeactivateAccountModal());
+    }
+
+    const checkUpdatesBtn = document.getElementById('accountCheckUpdatesBtn');
+    if (checkUpdatesBtn) {
+      checkUpdatesBtn.addEventListener('click', () => this.checkForAppUpdates());
     }
 
     passwordToggles.forEach((toggleBtn) => {

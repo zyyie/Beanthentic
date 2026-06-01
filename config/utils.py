@@ -174,6 +174,60 @@ def get_current_user_phone() -> str | None:
     return session.get("user_phone")
 
 
+def get_current_admin_account() -> dict:
+    """
+    Resolve the logged-in admin against users.json and session.
+    Tolerates legacy phone key formats; profile photos use normalized storage_phone.
+    """
+    from config.validation import validate_phone
+
+    session_phone = (get_current_user_phone() or "").strip()
+    users = load_users()
+    phone_key = resolve_user_phone_key(users, session_phone) if session_phone else None
+    if not phone_key:
+        phone_key = session_phone
+
+    user = {}
+    if phone_key and phone_key in users:
+        user = users[phone_key]
+    elif session_phone and session_phone in users:
+        phone_key = session_phone
+        user = users[session_phone]
+
+    ok, _, normalized = validate_phone(session_phone or phone_key or "")
+    storage_phone = normalized if ok else (session_phone or phone_key or "").strip()
+    if not storage_phone:
+        import re
+
+        digits = re.sub(r"\D+", "", session_phone or phone_key or "")
+        if digits.startswith("63") and len(digits) >= 12:
+            digits = digits[2:]
+        if digits.startswith("0") and len(digits) == 11:
+            digits = digits[1:]
+        if len(digits) == 10 and digits.startswith("9"):
+            storage_phone = digits
+    display_phone = storage_phone or session_phone or phone_key or ""
+
+    full_name = (user.get("full_name") or session.get("user_name") or "").strip()
+    first_name = (user.get("first_name") or "").strip()
+    last_name = (user.get("last_name") or "").strip()
+    if not first_name and full_name:
+        parts = full_name.split(None, 1)
+        first_name = parts[0] if parts else ""
+        last_name = parts[1] if len(parts) > 1 else ""
+
+    return {
+        "phone_key": phone_key or "",
+        "storage_phone": storage_phone,
+        "display_phone": display_phone,
+        "user": user,
+        "full_name": full_name,
+        "first_name": first_name,
+        "last_name": last_name,
+        "has_users_record": bool(user),
+    }
+
+
 def get_current_farmer_phone() -> str | None:
     """Get current logged-in farmer's phone number."""
     return session.get("farmer_phone")

@@ -1,4 +1,40 @@
 // IPOPHL Document Analyzer - File Previewer & AI Analysis Integration
+
+function ipophlApi(path) {
+    if (typeof window.beanthenticApiUrl === 'function') {
+        return window.beanthenticApiUrl(path);
+    }
+    const base = (typeof window.__BEANTHENTIC_API_BASE__ === 'string' ? window.__BEANTHENTIC_API_BASE__ : '').replace(/\/$/, '');
+    const normalized = path.startsWith('/') ? path : `/${path}`;
+    return base ? `${base}${normalized}` : normalized;
+}
+
+async function ipophlJson(response) {
+    if (typeof window.beanthenticParseJsonResponse === 'function') {
+        return window.beanthenticParseJsonResponse(response);
+    }
+    const text = await response.text();
+    const trimmed = text.trim();
+    if (trimmed.startsWith('<!') || trimmed.toLowerCase().startsWith('<html')) {
+        throw new Error(
+            `Server returned a web page instead of JSON (HTTP ${response.status}). Restart python web.py and hard-refresh the dashboard.`
+        );
+    }
+    try {
+        return trimmed ? JSON.parse(trimmed) : {};
+    } catch {
+        throw new Error('Server returned invalid JSON.');
+    }
+}
+
+function ipophlAbsoluteUrl(url) {
+    if (!url) return url;
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+        return url;
+    }
+    return ipophlApi(url.startsWith('/') ? url : `/${url}`);
+}
+
 class IPOPHLAnalyzer {
     constructor() {
         this.currentFile = null;
@@ -8,19 +44,131 @@ class IPOPHLAnalyzer {
     }
 
     init() {
+        this.ensureModalInBody();
         this.attachEventListeners();
+        this.setupDelegatedFileActions();
         this.setupFileUploadHandlers();
         this.loadExistingDocuments();
     }
 
+    ensureModalInBody() {
+        const modal = document.getElementById('filePreviewModal');
+        if (modal && modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+    }
+
+    escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    setupDelegatedFileActions() {
+        if (window.__ipophlDelegatedActionsBound) return;
+        window.__ipophlDelegatedActionsBound = true;
+
+        document.addEventListener('click', (e) => {
+            const card = e.target.closest('#ipophl-module .file-item[data-file-uuid]');
+            if (!card) return;
+
+            const analyzeBtn = e.target.closest('button.file-action-btn.ai-analysis');
+            if (analyzeBtn && card.contains(analyzeBtn)) {
+                e.preventDefault();
+                const fileUuid = card.getAttribute('data-file-uuid');
+                if (fileUuid) {
+                    (window.ipophlAnalyzer || this).loadAndShowFullAnalysis(fileUuid);
+                }
+                return;
+            }
+
+            const deleteBtn = e.target.closest('button.file-action-btn.delete');
+            if (deleteBtn && card.contains(deleteBtn)) {
+                e.preventDefault();
+                const fileUuid = card.getAttribute('data-file-uuid');
+                if (fileUuid) {
+                    (window.ipophlAnalyzer || this).deleteFile(fileUuid, deleteBtn);
+                }
+            }
+        });
+    }
+
+    bindFileCardActions(fileItem, doc) {
+        if (!fileItem || !doc?.file_uuid) return;
+
+        const fileUuid = String(doc.file_uuid);
+        fileItem.setAttribute('data-file-uuid', fileUuid);
+
+        const analyzeBtn = fileItem.querySelector('button.file-action-btn.ai-analysis');
+        const deleteBtn = fileItem.querySelector('button.file-action-btn.delete');
+        const analyzer = window.ipophlAnalyzer || this;
+
+        if (analyzeBtn) {
+            analyzeBtn.type = 'button';
+            analyzeBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                analyzer.loadAndShowFullAnalysis(fileUuid);
+            };
+        }
+
+        if (deleteBtn) {
+            deleteBtn.type = 'button';
+            deleteBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                analyzer.deleteFile(fileUuid, deleteBtn);
+            };
+        }
+    }
+
+    rebindAllFileCards() {
+        document.querySelectorAll('#ipophl-module .file-item[data-file-uuid]').forEach((card) => {
+            const fileUuid = card.getAttribute('data-file-uuid');
+            if (!fileUuid) return;
+            this.bindFileCardActions(card, {
+                file_uuid: fileUuid,
+                filename: card.querySelector('.file-name')?.textContent?.trim() || 'Document',
+            });
+        });
+    }
+
     async loadExistingDocuments() {
         try {
-            const response = await fetch('/api/ipo-documents');
-            const data = await response.json();
-            
-            if (data.items) {
+            document.querySelectorAll('#ipophl-module .attached-files').forEach((container) => {
+                container.querySelectorAll('.file-item[data-file-uuid]').forEach((el) => el.remove());
+            });
+
+            try {
+                const purgeRes = await fetch(ipophlApi('/api/ipo-purge-legacy'), {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json' },
+                });
+                await ipophlJson(purgeRes);
+            } catch (purgeErr) {
+                console.warn('Legacy IPOPHL cleanup:', purgeErr.message || purgeErr);
+            }
+
+            const response = await fetch(ipophlApi('/api/ipo-documents'), {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+            });
+            const data = await ipophlJson(response);
+
+            if (!response.ok) {
+                console.warn('IPO documents list:', data.message || data.error || response.status);
+                return;
+            }
+
+            if (window.dashboardApp) {
+                window.dashboardApp.ipophlFiles = {};
+            }
+
+            if (data.items?.length) {
                 data.items.forEach(doc => {
-                    // task_id should be the full service name (e.g. phase1-product)
                     const container = document.getElementById(`${doc.task_id}-files`);
                     if (container) {
                         this.renderDocumentCard(container, doc);
@@ -29,6 +177,7 @@ class IPOPHLAnalyzer {
                 });
                 this.refreshDashboardIndicator();
             }
+            this.rebindAllFileCards();
         } catch (error) {
             console.error('Failed to load existing documents:', error);
         }
@@ -66,92 +215,129 @@ class IPOPHLAnalyzer {
         }
     }
 
-    renderDocumentCard(container, doc) {
-        // Prevent duplication: check if file with this name already exists
-        const existingFiles = container.querySelectorAll('.file-name');
-        for (let nameEl of existingFiles) {
-            if (nameEl.textContent === doc.filename) {
-                // If exists, just update the existing card with AI info
-                const card = nameEl.closest('.file-item');
-                this.updateCardWithAI(card, doc);
-                return;
-            }
-        }
+    buildFileCardMarkup(doc) {
+        const filename = doc.filename || doc.original_filename || 'Document';
+        const fileUuid = doc.file_uuid || doc.id;
+        const fileExt = filename.split('.').pop().toLowerCase();
+        const iconClass = fileExt === 'pdf' ? 'fa-file-pdf text-danger'
+            : (fileExt === 'doc' || fileExt === 'docx') ? 'fa-file-word text-primary'
+            : 'fa-file-lines text-success';
+        const score = Number(doc.ai_score);
+        const hasScore = Number.isFinite(score);
+        const scoreClass = hasScore ? this.getScoreClass(score) : 'score-low';
+        const scoreLabel = hasScore ? `${score}%` : (doc.ai_status || 'Analyzed');
+        const meta = doc.file_size
+            ? this.formatFileSize(doc.file_size)
+            : (doc.ai_status || 'Ready for review');
 
-        const fileExt = doc.filename.split('.').pop().toLowerCase();
-        const iconClass = fileExt === 'pdf' ? 'fa-file-pdf text-danger' : 
-                         (fileExt === 'doc' || fileExt === 'docx') ? 'fa-file-word text-primary' :
-                         'fa-file-lines text-success';
-
-        const fileItem = document.createElement('div');
-        fileItem.className = 'file-item success ai-enhanced';
-        fileItem.innerHTML = `
+        return `
             <div class="file-info">
                 <i class="fa-solid ${iconClass}"></i>
                 <div class="file-details">
-                    <span class="file-name">${doc.filename}</span>
-                    <span class="file-meta">${this.formatFileSize(doc.file_size)}</span>
+                    <span class="file-name">${this.escapeHtml(filename)}</span>
+                    <span class="file-meta">${this.escapeHtml(meta)}</span>
                 </div>
             </div>
             <div class="file-status-actions">
+                ${hasScore ? `<span class="ai-score-badge ${scoreClass}"><i class="fa-solid fa-gauge-high"></i> ${this.escapeHtml(scoreLabel)}</span>` : ''}
                 <div class="file-actions">
-                    <button type="button" class="file-action-btn ai-analysis" onclick="ipophlAnalyzer.loadAndShowFullAnalysis('${doc.file_uuid}')" title="AI Analysis">
+                    <button type="button" class="file-action-btn ai-analysis" title="Preview &amp; AI analysis" aria-label="Preview and AI analysis for ${this.escapeHtml(filename)}">
                         <i class="fa-solid fa-brain"></i>
                     </button>
-                    <button type="button" class="file-action-btn delete" onclick="ipophlAnalyzer.deleteFile('${doc.file_uuid}', this)" title="Delete File">
+                    <button type="button" class="file-action-btn delete" title="Delete file" aria-label="Delete ${this.escapeHtml(filename)}">
                         <i class="fa-solid fa-trash-can"></i>
                     </button>
                 </div>
             </div>
         `;
+    }
+
+    renderDocumentCard(container, doc) {
+        if (!container || !doc?.file_uuid) return;
+
+        const filename = doc.filename || doc.original_filename || 'Document';
+        const existing = container.querySelector(`[data-file-uuid="${doc.file_uuid}"]`);
+        if (existing) {
+            existing.className = 'file-item success ai-enhanced';
+            existing.setAttribute('data-file-uuid', doc.file_uuid);
+            existing.innerHTML = this.buildFileCardMarkup(doc);
+            this.bindFileCardActions(existing, doc);
+            return;
+        }
+
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item success ai-enhanced';
+        fileItem.setAttribute('data-file-uuid', doc.file_uuid);
+        fileItem.innerHTML = this.buildFileCardMarkup(doc);
         container.appendChild(fileItem);
+        this.bindFileCardActions(fileItem, doc);
     }
 
     updateCardWithAI(card, doc) {
-        card.classList.add('ai-enhanced');
-        
-        // Add or update status and actions wrapper
-        let statusActionsWrapper = card.querySelector('.file-status-actions');
-        if (!statusActionsWrapper) {
-            // Remove old status and actions if they exist outside the wrapper
-            const oldStatus = card.querySelector('.file-status');
-            const oldActions = card.querySelector('.file-actions');
-            if (oldStatus) oldStatus.remove();
-            if (oldActions) oldActions.remove();
-
-            statusActionsWrapper = document.createElement('div');
-            statusActionsWrapper.className = 'file-status-actions';
-            card.appendChild(statusActionsWrapper);
-        }
-        
-        statusActionsWrapper.innerHTML = `
-            <div class="file-actions">
-                <button type="button" class="file-action-btn ai-analysis" onclick="ipophlAnalyzer.loadAndShowFullAnalysis('${doc.file_uuid}')" title="AI Analysis">
-                    <i class="fa-solid fa-brain"></i>
-                </button>
-                <button type="button" class="file-action-btn delete" onclick="ipophlAnalyzer.deleteFile('${doc.file_uuid}', this)" title="Delete File">
-                    <i class="fa-solid fa-trash-can"></i>
-                </button>
-            </div>
-        `;
+        if (!card) return;
+        card.classList.add('ai-enhanced', 'success');
+        card.classList.remove('error', 'uploading');
+        if (doc.file_uuid) card.setAttribute('data-file-uuid', doc.file_uuid);
+        card.innerHTML = this.buildFileCardMarkup(doc);
+        this.bindFileCardActions(card, doc);
     }
 
     async loadAndShowFullAnalysis(fileUuid) {
+        if (!fileUuid) {
+            this.showToast('No document id for analysis', 'error');
+            return;
+        }
+
+        const card = Array.from(document.querySelectorAll('#ipophl-module .file-item[data-file-uuid]'))
+            .find((el) => el.getAttribute('data-file-uuid') === fileUuid);
+        const cardName = card?.querySelector('.file-name')?.textContent?.trim() || 'Document';
+
+        this.showFullAIAnalysis({
+            filename: cardName,
+            file_uuid: fileUuid,
+            preview_url: '',
+            analysis: null,
+            loading: true,
+        });
+
         try {
-            const response = await fetch(`/api/ipo-analysis/${fileUuid}`);
-            const result = await response.json();
-            
-            if (result.success) {
-                const fileData = {
+            const response = await fetch(ipophlApi(`/api/ipo-analysis/${encodeURIComponent(fileUuid)}`), {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+            });
+            const result = await ipophlJson(response);
+
+            if (response.ok && result.success) {
+                const ext = (result.filename || '').includes('.') ? result.filename.split('.').pop() : 'pdf';
+                const previewUrl = result.preview_url
+                    || `/api/file-preview/${encodeURIComponent(fileUuid)}.${ext}`;
+                this.showFullAIAnalysis({
                     file_info: { filename: result.filename },
-                    preview_url: `/api/file-preview/${fileUuid}`,
+                    filename: result.filename || cardName,
+                    preview_url: previewUrl,
                     analysis: result.analysis,
-                    file_uuid: fileUuid
-                };
-                this.showFullAIAnalysis(fileData);
+                    file_uuid: fileUuid,
+                });
+                return;
             }
+
+            throw new Error(this.extractApiErrorMessage(result, response));
         } catch (error) {
-            this.showToast('Failed to load analysis', 'error');
+            console.error('Failed to load analysis:', error);
+            this.setAnalysisError(error.message || 'Failed to load analysis');
+            this.showToast(error.message || 'Failed to load analysis', 'error');
+        }
+    }
+
+    setAnalysisError(message) {
+        const badge = document.getElementById('analysisStatusBadge');
+        if (badge) {
+            badge.textContent = 'Error';
+            badge.className = 'status-badge status-error';
+        }
+        const paragraph = document.getElementById('improvementAnalysisParagraph');
+        if (paragraph) {
+            paragraph.innerHTML = `<p class="placeholder">${this.escapeHtml(message)}</p>`;
         }
     }
 
@@ -166,34 +352,56 @@ class IPOPHLAnalyzer {
         const fileUuid = fileData.file_uuid || 
                         (filename !== 'Document' ? filename.split('.')[0] : 'unknown');
 
+        let previewUrl = fileData.preview_url || '';
+        if (previewUrl && !previewUrl.includes('.')) {
+            const ext = filename.includes('.') ? filename.split('.').pop() : 'pdf';
+            previewUrl = `${previewUrl}.${ext}`;
+        }
+
         this.currentFile = {
-            filename: filename,
-            preview_url: fileData.preview_url,
+            filename,
+            preview_url: previewUrl,
             analysis: fileData.analysis,
-            file_uuid: fileUuid
+            file_uuid: fileUuid,
         };
-        
-        // Show the full AI analysis modal
+
         const modal = document.getElementById('filePreviewModal');
         if (modal) {
+            this.ensureModalInBody();
             modal.classList.add('active');
-            
-            // Set file name
+            modal.removeAttribute('hidden');
+            modal.style.display = 'flex';
+            modal.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('modal-open');
+
             const nameEl = document.getElementById('previewFileName');
             if (nameEl) nameEl.textContent = this.currentFile.filename;
-            
-            // Load file preview
-            this.loadFilePreview(this.currentFile.preview_url);
-            
-            // Load AI analysis
+
+            if (fileData.loading) {
+                const loading = document.getElementById('previewLoading');
+                if (loading) loading.classList.remove('hidden');
+                const badge = document.getElementById('analysisStatusBadge');
+                if (badge) {
+                    badge.textContent = 'Loading…';
+                    badge.className = 'status-badge status-analyzing';
+                }
+                return;
+            }
+
+            if (this.currentFile.preview_url) {
+                this.loadFilePreview(this.currentFile.preview_url);
+            }
             this.loadAIAnalysis(this.currentFile);
         }
     }
 
     attachEventListeners() {
-        // Modal close handlers
         document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal') || e.target.classList.contains('modal-close')) {
+            if (e.target.classList.contains('modal-close') || e.target.closest('.modal-close')) {
+                this.closeFilePreview();
+                return;
+            }
+            if (e.target.id === 'filePreviewModal') {
                 this.closeFilePreview();
             }
         });
@@ -274,27 +482,51 @@ class IPOPHLAnalyzer {
             formData.append('task_id', service); // Use full service name as task_id for consistency
 
             // Upload and analyze file
-            const response = await fetch('/api/ipo-analyze', {
+            const response = await fetch(ipophlApi('/api/ipo-analyze'), {
                 method: 'POST',
-                body: formData
+                body: formData,
+                credentials: 'same-origin',
             });
 
-            const result = await response.json();
-
-            if (result.success) {
-                // Display file with AI analysis
-                this.displayUploadedFile(attachedFilesContainer, result, file.name);
-                
-                // Show preview modal with full AI analysis
-                this.showFullAIAnalysis(result);
-            } else {
-                throw new Error(result.error || 'Upload failed');
+            let result = {};
+            try {
+                result = await ipophlJson(response);
+            } catch (_parseErr) {
+                throw new Error(`Server error (${response.status}). Try again or check that the app server is running.`);
             }
+
+            const analyzed = Boolean(result.success && result.analysis && result.file_uuid);
+            if (analyzed) {
+                this.displayUploadedFile(attachedFilesContainer, result, file.name);
+                this.showFullAIAnalysis({
+                    filename: result.filename || file.name,
+                    preview_url: result.preview_url,
+                    analysis: result.analysis,
+                    file_uuid: result.file_uuid,
+                });
+                if (result.warning && window.dashboardApp?.showIpophlNotification) {
+                    window.dashboardApp.showIpophlNotification(result.warning);
+                }
+                return;
+            }
+
+            throw new Error(this.extractApiErrorMessage(result, response));
 
         } catch (error) {
             console.error('File upload error:', error);
             this.showUploadError(attachedFilesContainer, file.name, error.message);
         }
+    }
+
+    extractApiErrorMessage(result, response) {
+        const message = (result?.message || '').trim();
+        const code = (result?.error || '').trim();
+        if (message) return message;
+        if (code && code !== 'VALIDATION_ERROR') return code;
+        if (!response?.ok) {
+            return `Upload failed (${response.status}). Check server logs and database connection.`;
+        }
+        return 'Upload and analysis failed.';
     }
 
     parseServiceName(service) {
@@ -328,27 +560,45 @@ class IPOPHLAnalyzer {
         container.appendChild(fileItem);
     }
 
-    showUploadError(container, filename, error) {
+    showUploadError(container, filename, error, partialResult = null) {
         if (!container) return;
+
+        if (partialResult?.file_uuid && partialResult?.analysis) {
+            this.displayUploadedFile(container, partialResult, filename);
+            return;
+        }
+
         const fileItem = Array.from(container.querySelectorAll('.file-item.uploading'))
-            .find(item => item.dataset.filename === filename);
-            
-        if (fileItem) {
-            fileItem.className = 'file-item error';
-            fileItem.innerHTML = `
-                <div class="file-info">
-                    <i class="fa-solid fa-circle-exclamation text-danger"></i>
-                    <div class="file-details">
-                        <span class="file-name">${filename}</span>
-                        <span class="file-meta text-danger">${error}</span>
-                    </div>
+            .find((item) => item.dataset.filename === filename);
+
+        if (!fileItem) return;
+
+        fileItem.className = 'file-item error';
+        fileItem.removeAttribute('data-file-uuid');
+        fileItem.innerHTML = `
+            <div class="file-info">
+                <i class="fa-solid fa-circle-exclamation text-danger"></i>
+                <div class="file-details">
+                    <span class="file-name">${this.escapeHtml(filename)}</span>
+                    <span class="file-meta text-danger">${this.escapeHtml(error)}</span>
                 </div>
-                <div class="file-status-actions">
-                    <div class="file-actions">
-                        <i class="fa-solid fa-circle-xmark" style="color: #dc2626; margin-right: 10px;"></i>
-                    </div>
+            </div>
+            <div class="file-status-actions">
+                <div class="file-actions">
+                    <button type="button" class="file-action-btn delete" title="Remove from list" aria-label="Remove failed upload">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
                 </div>
-            `;
+            </div>
+        `;
+
+        const removeBtn = fileItem.querySelector('.file-action-btn.delete');
+        if (removeBtn) {
+            removeBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                fileItem.remove();
+            };
         }
     }
 
@@ -363,12 +613,12 @@ class IPOPHLAnalyzer {
         
         const taskId = container.id.replace('-files', '');
         const doc = {
-            filename: result.filename,
-            file_size: result.analysis.text_length * 2,
+            filename: result.filename || originalFilename,
+            file_size: result.file_size || (result.analysis?.text_length || 0) * 2,
             file_uuid: result.file_uuid,
-            ai_score: result.analysis.readiness_score,
-            ai_status: result.analysis.status,
-            task_id: taskId
+            ai_score: result.analysis?.readiness_score ?? 0,
+            ai_status: result.analysis?.status || 'Analyzed',
+            task_id: taskId,
         };
 
         this.renderDocumentCard(container, doc);
@@ -376,34 +626,89 @@ class IPOPHLAnalyzer {
         this.refreshDashboardIndicator();
     }
 
-    async deleteFile(fileUuid, btn) {
-        const confirmed = await window.dashboardApp.showConfirmDialog(
-            'Are you sure you want to delete this document? This action cannot be undone.',
-            'Delete Document',
-            'danger'
-        );
-        if (!confirmed) return;
-        
-        try {
-            const response = await fetch(`/api/ipo-delete/${fileUuid}`, { method: 'DELETE' });
-            const result = await response.json();
-            
-            if (result.success) {
-                const fileItem = btn.closest('.file-item');
-                const container = fileItem.parentElement;
-                const taskId = container.id.replace('-files', '');
-                
-                this.updateDashboardState(taskId, { file_uuid: fileUuid }, 'remove');
-                this.refreshDashboardIndicator();
+    removeFileCardFromDom(fileUuid, btn) {
+        const fileItem = btn?.closest?.('.file-item')
+            || document.querySelector(`#ipophl-module .file-item[data-file-uuid="${fileUuid}"]`);
+        const container = fileItem?.parentElement;
+        const taskId = container?.id?.replace('-files', '');
 
-                fileItem.style.opacity = '0';
-                setTimeout(() => fileItem.remove(), 300);
-                this.showToast('Document deleted', 'success');
-            } else {
-                throw new Error(result.error);
+        if (taskId) {
+            this.updateDashboardState(taskId, { file_uuid: fileUuid }, 'remove');
+        }
+        this.refreshDashboardIndicator();
+
+        if (this.currentFile?.file_uuid === fileUuid) {
+            this.closeFilePreview();
+        }
+
+        if (fileItem) {
+            fileItem.remove();
+        }
+    }
+
+    async requestDeleteOnServer(fileUuid) {
+        const encoded = encodeURIComponent(fileUuid);
+        const attempts = [
+            () => fetch(ipophlApi('/api/ipo-delete'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ file_uuid: fileUuid }),
+            }),
+            () => fetch(ipophlApi(`/api/ipo-delete?file_uuid=${encoded}`), {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+            }),
+            () => fetch(ipophlApi(`/api/ipo-delete/${encoded}`), {
+                method: 'DELETE',
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+            }),
+        ];
+
+        let lastError = null;
+        for (const run of attempts) {
+            try {
+                const response = await run();
+                const result = await ipophlJson(response);
+                if (response.ok && result.success) {
+                    return result;
+                }
+                lastError = new Error(this.extractApiErrorMessage(result, response));
+            } catch (err) {
+                lastError = err;
             }
+        }
+        throw lastError || new Error('Delete failed');
+    }
+
+    async deleteFile(fileUuid, btn) {
+        if (!fileUuid) {
+            this.showToast('Missing document id', 'error');
+            return;
+        }
+
+        const message = 'Delete this document? This cannot be undone.';
+        let confirmed = window.confirm(message);
+        if (!confirmed && window.dashboardApp?.showConfirmDialog) {
+            try {
+                confirmed = await window.dashboardApp.showConfirmDialog(message, 'Delete Document');
+            } catch (_err) {
+                confirmed = false;
+            }
+        }
+        if (!confirmed) return;
+
+        this.removeFileCardFromDom(fileUuid, btn);
+
+        try {
+            await this.requestDeleteOnServer(fileUuid);
+            this.showToast('Document deleted', 'success');
         } catch (error) {
-            this.showToast('Failed to delete document', 'error');
+            console.error('Delete failed:', error);
+            this.showToast(error.message || 'Failed to delete document', 'error');
+            await this.loadExistingDocuments();
         }
     }
 
@@ -441,7 +746,7 @@ class IPOPHLAnalyzer {
         if (isWordDoc) {
             try {
                 // Use mammoth.js for local Word document rendering
-                const response = await fetch(previewUrl);
+                const response = await fetch(ipophlAbsoluteUrl(previewUrl), { credentials: 'same-origin' });
                 const arrayBuffer = await response.arrayBuffer();
                 
                 const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
@@ -485,7 +790,7 @@ class IPOPHLAnalyzer {
                 loading.classList.add('hidden');
             };
 
-            frame.src = finalUrl;
+            frame.src = ipophlAbsoluteUrl(finalUrl);
 
             // Auto-hide spinner after timeout
             setTimeout(() => {
@@ -571,8 +876,11 @@ class IPOPHLAnalyzer {
                 
                 if (!identifier) throw new Error('No valid file identifier found');
 
-                const response = await fetch(`/api/ipo-analysis/${encodeURIComponent(identifier)}`);
-                const result = await response.json();
+                const response = await fetch(ipophlApi(`/api/ipo-analysis/${encodeURIComponent(identifier)}`), {
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json' },
+                });
+                const result = await ipophlJson(response);
                 
                 if (result.success) {
                     this.displayAnalysisResults(result.analysis);
@@ -718,11 +1026,13 @@ class IPOPHLAnalyzer {
         refreshBtn.disabled = true;
         
         try {
-            const response = await fetch(`/api/ipo-analysis/${this.currentFile.file_uuid}`, {
-                method: 'POST'
+            const response = await fetch(ipophlApi(`/api/ipo-analysis/${encodeURIComponent(this.currentFile.file_uuid)}`), {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
             });
-            
-            const result = await response.json();
+
+            const result = await ipophlJson(response);
             
             if (result.success) {
                 // Update current file data
@@ -750,12 +1060,17 @@ class IPOPHLAnalyzer {
 
     closeFilePreview() {
         const modal = document.getElementById('filePreviewModal');
-        modal.classList.remove('active');
-        
-        // Clear iframe
-        document.getElementById('filePreviewFrame').src = '';
-        
-        // Reset current file
+        if (modal) {
+            modal.classList.remove('active');
+            modal.setAttribute('hidden', '');
+            modal.style.display = 'none';
+            modal.setAttribute('aria-hidden', 'true');
+        }
+        document.body.classList.remove('modal-open');
+
+        const frame = document.getElementById('filePreviewFrame');
+        if (frame) frame.src = 'about:blank';
+
         this.currentFile = null;
         this.currentAnalysis = null;
     }
@@ -796,7 +1111,16 @@ function refreshAnalysis() {
     }
 }
 
-// Initialize the analyzer when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    window.ipophlAnalyzer = new IPOPHLAnalyzer();
-});
+function initIpophlAnalyzer() {
+    if (!window.ipophlAnalyzer) {
+        window.ipophlAnalyzer = new IPOPHLAnalyzer();
+    } else if (typeof window.ipophlAnalyzer.rebindAllFileCards === 'function') {
+        window.ipophlAnalyzer.rebindAllFileCards();
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initIpophlAnalyzer);
+} else {
+    initIpophlAnalyzer();
+}
