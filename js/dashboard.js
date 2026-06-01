@@ -5391,7 +5391,8 @@ class DashboardApp {
       });
     });
     
-    if (completeBtn) {
+    if (completeBtn && !completeBtn.dataset.completeBound) {
+      completeBtn.dataset.completeBound = '1';
       completeBtn.addEventListener('click', () => {
         this.completeRegistration();
       });
@@ -5688,8 +5689,8 @@ class DashboardApp {
 
       this.setCompleteRegistrationLoading(true, 'Opening GI Updates inbox…');
       await this.switchModule('register');
-      if (typeof this.refreshContributions === 'function') {
-        await this.refreshContributions();
+      if (typeof this.loadContributionsFromApi === 'function') {
+        await this.loadContributionsFromApi();
       }
     } catch (err) {
       console.error('Complete registration failed:', err);
@@ -9681,10 +9682,18 @@ class DashboardApp {
 
   mapGiContributionItem(item) {
     const status = String(item.upload_status || item.status || 'pending').toLowerCase();
+    const phase = String(item.current_phase || '').trim();
+    const fromAdmin =
+      item.direction === 'outbound' ||
+      phase === 'admin_submission' ||
+      !!item.from_admin;
     return {
       id: Number(item.gi_update_id || item.id || 0),
       farmer_id: Number(item.farmer_id || 0),
-      farmer: String(item.farmer_name || item.farmer || 'Farmer'),
+      fromAdmin,
+      farmer: fromAdmin
+        ? String(item.sender_name || item.farmer_name || 'IPOPHL Administrator')
+        : String(item.farmer_name || item.farmer || 'Farmer'),
       farmer_email: String(item.farmer_email || ''),
       subject: String(item.title || item.subject || 'GI Update'),
       preview: String(item.preview || item.content || '').replace(/\s+/g, ' ').trim(),
@@ -9704,7 +9713,7 @@ class DashboardApp {
     this.contributionsLoading = true;
     this.contributionsLoadError = '';
     try {
-      const res = await fetch('/api/gi-contributions-list?limit=500', { credentials: 'same-origin' });
+      const res = await fetch('/api/gi-contributions-list?limit=500&phase=all', { credentials: 'same-origin' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
         throw new Error(
@@ -9965,7 +9974,7 @@ class DashboardApp {
           <div class="beanthentic-contribution-star ${contribution.starred ? 'starred' : ''}">
             <i class="${contribution.starred ? 'fa-solid' : 'fa-regular'} fa-star"></i>
           </div>
-          <div class="beanthentic-contribution-farmer">${contribution.farmer}</div>
+          <div class="beanthentic-contribution-farmer">${contribution.fromAdmin ? '<i class="fa-solid fa-paper-plane" aria-hidden="true"></i> ' : ''}${contribution.farmer}</div>
         </div>
         <div class="beanthentic-contribution-subject">
           <span class="beanthentic-contribution-subject-text">${contribution.subject}</span>
