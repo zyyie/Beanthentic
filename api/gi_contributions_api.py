@@ -164,19 +164,26 @@ def _load_ipophl_disk_files(file_uuids: list[str]) -> list[tuple[str, Path]]:
     return out
 
 
-def _gi_attachment_base_url() -> str:
-    """URLs for mobile must point at the app server (:8080), not the admin web.py host."""
+def _gi_attachment_base_url(*, prefer_app_server: bool = False) -> str:
+    """Base URL embedded in attachment JSON for the mobile app."""
     from config.app_connection import app_server_base
 
-    base = (app_server_base() or "").strip().rstrip("/")
-    if base:
-        return base
-    return _public_base_url()
+    app_base = (app_server_base() or "").strip().rstrip("/")
+    admin_base = _public_base_url().strip().rstrip("/")
+    if prefer_app_server and app_base:
+        return app_base
+    if app_base:
+        return app_base
+    return admin_base
 
 
-def _save_gi_attachments_from_paths(disk_files: list[tuple[str, Path]]) -> list[dict]:
+def _save_gi_attachments_from_paths(
+    disk_files: list[tuple[str, Path]],
+    *,
+    base_url: str | None = None,
+) -> list[dict]:
     GI_CONTRIB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    base_url = _gi_attachment_base_url()
+    base_url = base_url or _gi_attachment_base_url()
     attachments: list[dict] = []
     for original, path in disk_files[:IPOPHL_GI_MAX_FILES]:
         if not path.is_file():
@@ -370,6 +377,19 @@ def publish_ipophl_registration_to_gi_updates(
         for original, path in disk_files:
             file_entries.append((task_id, label, original, path))
 
+    farmer_ids: list[int] = []
+    if app_db_params():
+        try:
+            farmer_ids = _list_active_farmer_ids()
+        except Exception as e:
+            mysql_err = e
+    if app_db_params() and not farmer_ids:
+        raise ValueError(
+            "No farmers in the app database. Add at least one farmer on the mobile app or app server first."
+        )
+
+    attach_base = (_public_base_url() or "").strip().rstrip("/") or _gi_attachment_base_url()
+
     for task_id, label, original, path in file_entries:
         display = _display_filename(original, path)
         card_title = (title or label).strip()[:150]
@@ -383,36 +403,10 @@ def publish_ipophl_registration_to_gi_updates(
 
         published_this_card = False
 
-        if _gi_http_bases():
+        # 1) MySQL first — always commits so Complete Registration saves even if :8080 HTTP fails.
+        if app_db_params() and farmer_ids:
             try:
-                data = _send_gi_via_http(
-                    send_to_all=True,
-                    farmer_id=0,
-                    title=card_title,
-                    content=doc_content,
-                    category=task_category,
-                    sender_name=sender_name[:255],
-                    uploads=[],
-                    disk_files=single,
-                    http_timeout=45.0,
-                )
-                if data.get("gi_update_ids"):
-                    all_created_ids.extend(
-                        int(x) for x in data["gi_update_ids"] if int(x or 0) > 0
-                    )
-                elif data.get("gi_update_id"):
-                    all_created_ids.append(int(data["gi_update_id"]))
-                if data.get("sent_count") or data.get("gi_update_ids"):
-                    published_this_card = True
-                    last_attachments = data.get("attachments") or last_attachments
-            except Exception as e:
-                if http_err is None:
-                    http_err = e
-
-        if not published_this_card and app_db_params():
-            try:
-                attachments = _save_gi_attachments_from_paths(single)
-                farmer_ids = _list_active_farmer_ids()
+                attachments = _save_gi_attachments_from_paths(single, base_url=attach_base)
                 created_ids = _broadcast_admin_submissions_mysql(
                     farmer_ids=farmer_ids,
                     title=card_title,
@@ -427,6 +421,33 @@ def publish_ipophl_registration_to_gi_updates(
                 published_this_card = True
             except Exception as e:
                 mysql_err = e
+
+        # 2) HTTP fallback only if MySQL did not save this card (sync files to app server).
+        if not published_this_card and _gi_http_bases():
+            try:
+                data = _send_gi_via_http(
+                    send_to_all=True,
+                    farmer_id=0,
+                    title=card_title,
+                    content=doc_content,
+                    category=task_category,
+                    sender_name=sender_name[:255],
+                    uploads=[],
+                    disk_files=single,
+                    http_timeout=60.0,
+                )
+                if data.get("gi_update_ids"):
+                    all_created_ids.extend(
+                        int(x) for x in data["gi_update_ids"] if int(x or 0) > 0
+                    )
+                elif data.get("gi_update_id"):
+                    all_created_ids.append(int(data["gi_update_id"]))
+                if data.get("sent_count") or data.get("gi_update_ids"):
+                    published_this_card = True
+                    last_attachments = data.get("attachments") or last_attachments
+            except Exception as e:
+                if http_err is None:
+                    http_err = e
 
         if published_this_card:
             cards_published += 1
@@ -450,7 +471,8 @@ def publish_ipophl_registration_to_gi_updates(
     except Exception:
         pass
 
-    farmer_count = len(_list_active_farmer_ids()) if cards_published else 0
+    farmer_count = len(farmer_ids) if farmer_ids else 0
+    source = "app_mysql" if app_db_params() and cards_published else "app_server_http"
     return {
         "ok": True,
         "broadcast": True,
@@ -458,8 +480,25 @@ def publish_ipophl_registration_to_gi_updates(
         "sent_count": farmer_count,
         "gi_update_ids": all_created_ids,
         "attachments": last_attachments,
-        "source": "app_server_http" if _gi_http_bases() else "app_mysql",
+        "source": source,
     }
+
+
+def _count_admin_gi_rows() -> int:
+    params = app_db_params()
+    if not params:
+        return 0
+    conn = connect_app_mysql(params)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) AS c FROM gi_updates "
+                "WHERE current_phase IN ('admin_submission', 'admin_progress')"
+            )
+            row = cur.fetchone() or {}
+            return int(row.get("c") if isinstance(row, dict) else row[0] if row else 0)
+    finally:
+        conn.close()
 
 
 def _send_gi_via_http(

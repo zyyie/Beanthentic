@@ -5526,6 +5526,26 @@ class DashboardApp {
     return uuids;
   }
 
+  async fetchAllIpophlFileEntriesFromServer() {
+    const entries = [];
+    const seen = new Set();
+    try {
+      const res = await fetch('/api/ipo-documents?limit=300', { credentials: 'same-origin' });
+      const data = await res.json().catch(() => ({}));
+      (data.items || []).forEach((doc) => {
+        const id = String(doc.file_uuid || '').trim();
+        const taskId = String(doc.task_id || '').trim();
+        if (id && !seen.has(id)) {
+          seen.add(id);
+          entries.push({ file_uuid: id, task_id: taskId });
+        }
+      });
+    } catch (e) {
+      console.warn('Could not load IPOPHL documents:', e);
+    }
+    return entries;
+  }
+
   async fetchPhase5FileUuidsFromServer() {
     const uuids = [];
     const seen = new Set();
@@ -5557,19 +5577,21 @@ class DashboardApp {
   async completeRegistration() {
     const phase5TaskIds = ['phase5-cert', 'phase5-compliance'];
     let fileEntries = this.collectIpophlPublishEntries();
-    let fileUuids = fileEntries.map((e) => e.file_uuid);
+
+    if (!fileEntries.length) {
+      fileEntries = await this.fetchAllIpophlFileEntriesFromServer();
+    }
+
+    let fileUuids = fileEntries.map((e) => e.file_uuid).filter(Boolean);
 
     if (!fileUuids.length) {
       fileUuids = this.collectPhase5FileUuids();
-    }
-    if (!fileUuids.length) {
-      fileUuids = await this.fetchPhase5FileUuidsFromServer();
       fileEntries = fileUuids.map((id) => ({ file_uuid: id, task_id: '' }));
     }
 
     if (!fileUuids.length) {
       this.showIpophlNotification(
-        'Please upload at least one Phase 5 document (certificate or compliance) before completing.'
+        'No IPOPHL files found. Upload documents in any IPOPHL phase first, then click Complete Registration.'
       );
       return;
     }
@@ -5589,27 +5611,29 @@ class DashboardApp {
         body: JSON.stringify({
           file_uuids: fileUuids,
           file_entries: fileEntries,
-          task_ids: phase5TaskIds,
         }),
       });
       const data = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        throw new Error('Session expired. Log in again, then click Complete Registration.');
+      }
       if (!res.ok || data.ok === false) {
         const err =
           data.error ||
-          data.message ||
           data.detail ||
-          'Could not upload files to the farmer app GI Updates page.';
+          data.message ||
+          `Save failed (HTTP ${res.status}). Check settings.json and MySQL on the app device.`;
         throw new Error(err);
       }
       const sent = data.sent_count || (data.gi_update_ids && data.gi_update_ids.length) || 0;
       const fileCount = data.file_count || fileUuids.length;
       const cards = data.cards_published || 0;
+      const dbRows = data.db_rows;
       this.showIpophlNotification(
-        cards
-          ? `Done! ${cards} category card(s) (${fileCount} file(s)) sent to GI Updates for ${sent || 'all'} farmer(s).`
-          : sent
-            ? `Done! ${fileCount} file(s) sent to GI Updates for ${sent} farmer(s).`
-            : `Done! ${fileCount} file(s) sent to GI Updates.`
+        data.message ||
+          (cards
+            ? `Saved! ${cards} card(s), ${fileCount} file(s) in database (${dbRows != null ? dbRows + ' rows' : sent + ' farmers'}). Open GI Updates on the app.`
+            : `Saved ${fileCount} file(s) to GI Updates.`)
       );
 
       console.log('IPOPHL → GI Updates published:', {

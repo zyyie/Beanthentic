@@ -43,7 +43,7 @@ from config.validation import (
     validate_uuid_like,
 )
 from config.utils import get_current_user_phone, is_authenticated, log_activity
-from api.gi_contributions_api import publish_ipophl_registration_to_gi_updates
+from api.gi_contributions_api import _count_admin_gi_rows, publish_ipophl_registration_to_gi_updates
 from config.ipophl_store import collect_registration_file_uuids
 
 
@@ -665,7 +665,7 @@ def register_ipophl_routes(app):
 
         task_ids = body.get("task_ids")
         if not isinstance(task_ids, list) or not task_ids:
-            task_ids = ["phase5-cert", "phase5-compliance"]
+            task_ids = None
 
         file_uuids = collect_registration_file_uuids(file_uuids=client_uuids, task_ids=task_ids)
 
@@ -686,7 +686,7 @@ def register_ipophl_routes(app):
             return jsonify(
                 {
                     "ok": False,
-                    "error": "No registration files found. Upload Phase 5 documents first.",
+                    "error": "No IPOPHL files found on this computer. Upload documents in IPOPHL first, then try again.",
                 }
             ), 400
 
@@ -713,16 +713,27 @@ def register_ipophl_routes(app):
                 )
             except Exception:
                 pass
-            return jsonify({"ok": True, "file_count": len(file_uuids), **result})
+            db_rows = _count_admin_gi_rows()
+            return jsonify(
+                {
+                    "ok": True,
+                    "file_count": len(file_uuids),
+                    "db_rows": db_rows,
+                    "message": f"Saved {result.get('cards_published', 0)} card(s) to database ({db_rows} GI rows).",
+                    **result,
+                }
+            )
         except ValueError as e:
             return jsonify({"ok": False, "error": str(e)}), 400
         except Exception as e:
+            err_text = str(e)
             return jsonify(
                 {
                     "ok": False,
                     "error": safe_error_message(
                         e,
-                        public="Could not publish to GI Updates. Check app_server_base in settings.json.",
+                        public="Could not save to GI Updates. Check MySQL (settings.json app_db_host) and app server :8080.",
                     ),
+                    "detail": err_text,
                 }
             ), 503
