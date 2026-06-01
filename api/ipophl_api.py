@@ -45,7 +45,11 @@ from config.validation import (
     validate_uuid_like,
 )
 from config.utils import get_current_user_phone, is_authenticated, log_activity
-from api.gi_contributions_api import _count_admin_gi_rows, publish_ipophl_registration_to_gi_updates
+from api.gi_contributions_api import (
+    _count_admin_gi_rows,
+    publish_gi_registration_fallback_to_gi_updates,
+    publish_ipophl_registration_to_gi_updates,
+)
 from config.ipophl_store import collect_registration_file_uuids
 
 
@@ -688,13 +692,12 @@ def register_ipophl_routes(app):
                     if uid not in file_uuids:
                         file_uuids.append(uid)
 
-        if not file_uuids:
-            return jsonify(
-                {
-                    "ok": False,
-                    "error": "No IPOPHL files found on this computer. Upload documents in IPOPHL first, then try again.",
-                }
-            ), 400
+        force_publish = str(body.get("force_publish") or "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
 
         title = str(body.get("title") or "").strip() or None
         content = str(body.get("content") or "").strip() or None
@@ -704,13 +707,27 @@ def register_ipophl_routes(app):
             apply_task_overrides_to_store(task_overrides)
 
         try:
-            result = publish_ipophl_registration_to_gi_updates(
-                file_uuids=file_uuids,
-                title=title,
-                content=content,
-                category=category,
-                task_overrides=task_overrides or None,
-            )
+            if file_uuids:
+                try:
+                    result = publish_ipophl_registration_to_gi_updates(
+                        file_uuids=file_uuids,
+                        title=title,
+                        content=content,
+                        category=category,
+                        task_overrides=task_overrides or None,
+                    )
+                except (ValueError, RuntimeError):
+                    if not force_publish:
+                        raise
+                    result = publish_gi_registration_fallback_to_gi_updates(
+                        title=title,
+                        content=content,
+                    )
+            else:
+                result = publish_gi_registration_fallback_to_gi_updates(
+                    title=title,
+                    content=content,
+                )
             try:
                 user_phone = get_current_user_phone()
                 sent = int(result.get("sent_count") or len(result.get("gi_update_ids") or []))

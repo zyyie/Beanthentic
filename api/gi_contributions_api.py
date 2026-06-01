@@ -417,6 +417,140 @@ def _set_gi_progress_mysql(
         conn.close()
 
 
+def _discover_any_ipophl_disk_files() -> list[tuple[str, Path]]:
+    """Last-resort: any publishable file from IPOPHL store or uploads folder."""
+    from config.ipophl_store import UPLOADS_DIR, list_documents, resolve_file_path
+
+    out: list[tuple[str, Path]] = []
+    seen: set[str] = set()
+    for record in list_documents(limit=300):
+        uid = str(record.get("file_uuid") or "").strip()
+        if not uid:
+            continue
+        path = resolve_file_path(uid)
+        if not path or not path.is_file():
+            continue
+        ext = path.suffix.lower()
+        if ext not in GI_ALLOWED_EXTENSIONS:
+            continue
+        if path.stat().st_size <= 0:
+            continue
+        key = path.resolve().as_posix()
+        if key in seen:
+            continue
+        seen.add(key)
+        name = str(record.get("original_filename") or path.name)
+        out.append((name, path))
+        if len(out) >= IPOPHL_GI_MAX_FILES:
+            return out
+    if UPLOADS_DIR.exists():
+        for path in sorted(UPLOADS_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+            if not path.is_file():
+                continue
+            ext = path.suffix.lower()
+            if ext not in GI_ALLOWED_EXTENSIONS:
+                continue
+            if path.stat().st_size <= 0 or path.stat().st_size > GI_MAX_FILE_BYTES:
+                continue
+            key = path.resolve().as_posix()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append((path.name, path))
+            if len(out) >= IPOPHL_GI_MAX_FILES:
+                break
+    return out
+
+
+def publish_gi_registration_fallback_to_gi_updates(
+    *,
+    title: str | None = None,
+    content: str | None = None,
+) -> dict:
+    """
+    Always insert at least one admin_submission row (and optional attachment)
+    so Complete Registration shows something in app.py GI Updates.
+    """
+    farmer_ids: list[int] = []
+    if app_db_params():
+        farmer_ids = _list_active_farmer_ids()
+    if not farmer_ids:
+        raise ValueError(
+            "No farmers in the app database. Add at least one farmer on the mobile app first."
+        )
+
+    disk_files = _discover_any_ipophl_disk_files()
+    sender_name = "IPOPHL Administrator"
+    card_title = (title or "GI Registration — Complete").strip()[:150]
+    body = (
+        content
+        or "Administrator completed GI registration. Documents are listed in GI Updates."
+    ).strip()
+    if disk_files:
+        display = _display_filename(disk_files[0][0], disk_files[0][1])
+        body = f"{body}\n\nAttached: {display}"
+
+    mysql_err: Exception | None = None
+    http_err: Exception | None = None
+    created_ids: list[int] = []
+    attachments: list[dict] = []
+
+    if app_db_params():
+        try:
+            attachments = _prepare_ipophl_attachments(disk_files[:1]) if disk_files else []
+            created_ids = _broadcast_admin_submissions_mysql(
+                farmer_ids=farmer_ids,
+                title=card_title,
+                content=body[:5000],
+                category="ipophl_registration",
+                attachments=attachments,
+                sender_name=sender_name[:255],
+                set_progress_percent=100.0,
+            )
+        except Exception as e:
+            mysql_err = e
+
+    if not created_ids and _gi_http_bases():
+        try:
+            data = _send_gi_via_http(
+                send_to_all=True,
+                farmer_id=0,
+                title=card_title,
+                content=body[:5000],
+                category="ipophl_registration",
+                sender_name=sender_name[:255],
+                uploads=[],
+                disk_files=disk_files[:1] if disk_files else None,
+                http_timeout=60.0,
+            )
+            if data.get("gi_update_ids"):
+                created_ids.extend(int(x) for x in data["gi_update_ids"] if int(x or 0) > 0)
+            attachments = data.get("attachments") or attachments
+        except Exception as e:
+            http_err = e
+
+    if not created_ids:
+        detail = friendly_load_failure(
+            module_label="GI Updates (fallback publish)",
+            mysql_error=mysql_err,
+            http_error=http_err,
+        )
+        raise RuntimeError(detail)
+
+    return {
+        "ok": True,
+        "broadcast": True,
+        "cards_published": 1,
+        "files_resolved": len(disk_files),
+        "files_requested": max(1, len(disk_files)),
+        "sent_count": len(farmer_ids),
+        "gi_update_ids": created_ids,
+        "attachments": attachments,
+        "source": "app_mysql" if app_db_params() else "app_server_http",
+        "fallback": True,
+    }
+
+
 def publish_ipophl_registration_to_gi_updates(
     *,
     file_uuids: list[str],

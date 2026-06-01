@@ -5721,27 +5721,13 @@ class DashboardApp {
     }
   }
 
-  sendRegistrationEmail(registrationData) {
-    try {
-      // Create email content
-      const emailContent = this.createEmailContent(registrationData);
-      
-      // Create Gmail web interface link with correct IPOPHL addresses
-      const subject = encodeURIComponent('GI Registration Application - Lipa City Products');
-      const body = encodeURIComponent(emailContent);
-      const to = encodeURIComponent('copyright@ipophl.gov.ph,csd@ipophl.gov.ph');
-      
-      // Redirect to Gmail web interface
-      const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`;
-      
-      // Open Gmail in new tab
-      window.open(gmailLink, '_blank');
-      
-      this.showIpophlNotification('Opening Gmail to send registration to IPOPHL...');
-    } catch (error) {
-      console.error('Error opening Gmail:', error);
-      this.showIpophlNotification('Failed to open Gmail. Please try again.');
+  sendRegistrationEmail(_registrationData) {
+    if (typeof window.publishIpophlToGiUpdates === 'function') {
+      return window.publishIpophlToGiUpdates();
     }
+    this.showIpophlNotification(
+      'Reload the dashboard (Ctrl+F5), then click Complete Registration to save to GI Updates.'
+    );
   }
 
   createEmailContent(registrationData) {

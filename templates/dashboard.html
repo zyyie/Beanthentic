@@ -2251,17 +2251,9 @@
   <script src="js/main.js"></script>
   <script src="js/navigation.js"></script>
   <script src="js/beanthentic_datetime.js?v=20260524-msgshort"></script>
-  <script src="js/dashboard.js?v=20260602gi-db-save"></script>
-  <script>
-    (function () {
-      if (!window.dashboardApp || typeof window.dashboardApp.completeRegistration !== 'function') return;
-      var src = window.dashboardApp.completeRegistration.toString();
-      if (src.indexOf('complete-registration') < 0 && src.indexOf('Email sent to IPOPHL') >= 0) {
-        console.warn('Stale dashboard.js detected. Press Ctrl+F5, then restart python web.py.');
-      }
-    })();
-  </script>
-  <script src="js/ipophl-analyzer.js?v=20260602gi-topics"></script>
+  <script src="js/ipophl-complete-gi.js?v={{ static_cache_bust }}"></script>
+  <script src="js/dashboard.js?v={{ static_cache_bust }}"></script>
+  <script src="js/ipophl-analyzer.js?v={{ static_cache_bust }}"></script>
   
   <!-- Delete Confirmation Modal -->
   <div class="messaging-modal-overlay" id="deleteMsgModal" hidden>
