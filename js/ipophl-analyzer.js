@@ -90,6 +90,7 @@ class IPOPHLAnalyzer {
 
         const fileItem = document.createElement('div');
         fileItem.className = 'file-item success ai-enhanced';
+        fileItem.dataset.fileUuid = doc.file_uuid;
         fileItem.innerHTML = `
             <div class="file-info">
                 <i class="fa-solid ${iconClass}"></i>
@@ -114,6 +115,9 @@ class IPOPHLAnalyzer {
 
     updateCardWithAI(card, doc) {
         card.classList.add('ai-enhanced');
+        if (doc.file_uuid) {
+            card.dataset.fileUuid = doc.file_uuid;
+        }
         
         // Add or update status and actions wrapper
         let statusActionsWrapper = card.querySelector('.file-status-actions');

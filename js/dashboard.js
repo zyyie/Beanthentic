@@ -5475,52 +5475,78 @@ class DashboardApp {
     const services = ['phase5-cert', 'phase5-compliance'];
     const uuids = [];
     const seen = new Set();
+    const addUuid = (id) => {
+      const uid = String(id || '').trim();
+      if (uid && !seen.has(uid)) {
+        seen.add(uid);
+        uuids.push(uid);
+      }
+    };
+
     services.forEach((service) => {
-      const files = this.ipophlFiles?.[service] || [];
-      files.forEach((f) => {
-        const id = f.id || f.file_uuid;
-        if (id && !seen.has(id)) {
-          seen.add(id);
-          uuids.push(id);
-        }
+      (this.ipophlFiles?.[service] || []).forEach((f) => addUuid(f.id || f.file_uuid));
+
+      const container = document.getElementById(`${service}-files`);
+      if (!container) return;
+
+      container.querySelectorAll('[data-file-uuid]').forEach((el) => addUuid(el.getAttribute('data-file-uuid')));
+
+      container.querySelectorAll('.file-action-btn.ai-analysis').forEach((btn) => {
+        const onclick = btn.getAttribute('onclick') || '';
+        const match = onclick.match(/loadAndShowFullAnalysis\('([^']+)'\)/);
+        if (match) addUuid(match[1]);
       });
     });
+
+    return uuids;
+  }
+
+  async fetchPhase5FileUuidsFromServer() {
+    const services = ['phase5-cert', 'phase5-compliance'];
+    const uuids = [];
+    const seen = new Set();
+
+    for (const taskId of services) {
+      try {
+        const res = await fetch(
+          `/api/ipo-documents?task_id=${encodeURIComponent(taskId)}&limit=50`,
+          { credentials: 'same-origin' }
+        );
+        const data = await res.json().catch(() => ({}));
+        (data.items || []).forEach((doc) => {
+          const uid = String(doc.file_uuid || '').trim();
+          if (uid && !seen.has(uid)) {
+            seen.add(uid);
+            uuids.push(uid);
+          }
+        });
+      } catch (e) {
+        console.warn('Could not load IPOPHL documents for', taskId, e);
+      }
+    }
     return uuids;
   }
 
   async completeRegistration() {
-    const allAttachments = this.collectAllPhaseData();
+    const phase5TaskIds = ['phase5-cert', 'phase5-compliance'];
     let fileUuids = this.collectPhase5FileUuids();
 
-    if (fileUuids.length === 0) {
-      const phase5 = allAttachments.phase5;
-      if (phase5?.files?.length) {
-        phase5.files.forEach((f) => {
-          const id = f.id || f.file_uuid;
-          if (id) fileUuids.push(id);
-        });
-      }
+    if (!fileUuids.length) {
+      fileUuids = await this.fetchPhase5FileUuidsFromServer();
     }
 
-    const hasAnyData = Object.values(allAttachments).some(
-      (phase) =>
-        (phase.files && phase.files.length > 0) || (phase.links && phase.links.length > 0)
-    );
-
-    if (!fileUuids.length && !hasAnyData) {
+    if (!fileUuids.length) {
       this.showIpophlNotification(
-        'Please upload at least one registration document in Phase 5 before completing.'
+        'Please upload at least one Phase 5 document (certificate or compliance) before completing.'
       );
       return;
     }
-
-    const phase5TaskIds = ['phase5-cert', 'phase5-compliance'];
 
     const completeBtn = document.querySelector('#ipophl-module .complete-btn');
     const prevLabel = completeBtn?.textContent || 'Complete Registration';
     if (completeBtn) {
       completeBtn.disabled = true;
-      completeBtn.textContent = 'Publishing to GI Updates…';
+      completeBtn.textContent = 'Sending to GI Updates…';
     }
 
     try {
@@ -5539,31 +5565,29 @@ class DashboardApp {
           data.error ||
           data.message ||
           data.detail ||
-          'Could not send files to farmers\' GI Updates page.';
+          'Could not upload files to the farmer app GI Updates page.';
         throw new Error(err);
       }
       const sent = data.sent_count || (data.gi_update_ids && data.gi_update_ids.length) || 0;
+      const fileCount = data.file_count || fileUuids.length;
       this.showIpophlNotification(
         sent
-          ? `GI Registration complete! Documents published to GI Updates for ${sent} farmer(s).`
-          : 'GI Registration complete! Documents published to GI Updates.'
+          ? `Done! ${fileCount} file(s) sent to GI Updates (news.php) for ${sent} farmer(s). Open the mobile app to view.`
+          : `Done! ${fileCount} file(s) sent to GI Updates (news.php). Open the mobile app to view.`
       );
 
-      if (hasAnyData) {
-        this.sendRegistrationEmail(allAttachments);
-        this.showIpophlNotification('Opening Gmail to notify IPOPHL…');
-      }
-
-      console.log('Completed GI Registration:', {
+      console.log('IPOPHL → GI Updates published:', {
         fileUuids,
+        sent,
+        source: data.source,
         completedAt: new Date().toISOString(),
       });
     } catch (err) {
       console.error('Complete registration failed:', err);
-      let msg = err.message || 'Failed to publish to GI Updates.';
+      let msg = err.message || 'Failed to send files to GI Updates.';
       if (msg === 'Failed to fetch') {
         msg =
-          'Could not reach the admin server. Restart web.py and confirm settings.json app_server_base points to the app device (port 8080).';
+          'Could not reach web.py. Restart python web.py, hard-refresh the page (Ctrl+F5), and set settings.json app_server_base to the app device (e.g. http://192.168.x.x:8080).';
       }
       this.showIpophlNotification(msg);
     } finally {

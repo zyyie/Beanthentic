@@ -187,6 +187,11 @@ def publish_ipophl_registration_to_gi_updates(
     """
     disk_files = _load_ipophl_disk_files(file_uuids)
     if not disk_files:
+        if file_uuids:
+            raise ValueError(
+                "Registration files were not found on this device or are empty (0 bytes). "
+                "Re-upload Phase 5 documents, then click Complete Registration again."
+            )
         raise ValueError(
             "No registration files found. Upload documents in Phase 5 before completing registration."
         )
@@ -286,7 +291,9 @@ def _send_gi_via_http(
     for base in _gi_http_bases():
         try:
             data = app_http_post_multipart("/api/admin_gi_send.php", fields, files)
-            if data.get("ok"):
+            if data.get("ok") or data.get("sent_count") or data.get("gi_update_ids"):
+                if not data.get("ok"):
+                    data["ok"] = True
                 return data
             last_err = RuntimeError(str(data.get("detail") or data.get("error") or "GI send rejected"))
         except Exception as e:
