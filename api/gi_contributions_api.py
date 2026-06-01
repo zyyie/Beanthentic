@@ -174,6 +174,92 @@ def _save_gi_attachments_from_paths(disk_files: list[tuple[str, Path]]) -> list[
     return attachments
 
 
+def _broadcast_admin_submissions_mysql(
+    *,
+    farmer_ids: list[int],
+    title: str,
+    content: str,
+    category: str,
+    attachments: list[dict],
+    sender_name: str,
+    set_progress_percent: float | None = 100.0,
+) -> list[int]:
+    """Insert admin_submission rows for many farmers in one transaction (must commit)."""
+    params = app_db_params()
+    if not params:
+        raise RuntimeError("app_db_host not set in settings.json")
+    if not farmer_ids:
+        raise RuntimeError("No farmers found in the database.")
+
+    preview = " ".join(content.split())[:200]
+    attachments_json = json.dumps(attachments) if attachments else None
+    cat = (category or "general")[:30]
+    conn = connect_app_mysql(params)
+    created_ids: list[int] = []
+    try:
+        with conn.cursor() as cur:
+            ensure_gi_updates_table(cur)
+            has_preview = "preview" in _gi_table_columns(cur)
+            for fid in farmer_ids:
+                cur.execute(
+                    """
+                    INSERT INTO gi_updates (
+                      farmer_id, current_phase, title, content, category,
+                      sender_name, attachments_json, upload_status,
+                      is_starred, is_read_admin, progress_percent
+                    ) VALUES (
+                      %s, 'admin_submission', %s, %s, %s,
+                      %s, %s, 'approved',
+                      0, 1, 0
+                    )
+                    """,
+                    (
+                        fid,
+                        title[:255],
+                        content,
+                        cat,
+                        sender_name[:255],
+                        attachments_json,
+                    ),
+                )
+                gid = int(cur.lastrowid or 0)
+                if gid and has_preview:
+                    try:
+                        cur.execute(
+                            "UPDATE gi_updates SET preview = %s WHERE gi_update_id = %s",
+                            (preview, gid),
+                        )
+                    except Exception:
+                        pass
+                if gid:
+                    created_ids.append(gid)
+            if set_progress_percent is not None and farmer_ids:
+                progress = max(0.0, min(100.0, float(set_progress_percent)))
+                note = "GI Registration complete — documents are available in GI Updates."
+                for fid in farmer_ids:
+                    cur.execute(
+                        """
+                        INSERT INTO gi_updates
+                          (farmer_id, title, content, upload_status, is_read_admin,
+                           category, current_phase, progress_percent, sender_name)
+                        VALUES
+                          (%s, 'GI Progress Update', %s, 'approved', 1,
+                           'general', 'admin_progress', %s, %s)
+                        """,
+                        (fid, note, progress, sender_name[:255]),
+                    )
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        conn.close()
+    return created_ids
+
+
 def publish_ipophl_registration_to_gi_updates(
     *,
     file_uuids: list[str],
@@ -183,7 +269,7 @@ def publish_ipophl_registration_to_gi_updates(
 ) -> dict:
     """
     Broadcast IPOPHL Phase 5 registration files to all farmers' GI Updates inbox (mobile app).
-    Uses HTTP bridge to app_server_base when admin web.py runs on a different device than MySQL.
+    Writes to app MySQL first (with commit), then HTTP bridge as fallback.
     """
     disk_files = _load_ipophl_disk_files(file_uuids)
     if not disk_files:
@@ -210,14 +296,38 @@ def publish_ipophl_registration_to_gi_updates(
     http_err: Exception | None = None
     mysql_err: Exception | None = None
 
-    if _prefer_http_for_gi_send() and _gi_http_bases():
+    if app_db_params():
+        try:
+            attachments = _save_gi_attachments_from_paths(disk_files)
+            farmer_ids = _list_active_farmer_ids()
+            created_ids = _broadcast_admin_submissions_mysql(
+                farmer_ids=farmer_ids,
+                title=doc_title,
+                content=doc_content,
+                category=category,
+                attachments=attachments,
+                sender_name=sender_name[:255],
+                set_progress_percent=100.0,
+            )
+            return {
+                "ok": True,
+                "broadcast": True,
+                "sent_count": len(created_ids),
+                "gi_update_ids": created_ids,
+                "attachments": attachments,
+                "source": "app_mysql",
+            }
+        except Exception as e:
+            mysql_err = e
+
+    if _gi_http_bases():
         try:
             data = _send_gi_via_http(
                 send_to_all=True,
                 farmer_id=0,
                 title=doc_title,
                 content=doc_content,
-                category=category[:64],
+                category=category[:30],
                 sender_name=sender_name[:255],
                 uploads=[],
                 disk_files=disk_files,
@@ -226,34 +336,6 @@ def publish_ipophl_registration_to_gi_updates(
             return data
         except Exception as e:
             http_err = e
-
-    try:
-        attachments = _save_gi_attachments_from_paths(disk_files)
-        farmer_ids = _list_active_farmer_ids()
-        if not farmer_ids:
-            raise RuntimeError("No farmers found in the database.")
-        created_ids: list[int] = []
-        for fid in farmer_ids:
-            created_ids.append(
-                _insert_admin_submission(
-                    farmer_id=fid,
-                    title=doc_title,
-                    content=doc_content,
-                    category=category[:64],
-                    attachments=attachments,
-                    sender_name=sender_name[:255],
-                )
-            )
-        return {
-            "ok": True,
-            "broadcast": True,
-            "sent_count": len(created_ids),
-            "gi_update_ids": created_ids,
-            "attachments": attachments,
-            "source": "app_mysql",
-        }
-    except Exception as e:
-        mysql_err = e
 
     detail = friendly_load_failure(
         module_label="IPOPHL registration → GI Updates",
@@ -589,7 +671,15 @@ def _patch_mysql(gi_id: int, fields: dict) -> int:
                 f"UPDATE gi_updates SET {', '.join(sets)} WHERE gi_update_id = %s AND current_phase = 'farmer_submission'",
                 tuple(args),
             )
-            return int(cur.rowcount or 0)
+            updated = int(cur.rowcount or 0)
+        conn.commit()
+        return updated
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         conn.close()
 
@@ -701,7 +791,14 @@ def _insert_admin_submission(
                     )
                 except Exception:
                     pass
-            return gid
+        conn.commit()
+        return gid
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         conn.close()
 
@@ -764,18 +861,15 @@ def handle_gi_contributions_send():
             farmer_ids = _list_active_farmer_ids()
             if not farmer_ids:
                 return jsonify({"ok": False, "error": "No farmers found in the database."}), 400
-            created_ids: list[int] = []
-            for fid in farmer_ids:
-                created_ids.append(
-                    _insert_admin_submission(
-                        farmer_id=fid,
-                        title=title[:255],
-                        content=content,
-                        category=category[:64],
-                        attachments=attachments,
-                        sender_name=sender_name[:255],
-                    )
-                )
+            created_ids = _broadcast_admin_submissions_mysql(
+                farmer_ids=farmer_ids,
+                title=title[:255],
+                content=content,
+                category=category,
+                attachments=attachments,
+                sender_name=sender_name[:255],
+                set_progress_percent=None,
+            )
             return jsonify(
                 {
                     "ok": True,
@@ -879,6 +973,13 @@ def register_gi_contributions_routes(app) -> None:
                                 (gi_id,),
                             )
                             deleted = int(cur.rowcount or 0)
+                        conn.commit()
+                    except Exception:
+                        try:
+                            conn.rollback()
+                        except Exception:
+                            pass
+                        raise
                     finally:
                         conn.close()
                 except Exception as e:
