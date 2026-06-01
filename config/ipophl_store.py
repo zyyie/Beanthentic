@@ -150,10 +150,22 @@ def _save(data: dict) -> None:
     STORE_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
+def _normalize_record_file_path(record: dict) -> dict:
+    """Store portable paths so publish works after folder moves."""
+    file_uuid = str(record.get("file_uuid") or "").strip()
+    raw_path = str(record.get("file_path") or "").strip()
+    if file_uuid and raw_path:
+        name = Path(raw_path).name
+        if _UUID_FILE_RE.match(name) or name.startswith(file_uuid):
+            record = {**record, "file_path": f"machinelearning/uploads/{name}"}
+    return record
+
+
 def upsert_document(record: dict) -> None:
     file_uuid = str(record.get("file_uuid") or "").strip()
     if not file_uuid:
         return
+    record = _normalize_record_file_path(dict(record))
     data = _load()
     data[file_uuid] = record
     _save(data)

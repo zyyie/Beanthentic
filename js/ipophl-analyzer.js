@@ -300,7 +300,11 @@ class IPOPHLAnalyzer {
             if (result.success) {
                 // Display file with AI analysis
                 this.displayUploadedFile(attachedFilesContainer, result, file.name);
-                
+                this.showToast(
+                    'Saved on server. Click Complete Registration to publish to GI Updates.',
+                    'success'
+                );
+
                 // Show preview modal with full AI analysis
                 this.showFullAIAnalysis(result);
             } else {

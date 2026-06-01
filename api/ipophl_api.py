@@ -381,6 +381,8 @@ def register_ipophl_routes(app):
                 return jsonify({"error": analysis_result.get("error", "Analysis failed")}), 500
 
             file_uuid = file_path_obj.stem
+            # Always store a portable relative path (survives PC moves / OneDrive paths).
+            relative_path = f"machinelearning/uploads/{file_path_obj.name}"
             existing_record = get_json_document(file_uuid)
             existing_analysis = None
             if existing_record:
@@ -402,13 +404,14 @@ def register_ipophl_routes(app):
             if existing_analysis:
                 doc_analysis = existing_analysis
                 doc_analysis.original_filename = stored_display_name
+                doc_analysis.file_path = relative_path
                 doc_analysis.task_id = task_id
                 doc_analysis.ipophl_phase = ipophl_phase
             else:
                 doc_analysis = DocumentAnalysis(
                     file_uuid=file_uuid,
                     original_filename=stored_display_name,
-                    file_path=file_path,
+                    file_path=relative_path,
                     file_type=file_ext,
                     file_size=os.path.getsize(str(file_path_obj)),
                     ipophl_phase=ipophl_phase,
@@ -687,10 +690,18 @@ def register_ipophl_routes(app):
                 uid = str(entry.get("file_uuid") or entry.get("id") or "").strip()
                 tid = str(entry.get("task_id") or entry.get("service") or "").strip()
                 if uid:
-                    if tid:
-                        task_overrides[uid] = tid
+                    norm_tid = normalize_ipophl_task_id(tid)
+                    if norm_tid and norm_tid != "ipophl-other":
+                        task_overrides[uid] = norm_tid
                     if uid not in file_uuids:
                         file_uuids.append(uid)
+
+        publish_all_categories = str(body.get("publish_all_categories") or "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
 
         force_publish = str(body.get("force_publish") or "").strip().lower() in (
             "1",
@@ -715,6 +726,7 @@ def register_ipophl_routes(app):
                         content=content,
                         category=category,
                         task_overrides=task_overrides or None,
+                        publish_all_categories=publish_all_categories,
                     )
                 except (ValueError, RuntimeError):
                     if not force_publish:

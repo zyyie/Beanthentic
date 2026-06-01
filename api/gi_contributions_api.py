@@ -558,7 +558,7 @@ def publish_ipophl_registration_to_gi_updates(
     content: str | None = None,
     category: str = "ipophl_registration",
     task_overrides: dict[str, str] | None = None,
-    publish_all_categories: bool = True,
+    publish_all_categories: bool = False,
 ) -> dict:
     """
     Publish IPOPHL to farmers' GI Updates — one feed card per document category (13 groups).

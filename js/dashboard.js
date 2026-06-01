@@ -5672,6 +5672,8 @@ class DashboardApp {
         body: JSON.stringify({
           file_uuids: fileUuids,
           file_entries: fileEntries,
+          force_publish: true,
+          publish_all_categories: false,
         }),
       });
       const data = await beanthenticParseJsonResponse(res).catch(() => ({}));
