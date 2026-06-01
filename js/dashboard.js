@@ -5444,7 +5444,9 @@ class DashboardApp {
     if (hasFiles || hasLinks) return true;
 
     const container = document.getElementById(`${service}-files`);
-    return Boolean(container?.querySelector('.file-item'));
+    return Boolean(
+      container?.querySelector('.file-item[data-file-uuid], .file-item.pending, .file-item.success')
+    );
   }
 
   isIpophlPhaseComplete(phaseNum) {

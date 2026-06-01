@@ -1,5 +1,6 @@
 /**
- * IPOPHL Complete → GI Updates (XAMPP). Loaded before dashboard.js.
+ * IPOPHL Complete Registration — upload files + publish to app GI Updates (one step).
+ * Same pattern as admin_gi_send / gi-contributions-send on the app server.
  */
 (function () {
   'use strict';
@@ -22,9 +23,9 @@
     el.className = 'ipophl-notification';
     el.textContent = msg;
     el.style.cssText =
-      'position:fixed;top:20px;right:20px;background:#145e1e;color:#fff;padding:14px 18px;border-radius:8px;z-index:99999;max-width:380px;line-height:1.4;';
+      'position:fixed;top:20px;right:20px;background:#145e1e;color:#fff;padding:14px 18px;border-radius:8px;z-index:99999;max-width:400px;line-height:1.45;';
     document.body.appendChild(el);
-    setTimeout(() => el.remove(), 10000);
+    setTimeout(() => el.remove(), 12000);
   }
 
   function setLoading(isLoading, label) {
@@ -40,7 +41,7 @@
       btn.innerHTML =
         '<span class="complete-btn-spinner" aria-hidden="true"></span>' +
         '<span class="complete-btn-label">' +
-        (label || 'Saving to GI Updates…') +
+        (label || 'Uploading to GI Updates…') +
         '</span>';
     } else {
       btn.disabled = false;
@@ -50,124 +51,60 @@
     }
   }
 
-  function taskIdFromContainer(el) {
-    const container = el.closest('[id$="-files"]');
-    if (!container || !container.id) return '';
-    return container.id.replace(/-files$/, '');
-  }
-
-  function collectFileEntriesFromDom() {
-    const byUuid = new Map();
-    const add = (uuid, taskId) => {
-      const id = String(uuid || '').trim();
-      if (!id) return;
-      const tid = String(taskId || '').trim();
-      const prev = byUuid.get(id) || {};
-      byUuid.set(id, {
-        file_uuid: id,
-        task_id: tid && tid.indexOf('phase') === 0 ? tid : prev.task_id || tid,
-      });
+  function collectExistingUuids() {
+    const uuids = new Set();
+    const add = (id) => {
+      const u = String(id || '').trim();
+      if (u && !u.startsWith('pending-')) uuids.add(u);
     };
-
     document.querySelectorAll('#ipophl-module .file-item[data-file-uuid]').forEach((el) => {
-      add(
-        el.getAttribute('data-file-uuid') || el.dataset.fileUuid,
-        el.getAttribute('data-task-id') || el.dataset.taskId || taskIdFromContainer(el)
-      );
+      add(el.getAttribute('data-file-uuid') || el.dataset.fileUuid);
     });
-
-    document.querySelectorAll('#ipophl-module [data-file-uuid]').forEach((el) => {
-      if (el.classList && el.classList.contains('file-item')) return;
-      add(el.getAttribute('data-file-uuid'), taskIdFromContainer(el));
-    });
-
-    document.querySelectorAll('#ipophl-module .file-action-btn.ai-analysis').forEach((btn) => {
-      const m = (btn.getAttribute('onclick') || '').match(/loadAndShowFullAnalysis\('([^']+)'\)/);
-      if (!m) return;
-      const item = btn.closest('.file-item');
-      add(
-        m[1],
-        item
-          ? item.getAttribute('data-task-id') || item.dataset.taskId || taskIdFromContainer(item)
-          : ''
-      );
-    });
-
-    if (window.dashboardApp && window.dashboardApp.ipophlFiles) {
-      Object.keys(window.dashboardApp.ipophlFiles).forEach((taskId) => {
-        (window.dashboardApp.ipophlFiles[taskId] || []).forEach((f) => {
-          add(f.id || f.file_uuid, taskId);
-        });
+    if (window.dashboardApp?.ipophlFiles) {
+      Object.values(window.dashboardApp.ipophlFiles).forEach((list) => {
+        (list || []).forEach((f) => add(f.id || f.file_uuid));
       });
     }
-
-    return Array.from(byUuid.values());
-  }
-
-  async function fetchServerFileEntries() {
-    try {
-      const res = await fetch(API('/api/ipo-documents?limit=300'), { credentials: 'same-origin' });
-      const data = await parseJson(res);
-      return (data.items || [])
-        .map((d) => ({
-          file_uuid: String(d.file_uuid || '').trim(),
-          task_id: String(d.task_id || '').trim(),
-        }))
-        .filter((e) => e.file_uuid);
-    } catch (e) {
-      console.warn('ipo-documents list failed', e);
-      return [];
-    }
-  }
-
-  function mergeFileEntries(serverEntries, domEntries) {
-    const byUuid = new Map();
-    serverEntries.forEach((e) => {
-      if (e.file_uuid) byUuid.set(e.file_uuid, { ...e });
-    });
-    domEntries.forEach((e) => {
-      if (!e.file_uuid) return;
-      const prev = byUuid.get(e.file_uuid) || {};
-      const tid =
-        e.task_id && e.task_id.indexOf('phase') === 0
-          ? e.task_id
-          : prev.task_id && prev.task_id.indexOf('phase') === 0
-            ? prev.task_id
-            : e.task_id || prev.task_id || '';
-      byUuid.set(e.file_uuid, { file_uuid: e.file_uuid, task_id: tid });
-    });
-    return Array.from(byUuid.values());
+    return Array.from(uuids);
   }
 
   async function publishIpophlToGiUpdates() {
-    setLoading(true, 'Reading uploaded documents…');
+    const pending =
+      window.ipophlAnalyzer && typeof window.ipophlAnalyzer.collectPendingUploads === 'function'
+        ? window.ipophlAnalyzer.collectPendingUploads()
+        : [];
+    const existingUuids = collectExistingUuids();
 
-    const serverEntries = await fetchServerFileEntries();
-    const domEntries = collectFileEntriesFromDom();
-    const fileEntries = mergeFileEntries(serverEntries, domEntries);
-    const fileUuids = fileEntries.map((e) => e.file_uuid);
-
-    if (!fileUuids.length) {
-      setLoading(false);
+    if (!pending.length && !existingUuids.length) {
       notify(
-        'No saved IPOPHL files on this PC. Upload in each IPOPHL section (wait for analysis to finish), then click Complete Registration again. Use the same PC that runs python web.py.'
+        'Pumili muna ng file sa Phase 5 (o ibang phase), tapos click Complete Registration. Doon ia-upload sa database at lalabas sa GI Updates sa app.'
       );
       return;
     }
 
-    setLoading(true, 'Saving ' + fileUuids.length + ' file(s) to GI Updates…');
+    setLoading(
+      true,
+      pending.length
+        ? `Uploading ${pending.length} file(s) and saving to GI Updates…`
+        : 'Publishing to GI Updates…'
+    );
+
+    const form = new FormData();
+    pending.forEach(({ file, task_id }) => {
+      form.append('files', file);
+      form.append('task_ids', task_id);
+    });
+    if (existingUuids.length) {
+      form.append('file_uuids_json', JSON.stringify(existingUuids));
+    }
+    form.append('publish_all_categories', 'true');
+    form.append('force_publish', 'true');
 
     try {
       const res = await fetch(API('/api/ipophl/complete-registration'), {
         method: 'POST',
         credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          file_uuids: fileUuids,
-          file_entries: fileEntries,
-          force_publish: true,
-          publish_all_categories: false,
-        }),
+        body: form,
       });
       const data = await parseJson(res).catch(() => ({}));
       if (res.status === 401) {
@@ -176,23 +113,24 @@
       if (!res.ok || data.ok === false) {
         throw new Error(data.error || data.message || data.detail || 'Save failed (HTTP ' + res.status + ')');
       }
-      const cards = data.cards_published || 0;
-      const withFiles = data.categories_with_files != null ? data.categories_with_files : cards;
+
+      if (window.ipophlAnalyzer?.clearPendingAfterPublish) {
+        window.ipophlAnalyzer.clearPendingAfterPublish();
+      }
+      if (window.ipophlAnalyzer?.loadExistingDocuments) {
+        await window.ipophlAnalyzer.loadExistingDocuments();
+      }
+
       notify(
         data.message ||
-          'Saved ' +
-            cards +
-            ' update(s) with ' +
-            withFiles +
-            ' file attachment(s). On the phone: open GI Updates and pull to refresh (app.py on port 8080).'
+          'Done! Files are in the database. Sa phone: buksan GI Updates at i-refresh (app.py :8080).'
       );
-      if (window.dashboardApp) {
-        if (typeof window.dashboardApp.switchModule === 'function') {
-          await window.dashboardApp.switchModule('register');
-        }
-        if (typeof window.dashboardApp.loadContributionsFromApi === 'function') {
-          await window.dashboardApp.loadContributionsFromApi();
-        }
+
+      if (window.dashboardApp?.switchModule) {
+        await window.dashboardApp.switchModule('register');
+      }
+      if (window.dashboardApp?.loadContributionsFromApi) {
+        await window.dashboardApp.loadContributionsFromApi();
       }
     } catch (err) {
       console.error('GI publish failed:', err);
@@ -226,9 +164,7 @@
   function patchDashboardApp() {
     if (!window.dashboardApp) return;
     window.dashboardApp.completeRegistration = publishIpophlToGiUpdates;
-    window.dashboardApp.sendRegistrationEmail = function () {
-      return publishIpophlToGiUpdates();
-    };
+    window.dashboardApp.sendRegistrationEmail = publishIpophlToGiUpdates;
   }
 
   if (document.readyState === 'loading') {

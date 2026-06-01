@@ -72,5 +72,27 @@
     "analysis_timestamp": "2026-06-01T19:05:48",
     "ipophl_phase": "phase5",
     "task_id": "phase5-cert"
+  },
+  "82660ecd-80f8-4834-9ec8-4969980b85dd": {
+    "file_uuid": "82660ecd-80f8-4834-9ec8-4969980b85dd",
+    "original_filename": "test-complete.txt",
+    "file_path": "machinelearning/uploads/82660ecd-80f8-4834-9ec8-4969980b85dd.txt",
+    "file_type": ".txt",
+    "file_size": 22,
+    "ai_score": 50,
+    "ai_status": "Not Ready",
+    "detected_features": [],
+    "missing_requirements": [
+      "GI Registration Certificate",
+      "Official Notice of Registration",
+      "Registration Number"
+    ],
+    "analysis_method": "rule_based",
+    "text_length": 22,
+    "shap_analysis": "<p>The rule-based analysis has identified <strong>0</strong> out of <strong>3</strong> mandatory requirements within this document. This results in an initial readiness score of <strong>0%</strong>. Current findings indicate that the document lacks several critical structural elements and key technical terms that are essential for this part of the Geographical Indication application.</p><p>A detailed review of the missing components reveals that the following areas require immediate attention: <strong>GI Registration Certificate, Official Notice of Registration, Registration Number</strong> and other related identifiers. The absence of these specific requirements may lead to formality examination deficiencies, as they are necessary to validate the document's relevance to the Lipa Barako coffee registration process.</p><p>To improve this document's standing, it is recommended to explicitly integrate the missing mandatory requirements identified above. Ensuring that all task-specific details are fully addressed will help achieve a higher compliance score and facilitate a smoother approval workflow with IPOPHL. Once updated, the document should be re-analyzed to verify readiness.</p>",
+    "upload_timestamp": "",
+    "analysis_timestamp": "2026-06-01T23:46:41.536631",
+    "ipophl_phase": "unknown",
+    "task_id": "phase5-cert"
   }
 }

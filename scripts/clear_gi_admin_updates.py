@@ -36,6 +36,11 @@ def main() -> None:
         action="store_true",
         help="Delete every row in gi_updates (admin + farmer submissions)",
     )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip confirmation prompt (not recommended)",
+    )
     args = parser.parse_args()
 
     params = app_db_params()
@@ -55,6 +60,15 @@ def main() -> None:
         print(f"  {exc}")
         print("Check: XAMPP/MySQL running on that PC, same Wi-Fi, settings.json app_db_host")
         raise SystemExit(1) from exc
+
+    scope = "ALL gi_updates rows" if args.all else "admin_submission + admin_progress rows"
+    if not args.yes:
+        print(f"\nWARNING: This will DELETE {scope} on {host}/{db}.")
+        print("Mobile GI Updates will appear empty until admin clicks Complete Registration again.")
+        answer = input("Type YES to continue: ").strip()
+        if answer != "YES":
+            print("Cancelled.")
+            raise SystemExit(0)
 
     try:
         with conn.cursor() as cur:

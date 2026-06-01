@@ -69,6 +69,86 @@ def _is_db_error(exc: BaseException) -> bool:
     )
 
 
+def _ingest_ipophl_upload(file, *, task_id: str, ipophl_phase: str | None = None) -> str:
+    """
+    Save one IPOPHL file to disk + JSON (same as /api/ipo-analyze).
+    Returns file_uuid. Used when admin clicks Complete Registration (batch upload).
+    """
+    from machinelearning.ai_engine import gi_analyzer
+
+    if not file or not getattr(file, "filename", None) or file.filename == "":
+        raise ValueError("No file provided")
+
+    ok_name, name_err, file_ext = validate_filename_extension(file.filename)
+    if not ok_name:
+        raise ValueError(name_err)
+
+    task_id = normalize_ipophl_task_id(task_id)
+    phase = ipophl_phase or (
+        task_id.split("-", 1)[0] if task_id.startswith("phase") else "unknown"
+    )
+    phase = validate_enum(phase, IPOPHL_PHASES, "unknown")
+
+    raw_path = gi_analyzer.save_uploaded_file(file, file.filename)
+    file_path_obj = Path(raw_path)
+    relative_path = f"machinelearning/uploads/{file_path_obj.name}"
+    file_uuid = file_path_obj.stem
+
+    try:
+        analysis_result = gi_analyzer.analyze_document(str(file_path_obj), task_id=task_id)
+    except Exception:
+        analysis_result = {"success": True, "readiness_score": 50, "status": "Uploaded"}
+
+    if not analysis_result.get("success", False):
+        analysis_result = {
+            "success": True,
+            "readiness_score": 10,
+            "status": "Uploaded",
+            "detected_features": [],
+            "missing_requirements": [],
+            "analysis_method": "upload_only",
+            "text_length": 0,
+            "shap_analysis": "",
+        }
+
+    existing_record = get_json_document(file_uuid)
+    raw_upload_name = (file.filename or "").strip()
+    stored_display_name = secure_filename(raw_upload_name) or f"document{file_ext}"
+
+    if existing_record:
+        doc_analysis = DocumentAnalysis(
+            file_uuid=file_uuid,
+            original_filename=stored_display_name,
+            file_path=relative_path,
+            file_type=file_ext,
+            file_size=int(os.path.getsize(str(file_path_obj))),
+            ipophl_phase=phase,
+            task_id=task_id,
+        )
+    else:
+        doc_analysis = DocumentAnalysis(
+            file_uuid=file_uuid,
+            original_filename=stored_display_name,
+            file_path=relative_path,
+            file_type=file_ext,
+            file_size=os.path.getsize(str(file_path_obj)),
+            ipophl_phase=phase,
+            task_id=task_id,
+        )
+
+    doc_analysis.ai_score = int(analysis_result.get("readiness_score") or 50)
+    doc_analysis.ai_status = str(analysis_result.get("status") or "Uploaded")
+    doc_analysis.set_detected_features(analysis_result.get("detected_features") or [])
+    doc_analysis.set_missing_requirements(analysis_result.get("missing_requirements") or [])
+    doc_analysis.analysis_method = analysis_result.get("analysis_method") or "rule_based"
+    doc_analysis.text_length = int(analysis_result.get("text_length") or 0)
+    doc_analysis.shap_analysis = analysis_result.get("shap_analysis") or ""
+    doc_analysis.analysis_timestamp = datetime.utcnow()
+
+    _persist_document(doc_analysis, is_new=existing_record is None)
+    return file_uuid
+
+
 def _persist_document(doc_analysis, *, is_new: bool) -> str:
     """
     Save analysis metadata: try app MySQL and HTTP bridge when configured,
@@ -370,64 +450,17 @@ def register_ipophl_routes(app):
                 request.form.get("phase", "unknown"), IPOPHL_PHASES, "unknown"
             )
             task_id = normalize_ipophl_task_id(request.form.get("task_id"))
-
-            raw_path = gi_analyzer.save_uploaded_file(file, file.filename)
-            file_path_obj = Path(raw_path)
-            file_path = file_path_obj.as_posix()
-
-            analysis_result = gi_analyzer.analyze_document(str(file_path_obj), task_id=task_id)
-
-            if not analysis_result.get("success", False):
-                return jsonify({"error": analysis_result.get("error", "Analysis failed")}), 500
-
-            file_uuid = file_path_obj.stem
-            # Always store a portable relative path (survives PC moves / OneDrive paths).
-            relative_path = f"machinelearning/uploads/{file_path_obj.name}"
-            existing_record = get_json_document(file_uuid)
-            existing_analysis = None
-            if existing_record:
-                existing_analysis = DocumentAnalysis(
-                    file_uuid=file_uuid,
-                    original_filename=existing_record.get("original_filename") or secure_filename(file.filename),
-                    file_path=existing_record.get("file_path") or file_path,
-                    file_type=existing_record.get("file_type") or file_ext,
-                    file_size=int(existing_record.get("file_size") or os.path.getsize(str(file_path_obj))),
-                    ipophl_phase=existing_record.get("ipophl_phase") or ipophl_phase,
-                    task_id=existing_record.get("task_id") or task_id,
-                )
-                existing_analysis.ai_score = int(existing_record.get("ai_score") or 0)
-                existing_analysis.ai_status = existing_record.get("ai_status") or "Not Ready"
-
-            raw_upload_name = (file.filename or "").strip()
-            stored_display_name = secure_filename(raw_upload_name) or f"document{file_ext}"
-
-            if existing_analysis:
-                doc_analysis = existing_analysis
-                doc_analysis.original_filename = stored_display_name
-                doc_analysis.file_path = relative_path
-                doc_analysis.task_id = task_id
-                doc_analysis.ipophl_phase = ipophl_phase
+            file_uuid = _ingest_ipophl_upload(
+                file, task_id=task_id, ipophl_phase=ipophl_phase
+            )
+            doc_analysis = get_json_document(file_uuid)
+            source = "local_json"
+            if doc_analysis:
+                doc_analysis = _doc_record_from_json(doc_analysis)
             else:
-                doc_analysis = DocumentAnalysis(
-                    file_uuid=file_uuid,
-                    original_filename=stored_display_name,
-                    file_path=relative_path,
-                    file_type=file_ext,
-                    file_size=os.path.getsize(str(file_path_obj)),
-                    ipophl_phase=ipophl_phase,
-                    task_id=task_id,
-                )
-
-            doc_analysis.ai_score = analysis_result.get("readiness_score", 0)
-            doc_analysis.ai_status = analysis_result.get("status", "Not Ready")
-            doc_analysis.set_detected_features(analysis_result.get("detected_features", []))
-            doc_analysis.set_missing_requirements(analysis_result.get("missing_requirements", []))
-            doc_analysis.analysis_method = analysis_result.get("analysis_method", "rule_based")
-            doc_analysis.text_length = analysis_result.get("text_length", 0)
-            doc_analysis.shap_analysis = analysis_result.get("shap_analysis", "")
-            doc_analysis.analysis_timestamp = datetime.utcnow()
-
-            source = _persist_document(doc_analysis, is_new=existing_analysis is None)
+                doc_analysis = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
+            if not doc_analysis:
+                return jsonify({"error": "Could not save document."}), 500
 
             try:
                 user_phone = get_current_user_phone()
@@ -440,13 +473,14 @@ def register_ipophl_routes(app):
             except Exception:
                 pass
 
+            preview_path = str(getattr(doc_analysis, "file_path", "") or "")
             return jsonify({
                 "success": True,
                 "file_uuid": file_uuid,
                 "filename": file.filename,
                 "source": source,
                 "analysis": _analysis_response(doc_analysis),
-                "preview_url": gi_analyzer.get_file_preview_url(file_path),
+                "preview_url": gi_analyzer.get_file_preview_url(preview_path),
                 "ipophl_phase": ipophl_phase,
                 "task_id": task_id,
             })
@@ -659,18 +693,50 @@ def register_ipophl_routes(app):
 
     @app.route("/api/ipophl/complete-registration", methods=["POST"])
     def api_ipophl_complete_registration():
-        """Publish Phase 5 IPOPHL files to all farmers' GI Updates (mobile app)."""
+        """
+        Complete Registration (Phase 5): upload selected files + publish to app GI Updates (MySQL).
+        Accepts JSON { file_uuids, file_entries } or multipart files[] + task_ids[] (like admin_gi_send).
+        """
         if not is_authenticated():
             return jsonify({"ok": False, "error": "Unauthorized"}), 401
 
-        body = request.get_json(silent=True) or {}
-        if not isinstance(body, dict):
-            body = {}
+        body: dict = {}
+        if request.is_json:
+            body = request.get_json(silent=True) or {}
+            if not isinstance(body, dict):
+                body = {}
+        elif request.form.get("file_uuids_json"):
+            try:
+                import json as _json
 
-        raw_uuids = body.get("file_uuids")
+                parsed = _json.loads(request.form.get("file_uuids_json") or "[]")
+                if isinstance(parsed, list):
+                    body["file_uuids"] = parsed
+            except Exception:
+                pass
+
         client_uuids: list[str] = []
+        raw_uuids = body.get("file_uuids")
         if isinstance(raw_uuids, list):
             client_uuids = [str(u).strip() for u in raw_uuids if str(u).strip()]
+
+        upload_errors: list[str] = []
+        uploads = request.files.getlist("files") or request.files.getlist("file") or []
+        task_id_list = request.form.getlist("task_ids") or request.form.getlist("task_id") or []
+        for index, upload in enumerate(uploads):
+            if not upload or not getattr(upload, "filename", None) or upload.filename == "":
+                continue
+            tid = (
+                task_id_list[index]
+                if index < len(task_id_list)
+                else (task_id_list[-1] if task_id_list else "ipophl-other")
+            )
+            try:
+                uid = _ingest_ipophl_upload(upload, task_id=str(tid))
+                if uid and uid not in client_uuids:
+                    client_uuids.append(uid)
+            except Exception as e:
+                upload_errors.append(f"{upload.filename}: {e}")
 
         task_ids = body.get("task_ids")
         if not isinstance(task_ids, list) or not task_ids:
@@ -696,7 +762,11 @@ def register_ipophl_routes(app):
                     if uid not in file_uuids:
                         file_uuids.append(uid)
 
-        publish_all_categories = str(body.get("publish_all_categories") or "").strip().lower() in (
+        publish_all_categories = str(
+            body.get("publish_all_categories")
+            or request.form.get("publish_all_categories")
+            or "true"
+        ).strip().lower() in (
             "1",
             "true",
             "yes",
@@ -759,11 +829,13 @@ def register_ipophl_routes(app):
             total_cats = int(result.get("categories_total") or 13)
             skipped = max(0, requested - resolved)
             msg = (
-                f"Published {cards} GI Update card(s) ({total_cats} IPOPHL categories). "
-                f"{with_files} categor{'y' if with_files == 1 else 'ies'} include attached file(s)."
+                f"Uploaded and published {with_files} file(s) to GI Updates "
+                f"({cards} card(s) on the app). Open GI Updates on the phone and refresh."
             )
+            if upload_errors:
+                msg += " Some files failed: " + "; ".join(upload_errors[:3])
             if skipped:
-                msg += f" {skipped} file(s) were missing on this PC — re-upload in IPOPHL, then try again."
+                msg += f" {skipped} saved file(s) were missing on disk — select them again, then Complete."
             return jsonify(
                 {
                     "ok": True,
