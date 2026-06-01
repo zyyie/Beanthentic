@@ -351,10 +351,13 @@ def publish_ipophl_registration_to_gi_updates(
     Publish IPOPHL files to farmers' GI Updates — one feed card per document category
     (Product Documentation, Filing Documents, etc.), like separate Facebook posts.
     """
-    from config.ipophl_store import group_disk_files_by_task, task_label
+    from config.ipophl_store import apply_task_overrides_to_store, build_publish_file_entries
 
-    groups = group_disk_files_by_task(file_uuids, task_overrides=task_overrides)
-    if not groups:
+    if task_overrides:
+        apply_task_overrides_to_store(task_overrides)
+
+    publish_rows = build_publish_file_entries(file_uuids, task_overrides=task_overrides)
+    if not publish_rows:
         if file_uuids:
             raise ValueError(
                 "Registration files were not found on this device or are empty (0 bytes). "
@@ -371,11 +374,15 @@ def publish_ipophl_registration_to_gi_updates(
     cards_published = 0
     last_attachments: list[dict] = []
 
-    file_entries: list[tuple[str, str, str, Path]] = []
-    for task_id, disk_files in groups.items():
-        label = task_label(task_id)
-        for original, path in disk_files:
-            file_entries.append((task_id, label, original, path))
+    file_entries: list[tuple[str, str, str, Path]] = [
+        (
+            str(row["task_id"]),
+            str(row["label"]),
+            str(row["original"]),
+            row["path"],
+        )
+        for row in publish_rows
+    ]
 
     farmer_ids: list[int] = []
     if app_db_params():

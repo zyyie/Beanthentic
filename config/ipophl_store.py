@@ -33,9 +33,93 @@ IPOPHL_TASK_LABELS: dict[str, str] = {
     "phase4-pub": "Publication Documents",
     "phase5-cert": "Registration Documents",
     "phase5-compliance": "Compliance Documentation",
+    "ipophl-other": "IPOPHL Document",
 }
 
 IPOPHL_TASK_ORDER: list[str] = list(IPOPHL_TASK_LABELS.keys())
+
+_TASK_ID_RE = re.compile(r"^phase[1-5]-[a-z0-9-]+$", re.I)
+
+
+def normalize_ipophl_task_id(raw: str | None) -> str:
+    """Validate task_id from upload zone (do not use secure_filename — it is for file names only)."""
+    tid = str(raw or "").strip().lower()
+    if tid in IPOPHL_TASK_LABELS:
+        return tid
+    if _TASK_ID_RE.match(tid):
+        return tid
+    if tid in ("unknown", "ipophl-other", "ipophl-unassigned", ""):
+        return "ipophl-other"
+    return "ipophl-other"
+
+
+def apply_task_overrides_to_store(task_overrides: dict[str, str]) -> int:
+    """Persist correct upload-zone task_id before publishing to GI Updates."""
+    updated = 0
+    for raw_uuid, raw_tid in (task_overrides or {}).items():
+        file_uuid = str(raw_uuid or "").strip()
+        task_id = normalize_ipophl_task_id(raw_tid)
+        if not file_uuid or task_id == "ipophl-other":
+            continue
+        record = get_document(file_uuid)
+        if not isinstance(record, dict):
+            continue
+        phase = task_id.split("-", 1)[0] if task_id.startswith("phase") else record.get("ipophl_phase")
+        if record.get("task_id") == task_id and record.get("ipophl_phase") == phase:
+            continue
+        record["task_id"] = task_id
+        record["ipophl_phase"] = phase
+        upsert_document(record)
+        updated += 1
+    return updated
+
+
+def build_publish_file_entries(
+    file_uuids: list[str],
+    *,
+    task_overrides: dict[str, str] | None = None,
+) -> list[dict]:
+    """One GI card per file with the correct IPOPHL category title."""
+    overrides = task_overrides or {}
+    entries: list[dict] = []
+    seen_paths: set[str] = set()
+
+    for raw in file_uuids:
+        file_uuid = str(raw or "").strip()
+        if not file_uuid:
+            continue
+        record = get_document(file_uuid)
+        task_id = normalize_ipophl_task_id(
+            overrides.get(file_uuid) or (record or {}).get("task_id")
+        )
+        hint = str((record or {}).get("original_filename") or "") if record else None
+        path = resolve_file_path(file_uuid, filename_hint=hint or None)
+        if not path or not path.is_file():
+            continue
+        key = path.resolve().as_posix()
+        if key in seen_paths:
+            continue
+        seen_paths.add(key)
+        name = str((record or {}).get("original_filename") or path.name)
+        entries.append(
+            {
+                "file_uuid": file_uuid,
+                "task_id": task_id,
+                "label": task_label(task_id),
+                "original": name,
+                "path": path,
+            }
+        )
+
+    def sort_key(item: dict) -> tuple[int, int | str]:
+        tid = str(item.get("task_id") or "")
+        try:
+            return (0, IPOPHL_TASK_ORDER.index(tid))
+        except ValueError:
+            return (1, tid)
+
+    entries.sort(key=sort_key)
+    return entries
 
 
 def _load() -> dict:
@@ -263,8 +347,8 @@ def bootstrap_orphan_uploads(*, limit: int = 500) -> int:
             "shap_analysis": "Recovered from uploads folder",
             "upload_timestamp": datetime.utcfromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
             "analysis_timestamp": datetime.utcfromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
-            "ipophl_phase": "phase1",
-            "task_id": "phase1-product",
+            "ipophl_phase": "unknown",
+            "task_id": "ipophl-other",
         }
         added += 1
 

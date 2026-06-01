@@ -88,9 +88,11 @@ class IPOPHLAnalyzer {
                          (fileExt === 'doc' || fileExt === 'docx') ? 'fa-file-word text-primary' :
                          'fa-file-lines text-success';
 
+        const zoneTaskId = (container && container.id) ? container.id.replace(/-files$/, '') : (doc.task_id || '');
         const fileItem = document.createElement('div');
         fileItem.className = 'file-item success ai-enhanced';
         fileItem.dataset.fileUuid = doc.file_uuid;
+        fileItem.dataset.taskId = zoneTaskId || doc.task_id || '';
         fileItem.innerHTML = `
             <div class="file-info">
                 <i class="fa-solid ${iconClass}"></i>
@@ -117,6 +119,11 @@ class IPOPHLAnalyzer {
         card.classList.add('ai-enhanced');
         if (doc.file_uuid) {
             card.dataset.fileUuid = doc.file_uuid;
+        }
+        const container = card.parentElement;
+        const zoneTaskId = container && container.id ? container.id.replace(/-files$/, '') : '';
+        if (zoneTaskId) {
+            card.dataset.taskId = zoneTaskId;
         }
         
         // Add or update status and actions wrapper

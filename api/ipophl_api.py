@@ -25,11 +25,13 @@ from config.ipophl_app_bridge import (
 )
 from config.ipophl_store import (
     analysis_payload_from_record,
+    apply_task_overrides_to_store,
     bootstrap_orphan_uploads,
     delete_document as delete_json_document,
     document_to_item,
     get_document as get_json_document,
     list_documents as list_json_documents,
+    normalize_ipophl_task_id,
     resolve_file_path,
     upsert_document as upsert_json_document,
 )
@@ -363,7 +365,7 @@ def register_ipophl_routes(app):
             ipophl_phase = validate_enum(
                 request.form.get("phase", "unknown"), IPOPHL_PHASES, "unknown"
             )
-            task_id = secure_filename((request.form.get("task_id") or "unknown")[:64])
+            task_id = normalize_ipophl_task_id(request.form.get("task_id"))
 
             raw_path = gi_analyzer.save_uploaded_file(file, file.filename)
             file_path_obj = Path(raw_path)
@@ -693,6 +695,9 @@ def register_ipophl_routes(app):
         title = str(body.get("title") or "").strip() or None
         content = str(body.get("content") or "").strip() or None
         category = str(body.get("category") or "ipophl_registration").strip() or "ipophl_registration"
+
+        if task_overrides:
+            apply_task_overrides_to_store(task_overrides)
 
         try:
             result = publish_ipophl_registration_to_gi_updates(

@@ -5471,29 +5471,48 @@ class DashboardApp {
     return hasAttachments;
   }
 
-  collectIpophlPublishEntries() {
+  collectIpophlPublishEntriesFromState() {
     const entries = [];
-    const seen = new Set();
+    const filesByService = this.ipophlFiles || {};
+    Object.keys(filesByService).forEach((taskId) => {
+      (filesByService[taskId] || []).forEach((f) => {
+        const id = String(f.id || f.file_uuid || '').trim();
+        if (id) entries.push({ file_uuid: id, task_id: taskId });
+      });
+    });
+    return entries;
+  }
+
+  collectIpophlPublishEntries() {
+    const byUuid = new Map();
+
+    const add = (fileUuid, taskId) => {
+      const id = String(fileUuid || '').trim();
+      const tid = String(taskId || '').trim();
+      if (!id || !tid) return;
+      byUuid.set(id, { file_uuid: id, task_id: tid });
+    };
+
+    this.collectIpophlPublishEntriesFromState().forEach((e) => add(e.file_uuid, e.task_id));
+
     const zones = document.querySelectorAll('#ipophl-module .file-upload-zone[data-service]');
     zones.forEach((zone) => {
       const taskId = zone.dataset.service;
       if (!taskId) return;
       const container = document.getElementById(`${taskId}-files`);
       if (!container) return;
-      container.querySelectorAll('[data-file-uuid]').forEach((el) => {
-        const id = el.getAttribute('data-file-uuid');
-        if (!id || seen.has(id)) return;
-        seen.add(id);
-        entries.push({ file_uuid: id, task_id: taskId });
+      container.querySelectorAll('.file-item').forEach((el) => {
+        const id = el.dataset.fileUuid || el.getAttribute('data-file-uuid');
+        const zoneTask = el.dataset.taskId || el.getAttribute('data-task-id') || taskId;
+        add(id, zoneTask);
       });
       container.querySelectorAll('.file-action-btn.ai-analysis').forEach((btn) => {
         const match = (btn.getAttribute('onclick') || '').match(/loadAndShowFullAnalysis\('([^']+)'\)/);
-        if (!match || seen.has(match[1])) return;
-        seen.add(match[1]);
-        entries.push({ file_uuid: match[1], task_id: taskId });
+        if (match) add(match[1], taskId);
       });
     });
-    return entries;
+
+    return Array.from(byUuid.values());
   }
 
   collectPhase5FileUuids() {
@@ -5575,7 +5594,6 @@ class DashboardApp {
   }
 
   async completeRegistration() {
-    const phase5TaskIds = ['phase5-cert', 'phase5-compliance'];
     let fileEntries = this.collectIpophlPublishEntries();
 
     if (!fileEntries.length) {
@@ -5585,8 +5603,9 @@ class DashboardApp {
     let fileUuids = fileEntries.map((e) => e.file_uuid).filter(Boolean);
 
     if (!fileUuids.length) {
-      fileUuids = this.collectPhase5FileUuids();
-      fileEntries = fileUuids.map((id) => ({ file_uuid: id, task_id: '' }));
+      const phase5Ids = this.collectPhase5FileUuids();
+      fileUuids = phase5Ids;
+      fileEntries = phase5Ids.map((id) => ({ file_uuid: id, task_id: '' }));
     }
 
     if (!fileUuids.length) {
