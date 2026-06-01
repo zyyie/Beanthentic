@@ -82,24 +82,20 @@ def build_publish_file_entries(
     """One GI card per file with the correct IPOPHL category title."""
     overrides = task_overrides or {}
     entries: list[dict] = []
-    seen_paths: set[str] = set()
+    seen_uuids: set[str] = set()
 
     for raw in file_uuids:
         file_uuid = str(raw or "").strip()
-        if not file_uuid:
+        if not file_uuid or file_uuid in seen_uuids:
             continue
+        seen_uuids.add(file_uuid)
         record = get_document(file_uuid)
         task_id = normalize_ipophl_task_id(
             overrides.get(file_uuid) or (record or {}).get("task_id")
         )
-        hint = str((record or {}).get("original_filename") or "") if record else None
-        path = resolve_file_path(file_uuid, filename_hint=hint or None)
+        path = resolve_file_path(file_uuid)
         if not path or not path.is_file():
             continue
-        key = path.resolve().as_posix()
-        if key in seen_paths:
-            continue
-        seen_paths.add(key)
         name = str((record or {}).get("original_filename") or path.name)
         entries.append(
             {
@@ -171,7 +167,7 @@ def collect_registration_file_uuids(
 ) -> list[str]:
     """
     Resolve file UUIDs for Complete Registration.
-    Phase 5 uploads may be stored under phase5-* or legacy/wrong task_id — gather all candidates.
+    When the client sends an explicit list, use only those UUIDs (one GI card per file).
     """
     bootstrap_orphan_uploads(limit=500)
     seen: set[str] = set()
@@ -186,6 +182,7 @@ def collect_registration_file_uuids(
     if file_uuids:
         for raw in file_uuids:
             add(raw)
+        return out
 
     phase5_tasks = task_ids or ["phase5-cert", "phase5-compliance"]
     for tid in phase5_tasks:
@@ -358,18 +355,22 @@ def bootstrap_orphan_uploads(*, limit: int = 500) -> int:
 
 
 def resolve_file_path(file_uuid: str, *, filename_hint: str | None = None) -> Path | None:
+    """Resolve upload path by UUID only (never generic names like uploaded.docx)."""
+    _ = filename_hint  # kept for callers; ignored to avoid wrong file matches
     record = get_document(file_uuid)
     if record:
-        path = Path(str(record.get("file_path") or ""))
-        if path.exists():
-            return path
+        raw_path = str(record.get("file_path") or "").strip()
+        if raw_path:
+            path = Path(raw_path)
+            if path.is_file():
+                return path
+            # Relative path or moved project folder
+            by_name = UPLOADS_DIR / path.name
+            if by_name.is_file():
+                return by_name
 
     if UPLOADS_DIR.exists():
         for candidate in UPLOADS_DIR.glob(f"{file_uuid}.*"):
             if candidate.is_file():
                 return candidate
-        if filename_hint:
-            for candidate in UPLOADS_DIR.glob(f"*{Path(filename_hint).name}"):
-                if candidate.is_file():
-                    return candidate
     return None

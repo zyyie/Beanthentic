@@ -719,12 +719,19 @@ def register_ipophl_routes(app):
             except Exception:
                 pass
             db_rows = _count_admin_gi_rows()
+            cards = int(result.get("cards_published") or 0)
+            resolved = int(result.get("files_resolved") or cards)
+            requested = int(result.get("files_requested") or len(file_uuids))
+            skipped = max(0, requested - resolved)
+            msg = f"Published {cards} of {requested} file(s) to GI Updates."
+            if skipped:
+                msg += f" {skipped} file(s) were missing on this PC — re-upload in IPOPHL, then try again."
             return jsonify(
                 {
                     "ok": True,
                     "file_count": len(file_uuids),
                     "db_rows": db_rows,
-                    "message": f"Saved {result.get('cards_published', 0)} card(s) to database ({db_rows} GI rows).",
+                    "message": msg,
                     **result,
                 }
             )

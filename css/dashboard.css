@@ -2584,6 +2584,36 @@ select:focus {
   box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
 }
 
+.phase-btn.complete-btn.is-loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 12rem;
+  opacity: 0.92;
+  cursor: wait;
+}
+
+.complete-btn-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: complete-btn-spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
+.complete-btn-label {
+  white-space: nowrap;
+}
+
+@keyframes complete-btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .phase-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;

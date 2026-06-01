@@ -225,6 +225,58 @@ def _save_gi_attachments_from_paths(
     return attachments
 
 
+def _sync_attachments_to_app_server(disk_files: list[tuple[str, Path]]) -> list[dict]:
+    """Upload files to app server :8080 so mobile GI Updates can preview/open them."""
+    if not disk_files or not _gi_http_bases():
+        return []
+    files = _multipart_files_from_disk(disk_files)
+    if not files:
+        return []
+    fields = {"sync_only": "1"}
+    timeout = max(60.0, 12.0 * len(files))
+    last_err: Exception | None = None
+    for base in _gi_http_bases():
+        try:
+            data = app_http_post_multipart(
+                "/api/admin_gi_sync_files.php",
+                fields,
+                files,
+                timeout=timeout,
+            )
+            raw = data.get("attachments")
+            if not isinstance(raw, list) or not raw:
+                last_err = RuntimeError(str(data.get("error") or "No attachments returned"))
+                continue
+            base_url = base.rstrip("/")
+            out: list[dict] = []
+            for item in raw:
+                if not isinstance(item, dict):
+                    continue
+                path = str(item.get("path") or "").strip()
+                url = str(item.get("url") or "").strip()
+                if path and not url.startswith("http"):
+                    url = f"{base_url}{path if path.startswith('/') else '/' + path}"
+                out.append({**item, "path": path, "url": url})
+            if out:
+                return out
+        except Exception as e:
+            last_err = e
+    if last_err:
+        import logging
+
+        logging.getLogger(__name__).warning("GI file sync to app server failed: %s", last_err)
+    return []
+
+
+def _prepare_ipophl_attachments(disk_files: list[tuple[str, Path]]) -> list[dict]:
+    """Prefer app-server copies (mobile preview); fall back to admin-hosted files."""
+    synced = _sync_attachments_to_app_server(disk_files)
+    if synced:
+        return synced
+    base = _gi_attachment_base_url(prefer_app_server=True) or _public_base_url()
+    return _save_gi_attachments_from_paths(disk_files, base_url=base)
+
+
 def _broadcast_admin_submissions_mysql(
     *,
     farmer_ids: list[int],
@@ -421,8 +473,6 @@ def publish_ipophl_registration_to_gi_updates(
             "No farmers in the app database. Add at least one farmer on the mobile app or app server first."
         )
 
-    attach_base = (_public_base_url() or "").strip().rstrip("/") or _gi_attachment_base_url()
-
     for task_id, label, original, path in file_entries:
         display = _display_filename(original, path)
         card_title = (title or label).strip()[:150]
@@ -439,7 +489,7 @@ def publish_ipophl_registration_to_gi_updates(
         # 1) MySQL first — always commits so Complete Registration saves even if :8080 HTTP fails.
         if app_db_params() and farmer_ids:
             try:
-                attachments = _save_gi_attachments_from_paths(single, base_url=attach_base)
+                attachments = _prepare_ipophl_attachments(single)
                 created_ids = _broadcast_admin_submissions_mysql(
                     farmer_ids=farmer_ids,
                     title=card_title,
@@ -510,6 +560,8 @@ def publish_ipophl_registration_to_gi_updates(
         "ok": True,
         "broadcast": True,
         "cards_published": cards_published,
+        "files_resolved": len(publish_rows),
+        "files_requested": len(file_uuids),
         "sent_count": farmer_count,
         "gi_update_ids": all_created_ids,
         "attachments": last_attachments,

@@ -5593,13 +5593,43 @@ class DashboardApp {
     return uuids;
   }
 
-  async completeRegistration() {
-    let fileEntries = this.collectIpophlPublishEntries();
-
-    if (!fileEntries.length) {
-      fileEntries = await this.fetchAllIpophlFileEntriesFromServer();
+  setCompleteRegistrationLoading(isLoading, label) {
+    const completeBtn = document.querySelector('#ipophl-module .complete-btn');
+    if (!completeBtn) return;
+    if (!completeBtn.dataset.defaultLabel) {
+      completeBtn.dataset.defaultLabel = completeBtn.textContent.trim() || 'Complete Registration';
     }
+    if (isLoading) {
+      completeBtn.disabled = true;
+      completeBtn.classList.add('is-loading');
+      completeBtn.setAttribute('aria-busy', 'true');
+      completeBtn.innerHTML =
+        '<span class="complete-btn-spinner" aria-hidden="true"></span>' +
+        `<span class="complete-btn-label">${label || 'Publishing to GI Updates…'}</span>`;
+    } else {
+      completeBtn.disabled = false;
+      completeBtn.classList.remove('is-loading');
+      completeBtn.removeAttribute('aria-busy');
+      completeBtn.textContent = completeBtn.dataset.defaultLabel;
+    }
+  }
 
+  async completeRegistration() {
+    const merged = new Map();
+    const serverEntries = await this.fetchAllIpophlFileEntriesFromServer();
+    serverEntries.forEach((e) => {
+      if (e.file_uuid) merged.set(e.file_uuid, { ...e });
+    });
+    this.collectIpophlPublishEntries().forEach((e) => {
+      if (!e.file_uuid) return;
+      const prev = merged.get(e.file_uuid) || {};
+      merged.set(e.file_uuid, {
+        file_uuid: e.file_uuid,
+        task_id: e.task_id || prev.task_id || '',
+      });
+    });
+
+    let fileEntries = Array.from(merged.values());
     let fileUuids = fileEntries.map((e) => e.file_uuid).filter(Boolean);
 
     if (!fileUuids.length) {
@@ -5615,12 +5645,7 @@ class DashboardApp {
       return;
     }
 
-    const completeBtn = document.querySelector('#ipophl-module .complete-btn');
-    const prevLabel = completeBtn?.textContent || 'Complete Registration';
-    if (completeBtn) {
-      completeBtn.disabled = true;
-      completeBtn.textContent = 'Publishing files…';
-    }
+    this.setCompleteRegistrationLoading(true, `Publishing ${fileUuids.length} file(s) to GI Updates…`);
 
     try {
       const res = await fetch('/api/ipophl/complete-registration', {
@@ -5644,23 +5669,28 @@ class DashboardApp {
           `Save failed (HTTP ${res.status}). Check settings.json and MySQL on the app device.`;
         throw new Error(err);
       }
-      const sent = data.sent_count || (data.gi_update_ids && data.gi_update_ids.length) || 0;
-      const fileCount = data.file_count || fileUuids.length;
       const cards = data.cards_published || 0;
-      const dbRows = data.db_rows;
+      const resolved = data.files_resolved != null ? data.files_resolved : cards;
+      const requested = data.files_requested != null ? data.files_requested : fileUuids.length;
       this.showIpophlNotification(
         data.message ||
-          (cards
-            ? `Saved! ${cards} card(s), ${fileCount} file(s) in database (${dbRows != null ? dbRows + ' rows' : sent + ' farmers'}). Open GI Updates on the app.`
-            : `Saved ${fileCount} file(s) to GI Updates.`)
+          `Published ${cards} of ${requested} file(s). Open Farmer's Contribution or GI Updates on the app.`
       );
 
       console.log('IPOPHL → GI Updates published:', {
         fileUuids,
-        sent,
+        cards,
+        resolved,
+        requested,
         source: data.source,
         completedAt: new Date().toISOString(),
       });
+
+      this.setCompleteRegistrationLoading(true, 'Opening GI Updates inbox…');
+      await this.switchModule('register');
+      if (typeof this.refreshContributions === 'function') {
+        await this.refreshContributions();
+      }
     } catch (err) {
       console.error('Complete registration failed:', err);
       let msg = err.message || 'Failed to send files to GI Updates.';
@@ -5670,10 +5700,7 @@ class DashboardApp {
       }
       this.showIpophlNotification(msg);
     } finally {
-      if (completeBtn) {
-        completeBtn.disabled = false;
-        completeBtn.textContent = prevLabel;
-      }
+      this.setCompleteRegistrationLoading(false);
     }
   }
 
