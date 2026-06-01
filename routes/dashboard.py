@@ -187,62 +187,20 @@ def register_dashboard_routes(app):
 
     @app.route("/api/admin-notifications", methods=["GET"])
     def api_admin_notifications():
-        """Admin notifications summary for the dashboard."""
+        """In-app admin notifications (messages, transactions, moderation, registrations, etc.)."""
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
+        from config.admin_notifications import build_admin_notifications
+
         user_phone = get_current_user_phone()
-        notifications = []
-        now = datetime.now()
+        items: list = []
+        try:
+            items = build_admin_notifications(admin_phone=user_phone)
+        except Exception:
+            items = []
 
-        # IPOPHL document notifications
-        from config.models import DocumentAnalysis
-        recent_docs = DocumentAnalysis.query.filter(
-            DocumentAnalysis.upload_timestamp > now.replace(hour=0, minute=0, second=0, microsecond=0)
-        ).order_by(DocumentAnalysis.upload_timestamp.desc()).limit(5).all()
-
-        for doc in recent_docs:
-            if doc.ai_score < 70:
-                notifications.append(
-                    {
-                        "id": f"doc-{doc.file_uuid}",
-                        "title": f"Document: {doc.original_filename}",
-                        "message": f"Low readiness score: {doc.ai_score}%",
-                        "timestamp": doc.upload_timestamp.isoformat(),
-                        "type": "warning",
-                        "read": False,
-                        "target_module": "ipophl-analyzer",
-                    }
-                )
-            else:
-                notifications.append(
-                    {
-                        "id": f"doc-{doc.file_uuid}",
-                        "title": f"Document: {doc.original_filename}",
-                        "message": f"Readiness score: {doc.ai_score}%",
-                        "timestamp": doc.upload_timestamp.isoformat(),
-                        "type": "success",
-                        "read": False,
-                        "target_module": "ipophl-analyzer",
-                    }
-                )
-
-        # If no notifications, add a welcome message
-        if not notifications:
-            notifications.append(
-                {
-                    "id": "welcome",
-                    "title": "Welcome to Beanthentic",
-                    "message": "Upload and analyze IPOPHL files to start readiness tracking.",
-                    "timestamp": now.isoformat(),
-                    "type": "activity",
-                    "read": False,
-                    "target_module": "ipophl-analyzer",
-                }
-            )
-
-        notifications.sort(key=lambda item: item.get("meta", ""), reverse=True)
-        return jsonify({"items": notifications})
+        return jsonify({"ok": True, "items": items, "count": len(items)})
 
     @app.route("/settings/security", methods=["POST"])
     def settings_security():

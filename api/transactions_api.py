@@ -4,59 +4,19 @@ Admin Transactions API — reads approved/sent rows from beanthentic_app (same a
 
 from __future__ import annotations
 
-import json
-import os
 from datetime import date, datetime
-from pathlib import Path
-from urllib.request import Request, urlopen
 
 from flask import jsonify, request
-from pymysql.cursors import DictCursor
 
 from config.app_connection import (
     app_db_params,
-    app_server_base,
     clamp_limit,
     friendly_load_failure,
     load_error_payload,
 )
+from config.app_http_bridge import app_http_get_json
 from config.mysql_app_bridge import connect_app_mysql
 from config.utils import is_authenticated
-
-
-def _read_connection_settings() -> dict:
-    try:
-        settings_path = Path(__file__).resolve().parents[1] / "settings.json"
-        raw = json.loads(settings_path.read_text(encoding="utf-8"))
-        conn = raw.get("connection")
-        return conn if isinstance(conn, dict) else {}
-    except Exception:
-        return {}
-
-
-def _app_db_params() -> dict | None:
-    cfg = _read_connection_settings()
-    host = os.getenv("BEANTHENTIC_APP_DB_HOST", "").strip() or str(cfg.get("app_db_host") or "").strip()
-    if not host:
-        return None
-    return {
-        "host": host,
-        "port": int(os.getenv("BEANTHENTIC_APP_DB_PORT", str(cfg.get("app_db_port") or "3306"))),
-        "user": os.getenv("BEANTHENTIC_APP_DB_USER", str(cfg.get("app_db_user") or "root")),
-        "password": os.getenv("BEANTHENTIC_APP_DB_PASS", str(cfg.get("app_db_pass") or "")),
-        "database": os.getenv("BEANTHENTIC_APP_DB_NAME", str(cfg.get("app_db_name") or "beanthentic_app")),
-        "charset": "utf8mb4",
-        "cursorclass": DictCursor,
-        "autocommit": True,
-    }
-
-
-def _app_server_base() -> str:
-    base = os.getenv("BEANTHENTIC_APP_SERVER_BASE", "").strip()
-    if base:
-        return base.rstrip("/")
-    cfg = _read_connection_settings()
-    return str(cfg.get("app_server_base") or "").strip().rstrip("/")
 
 
 def _dt_iso(val) -> str:
@@ -199,19 +159,12 @@ def _load_from_mysql(limit: int, farmer_id: int | None) -> list[dict]:
 
 
 def _load_from_app_http(limit: int, farmer_id: int | None) -> list[dict]:
-    base = app_server_base()
-    if not base:
-        raise RuntimeError("app_server_base not set in settings.json")
-    url = f"{base}/api/admin_customer_transactions.php?limit={int(limit)}"
+    query: dict = {"limit": int(limit)}
     if farmer_id and farmer_id > 0:
-        url += f"&farmer_id={int(farmer_id)}"
-    req = Request(url, headers={"Accept": "application/json"})
-    with urlopen(req, timeout=15) as resp:
-        raw = resp.read().decode("utf-8", errors="replace")
-    data = json.loads(raw) if raw else {}
-    if not isinstance(data, dict) or data.get("ok") is not True:
-        err = (data or {}).get("error") if isinstance(data, dict) else None
-        raise RuntimeError(err or "Bad response from app server")
+        query["farmer_id"] = int(farmer_id)
+    data = app_http_get_json("/api/admin_customer_transactions.php", query=query, timeout=15)
+    if not data.get("ok"):
+        raise RuntimeError(str(data.get("error") or data.get("detail") or "Bad response from app server"))
     items = data.get("items")
     return items if isinstance(items, list) else []
 

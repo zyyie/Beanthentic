@@ -16,6 +16,8 @@ from flask import jsonify, request
 import pymysql
 from pymysql.cursors import DictCursor
 
+from config.app_connection import app_db_params as _shared_app_db_params
+from config.app_connection import app_http_timeout, app_server_base, friendly_load_failure, iter_app_server_bases
 from config.farmer_moderation import (
     apply_suspend,
     apply_unsuspend,
@@ -40,30 +42,8 @@ from config.utils import get_current_user_phone, is_authenticated, log_activity
 
 
 def _app_db_params() -> dict | None:
-    """
-    Optional "remote app DB" bridge.
-
-    If BEANTHENTIC_APP_DB_HOST is set, dashboard farmer data will be sourced from
-    the Beanthentic-App XAMPP MySQL schema (beanthentic_app) instead of this
-    website's SQLAlchemy Farmer model.
-    """
-    host = os.getenv("BEANTHENTIC_APP_DB_HOST", "").strip()
-    if not host:
-        cfg = _read_connection_settings()
-        host = str(cfg.get("app_db_host") or "").strip()
-    if not host:
-        return None
-    cfg = _read_connection_settings()
-    return {
-        "host": host,
-        "port": int(os.getenv("BEANTHENTIC_APP_DB_PORT", str(cfg.get("app_db_port") or "3306"))),
-        "user": os.getenv("BEANTHENTIC_APP_DB_USER", str(cfg.get("app_db_user") or "root")),
-        "password": os.getenv("BEANTHENTIC_APP_DB_PASS", str(cfg.get("app_db_pass") or "")),
-        "database": os.getenv("BEANTHENTIC_APP_DB_NAME", str(cfg.get("app_db_name") or "beanthentic_app")),
-        "charset": "utf8mb4",
-        "cursorclass": DictCursor,
-        "autocommit": True,
-    }
+    """Shared resolver (includes LAN fallbacks when settings use 127.0.0.1)."""
+    return _shared_app_db_params()
 
 
 def _read_connection_settings() -> dict:
@@ -98,24 +78,15 @@ def _app_shared_db_configured() -> bool:
 def _load_dashboard_transactions(limit: int, farmer_id: int | None = None) -> tuple[list[dict], str, list[str]]:
     """
     Load approved/sent customer transactions (same as app Transaction History).
-    Direct MySQL first (same as farmer register), then HTTP app server fallback.
+    Uses shared loader: MySQL first, HTTP app server fallback.
     """
-    errors: list[str] = []
+    from api.transactions_api import load_admin_transactions
 
-    if _app_db_params():
-        try:
-            return _list_app_customer_transactions(limit, farmer_id), "app_mysql", errors
-        except Exception as e:
-            errors.append(f"MySQL: {e}")
-
-    if _app_server_base():
-        http_items, http_err = _fetch_customer_transactions_via_app_server(limit, farmer_id)
-        if http_items is not None:
-            return http_items, "app_server_http", errors
-        if http_err:
-            errors.append(f"HTTP: {http_err}")
-
-    return [], "app_mysql", errors
+    try:
+        items, source = load_admin_transactions(limit, farmer_id)
+        return items, source, []
+    except Exception as e:
+        return [], "", [str(e)]
 
 
 def admin_transactions_get_response(limit: int = 400, farmer_id: int | None = None):
@@ -232,72 +203,124 @@ def _coffee_balance_after_by_txn_id_legacy():
 
 def _fetch_ownership_supplement_via_app_server() -> dict | None:
     """Load SQLite-backed ownership map from Beanthentic-App (port 8080)."""
-    base = _app_server_base()
-    if not base:
-        return None
-    url = base + "/api/farmer-ownership-supplement.php"
-    try:
-        req = Request(url, headers={"Accept": "application/json"})
-        with urlopen(req, timeout=8) as resp:
-            raw = resp.read().decode("utf-8", errors="replace")
-        data = json.loads(raw) if raw else None
-        if isinstance(data, dict) and data.get("ok") is True:
-            return data
-    except (HTTPError, URLError, TimeoutError, ValueError):
-        pass
+    timeout = min(app_http_timeout(), 8.0)
+    for base in iter_app_server_bases():
+        url = base + "/api/farmer-ownership-supplement.php"
+        try:
+            req = Request(url, headers={"Accept": "application/json"})
+            with urlopen(req, timeout=timeout) as resp:
+                raw = resp.read().decode("utf-8", errors="replace")
+            data = json.loads(raw) if raw else None
+            if isinstance(data, dict) and data.get("ok") is True:
+                return data
+        except (HTTPError, URLError, TimeoutError, ValueError):
+            continue
     return None
 
 
 def _fetch_farmer_data_via_app_server() -> tuple[list[dict] | None, str | None]:
-    base = _app_server_base()
-    if not base:
+    if not iter_app_server_bases():
         return None, "APP_SERVER_BASE_NOT_SET"
-    url = base + "/api/admin_farmer_data.php"
-    try:
-        req = Request(url, headers={"Accept": "application/json"})
-        with urlopen(req, timeout=8) as resp:
-            raw = resp.read().decode("utf-8", errors="replace")
-        data = json.loads(raw) if raw else None
-        if not isinstance(data, dict) or data.get("ok") is not True:
-            return None, "BAD_RESPONSE_FROM_APP_SERVER"
-        items = data.get("items")
-        return (items if isinstance(items, list) else []), None
-    except (HTTPError, URLError, TimeoutError, ValueError) as e:
-        return None, str(e)
+    last_err: str | None = None
+    for base in iter_app_server_bases():
+        url = base + "/api/admin_farmer_data.php"
+        try:
+            req = Request(url, headers={"Accept": "application/json"})
+            with urlopen(req, timeout=app_http_timeout()) as resp:
+                raw = resp.read().decode("utf-8", errors="replace")
+            data = json.loads(raw) if raw else None
+            if not isinstance(data, dict) or data.get("ok") is not True:
+                last_err = "BAD_RESPONSE_FROM_APP_SERVER"
+                continue
+            items = data.get("items")
+            return (items if isinstance(items, list) else []), None
+        except (HTTPError, URLError, TimeoutError, ValueError) as e:
+            last_err = str(e)
+            continue
+    return None, last_err or "APP_SERVER_UNREACHABLE"
 
 
 def _fetch_customer_transactions_via_app_server(
     limit: int, farmer_id: int | None = None
 ) -> tuple[list[dict] | None, str | None]:
     """When admin PC cannot reach MySQL directly, use Beanthentic-App HTTP API on XAMPP device."""
-    base = _app_server_base()
-    if not base:
+    if not iter_app_server_bases():
         return None, "APP_SERVER_BASE_NOT_SET"
     limit = max(1, min(int(limit or 400), 800))
-    url = f"{base}/api/admin_customer_transactions.php?limit={limit}"
-    if farmer_id:
-        url += f"&farmer_id={int(farmer_id)}"
-    try:
-        req = Request(url, headers={"Accept": "application/json"})
-        with urlopen(req, timeout=12) as resp:
-            raw = resp.read().decode("utf-8", errors="replace")
-        data = json.loads(raw) if raw else None
-        if not isinstance(data, dict) or data.get("ok") is not True:
-            err = (data or {}).get("error") if isinstance(data, dict) else None
-            return None, err or "BAD_RESPONSE_FROM_APP_SERVER"
-        items = data.get("items")
-        return (items if isinstance(items, list) else []), None
-    except HTTPError as e:
+    last_err: str | None = None
+    for base in iter_app_server_bases():
+        url = f"{base}/api/admin_customer_transactions.php?limit={limit}"
+        if farmer_id:
+            url += f"&farmer_id={int(farmer_id)}"
         try:
-            body = e.read().decode("utf-8", errors="replace")
-            parsed = json.loads(body) if body else {}
-            if isinstance(parsed, dict) and parsed.get("error"):
-                return None, str(parsed.get("error"))
-        except Exception:
-            pass
-        return None, f"HTTP {e.code}"
-    except (URLError, TimeoutError, ValueError) as e:
-        return None, str(e)
+            req = Request(url, headers={"Accept": "application/json"})
+            with urlopen(req, timeout=app_http_timeout()) as resp:
+                raw = resp.read().decode("utf-8", errors="replace")
+            data = json.loads(raw) if raw else None
+            if not isinstance(data, dict) or data.get("ok") is not True:
+                err = (data or {}).get("error") if isinstance(data, dict) else None
+                last_err = err or "BAD_RESPONSE_FROM_APP_SERVER"
+                continue
+            items = data.get("items")
+            return (items if isinstance(items, list) else []), None
+        except HTTPError as e:
+            try:
+                body = e.read().decode("utf-8", errors="replace")
+                parsed = json.loads(body) if body else {}
+                if isinstance(parsed, dict) and parsed.get("error"):
+                    last_err = str(parsed.get("error"))
+                    continue
+            except Exception:
+                pass
+            last_err = f"HTTP {e.code}"
+            continue
+        except (URLError, TimeoutError, ValueError) as e:
+            last_err = str(e)
+            continue
+    return None, last_err or "APP_SERVER_UNREACHABLE"
+
+
+_FARM_INFO_COLUMNS: set[str] | None = None
+
+
+def _farm_information_columns(conn) -> set[str]:
+    global _FARM_INFO_COLUMNS
+    if _FARM_INFO_COLUMNS is not None:
+        return _FARM_INFO_COLUMNS
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT COLUMN_NAME
+                FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'farm_information'
+                """
+            )
+            rows = cur.fetchall() or []
+            _FARM_INFO_COLUMNS = {
+                str(row.get("COLUMN_NAME") or row[0]).strip()
+                for row in rows
+                if (row.get("COLUMN_NAME") if isinstance(row, dict) else row[0])
+            }
+    except Exception:
+        _FARM_INFO_COLUMNS = {"ownership_status", "farm_size_ha", "barangay"}
+    return _FARM_INFO_COLUMNS
+
+
+def _farm_info_flag_select(conn) -> str:
+    cols = _farm_information_columns(conn)
+    parts = []
+    for col in (
+        "is_landowner",
+        "is_cloa_holder",
+        "is_leaseholder",
+        "is_seasonal_farm_worker",
+        "is_others",
+    ):
+        if col in cols:
+            parts.append(f"fi.{col}")
+    return (", " + ", ".join(parts)) if parts else ""
 
 
 def _ensure_ownership_varchar(conn) -> None:
@@ -332,6 +355,198 @@ def _app_db_connect():
     if not params:
         return None
     return connect_app_mysql(params)
+
+
+def _farmer_account_action_via_http(
+    farmer_id: int,
+    action: str,
+    reason: str,
+    days: int,
+) -> dict:
+    payload = {
+        "farmer_id": farmer_id,
+        "action": action,
+        "reason": reason,
+        "days": days,
+    }
+    last_err: Exception | None = None
+    for base in _moderation_http_bases():
+        url = base.rstrip("/") + "/api/farmer_account_action.php"
+        try:
+            req = Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Accept": "application/json", "Content-Type": "application/json"},
+                method="POST",
+            )
+            with urlopen(req, timeout=app_http_timeout()) as resp:
+                raw = resp.read().decode("utf-8", errors="replace")
+            data = json.loads(raw) if raw else {}
+            if not isinstance(data, dict):
+                last_err = RuntimeError(f"Bad response from {base}")
+                continue
+            if not data.get("ok"):
+                last_err = RuntimeError(
+                    str(data.get("detail") or data.get("error") or "App server rejected moderation action")
+                )
+                continue
+            status = data.get("account_status")
+            if isinstance(status, dict):
+                return status
+            return {}
+        except HTTPError as exc:
+            try:
+                raw = exc.read().decode("utf-8", errors="replace")
+                parsed = json.loads(raw) if raw else {}
+                if isinstance(parsed, dict) and (parsed.get("error") or parsed.get("detail")):
+                    last_err = RuntimeError(str(parsed.get("detail") or parsed.get("error")))
+                    continue
+            except Exception:
+                pass
+            last_err = RuntimeError(f"App server HTTP {exc.code} at {base}")
+        except (URLError, TimeoutError, ValueError, OSError) as exc:
+            last_err = exc
+    if last_err:
+        raise last_err
+    raise RuntimeError("No app server reachable for warning/suspend (port 8080).")
+
+
+def _read_settings_root() -> dict:
+    try:
+        settings_path = Path(__file__).resolve().parents[1] / "settings.json"
+        raw = json.loads(settings_path.read_text(encoding="utf-8"))
+        return raw if isinstance(raw, dict) else {}
+    except Exception:
+        return {}
+
+
+def _moderation_http_bases() -> list[str]:
+    """
+    App-server URLs for warning/suspend only.
+    Tries sms_gateway.local_base_url first (often the XAMPP/phone device), then settings connection.
+    """
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    def add(url: str | None) -> None:
+        base = (url or "").strip().rstrip("/")
+        if base and base not in seen:
+            seen.add(base)
+            ordered.append(base)
+
+    root = _read_settings_root()
+    sms = root.get("sms") if isinstance(root.get("sms"), dict) else {}
+    gw = sms.get("sms_gateway") if isinstance(sms.get("sms_gateway"), dict) else {}
+    add(str(gw.get("local_base_url") or ""))
+    add(str(sms.get("public_base_url") or "").replace(":5000", ":8080"))
+    for base in iter_app_server_bases():
+        add(base)
+    return ordered
+
+
+def _moderation_mysql_hosts() -> list[str]:
+    """MySQL hosts to try for warning/suspend (configured IP + LAN fallbacks from settings)."""
+    params = _app_db_params()
+    if not params:
+        return []
+    from config.app_connection import lan_fallback_hosts
+
+    hosts: list[str] = []
+    seen: set[str] = set()
+    primary = str(params.get("host") or "").strip()
+    if primary:
+        seen.add(primary)
+        hosts.append(primary)
+    for host in lan_fallback_hosts():
+        if host not in seen:
+            seen.add(host)
+            hosts.append(host)
+    root = _read_settings_root()
+    gw = ((root.get("sms") or {}).get("sms_gateway") or {}) if isinstance(root.get("sms"), dict) else {}
+    local = str(gw.get("local_base_url") or "")
+    if "://" in local:
+        from urllib.parse import urlparse
+
+        h = (urlparse(local).hostname or "").strip()
+        if h and h not in seen:
+            seen.add(h)
+            hosts.append(h)
+    return hosts
+
+
+def _connect_moderation_mysql():
+    """MySQL connection for warning/suspend — tries every candidate host before giving up."""
+    params = _app_db_params()
+    if not params:
+        return None
+    last_err: Exception | None = None
+    for host in _moderation_mysql_hosts():
+        try:
+            return connect_app_mysql({**params, "host": host})
+        except Exception as e:
+            last_err = e
+    if last_err:
+        raise last_err
+    return None
+
+
+def _run_farmer_account_action(
+    farmer_id: int,
+    action: str,
+    reason: str,
+    days: int,
+) -> tuple[dict | None, Exception | None, Exception | None]:
+    """
+    Warning / suspend / unsuspend for cross-device admin.
+    HTTP (port 8080) first, then MySQL with LAN fallback hosts.
+    Returns (status, http_error, mysql_error).
+    """
+    http_err: Exception | None = None
+    mysql_err: Exception | None = None
+    status: dict | None = None
+
+    if _moderation_http_bases():
+        try:
+            status = _farmer_account_action_via_http(farmer_id, action, reason, days)
+            if status is not None:
+                return status, None, None
+        except Exception as e:
+            http_err = e
+
+    if _app_db_params():
+        conn = None
+        try:
+            conn = _connect_moderation_mysql()
+            ensure_farmer_mod_columns(conn)
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT farmer_id FROM farmers WHERE farmer_id = %s LIMIT 1",
+                    (farmer_id,),
+                )
+                if not cur.fetchone():
+                    raise LookupError("Farmer not found.")
+
+            if action == "warning":
+                status = apply_warning(conn, farmer_id, reason)
+            elif action == "suspend":
+                status = apply_suspend(conn, farmer_id, reason, days=days)
+            else:
+                status = apply_unsuspend(conn, farmer_id, reason)
+
+            try:
+                conn.commit()
+            except Exception:
+                pass
+            return status, http_err, None
+        except LookupError:
+            raise
+        except Exception as e:
+            mysql_err = e
+        finally:
+            if conn:
+                conn.close()
+
+    return status, http_err, mysql_err
 
 
 def _normalize_coffee_variety(variety):
@@ -518,7 +733,8 @@ def _app_fetch_farmer_rows(limit: int = 2000) -> list[dict]:
     if not conn:
         return []
     limit = max(1, min(int(limit or 2000), 5000))
-    sql = """
+    flag_select = _farm_info_flag_select(conn)
+    sql = f"""
       SELECT
         f.farmer_id,
         u.user_id,
@@ -531,7 +747,7 @@ def _app_fetch_farmer_rows(limit: int = 2000) -> list[dict]:
         pi.contact_number,
         pi.birthday,
         COALESCE(pi.barangay, fi.barangay) AS barangay,
-        fi.ownership_status,
+        fi.ownership_status{flag_select},
         fi.farm_size_ha,
         ai.federation_assoc,
         ai.ncfrs,
@@ -683,10 +899,14 @@ def register_farmer_routes(app):
             items, err = _fetch_farmer_data_via_app_server()
             if items is not None:
                 return jsonify(items)
+            load_msg = friendly_load_failure(module_label="farmer data", mysql_error=e)
+            if err:
+                load_msg = f"{load_msg} App server fallback: {err}"
             return jsonify(
                 {
                     "error": "APP_DB_UNREACHABLE",
-                    "detail": safe_error_message(e),
+                    "detail": load_msg,
+                    "message": load_msg,
                     "fallback_error": err,
                 }
             ), 503
@@ -725,6 +945,7 @@ def register_farmer_routes(app):
                 sqlite_by_name=sqlite_by_name,
                 sqlite_by_phone=sqlite_by_phone,
                 sqlite_by_email=sqlite_by_email,
+                row_flags=r,
             )
             own_flags = ownership_columns(own_raw)
 
@@ -818,51 +1039,59 @@ def register_farmer_routes(app):
     def api_farmer_account_action():
         """Record admin warning, suspend (3 days default), or unsuspend on a farmer account."""
         if not is_authenticated():
-            return jsonify({"error": "Unauthorized"}), 401
+            return jsonify({"error": "Unauthorized", "message": "Admin login required."}), 401
 
-        params = _app_db_params()
-        if not params:
-            return jsonify({"error": "APP_DB_NOT_CONFIGURED"}), 503
-
-        data = request.get_json(silent=True) or {}
-        ok_fid, fid_err, farmer_id = validate_positive_int(
-            data.get("farmer_id"), field="farmer_id", minimum=1
-        )
-        action = validate_enum(data.get("action"), FARMER_ACCOUNT_ACTIONS, "")
         try:
-            reason = clean_text(data.get("reason"), REASON_MAX, "Reason", allow_empty=False) or ""
-        except ValueError as exc:
-            return api_error(str(exc), 400)
-        ok_days, days_err, days = validate_positive_int(
-            data.get("days") or 3, field="days", minimum=1, maximum=365
-        )
+            data = request.get_json(silent=True) or {}
+            ok_fid, fid_err, farmer_id = validate_positive_int(
+                data.get("farmer_id"), field="farmer_id", minimum=1
+            )
+            action = validate_enum(data.get("action"), FARMER_ACCOUNT_ACTIONS, "")
+            try:
+                reason = clean_text(data.get("reason"), REASON_MAX, "Reason", allow_empty=False) or ""
+            except ValueError as exc:
+                return api_error(str(exc), 400)
+            ok_days, days_err, days = validate_positive_int(
+                data.get("days") or 3, field="days", minimum=1, maximum=365
+            )
 
-        if not ok_fid:
-            return api_error(fid_err, 400)
-        if action not in FARMER_ACCOUNT_ACTIONS:
-            return api_error("action must be warning, suspend, or unsuspend.", 400)
-        if not ok_days:
-            return api_error(days_err, 400)
-
-        conn = None
-        try:
-            conn = connect_app_mysql(params)
-            with conn.cursor() as cur:
-                cur.execute("SELECT farmer_id FROM farmers WHERE farmer_id = %s LIMIT 1", (farmer_id,))
-                if not cur.fetchone():
-                    return jsonify({"error": "Farmer not found."}), 404
-
-            if action == "warning":
-                status = apply_warning(conn, farmer_id, reason)
-            elif action == "suspend":
-                status = apply_suspend(conn, farmer_id, reason, days=days)
-            else:
-                status = apply_unsuspend(conn, farmer_id, reason)
+            if not ok_fid:
+                return api_error(fid_err, 400)
+            if action not in FARMER_ACCOUNT_ACTIONS:
+                return api_error("action must be warning, suspend, or unsuspend.", 400)
+            if not ok_days:
+                return api_error(days_err, 400)
 
             try:
-                conn.commit()
-            except Exception:
-                pass
+                status, http_err, mysql_err = _run_farmer_account_action(
+                    farmer_id, action, reason, days
+                )
+            except LookupError:
+                return jsonify(
+                    {"error": "Farmer not found.", "message": "Farmer not found."}
+                ), 404
+
+            if status is None:
+                if not _app_db_params() and not _moderation_http_bases():
+                    return jsonify(
+                        {
+                            "error": "APP_DB_NOT_CONFIGURED",
+                            "detail": "Set app_db_host or app_server_base in settings.json.",
+                            "message": "Set app_db_host or app_server_base in settings.json.",
+                        }
+                    ), 503
+                detail = friendly_load_failure(
+                    module_label="farmer account action",
+                    mysql_error=mysql_err,
+                    http_error=http_err,
+                )
+                return jsonify(
+                    {
+                        "error": "APP_DB_UNREACHABLE",
+                        "detail": detail,
+                        "message": detail,
+                    }
+                ), 503
 
             try:
                 log_activity(
@@ -883,10 +1112,14 @@ def register_farmer_routes(app):
                 }
             )
         except Exception as e:
-            return jsonify({"error": "APP_DB_UNREACHABLE", "detail": safe_error_message(e)}), 503
-        finally:
-            if conn:
-                conn.close()
+            msg = friendly_load_failure(module_label="farmer account action", mysql_error=e)
+            return jsonify(
+                {
+                    "error": "FARMER_ACCOUNT_ACTION_FAILED",
+                    "detail": msg,
+                    "message": msg,
+                }
+            ), 500
 
     @app.route("/api/farmer-picker", methods=["GET"])
     def api_farmer_picker():

@@ -14,6 +14,8 @@ from pathlib import Path
 from flask import Flask, jsonify, redirect, request
 from sqlalchemy import text
 
+from config.app_connection import app_db_connect_timeout
+
 from config.auth import register_auth_routes
 from config.security import configure_app_security, require_admin, safe_error_message
 from config.validation import (
@@ -116,7 +118,7 @@ app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
-    "connect_args": {"connect_timeout": 3, "read_timeout": 5, "write_timeout": 5},
+    "connect_args": {"connect_timeout": app_db_connect_timeout(8)},
 }
 
 # Initialize database
@@ -170,9 +172,63 @@ register_export_routes(app)
 register_ipophl_routes(app)
 register_misconduct_report_routes(app)
 register_messaging_routes(app)
+
+# Backup GET /api/messages (same as messaging_api) if an older handler returns 503 without HTTP fallback
+from api.messaging_api import _shared_identity  # noqa: E402
+from config.app_connection import friendly_load_failure, load_error_payload  # noqa: E402
+from config.messaging_load import MessagesLoadError, load_shared_messages  # noqa: E402
+from config.utils import is_authenticated, is_farmer_authenticated  # noqa: E402
+
+
+@app.route("/api/messages", methods=["GET"], endpoint="api_messages_list_backup")
+def api_messages_list_backup():
+    if not (is_authenticated() or is_farmer_authenticated()):
+        return jsonify({"error": "Unauthorized"}), 401
+    role, phone, _name = _shared_identity()
+    folder = request.args.get("folder", "inbox")
+    search = (request.args.get("search", "") or "").strip().lower()
+    category = request.args.get("category", "").strip().lower()
+    limit = min(int(request.args.get("limit", "100")), 500)
+    try:
+        items, unread_count, source = load_shared_messages(
+            folder=folder,
+            search=search,
+            category=category,
+            limit=limit,
+            role=role,
+            phone=phone,
+        )
+        return jsonify({"items": items, "unread_count": unread_count, "source": source, "ok": True})
+    except MessagesLoadError as e:
+        msg = friendly_load_failure(
+            module_label="messages",
+            mysql_error=e.mysql_error,
+            http_error=e.http_error,
+        )
+        return jsonify(load_error_payload("MESSAGES_LOAD_FAILED", msg)), 503
+    except Exception as e:
+        msg = friendly_load_failure(module_label="messages", http_error=e)
+        return jsonify(load_error_payload("MESSAGES_LOAD_FAILED", msg)), 503
+
+
 register_platform_routes(app)
 register_ml_routes(app)
 register_farmer_portal_routes(app)
+
+# Ensure GI broadcast POST is registered on the app (avoids 405 from static_folder when a module fails to load)
+from api.gi_contributions_api import handle_gi_contributions_send  # noqa: E402
+
+for _gi_send_rule in (
+    "/api/gi-contributions-send",
+    "/api/gi-contributions/send",
+    "/api/gi-contributions/broadcast",
+):
+    app.add_url_rule(
+        _gi_send_rule,
+        endpoint=f"gi_broadcast_{_gi_send_rule.strip('/').replace('/', '_')}",
+        view_func=handle_gi_contributions_send,
+        methods=["POST"],
+    )
 
 
 @app.route("/connection-settings", methods=["GET", "POST"])
@@ -364,18 +420,100 @@ def connection_settings():
 # Health check endpoint
 @app.route("/health")
 def health():
-    """Health check endpoint for monitoring."""
+    """
+    Health check for monitoring.
+
+    Remote app MySQL (settings.json app_db_host) may be unreachable from the admin PC
+    while the admin app, IPOPHL (local JSON), and app HTTP bridge (:8080) still work.
+    """
+    from config.app_connection import app_db_params, app_server_base, friendly_mysql_error
+    from config.ipophl_store import STORE_PATH
+    from config.mysql_app_bridge import connect_app_mysql
+
+    payload: dict = {
+        "status": "healthy",
+        "admin_server": "up",
+        "database": "disconnected",
+        "app_mysql": "not_configured",
+        "app_server_http": "not_configured",
+        "ipophl_local": "unknown",
+    }
+    hints: list[str] = []
+
+    params = app_db_params()
+    if params:
+        payload["app_mysql"] = "disconnected"
+        conn = None
+        try:
+            conn = connect_app_mysql(params)
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                cur.fetchone()
+            payload["app_mysql"] = "connected"
+            payload["database"] = "connected"
+        except Exception as e:
+            payload["app_mysql_error"] = friendly_mysql_error(e, host=str(params.get("host") or ""))
+            hints.append(
+                "App MySQL unreachable from this PC. Use Connection Settings: set app_db_host to the "
+                "XAMPP PC LAN IP, start MySQL on that device, or use app_server_base HTTP only."
+            )
+        finally:
+            if conn:
+                conn.close()
+    else:
+        hints.append("Set app_db_host in settings.json or /connection-settings for farmer/app data.")
+
+    base = app_server_base()
+    if base:
+        payload["app_server_http"] = "disconnected"
+        payload["app_server_base"] = base
+        try:
+            from config.ipophl_app_bridge import _request_bridge
+
+            _request_bridge(action="list", query={"limit": 1}, timeout=4)
+            payload["app_server_http"] = "connected"
+            if payload["database"] != "connected":
+                payload["database"] = "http_only"
+        except Exception as e:
+            payload["app_server_http_error"] = str(e)
+            hints.append(
+                f"Cannot reach app server at {base}. On the XAMPP device run python app.py on port 8080 "
+                "and copy deploy/xampp_api/*.php into Beanthentic-App/api/."
+            )
+
+    if STORE_PATH.exists():
+        payload["ipophl_local"] = "available"
+    else:
+        payload["ipophl_local"] = "ready"
+
+    sqlalchemy_ok = False
     try:
         db.session.execute(text("SELECT 1"))
-        return jsonify({"status": "healthy", "database": "connected"}), 200
+        sqlalchemy_ok = True
+        payload["sqlalchemy"] = "connected"
     except Exception as e:
-        return jsonify(
-            {
-                "status": "unhealthy",
-                "database": "disconnected",
-                "error": safe_error_message(e, public="Database check failed."),
-            }
-        ), 503
+        payload["sqlalchemy"] = "disconnected"
+        payload["sqlalchemy_error"] = safe_error_message(e, public="SQLAlchemy ping failed.")
+
+    if payload["app_mysql"] == "connected" or payload["app_server_http"] == "connected":
+        payload["status"] = "healthy"
+        code = 200
+    elif payload["ipophl_local"] in ("available", "ready"):
+        payload["status"] = "degraded"
+        payload["message"] = (
+            "Admin web is running. Remote app database is not reachable; "
+            "IPOPHL uploads and local features still work."
+        )
+        code = 200
+    else:
+        payload["status"] = "unhealthy"
+        payload["message"] = "Admin web is running but no app database path is available."
+        code = 503
+
+    if hints:
+        payload["hints"] = hints
+
+    return jsonify(payload), code
 
 
 if __name__ == "__main__":

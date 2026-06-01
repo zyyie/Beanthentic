@@ -7793,6 +7793,23 @@ class DashboardApp {
   // MESSAGING MODULE
   // ═══════════════════════════════════════════════════
 
+  messagingApi(path, init = {}) {
+    const headers = { Accept: 'application/json', ...(init.headers || {}) };
+    return fetch(beanthenticApiUrl(path), { credentials: 'same-origin', ...init, headers });
+  }
+
+  messagingErrorMessage(data, status) {
+    if (data?.error === 'APP_DB_UNREACHABLE' || data?.error === 'MESSAGES_LOAD_FAILED') {
+      const detail = (data.detail || data.message || '').trim();
+      return detail || (
+        'Cannot load messages from the app database. Farmers may still load via the app server HTTP bridge. ' +
+        'Copy deploy/xampp_api/admin_shared_messages.php to Beanthentic-App/api/ on the XAMPP PC, ' +
+        'and check app_db_host / app_server_base in settings.json.'
+      );
+    }
+    return data?.message || data?.error || `Request failed (HTTP ${status})`;
+  }
+
   initMessagingModule() {
     if (this._messagingInitialized) return;
     this._messagingInitialized = true;
@@ -8009,9 +8026,9 @@ class DashboardApp {
       let url = `/api/messages?folder=all&limit=500`;
       if (this.messagingSearchTerm) url += `&search=${encodeURIComponent(this.messagingSearchTerm)}`;
 
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const res = await this.messagingApi(url);
+      const data = await beanthenticParseJsonResponse(res);
+      if (!res.ok) throw new Error(this.messagingErrorMessage(data, res.status));
       console.log('Fetched messages:', data);
       
       // Handle both {items: []} and [] formats
@@ -8080,7 +8097,8 @@ class DashboardApp {
       this.renderMessagingList();
     } catch (err) {
       console.warn('Failed to load chats:', err);
-      listEl.innerHTML = '<li class="messaging-list-empty"><i class="fa-solid fa-circle-exclamation"></i><p>Could not load chats. Try refreshing.</p></li>';
+      const hint = String(err.message || 'Could not load chats.');
+      listEl.innerHTML = `<li class="messaging-list-empty"><i class="fa-solid fa-circle-exclamation"></i><p>${this.escapeHtml(hint)}</p><p style="margin-top:0.5rem;font-size:0.85rem;"><a href="${beanthenticApiUrl('/connection-settings')}">Connection Settings</a></p></li>`;
     }
   }
 
@@ -8254,9 +8272,9 @@ class DashboardApp {
     const tail = this.messagingPhoneTail(farmerPhoneRaw);
 
     try {
-      await fetch(
+      await this.messagingApi(
         `/api/messages/mark-thread-read?phone=${encodeURIComponent(String(farmerPhoneRaw))}`,
-        { method: 'POST', headers: { Accept: 'application/json' } }
+        { method: 'POST' }
       );
     } catch (_err) {
       /* thread GET may have already marked read */
@@ -8333,9 +8351,8 @@ class DashboardApp {
   async fetchConversationThread(farmerPhoneRaw) {
     if (!farmerPhoneRaw) return [];
     try {
-      const res = await fetch(
-        `/api/messages/thread?phone=${encodeURIComponent(String(farmerPhoneRaw))}`,
-        { headers: { Accept: 'application/json' } }
+      const res = await this.messagingApi(
+        `/api/messages/thread?phone=${encodeURIComponent(String(farmerPhoneRaw))}`
       );
       if (!res.ok) return [];
       const data = await res.json();
@@ -8428,7 +8445,7 @@ class DashboardApp {
       // Get recipient name from header if originalMessage is missing (for new conversations)
       const headerName = document.getElementById('messagingDetailSenderName')?.textContent || '';
 
-      const res = await fetch('/api/messages', {
+      const res = await this.messagingApi('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
@@ -8856,7 +8873,7 @@ class DashboardApp {
 
       // If not found in local data and we have an ID, try API
       if (!msg && id) {
-        const res = await fetch(`/api/messages/${id}`);
+        const res = await this.messagingApi(`/api/messages/${id}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         msg = data.message;
@@ -9006,7 +9023,7 @@ class DashboardApp {
 
   async toggleMessagingArchive(id) {
     try {
-      const res = await fetch(`/api/messages/${id}/archive`, { method: 'POST' });
+      const res = await this.messagingApi(`/api/messages/${id}/archive`, { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
@@ -9057,7 +9074,7 @@ class DashboardApp {
 
   async _performDelete(id) {
     try {
-      const res = await fetch(`/api/messages/${id}`, { method: 'DELETE' });
+      const res = await this.messagingApi(`/api/messages/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       this.showNotification('Message deleted.', 'success');
@@ -9071,7 +9088,7 @@ class DashboardApp {
 
   async messagingMarkAllRead() {
     try {
-      const res = await fetch('/api/messages/mark-all-read', { method: 'POST' });
+      const res = await this.messagingApi('/api/messages/mark-all-read', { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       this.showNotification('All messages marked as read.', 'success');
@@ -9266,7 +9283,7 @@ class DashboardApp {
     }
 
     try {
-      const res = await fetch('/api/messages', {
+      const res = await this.messagingApi('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ 
@@ -9402,9 +9419,9 @@ class DashboardApp {
 
   async updateMessagingBadge() {
     try {
-      const res = await fetch('/api/messages/unread-count');
+      const res = await this.messagingApi('/api/messages/unread-count');
       if (!res.ok) return;
-      const data = await res.json();
+      const data = await beanthenticParseJsonResponse(res);
       const count = data.unread_count || 0;
 
       const headerBadge = document.getElementById('headerMessageBadge');

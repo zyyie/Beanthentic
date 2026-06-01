@@ -1,158 +1,182 @@
-"""Local JSON persistence for IPOPHL document analysis when MySQL is unavailable."""
+"""
+JSON fallback store for IPOPHL document metadata when MySQL is unavailable.
+"""
 
 from __future__ import annotations
 
 import json
-import threading
-from datetime import datetime, timezone
+import re
+from datetime import datetime
 from pathlib import Path
-from typing import Any
 
-_STORE_PATH = Path(__file__).resolve().parents[1] / "data" / "ipophl_documents.json"
-_DELETED_PATH = Path(__file__).resolve().parents[1] / "data" / "ipophl_deleted.json"
-_LOCK = threading.Lock()
+_UUID_FILE_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]+$",
+    re.I,
+)
+_ALLOWED_UPLOAD_SUFFIXES = frozenset({".pdf", ".doc", ".docx", ".txt", ".md", ".csv"})
+
+STORE_PATH = Path(__file__).resolve().parent.parent / "data" / "ipophl_documents.json"
+UPLOADS_DIR = Path(__file__).resolve().parent.parent / "machinelearning" / "uploads"
 
 
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z"
-
-
-def _load_raw() -> dict[str, dict[str, Any]]:
-    if not _STORE_PATH.exists():
+def _load() -> dict:
+    if not STORE_PATH.exists():
         return {}
     try:
-        data = json.loads(_STORE_PATH.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+        raw = json.loads(STORE_PATH.read_text(encoding="utf-8"))
+        return raw if isinstance(raw, dict) else {}
+    except json.JSONDecodeError:
         return {}
-    if not isinstance(data, dict):
-        return {}
-    return {k: v for k, v in data.items() if isinstance(v, dict)}
 
 
-def _save_raw(records: dict[str, dict[str, Any]]) -> None:
-    _STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _STORE_PATH.write_text(json.dumps(records, indent=2), encoding="utf-8")
+def _save(data: dict) -> None:
+    STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    STORE_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
-def _load_deleted_ids() -> set[str]:
-    if not _DELETED_PATH.exists():
-        return set()
-    try:
-        data = json.loads(_DELETED_PATH.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return set()
-    if isinstance(data, list):
-        return {str(x).strip() for x in data if str(x).strip()}
-    if isinstance(data, dict):
-        ids = data.get("ids")
-        if isinstance(ids, list):
-            return {str(x).strip() for x in ids if str(x).strip()}
-    return set()
-
-
-def _save_deleted_ids(ids: set[str]) -> None:
-    _DELETED_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _DELETED_PATH.write_text(json.dumps(sorted(ids), indent=2), encoding="utf-8")
-
-
-def mark_deleted(file_uuid: str) -> None:
-    """Remember admin-deleted ids so disk recovery does not re-import them."""
-    file_uuid = str(file_uuid or "").strip()
-    if not file_uuid:
-        return
-    with _LOCK:
-        ids = _load_deleted_ids()
-        if file_uuid in ids:
-            return
-        ids.add(file_uuid)
-        _save_deleted_ids(ids)
-
-
-def is_deleted(file_uuid: str) -> bool:
-    return str(file_uuid or "").strip() in _load_deleted_ids()
-
-
-def upsert(record: dict[str, Any]) -> dict[str, Any]:
-    """Insert or update a document analysis record keyed by file_uuid."""
+def upsert_document(record: dict) -> None:
     file_uuid = str(record.get("file_uuid") or "").strip()
     if not file_uuid:
-        raise ValueError("file_uuid is required")
-
-    with _LOCK:
-        records = _load_raw()
-        existing = records.get(file_uuid, {})
-        merged = {**existing, **record, "file_uuid": file_uuid}
-        if not merged.get("upload_timestamp"):
-            merged["upload_timestamp"] = _utc_now_iso()
-        merged["updated_at"] = _utc_now_iso()
-        records[file_uuid] = merged
-        _save_raw(records)
-        return merged
+        return
+    data = _load()
+    data[file_uuid] = record
+    _save(data)
 
 
-def get_raw(file_uuid: str) -> dict[str, Any] | None:
-    """Read store record even if it is tombstoned (used during delete)."""
+def get_document(file_uuid: str) -> dict | None:
     file_uuid = str(file_uuid or "").strip()
     if not file_uuid:
         return None
-    with _LOCK:
-        return _load_raw().get(file_uuid)
+    record = _load().get(file_uuid)
+    return record if isinstance(record, dict) else None
 
 
-def get(file_uuid: str) -> dict[str, Any] | None:
-    file_uuid = str(file_uuid or "").strip()
-    if not file_uuid or is_deleted(file_uuid):
-        return None
-    return get_raw(file_uuid)
-
-
-def purge(file_uuid: str) -> None:
-    """Remove from JSON store and tombstone so the file cannot reappear."""
+def delete_document(file_uuid: str) -> None:
     file_uuid = str(file_uuid or "").strip()
     if not file_uuid:
         return
-    mark_deleted(file_uuid)
-    with _LOCK:
-        records = _load_raw()
-        records.pop(file_uuid, None)
-        _save_raw(records)
+    data = _load()
+    if file_uuid in data:
+        data.pop(file_uuid, None)
+        _save(data)
 
 
-def delete(file_uuid: str) -> bool:
-    file_uuid = str(file_uuid or "").strip()
-    if not file_uuid:
-        return False
-    had = get_raw(file_uuid) is not None
-    purge(file_uuid)
-    return had
-
-
-def list_all(*, phase: str | None = None, task_id: str | None = None) -> list[dict[str, Any]]:
-    with _LOCK:
-        deleted = _load_deleted_ids()
-        records = [
-            r for r in _load_raw().values()
-            if str(r.get("file_uuid") or "").strip() not in deleted
-        ]
-
+def list_documents(*, phase: str | None = None, task_id: str | None = None, limit: int = 200) -> list[dict]:
+    items = list(_load().values())
+    items = [item for item in items if isinstance(item, dict)]
     if phase:
-        records = [r for r in records if r.get("ipophl_phase") == phase]
+        items = [item for item in items if str(item.get("ipophl_phase") or "") == phase]
     if task_id:
-        records = [r for r in records if r.get("task_id") == task_id]
+        items = [item for item in items if str(item.get("task_id") or "") == task_id]
+    items.sort(key=lambda item: str(item.get("upload_timestamp") or ""), reverse=True)
+    return items[: max(1, min(limit, 500))]
 
-    records.sort(key=lambda r: r.get("upload_timestamp") or "", reverse=True)
-    return records
 
-
-def to_list_item(record: dict[str, Any]) -> dict[str, Any]:
+def document_to_item(record: dict) -> dict:
     return {
         "file_uuid": record.get("file_uuid"),
-        "filename": record.get("original_filename") or record.get("filename"),
-        "file_type": record.get("file_type"),
-        "file_size": record.get("file_size", 0),
-        "upload_timestamp": record.get("upload_timestamp"),
-        "ai_score": record.get("ai_score", 0),
-        "ai_status": record.get("ai_status", "Not Ready"),
-        "ipophl_phase": record.get("ipophl_phase"),
-        "task_id": record.get("task_id"),
+        "filename": record.get("original_filename") or record.get("filename") or "Uploaded file",
+        "file_type": record.get("file_type") or "",
+        "file_size": int(record.get("file_size") or 0),
+        "upload_timestamp": record.get("upload_timestamp") or datetime.utcnow().isoformat(timespec="seconds"),
+        "ai_score": int(record.get("ai_score") or 0),
+        "ai_status": record.get("ai_status") or "Not Ready",
+        "ipophl_phase": record.get("ipophl_phase") or "unknown",
+        "task_id": record.get("task_id") or "unknown",
     }
+
+
+def analysis_payload_from_record(record: dict) -> dict:
+    detected = record.get("detected_features") or []
+    missing = record.get("missing_requirements") or []
+    if isinstance(detected, str):
+        try:
+            detected = json.loads(detected)
+        except json.JSONDecodeError:
+            detected = []
+    if isinstance(missing, str):
+        try:
+            missing = json.loads(missing)
+        except json.JSONDecodeError:
+            missing = []
+    return {
+        "readiness_score": int(record.get("ai_score") or 0),
+        "status": record.get("ai_status") or "Not Ready",
+        "detected_features": detected if isinstance(detected, list) else [],
+        "missing_requirements": missing if isinstance(missing, list) else [],
+        "analysis_method": record.get("analysis_method") or "rule_based",
+        "text_length": int(record.get("text_length") or 0),
+        "shap_analysis": record.get("shap_analysis") or "",
+        "analysis_timestamp": record.get("analysis_timestamp"),
+    }
+
+
+def bootstrap_orphan_uploads(*, limit: int = 500) -> int:
+    """Register on-disk upload files that are missing from the JSON store."""
+    if not UPLOADS_DIR.exists():
+        return 0
+
+    data = _load()
+    added = 0
+    candidates = sorted(
+        (path for path in UPLOADS_DIR.iterdir() if path.is_file()),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+
+    for candidate in candidates:
+        if added >= limit:
+            break
+        if not _UUID_FILE_RE.match(candidate.name):
+            continue
+
+        file_uuid = candidate.stem
+        if file_uuid in data:
+            continue
+
+        ext = candidate.suffix.lower()
+        if ext not in _ALLOWED_UPLOAD_SUFFIXES:
+            continue
+
+        stat = candidate.stat()
+        data[file_uuid] = {
+            "file_uuid": file_uuid,
+            "original_filename": f"uploaded{ext}",
+            "file_path": candidate.as_posix(),
+            "file_type": ext,
+            "file_size": stat.st_size,
+            "ai_score": 10,
+            "ai_status": "Uploaded - pending review",
+            "detected_features": [],
+            "missing_requirements": [],
+            "analysis_method": "disk_bootstrap",
+            "text_length": 0,
+            "shap_analysis": "Recovered from uploads folder",
+            "upload_timestamp": datetime.utcfromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
+            "analysis_timestamp": datetime.utcfromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
+            "ipophl_phase": "phase1",
+            "task_id": "phase1-product",
+        }
+        added += 1
+
+    if added:
+        _save(data)
+    return added
+
+
+def resolve_file_path(file_uuid: str, *, filename_hint: str | None = None) -> Path | None:
+    record = get_document(file_uuid)
+    if record:
+        path = Path(str(record.get("file_path") or ""))
+        if path.exists():
+            return path
+
+    if UPLOADS_DIR.exists():
+        for candidate in UPLOADS_DIR.glob(f"{file_uuid}.*"):
+            if candidate.is_file():
+                return candidate
+        if filename_hint:
+            for candidate in UPLOADS_DIR.glob(f"*{Path(filename_hint).name}"):
+                if candidate.is_file():
+                    return candidate
+    return None

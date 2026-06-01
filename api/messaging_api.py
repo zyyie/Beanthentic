@@ -15,8 +15,21 @@ from flask import jsonify, request, session
 import pymysql
 from pymysql.cursors import DictCursor
 
+from config.app_connection import app_db_params, app_server_base, friendly_load_failure, load_error_payload
+from config.phone_utils import normalize_phone as _normalize_phone, phone_variants
+from config.messaging_load import (
+    MessagesLoadError,
+    _ensure_shared_messages_table,
+    connect_messaging_mysql,
+    load_shared_messages,
+    load_shared_messages_thread,
+    load_unread_message_count,
+    send_shared_message,
+)
 from config.models import Message, db
+from config.mysql_app_bridge import connect_app_mysql
 from config.security import safe_error_message
+from pymysql.err import OperationalError
 from config.validation import (
     MESSAGE_BODY_MAX,
     MESSAGE_CATEGORIES,
@@ -36,71 +49,15 @@ from config.utils import (
 
 
 def _shared_db_params() -> dict | None:
-    host = os.getenv("BEANTHENTIC_APP_DB_HOST", "").strip()
-    if not host:
-        cfg = _read_connection_settings()
-        host = str(cfg.get("app_db_host") or "").strip()
-    if not host:
-        return None
-    cfg = _read_connection_settings()
-    return {
-        "host": host,
-        "port": int(os.getenv("BEANTHENTIC_APP_DB_PORT", str(cfg.get("app_db_port") or "3306"))),
-        "user": os.getenv("BEANTHENTIC_APP_DB_USER", str(cfg.get("app_db_user") or "root")),
-        "password": os.getenv("BEANTHENTIC_APP_DB_PASS", str(cfg.get("app_db_pass") or "")),
-        "database": os.getenv("BEANTHENTIC_APP_DB_NAME", str(cfg.get("app_db_name") or "beanthentic_app")),
-        "charset": "utf8mb4",
-        "cursorclass": DictCursor,
-        "autocommit": True,
-    }
-
-
-def _read_connection_settings() -> dict:
-    try:
-        settings_path = Path(__file__).resolve().parents[1] / "settings.json"
-        raw = json.loads(settings_path.read_text(encoding="utf-8"))
-        conn = raw.get("connection")
-        return conn if isinstance(conn, dict) else {}
-    except Exception:
-        return {}
+    """Backward-compatible alias for app_db_params()."""
+    return app_db_params()
 
 
 def _shared_connect():
-    params = _shared_db_params()
+    params = app_db_params()
     if not params:
         return None
-    conn = pymysql.connect(**params)
-    _ensure_shared_messages_table(conn)
-    return conn
-
-
-def _ensure_shared_messages_table(conn) -> None:
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS shared_messages (
-              message_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-              sender_role ENUM('admin','farmer') NOT NULL,
-              sender_phone VARCHAR(32) NOT NULL,
-              sender_name VARCHAR(255) NULL,
-              recipient_role ENUM('admin','farmer') NOT NULL,
-              recipient_phone VARCHAR(32) NOT NULL DEFAULT '',
-              recipient_name VARCHAR(255) NULL,
-              subject VARCHAR(300) NOT NULL,
-              body TEXT NOT NULL,
-              category VARCHAR(30) NOT NULL DEFAULT 'general',
-              farmer_id BIGINT UNSIGNED NULL,
-              is_read TINYINT(1) NOT NULL DEFAULT 0,
-              is_starred TINYINT(1) NOT NULL DEFAULT 0,
-              is_archived TINYINT(1) NOT NULL DEFAULT 0,
-              created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-              read_at DATETIME NULL,
-              INDEX idx_sm_recipient (recipient_role, recipient_phone, is_read, is_archived),
-              INDEX idx_sm_sender (sender_role, sender_phone),
-              INDEX idx_sm_created (created_at)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-            """
-        )
+    return connect_messaging_mysql()
 
 
 def _parse_message_fields(data: dict) -> tuple[dict | None, str | None]:
@@ -126,55 +83,6 @@ def _parse_message_fields(data: dict) -> tuple[dict | None, str | None]:
         "farmer_id": parsed_farmer_id,
         "recipient_phone_raw": (data.get("recipient_phone") or "").strip(),
     }, None
-
-
-def _normalize_phone(raw: str) -> str:
-    s = (raw or "").strip()
-    if not s:
-        return ""
-    digits = re.sub(r"\D+", "", s)
-    if not digits:
-        return ""
-    if digits.startswith("0"):
-        digits = digits[1:]
-    if digits.startswith("63"):
-        digits = digits[2:]
-    if len(digits) == 10 and digits.startswith("9"):
-        return "+63" + digits
-    if s.startswith("+"):
-        return s
-    return s
-
-
-def phone_variants(raw: str) -> list[str]:
-    """All common PH formats for one number (+63, 09…, 639…) — same rules as the mobile app."""
-    out: list[str] = []
-    seen: set[str] = set()
-
-    def add(val: str) -> None:
-        v = (val or "").strip()
-        if not v or v in seen:
-            return
-        seen.add(v)
-        out.append(v)
-
-    add(_normalize_phone(raw))
-    digits = re.sub(r"\D+", "", raw or "")
-    if not digits:
-        return out
-    add(digits)
-    if digits.startswith("0") and len(digits) >= 11:
-        add("+63" + digits[1:])
-        add(digits[1:])
-    if digits.startswith("63") and len(digits) >= 12:
-        add("+63" + digits[2:])
-        add("0" + digits[2:])
-        add(digits[2:])
-    if len(digits) == 10 and digits.startswith("9"):
-        add("+63" + digits)
-        add("0" + digits)
-        add("63" + digits)
-    return out
 
 
 def _normalize_shared_message_row(row: dict) -> dict:
@@ -219,136 +127,38 @@ def register_messaging_routes(app):
         if not (is_authenticated() or is_farmer_authenticated()):
             return jsonify({"error": "Unauthorized"}), 401
 
-        # Shared XAMPP DB mode (2-way with the mobile app)
-        if _shared_db_params():
+        # Shared XAMPP DB (same settings.json as farmers / GI) — MySQL direct or HTTP via app_server_base
+        if app_db_params() or app_server_base():
             role, phone, _name = _shared_identity()
-            folder = request.args.get("folder", "inbox")  # inbox | sent | starred | archived
+            folder = request.args.get("folder", "inbox")  # inbox | sent | starred | archived | all
             search = (request.args.get("search", "") or "").strip().lower()
             category = request.args.get("category", "").strip().lower()
             limit = min(int(request.args.get("limit", "100")), 500)
 
-            conn = None
             try:
-                conn = _shared_connect()
-                with conn.cursor() as cur:
-                    where = []
-                    args = []
-
-                    if folder == "inbox":
-                        if role == "admin":
-                            where.append("recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s) AND is_archived=0")
-                            args.append(phone)
-                        else:
-                            where.append("recipient_role='farmer' AND recipient_phone=%s AND is_archived=0")
-                            args.append(phone)
-                    elif folder == "sent":
-                        where.append("sender_role=%s AND sender_phone=%s")
-                        args.extend([role, phone])
-                    elif folder == "starred":
-                        if role == "admin":
-                            where.append(
-                                "((recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s)) OR (sender_role='admin' AND sender_phone=%s)) AND is_starred=1"
-                            )
-                            args.extend([phone, phone])
-                        else:
-                            where.append(
-                                "((recipient_role='farmer' AND recipient_phone=%s) OR (sender_role='farmer' AND sender_phone=%s)) AND is_starred=1"
-                            )
-                            args.extend([phone, phone])
-                    elif folder == "archived":
-                        if role == "admin":
-                            where.append("recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s) AND is_archived=1")
-                            args.append(phone)
-                        else:
-                            where.append("recipient_role='farmer' AND recipient_phone=%s AND is_archived=1")
-                            args.append(phone)
-                    elif folder == "all":
-                        if role == "admin":
-                            # All farmer↔admin chat rows (matches mobile shared_messages usage)
-                            where.append(
-                                """(
-                                  (recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s))
-                                  OR (sender_role='admin' AND sender_phone=%s)
-                                  OR sender_role='farmer'
-                                )"""
-                            )
-                            args.extend([phone, phone])
-                        else:
-                            where.append("((recipient_role='farmer' AND recipient_phone=%s) OR (sender_role='farmer' AND sender_phone=%s))")
-                            args.extend([phone, phone])
-                    else:
-                        if role == "admin":
-                            where.append("recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s) AND is_archived=0")
-                            args.append(phone)
-                        else:
-                            where.append("recipient_role='farmer' AND recipient_phone=%s AND is_archived=0")
-                            args.append(phone)
-
-                    if category:
-                        where.append("category=%s")
-                        args.append(category)
-
-                    cur.execute(
-                        """
-                        SELECT
-                          message_id AS id,
-                          sender_phone, sender_name,
-                          recipient_phone, recipient_name,
-                          subject, body, category, farmer_id,
-                          is_read, is_starred, is_archived,
-                          created_at, read_at,
-                          sender_role, recipient_role
-                        FROM shared_messages
-                        WHERE """
-                        + " AND ".join(where)
-                        + " ORDER BY created_at DESC, message_id DESC LIMIT %s",
-                        tuple(args + [limit]),
-                    )
-                    items = [_normalize_shared_message_row(m) for m in (cur.fetchall() or [])]
-
-                    if search:
-                        s = search
-                        items = [
-                            m
-                            for m in items
-                            if s in (str(m.get("subject") or "").lower())
-                            or s in (str(m.get("body") or "").lower())
-                            or s in (str(m.get("sender_name") or "").lower())
-                            or s in (str(m.get("recipient_name") or "").lower())
-                        ]
-
-                    # Unread count badge
-                    if role == "admin":
-                        cur.execute(
-                            """
-                            SELECT COUNT(*) AS c
-                            FROM shared_messages
-                            WHERE recipient_role='admin'
-                              AND (recipient_phone='' OR recipient_phone=%s)
-                              AND sender_role='farmer'
-                              AND is_read=0 AND is_archived=0
-                              AND LOWER(category) <> 'announcement'
-                            """,
-                            (phone,),
-                        )
-                    else:
-                        cur.execute(
-                            """
-                            SELECT COUNT(*) AS c
-                            FROM shared_messages
-                            WHERE recipient_role='farmer' AND recipient_phone=%s
-                              AND is_read=0 AND is_archived=0
-                            """,
-                            (phone,),
-                        )
-                    unread_count = int((cur.fetchone() or {}).get("c") or 0)
-
-                return jsonify({"items": items, "unread_count": unread_count})
+                items, unread_count, source = load_shared_messages(
+                    folder=folder,
+                    search=search,
+                    category=category,
+                    limit=limit,
+                    role=role,
+                    phone=phone,
+                )
+                return jsonify({"items": items, "unread_count": unread_count, "source": source, "ok": True})
+            except MessagesLoadError as e:
+                msg = friendly_load_failure(
+                    module_label="messages",
+                    mysql_error=e.mysql_error,
+                    http_error=e.http_error,
+                )
+                return jsonify(load_error_payload("MESSAGES_LOAD_FAILED", msg)), 503
             except Exception as e:
-                return jsonify({"error": "APP_DB_UNREACHABLE", "detail": str(e)}), 503
-            finally:
-                if conn:
-                    conn.close()
+                msg = friendly_load_failure(
+                    module_label="messages",
+                    mysql_error=e if isinstance(e, OperationalError) else None,
+                    http_error=None if isinstance(e, OperationalError) else e,
+                )
+                return jsonify(load_error_payload("MESSAGES_LOAD_FAILED", msg)), 503
 
         user_phone = (get_current_user_phone() or get_current_farmer_phone() or "")
         normalized_user_phone = _normalize_phone(user_phone)
@@ -441,60 +251,24 @@ def register_messaging_routes(app):
         if not variants:
             return jsonify({"error": "phone is required."}), 400
 
-        if _shared_db_params():
-            role, my_phone, _name = _shared_identity()
-            conn = None
+        if app_db_params() or app_server_base():
             try:
-                conn = _shared_connect()
-                ph = ", ".join(["%s"] * len(variants))
-                with conn.cursor() as cur:
-                    # Same thread scope as mobile chat_thread.php
-                    cur.execute(
-                        f"""
-                        SELECT
-                          message_id AS id,
-                          sender_phone, sender_name,
-                          recipient_phone, recipient_name,
-                          subject, body, category, farmer_id,
-                          is_read, is_starred, is_archived,
-                          created_at, read_at,
-                          sender_role, recipient_role
-                        FROM shared_messages
-                        WHERE LOWER(category) <> 'announcement'
-                          AND (
-                            (sender_role='farmer' AND sender_phone IN ({ph}))
-                            OR (recipient_role='farmer' AND recipient_phone IN ({ph}))
-                          )
-                        ORDER BY created_at ASC, message_id ASC
-                        LIMIT 500
-                        """,
-                        tuple(variants + variants),
-                    )
-                    rows = cur.fetchall() or []
-                    if role == "admin":
-                        cur.execute(
-                            f"""
-                            UPDATE shared_messages
-                            SET is_read = 1, read_at = NOW()
-                            WHERE recipient_role = 'admin'
-                              AND (recipient_phone = '' OR recipient_phone = %s)
-                              AND sender_role = 'farmer'
-                              AND sender_phone IN ({ph})
-                              AND is_read = 0
-                              AND LOWER(category) <> 'announcement'
-                            """,
-                            tuple([my_phone] + variants),
-                        )
-                        for row in rows:
-                            if str(row.get("sender_role") or "").lower() == "farmer":
-                                row["is_read"] = 1
-                items = [_normalize_shared_message_row(m) for m in rows]
-                return jsonify({"items": items})
+                items = load_shared_messages_thread(farmer_phone)
+                return jsonify({"items": items, "ok": True})
+            except MessagesLoadError as e:
+                msg = friendly_load_failure(
+                    module_label="message thread",
+                    mysql_error=e.mysql_error,
+                    http_error=e.http_error,
+                )
+                return jsonify(load_error_payload("MESSAGES_THREAD_FAILED", msg)), 503
             except Exception as e:
-                return jsonify({"error": "APP_DB_UNREACHABLE", "detail": str(e)}), 503
-            finally:
-                if conn:
-                    conn.close()
+                msg = friendly_load_failure(
+                    module_label="message thread",
+                    mysql_error=e if isinstance(e, OperationalError) else None,
+                    http_error=None if isinstance(e, OperationalError) else e,
+                )
+                return jsonify(load_error_payload("MESSAGES_THREAD_FAILED", msg)), 503
 
         variant_set = {v.strip() for v in variants if v.strip()}
 
@@ -551,40 +325,34 @@ def register_messaging_routes(app):
                 recipient = users.get(recipient_phone_raw, {})
                 recipient_name = recipient.get("full_name", "")
 
-            conn = None
             try:
-                conn = _shared_connect()
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        INSERT INTO shared_messages
-                          (sender_role, sender_phone, sender_name,
-                           recipient_role, recipient_phone, recipient_name,
-                           subject, body, category, farmer_id,
-                           is_read, is_starred, is_archived)
-                        VALUES
-                          (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, 0, 0)
-                        """,
-                        (
-                            role,
-                            phone,
-                            sender_name,
-                            recipient_role,
-                            recipient_phone,
-                            recipient_name,
-                            subject,
-                            body,
-                            category[:30],
-                            farmer_id,
-                        ),
-                    )
-                    mid = cur.lastrowid
-                return jsonify({"success": True, "message": {"id": int(mid)}}), 201
+                saved = send_shared_message(
+                    role=role,
+                    phone=phone,
+                    sender_name=sender_name,
+                    recipient_role=recipient_role,
+                    recipient_phone=recipient_phone,
+                    recipient_name=recipient_name,
+                    subject=subject,
+                    body=body,
+                    category=category,
+                    farmer_id=farmer_id,
+                )
+                return jsonify({"success": True, "message": _normalize_shared_message_row(saved)}), 201
+            except MessagesLoadError as e:
+                msg = friendly_load_failure(
+                    module_label="message send",
+                    mysql_error=e.mysql_error,
+                    http_error=e.http_error,
+                )
+                return jsonify(load_error_payload("MESSAGE_SEND_FAILED", msg)), 503
             except Exception as e:
-                return jsonify({"error": "APP_DB_UNREACHABLE", "detail": str(e)}), 503
-            finally:
-                if conn:
-                    conn.close()
+                msg = friendly_load_failure(
+                    module_label="message send",
+                    mysql_error=e if isinstance(e, OperationalError) else None,
+                    http_error=None if isinstance(e, OperationalError) else e,
+                )
+                return jsonify(load_error_payload("MESSAGE_SEND_FAILED", msg)), 503
 
         user_phone = (get_current_user_phone() or get_current_farmer_phone() or "")
         users = load_users()
@@ -863,14 +631,12 @@ def register_messaging_routes(app):
                             f"""
                             UPDATE shared_messages
                             SET is_read = 1, read_at = NOW()
-                            WHERE recipient_role = 'admin'
-                              AND (recipient_phone = '' OR recipient_phone = %s)
-                              AND sender_role = 'farmer'
+                            WHERE sender_role = 'farmer'
                               AND sender_phone IN ({ph})
                               AND is_read = 0
                               AND LOWER(category) <> 'announcement'
                             """,
-                            tuple([my_phone] + variants),
+                            tuple(variants),
                         )
                     else:
                         cur.execute(
@@ -1007,42 +773,18 @@ def register_messaging_routes(app):
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
-        if _shared_db_params():
+        if app_db_params() or app_server_base():
             role, phone, _name = _shared_identity()
-            conn = None
             try:
-                conn = _shared_connect()
-                with conn.cursor() as cur:
-                    if role == "admin":
-                        cur.execute(
-                            """
-                            SELECT COUNT(*) AS c
-                            FROM shared_messages
-                            WHERE recipient_role='admin'
-                              AND (recipient_phone='' OR recipient_phone=%s)
-                              AND sender_role='farmer'
-                              AND is_read=0 AND is_archived=0
-                              AND LOWER(category) <> 'announcement'
-                            """,
-                            (phone,),
-                        )
-                    else:
-                        cur.execute(
-                            """
-                            SELECT COUNT(*) AS c
-                            FROM shared_messages
-                            WHERE recipient_role='farmer' AND recipient_phone=%s
-                              AND is_read=0 AND is_archived=0
-                            """,
-                            (phone,),
-                        )
-                    count = int((cur.fetchone() or {}).get("c") or 0)
-                return jsonify({"unread_count": count})
+                unread_count = load_unread_message_count(role=role, phone=phone)
+                return jsonify({"unread_count": unread_count, "ok": True})
             except Exception as e:
-                return jsonify({"error": "APP_DB_UNREACHABLE", "detail": str(e)}), 503
-            finally:
-                if conn:
-                    conn.close()
+                msg = friendly_load_failure(
+                    module_label="messages",
+                    mysql_error=e if isinstance(e, OperationalError) else None,
+                    http_error=None if isinstance(e, OperationalError) else e,
+                )
+                return jsonify(load_error_payload("MESSAGES_LOAD_FAILED", msg)), 503
 
         user_phone = get_current_user_phone() or ""
         count = Message.query.filter(

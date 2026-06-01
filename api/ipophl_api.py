@@ -2,211 +2,281 @@
 IPOPHL document analysis API endpoints for Beanthentic application.
 
 Provides endpoints for IPOPHL document upload, analysis, and retrieval.
+When connected to the app DB, uses SQLAlchemy first and HTTP bridge fallback
+(same pattern as farmer records and messages).
 """
 
 import os
+import threading
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import unquote
+from types import SimpleNamespace
 
 from flask import jsonify, request, send_file
 from werkzeug.utils import secure_filename
 
-from config import ipophl_store
+from config.app_connection import app_db_params, app_server_base
+from config.ipophl_app_bridge import (
+    http_delete_document,
+    http_get_document,
+    http_list_documents,
+    http_upsert_document,
+    upsert_payload_from_model,
+)
+from config.ipophl_store import (
+    analysis_payload_from_record,
+    bootstrap_orphan_uploads,
+    delete_document as delete_json_document,
+    document_to_item,
+    get_document as get_json_document,
+    list_documents as list_json_documents,
+    resolve_file_path,
+    upsert_document as upsert_json_document,
+)
 from config.models import DocumentAnalysis, db
 from config.security import api_error, safe_error_message
 from config.validation import (
-    ALLOWED_UPLOAD_EXTENSIONS,
+    IPOPHL_PHASES,
     MAX_UPLOAD_BYTES,
     validate_enum,
     validate_filename_extension,
-    validate_document_id,
-    IPOPHL_PHASES,
+    validate_uuid_like,
 )
 from config.utils import get_current_user_phone, is_authenticated, log_activity
 
 
-def _analysis_payload_from_result(analysis_result: dict) -> dict:
-    return {
-        "readiness_score": analysis_result.get("readiness_score", 0),
-        "status": analysis_result.get("status", "Not Ready"),
-        "detected_features": analysis_result.get("detected_features", []),
-        "missing_requirements": analysis_result.get("missing_requirements", []),
-        "analysis_method": analysis_result.get("analysis_method", "rule_based"),
-        "text_length": analysis_result.get("text_length", 0),
-        "shap_analysis": analysis_result.get("shap_analysis", ""),
-    }
+def _is_db_error(exc: BaseException) -> bool:
+    text = str(exc).lower()
+    return any(
+        x in text
+        for x in (
+            "mysql",
+            "pymysql",
+            "sqlalchemy",
+            "operationalerror",
+            "access denied",
+            "timed out",
+            "can't connect",
+        )
+    )
 
 
-def _store_record_from_upload(
-    *,
-    file_uuid: str,
-    filename: str,
-    file_path: str,
-    file_ext: str,
-    file_size: int,
-    ipophl_phase: str,
-    task_id: str,
-    analysis_payload: dict,
-    uploaded_by: str = "",
-) -> dict:
-    return {
-        "file_uuid": file_uuid,
-        "original_filename": secure_filename(filename),
-        "file_path": file_path,
-        "file_type": file_ext,
-        "file_size": file_size,
-        "ipophl_phase": ipophl_phase,
-        "task_id": task_id,
-        "uploaded_by": (uploaded_by or "").strip(),
-        "ai_score": analysis_payload["readiness_score"],
-        "ai_status": analysis_payload["status"],
-        "detected_features": analysis_payload["detected_features"],
-        "missing_requirements": analysis_payload["missing_requirements"],
-        "analysis_method": analysis_payload["analysis_method"],
-        "text_length": analysis_payload["text_length"],
-        "shap_analysis": analysis_payload["shap_analysis"],
-    }
+def _persist_document(doc_analysis, *, is_new: bool) -> str:
+    """
+    Save analysis metadata: try app MySQL and HTTP bridge when configured,
+    always mirror to local JSON so ML uploads work when LAN DB is unreachable.
+    """
+    record = upsert_payload_from_model(doc_analysis)
+    upsert_json_document(record)
+
+    sources: list[str] = ["local_json"]
+
+    # Sync to XAMPP in the background so upload does not wait on LAN :8080 timeouts.
+    if app_server_base():
+
+        def _sync_http() -> None:
+            try:
+                http_upsert_document(record, timeout=4)
+            except Exception:
+                pass
+
+        threading.Thread(target=_sync_http, daemon=True).start()
+
+    return "+".join(sources)
 
 
-def _record_visible_to_user(rec: dict, current_user: str) -> bool:
-    """Show own uploads; also show legacy rows so the admin can delete them."""
-    uploaded_by = (rec.get("uploaded_by") or "").strip()
-    if not uploaded_by:
-        return True
-    if not current_user:
-        return True
-    return uploaded_by == current_user
+def _find_document_mysql(file_uuid: str):
+    doc = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
+    if doc:
+        return doc
+    safe_name = secure_filename(file_uuid)
+    return DocumentAnalysis.query.filter(
+        (DocumentAnalysis.original_filename == file_uuid)
+        | (DocumentAnalysis.original_filename == safe_name)
+        | (DocumentAnalysis.original_filename.like(f"{file_uuid}.%"))
+        | (DocumentAnalysis.original_filename.like(f"{safe_name}.%"))
+    ).first()
 
 
-def _resolve_from_disk(file_uuid: str) -> dict | None:
-    from machinelearning.ai_engine import gi_analyzer
+def _doc_record_from_http(data: dict) -> SimpleNamespace:
+    analysis = data.get("analysis") if isinstance(data.get("analysis"), dict) else {}
+    detected = analysis.get("detected_features", [])
+    missing = analysis.get("missing_requirements", [])
+    return SimpleNamespace(
+        file_uuid=data.get("file_uuid", ""),
+        original_filename=data.get("filename") or data.get("original_filename", ""),
+        file_path=data.get("file_path", ""),
+        file_type=data.get("file_type", ""),
+        file_size=int(data.get("file_size") or 0),
+        ipophl_phase=data.get("ipophl_phase", ""),
+        task_id=data.get("task_id", ""),
+        ai_score=int(analysis.get("readiness_score") or 0),
+        ai_status=analysis.get("status", "Not Ready"),
+        detected_features_list=detected if isinstance(detected, list) else [],
+        missing_requirements_list=missing if isinstance(missing, list) else [],
+        analysis_method=analysis.get("analysis_method", "rule_based"),
+        text_length=int(analysis.get("text_length") or 0),
+        shap_analysis=analysis.get("shap_analysis", ""),
+        upload_timestamp=data.get("upload_timestamp"),
+        analysis_timestamp=analysis.get("analysis_timestamp"),
+    )
 
-    if ipophl_store.is_deleted(file_uuid):
-        return None
 
-    for path in gi_analyzer.uploads_dir.iterdir():
-        if not path.is_file() or path.stem != file_uuid:
-            continue
-        if path.suffix.lower() not in ALLOWED_UPLOAD_EXTENSIONS:
-            continue
-        return {
+def _doc_record_from_json(record: dict) -> SimpleNamespace:
+    analysis = analysis_payload_from_record(record)
+    return SimpleNamespace(
+        file_uuid=record.get("file_uuid", ""),
+        original_filename=record.get("original_filename") or record.get("filename", ""),
+        file_path=record.get("file_path", ""),
+        file_type=record.get("file_type", ""),
+        file_size=int(record.get("file_size") or 0),
+        ipophl_phase=record.get("ipophl_phase", ""),
+        task_id=record.get("task_id", ""),
+        ai_score=int(analysis.get("readiness_score") or 0),
+        ai_status=analysis.get("status", "Not Ready"),
+        detected_features_list=analysis.get("detected_features", []),
+        missing_requirements_list=analysis.get("missing_requirements", []),
+        analysis_method=analysis.get("analysis_method", "rule_based"),
+        text_length=int(analysis.get("text_length") or 0),
+        shap_analysis=analysis.get("shap_analysis", ""),
+        upload_timestamp=record.get("upload_timestamp"),
+        analysis_timestamp=analysis.get("analysis_timestamp"),
+    )
+
+
+def _find_document(file_uuid: str):
+    """Local JSON first, then HTTP bridge, then SQLAlchemy (slow when LAN MySQL is down)."""
+    record = get_json_document(file_uuid)
+    if record:
+        return _doc_record_from_json(record), "local_json"
+
+    if app_server_base():
+        try:
+            data = http_get_document(file_uuid, timeout=4)
+            return _doc_record_from_http(data), "app_server_http"
+        except RuntimeError as e:
+            if str(e) != "NOT_FOUND":
+                pass
+
+    if app_db_params():
+        try:
+            doc = _find_document_mysql(file_uuid)
+            if doc:
+                return doc, "app_mysql"
+        except Exception:
+            pass
+
+    path = resolve_file_path(file_uuid)
+    if path and path.exists():
+        return _doc_record_from_json({
             "file_uuid": file_uuid,
             "original_filename": path.name,
             "file_path": path.as_posix(),
-            "file_type": path.suffix.lower(),
+            "file_type": path.suffix,
             "file_size": path.stat().st_size,
-            "task_id": "unknown",
+            "ai_score": 0,
+            "ai_status": "Uploaded - pending review",
+            "detected_features": [],
+            "missing_requirements": [],
+            "analysis_method": "disk_only",
+            "text_length": 0,
+            "shap_analysis": "",
+            "upload_timestamp": datetime.utcnow().isoformat(timespec="seconds"),
+            "analysis_timestamp": datetime.utcnow().isoformat(timespec="seconds"),
             "ipophl_phase": "unknown",
-        }
-    return None
+            "task_id": "unknown",
+        }), "disk_only"
+
+    return None, ""
 
 
-def _resolve_document_record(file_uuid: str) -> dict | None:
-    """Resolve metadata from local JSON store, disk, then MySQL (last — may be slow)."""
-    file_uuid = (file_uuid or "").strip()
-    if not file_uuid:
-        return None
+def _delete_document_record(file_uuid: str) -> None:
+    delete_json_document(file_uuid)
 
-    stored = ipophl_store.get(file_uuid)
-    if stored:
-        return stored
+    if app_db_params():
+        try:
+            doc = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
+            if doc:
+                db.session.delete(doc)
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
 
-    disk = _resolve_from_disk(file_uuid)
-    if disk:
-        return disk
-
-    try:
-        doc = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
-        if doc:
-            return {
-                "file_uuid": doc.file_uuid,
-                "original_filename": doc.original_filename,
-                "file_path": doc.file_path,
-                "file_type": doc.file_type,
-                "file_size": doc.file_size,
-                "ipophl_phase": doc.ipophl_phase,
-                "task_id": doc.task_id,
-                "ai_score": doc.ai_score,
-                "ai_status": doc.ai_status,
-                "detected_features": doc.detected_features_list,
-                "missing_requirements": doc.missing_requirements_list,
-                "analysis_method": doc.analysis_method,
-                "text_length": doc.text_length,
-                "shap_analysis": doc.shap_analysis or "",
-            }
-    except Exception:
-        pass
-
-    return None
+    if app_server_base():
+        try:
+            http_delete_document(file_uuid)
+        except Exception:
+            pass
 
 
-def _resolve_local_record(file_uuid: str) -> dict | None:
-    """Fast path for delete/list — never waits on MySQL."""
-    file_uuid = (file_uuid or "").strip()
-    if not file_uuid:
-        return None
-    stored = ipophl_store.get_raw(file_uuid)
-    if stored:
-        return stored
-    return _resolve_from_disk(file_uuid)
+def _list_documents(phase: str | None, task_id: str | None, limit: int) -> tuple[list[dict], str]:
+    bootstrap_orphan_uploads(limit=limit)
+    items = [document_to_item(record) for record in list_json_documents(phase=phase, task_id=task_id, limit=limit)]
+    if items:
+        return items, "local_json"
 
+    if app_server_base():
+        try:
+            remote = http_list_documents(phase=phase, task_id=task_id, limit=limit, timeout=4)
+            if remote:
+                return remote, "app_server_http"
+        except Exception:
+            pass
 
-def _remove_ipo_files_from_disk(file_uuid: str, record: dict | None = None) -> int:
-    from machinelearning.ai_engine import gi_analyzer
-
-    removed = 0
-    if record:
-        file_path = record.get("file_path")
-        if file_path:
-            path = Path(file_path)
-            if path.is_file():
-                path.unlink(missing_ok=True)
-                removed += 1
-
-    for path in gi_analyzer.uploads_dir.glob(f"{file_uuid}.*"):
-        if path.is_file():
-            path.unlink(missing_ok=True)
-            removed += 1
-    return removed
-
-
-def _bootstrap_disk_uploads() -> None:
-    """Index files already on disk into the local JSON store (e.g. after DB outage)."""
-    from machinelearning.ai_engine import gi_analyzer
-
-    known = {r.get("file_uuid") for r in ipophl_store.list_all()}
-    for path in gi_analyzer.uploads_dir.iterdir():
-        if not path.is_file():
-            continue
-        if path.suffix.lower() not in ALLOWED_UPLOAD_EXTENSIONS:
-            continue
-        file_uuid = path.stem
-        if file_uuid in known or ipophl_store.is_deleted(file_uuid):
-            continue
-        result = gi_analyzer.analyze_document(str(path), task_id="phase1-product")
-        if not result.get("success"):
-            continue
-        payload = _analysis_payload_from_result(result)
-        ipophl_store.upsert(
-            _store_record_from_upload(
-                file_uuid=file_uuid,
-                filename=path.name,
-                file_path=path.as_posix(),
-                file_ext=path.suffix.lower(),
-                file_size=path.stat().st_size,
-                ipophl_phase="phase1",
-                task_id="phase1-product",
-                analysis_payload=payload,
+    if app_db_params():
+        try:
+            query = DocumentAnalysis.query
+            if phase:
+                query = query.filter(DocumentAnalysis.ipophl_phase == phase)
+            if task_id:
+                query = query.filter(DocumentAnalysis.task_id == task_id)
+            documents = (
+                query.order_by(DocumentAnalysis.upload_timestamp.desc()).limit(limit).all()
             )
-        )
+            if documents:
+                items = [
+                    {
+                        "file_uuid": doc.file_uuid,
+                        "filename": doc.original_filename,
+                        "file_type": doc.file_type,
+                        "file_size": doc.file_size,
+                        "upload_timestamp": doc.upload_timestamp.isoformat(),
+                        "ai_score": doc.ai_score,
+                        "ai_status": doc.ai_status,
+                        "ipophl_phase": doc.ipophl_phase,
+                        "task_id": doc.task_id,
+                    }
+                    for doc in documents
+                ]
+                return items, "app_mysql"
+        except Exception:
+            pass
+
+    return [], "local_json"
+
+
+def _analysis_response(doc) -> dict:
+    return {
+        "readiness_score": doc.ai_score,
+        "status": doc.ai_status,
+        "detected_features": doc.detected_features_list,
+        "missing_requirements": doc.missing_requirements_list,
+        "analysis_method": doc.analysis_method,
+        "text_length": doc.text_length,
+        "shap_analysis": doc.shap_analysis,
+        "analysis_timestamp": (
+            doc.analysis_timestamp.isoformat()
+            if hasattr(doc.analysis_timestamp, "isoformat") and doc.analysis_timestamp
+            else doc.analysis_timestamp
+        ),
+    }
 
 
 def register_ipophl_routes(app):
     """Register IPOPHL document analysis routes with the Flask app."""
 
     def _guard_uuid(file_uuid: str):
-        ok, err = validate_document_id(file_uuid)
+        ok, err = validate_uuid_like(file_uuid)
         if not ok:
             return api_error(err, 400)
         return None
@@ -221,26 +291,31 @@ def register_ipophl_routes(app):
             return guard
 
         try:
-            # Find document record
-            doc_analysis = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
+            doc_analysis, source = _find_document(file_uuid)
             if not doc_analysis:
                 return jsonify({"error": "File not found"}), 404
 
-            # Check if file exists
-            file_path = Path(doc_analysis.file_path)
-            if not file_path.exists():
-                return jsonify({"error": "File not found on disk"}), 404
+            file_path = Path(doc_analysis.file_path) if doc_analysis.file_path else None
+            if not file_path or not file_path.exists():
+                resolved = resolve_file_path(file_uuid, filename_hint=getattr(doc_analysis, "original_filename", None))
+                if not resolved:
+                    return jsonify({"error": "File not found on disk"}), 404
+                file_path = resolved
 
-            # Return file info and preview URL
+            upload_ts = doc_analysis.upload_timestamp
+            if hasattr(upload_ts, "isoformat"):
+                upload_ts = upload_ts.isoformat()
+
             return jsonify({
                 "success": True,
+                "source": source,
                 "file_info": {
                     "filename": doc_analysis.original_filename,
                     "file_type": doc_analysis.file_type,
                     "file_size": doc_analysis.file_size,
-                    "upload_timestamp": doc_analysis.upload_timestamp.isoformat(),
+                    "upload_timestamp": upload_ts,
                     "ipophl_phase": doc_analysis.ipophl_phase,
-                    "task_id": doc_analysis.task_id
+                    "task_id": doc_analysis.task_id,
                 },
                 "preview_url": f"/api/file-preview/{file_uuid}{doc_analysis.file_type}",
                 "analysis": {
@@ -248,11 +323,13 @@ def register_ipophl_routes(app):
                     "ai_status": doc_analysis.ai_status,
                     "detected_features": doc_analysis.detected_features_list,
                     "missing_requirements": doc_analysis.missing_requirements_list,
-                    "shap_analysis": doc_analysis.shap_analysis
-                }
+                    "shap_analysis": doc_analysis.shap_analysis,
+                },
             })
 
         except Exception as e:
+            if _is_db_error(e):
+                return jsonify({"error": safe_error_message(e)}), 503
             return jsonify({"error": safe_error_message(e, public="Preview failed.")}), 500
 
     @app.route("/api/ipo-analyze", methods=["POST"])
@@ -262,16 +339,20 @@ def register_ipophl_routes(app):
             return jsonify({"error": "Unauthorized"}), 401
 
         try:
-            # Import AI engine
             from machinelearning.ai_engine import gi_analyzer
 
-            # Check if file was uploaded
-            if 'file' not in request.files:
+            if "file" not in request.files:
                 return jsonify({"error": "No file provided"}), 400
 
-            file = request.files['file']
-            if file.filename == '':
+            file = request.files["file"]
+            if file.filename == "":
                 return jsonify({"error": "No file selected"}), 400
+
+            if request.content_length and request.content_length > MAX_UPLOAD_BYTES:
+                return api_error(
+                    f"File too large. Maximum size is {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
+                    400,
+                )
 
             ok_name, name_err, file_ext = validate_filename_extension(file.filename)
             if not ok_name:
@@ -285,228 +366,157 @@ def register_ipophl_routes(app):
             raw_path = gi_analyzer.save_uploaded_file(file, file.filename)
             file_path_obj = Path(raw_path)
             file_path = file_path_obj.as_posix()
-            file_size = file_path_obj.stat().st_size
-            max_mb = MAX_UPLOAD_BYTES // (1024 * 1024)
-            if file_size > MAX_UPLOAD_BYTES:
-                try:
-                    file_path_obj.unlink(missing_ok=True)
-                except OSError:
-                    pass
-                return api_error(f"File too large. Maximum size is {max_mb} MB.", 400)
 
             analysis_result = gi_analyzer.analyze_document(str(file_path_obj), task_id=task_id)
 
-            if not analysis_result.get('success', False):
-                return jsonify({
-                    "success": False,
-                    "error": analysis_result.get('error', 'Analysis failed'),
-                    "message": analysis_result.get('error', 'Analysis failed'),
-                }), 500
+            if not analysis_result.get("success", False):
+                return jsonify({"error": analysis_result.get("error", "Analysis failed")}), 500
 
             file_uuid = file_path_obj.stem
-            analysis_payload = _analysis_payload_from_result(analysis_result)
-            user_phone = (get_current_user_phone() or "").strip()
-
-            ipophl_store.upsert(
-                _store_record_from_upload(
+            existing_record = get_json_document(file_uuid)
+            existing_analysis = None
+            if existing_record:
+                existing_analysis = DocumentAnalysis(
                     file_uuid=file_uuid,
-                    filename=file.filename,
+                    original_filename=existing_record.get("original_filename") or secure_filename(file.filename),
+                    file_path=existing_record.get("file_path") or file_path,
+                    file_type=existing_record.get("file_type") or file_ext,
+                    file_size=int(existing_record.get("file_size") or os.path.getsize(str(file_path_obj))),
+                    ipophl_phase=existing_record.get("ipophl_phase") or ipophl_phase,
+                    task_id=existing_record.get("task_id") or task_id,
+                )
+                existing_analysis.ai_score = int(existing_record.get("ai_score") or 0)
+                existing_analysis.ai_status = existing_record.get("ai_status") or "Not Ready"
+
+            if existing_analysis:
+                doc_analysis = existing_analysis
+            else:
+                doc_analysis = DocumentAnalysis(
+                    file_uuid=file_uuid,
+                    original_filename=secure_filename(file.filename),
                     file_path=file_path,
-                    file_ext=file_ext,
-                    file_size=file_size,
+                    file_type=file_ext,
+                    file_size=os.path.getsize(str(file_path_obj)),
                     ipophl_phase=ipophl_phase,
                     task_id=task_id,
-                    analysis_payload=analysis_payload,
-                    uploaded_by=user_phone,
-                )
-            )
-
-            db_saved = False
-            db_warning = None
-            try:
-                existing_analysis = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
-                if existing_analysis:
-                    doc_analysis = existing_analysis
-                else:
-                    doc_analysis = DocumentAnalysis(
-                        file_uuid=file_uuid,
-                        original_filename=secure_filename(file.filename),
-                        file_path=file_path,
-                        file_type=file_ext,
-                        file_size=file_size,
-                        ipophl_phase=ipophl_phase,
-                        task_id=task_id,
-                    )
-
-                doc_analysis.ai_score = analysis_payload["readiness_score"]
-                doc_analysis.ai_status = analysis_payload["status"]
-                doc_analysis.set_detected_features(analysis_payload["detected_features"])
-                doc_analysis.set_missing_requirements(analysis_payload["missing_requirements"])
-                doc_analysis.analysis_method = analysis_payload["analysis_method"]
-                doc_analysis.text_length = analysis_payload["text_length"]
-                doc_analysis.shap_analysis = analysis_payload["shap_analysis"]
-                doc_analysis.analysis_timestamp = datetime.utcnow()
-
-                if existing_analysis:
-                    db.session.commit()
-                else:
-                    db.session.add(doc_analysis)
-                    db.session.commit()
-
-                db_saved = True
-            except Exception as db_exc:
-                db.session.rollback()
-                db_warning = safe_error_message(
-                    db_exc,
-                    public="Analysis finished but could not be saved to the database. Check connection settings in settings.json.",
                 )
 
-            if db_saved:
-                try:
-                    log_activity(
-                        user_phone,
-                        "IPOPHL_DOCUMENT_ANALYZED",
-                        f"Analyzed {file.filename} - Score: {analysis_payload['readiness_score']}%",
-                        request.remote_addr,
-                    )
-                except Exception:
-                    pass
+            doc_analysis.ai_score = analysis_result.get("readiness_score", 0)
+            doc_analysis.ai_status = analysis_result.get("status", "Not Ready")
+            doc_analysis.set_detected_features(analysis_result.get("detected_features", []))
+            doc_analysis.set_missing_requirements(analysis_result.get("missing_requirements", []))
+            doc_analysis.analysis_method = analysis_result.get("analysis_method", "rule_based")
+            doc_analysis.text_length = analysis_result.get("text_length", 0)
+            doc_analysis.shap_analysis = analysis_result.get("shap_analysis", "")
+            doc_analysis.analysis_timestamp = datetime.utcnow()
 
-            response_body = {
-                "success": True,
-                "file_uuid": file_uuid,
-                "filename": file.filename,
-                "file_size": file_size,
-                "analysis": analysis_payload,
-                "preview_url": gi_analyzer.get_file_preview_url(file_path),
-                "ipophl_phase": ipophl_phase,
-                "task_id": task_id,
-                "db_saved": db_saved,
-            }
-            if db_warning:
-                response_body["warning"] = db_warning
-            return jsonify(response_body)
-
-        except Exception as e:
-            return jsonify({"error": safe_error_message(e, public="Analysis failed.")}), 500
-
-    def _delete_ipo_document(file_uuid: str):
-        file_uuid = unquote((file_uuid or "").strip())
-        guard = _guard_uuid(file_uuid)
-        if guard:
-            return guard
-
-        try:
-            record = _resolve_local_record(file_uuid)
-            removed = _remove_ipo_files_from_disk(file_uuid, record)
-            ipophl_store.purge(file_uuid)
-
-            # Best-effort DB cleanup — must not block delete when MySQL is offline
-            try:
-                doc_analysis = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
-                if doc_analysis:
-                    db.session.delete(doc_analysis)
-                    db.session.commit()
-            except Exception:
-                db.session.rollback()
+            source = _persist_document(doc_analysis, is_new=existing_analysis is None)
 
             try:
+                user_phone = get_current_user_phone()
                 log_activity(
-                    get_current_user_phone(),
-                    "IPOPHL_DOCUMENT_DELETED",
-                    f"Deleted {record.get('original_filename', file_uuid) if record else file_uuid}",
+                    user_phone,
+                    "IPOPHL_DOCUMENT_ANALYZED",
+                    f"Analyzed {file.filename} - Score: {doc_analysis.ai_score}%",
                     request.remote_addr,
                 )
             except Exception:
                 pass
 
-            return jsonify({"success": True, "removed": removed})
+            return jsonify({
+                "success": True,
+                "file_uuid": file_uuid,
+                "filename": file.filename,
+                "source": source,
+                "analysis": _analysis_response(doc_analysis),
+                "preview_url": gi_analyzer.get_file_preview_url(file_path),
+                "ipophl_phase": ipophl_phase,
+                "task_id": task_id,
+            })
 
         except Exception as e:
-            return jsonify({
-                "success": False,
-                "error": safe_error_message(e, public="Deletion failed."),
-                "message": safe_error_message(e, public="Deletion failed."),
-            }), 500
+            return jsonify({"error": safe_error_message(e, public="Analysis failed.")}), 500
 
-    @app.route("/api/ipo-purge-legacy", methods=["POST"])
-    def api_purge_legacy_ipo_documents():
-        """Remove auto-imported / legacy files (no uploaded_by) from disk and indexes."""
-        if not is_authenticated():
-            return jsonify({"error": "Unauthorized"}), 401
-
-        removed = 0
-        for rec in list(ipophl_store.list_all()):
-            if (rec.get("uploaded_by") or "").strip():
-                continue
-            file_uuid = str(rec.get("file_uuid") or "").strip()
-            if not file_uuid:
-                continue
-            _remove_ipo_files_from_disk(file_uuid, rec)
-            ipophl_store.purge(file_uuid)
-            removed += 1
-
-        return jsonify({"success": True, "removed": removed})
-
-    @app.route("/api/ipo-delete", methods=["POST", "GET"])
-    def api_delete_ipo_file_post():
-        """Delete an IPOPHL document (JSON body or ?file_uuid= query)."""
-        if not is_authenticated():
-            return jsonify({"error": "Unauthorized", "message": "Unauthorized"}), 401
-        if request.method == "GET":
-            file_uuid = request.args.get("file_uuid", "")
-        else:
-            payload = request.get_json(silent=True) or {}
-            file_uuid = payload.get("file_uuid") or request.form.get("file_uuid") or ""
-        return _delete_ipo_document(file_uuid)
-
-    @app.route("/api/ipo-delete/<path:file_uuid>", methods=["DELETE"])
+    @app.route("/api/ipo-delete/<file_uuid>", methods=["DELETE"])
     def api_delete_ipo_file(file_uuid):
-        """Delete an IPOPHL document by id in the URL path."""
+        """Delete an IPOPHL document."""
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
-        return _delete_ipo_document(file_uuid)
+        guard = _guard_uuid(file_uuid)
+        if guard:
+            return guard
 
-    @app.route("/api/file-preview/<path:filename>")
+        try:
+            doc_analysis, _source = _find_document(file_uuid)
+            if not doc_analysis:
+                return jsonify({"error": "Document not found"}), 404
+
+            file_path = doc_analysis.file_path
+            if file_path and os.path.exists(file_path):
+                os.remove(file_path)
+
+            _delete_document_record(file_uuid)
+
+            try:
+                user_phone = get_current_user_phone()
+                log_activity(
+                    user_phone,
+                    "IPOPHL_DOCUMENT_DELETED",
+                    f"Deleted {doc_analysis.original_filename}",
+                    request.remote_addr,
+                )
+            except Exception:
+                pass
+
+            return jsonify({"success": True})
+
+        except Exception as e:
+            return jsonify({"error": safe_error_message(e, public="Deletion failed.")}), 500
+
+    @app.route("/api/file-preview/<filename>")
     def api_file_preview(filename):
         """Serve file for preview."""
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
-        basename = unquote((filename or "").replace("\\", "/").split("/")[-1])
-        if not basename or ".." in basename:
+        safe_name = secure_filename(filename)
+        if not safe_name or safe_name != filename.replace("\\", "/").split("/")[-1]:
             return jsonify({"error": "Invalid file name."}), 400
 
         try:
-            file_uuid = basename.rsplit(".", 1)[0] if "." in basename else basename
-            ok_uuid, uuid_err = validate_document_id(file_uuid)
+            file_uuid = safe_name.rsplit(".", 1)[0] if "." in safe_name else safe_name
+            ok_uuid, uuid_err = validate_uuid_like(file_uuid)
             if not ok_uuid:
                 return jsonify({"error": uuid_err}), 400
 
-            record = _resolve_document_record(file_uuid)
-            if not record:
+            doc_analysis, _source = _find_document(file_uuid)
+            if not doc_analysis:
                 return jsonify({"error": "File not found"}), 404
 
-            file_path = Path(record["file_path"])
-            if not file_path.exists():
-                return jsonify({"error": "File not found on disk"}), 404
+            file_path = Path(doc_analysis.file_path) if doc_analysis.file_path else None
+            if not file_path or not file_path.exists():
+                resolved = resolve_file_path(file_uuid, filename_hint=safe_name)
+                if not resolved:
+                    return jsonify({"error": "File not found on disk"}), 404
+                file_path = resolved
 
-            # Determine mimetype for better browser preview
             mimetype = None
             suffix = file_path.suffix.lower()
-            if suffix == '.pdf':
-                mimetype = 'application/pdf'
-            elif suffix == '.csv':
-                mimetype = 'text/plain'
-            elif suffix in ['.doc', '.docx']:
-                mimetype = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            if suffix == ".pdf":
+                mimetype = "application/pdf"
+            elif suffix == ".csv":
+                mimetype = "text/plain"
+            elif suffix in [".doc", ".docx"]:
+                mimetype = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
             return send_file(str(file_path), as_attachment=False, mimetype=mimetype)
 
         except Exception as e:
+            if _is_db_error(e):
+                return jsonify({"error": safe_error_message(e)}), 503
             return jsonify({"error": safe_error_message(e, public="Preview failed.")}), 500
 
-    @app.route("/api/ipo-analysis/<path:file_uuid>", methods=["GET"])
+    @app.route("/api/ipo-analysis/<file_uuid>", methods=["GET"])
     def api_get_ipo_analysis(file_uuid):
         """Get analysis results for a specific document."""
         if not is_authenticated():
@@ -516,35 +526,23 @@ def register_ipophl_routes(app):
             return guard
 
         try:
-            record = _resolve_document_record(file_uuid)
-            if not record:
+            doc_analysis, source = _find_document(file_uuid)
+            if not doc_analysis:
                 return jsonify({"error": "Document not found"}), 404
-
-            from machinelearning.ai_engine import gi_analyzer
-
-            file_path = record.get("file_path") or ""
-            preview_url = gi_analyzer.get_file_preview_url(file_path) if file_path else ""
 
             return jsonify({
                 "success": True,
-                "file_uuid": record["file_uuid"],
-                "filename": record.get("original_filename"),
-                "preview_url": preview_url,
-                "analysis": {
-                    "readiness_score": record.get("ai_score", 0),
-                    "status": record.get("ai_status", "Not Ready"),
-                    "detected_features": record.get("detected_features") or [],
-                    "missing_requirements": record.get("missing_requirements") or [],
-                    "analysis_method": record.get("analysis_method", "rule_based"),
-                    "text_length": record.get("text_length", 0),
-                    "shap_analysis": record.get("shap_analysis", ""),
-                    "analysis_timestamp": record.get("updated_at"),
-                },
-                "ipophl_phase": record.get("ipophl_phase"),
-                "task_id": record.get("task_id"),
+                "source": source,
+                "file_uuid": doc_analysis.file_uuid,
+                "filename": doc_analysis.original_filename,
+                "analysis": _analysis_response(doc_analysis),
+                "ipophl_phase": doc_analysis.ipophl_phase,
+                "task_id": doc_analysis.task_id,
             })
 
         except Exception as e:
+            if _is_db_error(e):
+                return jsonify({"error": safe_error_message(e)}), 503
             return jsonify({"error": safe_error_message(e, public="Failed to retrieve analysis.")}), 500
 
     @app.route("/api/ipo-analysis/<file_uuid>", methods=["POST"])
@@ -557,20 +555,7 @@ def register_ipophl_routes(app):
             return guard
 
         try:
-            # Try to find by UUID first
-            doc_analysis = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
-            
-            # Fallback: Try to find by original filename if file_uuid looks like a filename
-            if not doc_analysis:
-                from werkzeug.utils import secure_filename
-                safe_name = secure_filename(file_uuid)
-                doc_analysis = DocumentAnalysis.query.filter(
-                    (DocumentAnalysis.original_filename == file_uuid) | 
-                    (DocumentAnalysis.original_filename == safe_name) |
-                    (DocumentAnalysis.original_filename.like(f"{file_uuid}.%")) |
-                    (DocumentAnalysis.original_filename.like(f"{safe_name}.%"))
-                ).first()
-
+            doc_analysis, _source = _find_document(file_uuid)
             if not doc_analysis:
                 return jsonify({"error": "Document not found"}), 404
 
@@ -583,41 +568,59 @@ def register_ipophl_routes(app):
 
             from machinelearning.ai_engine import gi_analyzer
 
-            result = gi_analyzer.analyze_document(doc_analysis.file_path, task_id=doc_analysis.task_id)
-            if result.get("success"):
-                doc_analysis.ai_score = result["readiness_score"]
-                doc_analysis.ai_status = result["status"]
-                doc_analysis.set_detected_features(result["detected_features"])
-                doc_analysis.set_missing_requirements(result["missing_requirements"])
-                doc_analysis.analysis_method = result["analysis_method"]
-                doc_analysis.text_length = result["text_length"]
-                doc_analysis.shap_analysis = result.get("shap_analysis", "")
-            else:
+            file_path = doc_analysis.file_path
+            path_obj = Path(file_path) if file_path else None
+            if not path_obj or not path_obj.exists():
+                resolved = resolve_file_path(file_uuid, filename_hint=getattr(doc_analysis, "original_filename", None))
+                if not resolved:
+                    return jsonify({"error": "File not found on disk"}), 404
+                path_obj = resolved
+                file_path = path_obj.as_posix()
+
+            result = gi_analyzer.analyze_document(str(path_obj), task_id=doc_analysis.task_id)
+            if not result.get("success"):
                 return jsonify({"error": "Re-analysis failed."}), 500
 
-            doc_analysis.analysis_timestamp = datetime.utcnow()
-            db.session.commit()
+            if not isinstance(doc_analysis, DocumentAnalysis):
+                doc_analysis = DocumentAnalysis(
+                    file_uuid=file_uuid,
+                    original_filename=doc_analysis.original_filename,
+                    file_path=file_path,
+                    file_type=doc_analysis.file_type,
+                    file_size=doc_analysis.file_size,
+                    ipophl_phase=doc_analysis.ipophl_phase,
+                    task_id=doc_analysis.task_id,
+                )
 
-            # Log activity
-            user_phone = get_current_user_phone()
-            log_activity(user_phone, "IPOPHL_DOCUMENT_UPDATED",
-                        f"Updated analysis for {doc_analysis.original_filename}",
-                        request.remote_addr)
+            doc_analysis.ai_score = result["readiness_score"]
+            doc_analysis.ai_status = result["status"]
+            doc_analysis.set_detected_features(result["detected_features"])
+            doc_analysis.set_missing_requirements(result["missing_requirements"])
+            doc_analysis.analysis_method = result["analysis_method"]
+            doc_analysis.text_length = result["text_length"]
+            doc_analysis.shap_analysis = result.get("shap_analysis", "")
+            doc_analysis.analysis_timestamp = datetime.utcnow()
+            _persist_document(doc_analysis, is_new=False)
+
+            try:
+                user_phone = get_current_user_phone()
+                log_activity(
+                    user_phone,
+                    "IPOPHL_DOCUMENT_UPDATED",
+                    f"Updated analysis for {doc_analysis.original_filename}",
+                    request.remote_addr,
+                )
+            except Exception:
+                pass
 
             return jsonify({
                 "success": True,
-                "analysis": {
-                    "readiness_score": doc_analysis.ai_score,
-                    "status": doc_analysis.ai_status,
-                    "detected_features": doc_analysis.detected_features_list,
-                    "missing_requirements": doc_analysis.missing_requirements_list,
-                    "analysis_method": doc_analysis.analysis_method,
-                    "text_length": doc_analysis.text_length,
-                    "shap_analysis": doc_analysis.shap_analysis
-                }
+                "analysis": _analysis_response(doc_analysis),
             })
 
         except Exception as e:
+            if _is_db_error(e):
+                return jsonify({"error": safe_error_message(e)}), 503
             return jsonify({"error": safe_error_message(e, public="Failed to update analysis.")}), 500
 
     @app.route("/api/ipo-documents", methods=["GET"])
@@ -631,47 +634,8 @@ def register_ipophl_routes(app):
             task_id = request.args.get("task_id")
             limit = min(max(request.args.get("limit", 50, type=int) or 50, 1), 200)
 
-            if request.args.get("recover_disk") == "1":
-                _bootstrap_disk_uploads()
-
-            current_user = (get_current_user_phone() or "").strip()
-            merged: dict[str, dict] = {}
-            for rec in ipophl_store.list_all(phase=phase, task_id=task_id):
-                file_uuid = str(rec.get("file_uuid") or "").strip()
-                if not file_uuid or ipophl_store.is_deleted(file_uuid):
-                    continue
-                if not _record_visible_to_user(rec, current_user):
-                    continue
-                file_path = rec.get("file_path")
-                if file_path and not Path(file_path).is_file():
-                    ipophl_store.purge(file_uuid)
-                    continue
-                merged[file_uuid] = ipophl_store.to_list_item(rec)
-
-            try:
-                query = DocumentAnalysis.query
-                if phase:
-                    query = query.filter(DocumentAnalysis.ipophl_phase == phase)
-                if task_id:
-                    query = query.filter(DocumentAnalysis.task_id == task_id)
-                documents = query.order_by(DocumentAnalysis.upload_timestamp.desc()).limit(limit).all()
-                for doc in documents:
-                    if ipophl_store.is_deleted(doc.file_uuid):
-                        continue
-                    stored = ipophl_store.get(doc.file_uuid)
-                    if not stored or not _record_visible_to_user(stored, current_user):
-                        continue
-                    merged[doc.file_uuid] = ipophl_store.to_list_item(stored)
-            except Exception:
-                pass
-
-            items = sorted(
-                merged.values(),
-                key=lambda row: row.get("upload_timestamp") or "",
-                reverse=True,
-            )[:limit]
-
-            return jsonify({"items": items, "count": len(items)})
+            items, source = _list_documents(phase, task_id, limit)
+            return jsonify({"items": items, "count": len(items), "source": source})
 
         except Exception as e:
             return jsonify({"error": safe_error_message(e, public="Failed to list documents.")}), 500

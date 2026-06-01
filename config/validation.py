@@ -30,13 +30,10 @@ FARMER_ACCOUNT_ACTIONS = frozenset({"warning", "suspend", "unsuspend"})
 MESSAGE_CATEGORIES = frozenset({"general", "farmer-update", "farmers", "announcement", "reminder"})
 PAYMENT_METHODS = frozenset({"cash", "bank", "gcash", "maya", "check", "other", ""})
 IPOPHL_PHASES = frozenset({"unknown", "phase1", "phase2", "phase3", "registration", "application"})
-ALLOWED_UPLOAD_EXTENSIONS = frozenset({
-    ".pdf", ".doc", ".docx", ".txt", ".md", ".csv",
-    ".jpg", ".jpeg", ".png", ".webp", ".gif",
-})
+ALLOWED_UPLOAD_EXTENSIONS = frozenset({".pdf", ".doc", ".docx", ".txt", ".md", ".csv"})
 ALLOWED_PROFILE_PHOTO_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".gif"})
 PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024
-MAX_UPLOAD_BYTES = 30 * 1024 * 1024  # 30 MB (GI PDFs can be large)
+MAX_UPLOAD_BYTES = 15 * 1024 * 1024  # 15 MB
 
 
 def validate_phone(phone: str) -> tuple[bool, str, str]:
@@ -232,17 +229,9 @@ def validate_filename_extension(
 
 
 def validate_uuid_like(value: str) -> tuple[bool, str]:
-    """Backward-compatible alias; IPOPHL ids may include underscores and spaces."""
-    return validate_document_id(value)
-
-
-def validate_document_id(value: str) -> tuple[bool, str]:
-    """Validate IPOPHL document ids (UUIDs or disk-bootstrap stems)."""
     s = (value or "").strip()
-    if not s or len(s) > 128:
-        return False, "Invalid document identifier."
-    if not re.match(r"^[A-Za-z0-9_\-. ()]+$", s):
-        return False, "Invalid document identifier format."
-    if ".." in s or "/" in s or "\\" in s:
-        return False, "Invalid document identifier format."
+    if not s or len(s) > 64:
+        return False, "Invalid identifier."
+    if not re.match(r"^[A-Za-z0-9\-]+$", s):
+        return False, "Invalid identifier format."
     return True, ""

@@ -24,5 +24,9 @@
   "9296476200": {
     "full_name": "Eliaza Mae Malibiran",
     "password_hash": "scrypt:32768:8:1$XaCyuE9PxDXlud5F$6bf78e841626f9689182a38a1b42d87b08762d1f88753d92c7e4132b19d146d55bba21698ccd326bf495713d2ca00eb10d72c45d41d501744c8f3abd129c236a"
+  },
+  "9930152544": {
+    "full_name": "Eliaza Mae Malibiran",
+    "password_hash": "scrypt:32768:8:1$j1xKDmX5IM9xX64T$b27c999b4ee8d077811d549387c4e2971601f8b512f0df9fb45a310d8b9c9362e935581a6bf873457908b39eba816c9aee2fc8f23bb727a48611220a14a3f7f5"
   }
 }

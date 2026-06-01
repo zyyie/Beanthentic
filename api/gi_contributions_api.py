@@ -5,10 +5,12 @@ GI Farmer contributions — mobile app (gi_updates) ↔ admin Farmer's Contribut
 from __future__ import annotations
 
 import json
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
-
+import mimetypes
+import uuid
+from datetime import datetime
+from pathlib import Path
 from flask import jsonify, request
+from werkzeug.utils import secure_filename
 
 from config.app_connection import (
     GI_UPLOAD_STATUSES,
@@ -16,10 +18,119 @@ from config.app_connection import (
     app_server_base,
     clamp_limit,
     friendly_load_failure,
+    is_loopback_host,
+    iter_app_server_bases,
     load_error_payload,
+    read_connection_settings,
 )
+from config.app_http_bridge import app_http_delete_json, app_http_get_json, app_http_patch_json, app_http_post_multipart
 from config.mysql_app_bridge import connect_app_mysql
 from config.utils import is_authenticated
+
+GI_CONTRIB_UPLOAD_DIR = Path(__file__).resolve().parents[1] / "uploads" / "gi_contributions"
+GI_ALLOWED_EXTENSIONS = frozenset(
+    {".pdf", ".doc", ".docx", ".txt", ".md", ".csv", ".jpg", ".jpeg", ".png", ".gif", ".webp"}
+)
+GI_MAX_FILE_BYTES = 15 * 1024 * 1024
+GI_MAX_FILES = 5
+
+
+def _gi_http_bases() -> list[str]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    def add(url: str | None) -> None:
+        base = (url or "").strip().rstrip("/")
+        if base and base not in seen:
+            seen.add(base)
+            ordered.append(base)
+
+    try:
+        settings_path = Path(__file__).resolve().parents[1] / "settings.json"
+        root = json.loads(settings_path.read_text(encoding="utf-8"))
+        if not isinstance(root, dict):
+            root = {}
+    except Exception:
+        root = {}
+    sms = root.get("sms") if isinstance(root.get("sms"), dict) else {}
+    gw = sms.get("sms_gateway") if isinstance(sms.get("sms_gateway"), dict) else {}
+    add(str(gw.get("local_base_url") or ""))
+    conn = root.get("connection") if isinstance(root.get("connection"), dict) else {}
+    add(str(conn.get("app_server_base") or ""))
+    for base in iter_app_server_bases():
+        add(base)
+    return ordered
+
+
+def _prefer_http_for_gi_send() -> bool:
+    params = app_db_params()
+    if not params:
+        return bool(_gi_http_bases())
+    host = str(params.get("host") or "").strip()
+    if is_loopback_host(host):
+        return False
+    return bool(_gi_http_bases())
+
+
+def _upload_files_for_http(uploads) -> list[tuple[str, str, bytes, str | None]]:
+    out: list[tuple[str, str, bytes, str | None]] = []
+    for upload in uploads[:GI_MAX_FILES]:
+        if not upload or not getattr(upload, "filename", None):
+            continue
+        original = secure_filename(upload.filename)
+        if not original:
+            continue
+        ext = Path(original).suffix.lower()
+        if ext not in GI_ALLOWED_EXTENSIONS:
+            continue
+        upload.seek(0, 2)
+        size = upload.tell()
+        upload.seek(0)
+        if size <= 0 or size > GI_MAX_FILE_BYTES:
+            continue
+        out.append(
+            (
+                "files",
+                original,
+                upload.read(),
+                upload.mimetype or mimetypes.guess_type(original)[0],
+            )
+        )
+    return out
+
+
+def _send_gi_via_http(
+    *,
+    send_to_all: bool,
+    farmer_id: int,
+    title: str,
+    content: str,
+    category: str,
+    sender_name: str,
+    uploads,
+) -> dict:
+    fields = {
+        "send_to_all": "1" if send_to_all else "0",
+        "title": title,
+        "content": content,
+        "category": category,
+        "sender_name": sender_name,
+    }
+    if not send_to_all and farmer_id > 0:
+        fields["farmer_id"] = str(farmer_id)
+    files = _upload_files_for_http(uploads)
+    last_err: Exception | None = None
+    for base in _gi_http_bases():
+        try:
+            data = app_http_post_multipart("/api/admin_gi_send.php", fields, files)
+            if data.get("ok"):
+                return data
+            last_err = RuntimeError(str(data.get("detail") or data.get("error") or "GI send rejected"))
+        except Exception as e:
+            last_err = e
+    if last_err:
+        raise last_err
+    raise RuntimeError("No app server reachable for GI send (port 8080).")
 
 
 def ensure_gi_updates_table(cur) -> None:
@@ -38,6 +149,7 @@ def ensure_gi_updates_table(cur) -> None:
           upload_status VARCHAR(32) NOT NULL DEFAULT 'pending',
           is_starred TINYINT(1) NOT NULL DEFAULT 0,
           is_read_admin TINYINT(1) NOT NULL DEFAULT 0,
+          is_read_farmer TINYINT(1) NOT NULL DEFAULT 0,
           created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME NULL,
           INDEX idx_gi_phase (current_phase),
@@ -46,6 +158,58 @@ def ensure_gi_updates_table(cur) -> None:
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """
     )
+    cur.execute("SHOW COLUMNS FROM gi_updates LIKE 'is_read_farmer'")
+    if not cur.fetchone():
+        cur.execute(
+            "ALTER TABLE gi_updates ADD COLUMN is_read_farmer TINYINT(1) NOT NULL DEFAULT 0 AFTER is_read_admin"
+        )
+
+
+def _public_base_url() -> str:
+    cfg = read_connection_settings()
+    sms = cfg.get("sms") if isinstance(cfg.get("sms"), dict) else {}
+    base = str(sms.get("public_base_url") or "").strip().rstrip("/")
+    if base:
+        return base
+    return app_server_base() or ""
+
+
+def _save_gi_upload_files(file_items) -> list[dict]:
+    GI_CONTRIB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    base_url = _public_base_url()
+    attachments: list[dict] = []
+    for upload in file_items[:GI_MAX_FILES]:
+        if not upload or not getattr(upload, "filename", None):
+            continue
+        original = secure_filename(upload.filename)
+        if not original:
+            continue
+        ext = Path(original).suffix.lower()
+        if ext not in GI_ALLOWED_EXTENSIONS:
+            continue
+        upload.seek(0, 2)
+        size = upload.tell()
+        upload.seek(0)
+        if size <= 0 or size > GI_MAX_FILE_BYTES:
+            continue
+        stored = f"{uuid.uuid4().hex}{ext}"
+        dest = GI_CONTRIB_UPLOAD_DIR / stored
+        upload.save(str(dest))
+        rel = f"uploads/gi_contributions/{stored}"
+        url = f"{base_url.rstrip('/')}/{rel}" if base_url else rel
+        mime = upload.mimetype or mimetypes.guess_type(original)[0] or ""
+        attachments.append(
+            {
+                "name": original,
+                "filename": original,
+                "path": rel,
+                "url": url,
+                "mime": mime,
+                "type": mime,
+                "size": size,
+            }
+        )
+    return attachments
 
 
 def _parse_gi_attachments(raw, base: str) -> list[dict]:
@@ -109,27 +273,34 @@ def _gi_row_to_admin_item(row: dict, base: str) -> dict:
         "created_at": created_iso,
         "attachments": _parse_gi_attachments(attachments_raw, base),
         "current_phase": str(row.get("current_phase") or ""),
+        "direction": (
+            "outbound"
+            if str(row.get("current_phase") or "").strip() == "admin_submission"
+            else "inbound"
+        ),
     }
 
 
-def _load_from_http(limit: int) -> list[dict]:
-    base = app_server_base()
-    if not base:
-        raise RuntimeError("app_server_base not set in settings.json")
-    url = f"{base}/api/admin_gi_contributions.php?{urlencode({'limit': limit})}"
-    req = Request(url, headers={"Accept": "application/json"})
-    with urlopen(req, timeout=20) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-    if not isinstance(data, dict) or not data.get("ok"):
-        err = data.get("error") if isinstance(data, dict) else None
-        raise RuntimeError(str(err or "HTTP load failed"))
+def _load_from_http(limit: int, *, phase: str | None = None) -> list[dict]:
+    phase_key = (phase or "inbox").strip().lower()
+    if phase_key in ("sent", "admin_submission"):
+        phase_key = "sent"
+    elif phase_key in ("inbox", "farmer_submission"):
+        phase_key = "inbox"
+    data = app_http_get_json(
+        "/api/admin_gi_contributions.php",
+        query={"limit": limit, "phase": phase_key},
+        timeout=20,
+    )
+    if not data.get("ok"):
+        raise RuntimeError(str(data.get("detail") or data.get("error") or "HTTP load failed"))
     items = data.get("items")
     if not isinstance(items, list):
         return []
     return [row for row in items if isinstance(row, dict)]
 
 
-def _load_from_mysql(limit: int) -> list[dict]:
+def _load_from_mysql(limit: int, *, phase: str | None = None) -> list[dict]:
     params = app_db_params()
     if not params:
         raise RuntimeError("app_db_host not set in settings.json")
@@ -138,19 +309,29 @@ def _load_from_mysql(limit: int) -> list[dict]:
     try:
         with conn.cursor() as cur:
             ensure_gi_updates_table(cur)
+            where = "1=1"
+            args: list = []
+            if phase == "farmer_submission":
+                where = "g.current_phase = 'farmer_submission'"
+            elif phase == "admin_submission":
+                where = "g.current_phase = 'admin_submission'"
+            elif phase == "inbox":
+                where = "g.current_phase = 'farmer_submission'"
+            elif phase == "sent":
+                where = "g.current_phase = 'admin_submission'"
             cur.execute(
-                """
+                f"""
                 SELECT g.*, u.email, u.username, u.phone_number,
                        pi.first_name, pi.last_name
                 FROM gi_updates g
                 LEFT JOIN farmers f ON f.farmer_id = g.farmer_id
                 LEFT JOIN users u ON u.user_id = f.user_id
                 LEFT JOIN personal_information pi ON pi.farmer_id = f.farmer_id
-                WHERE g.current_phase = 'farmer_submission'
+                WHERE {where}
                 ORDER BY g.created_at DESC, g.gi_update_id DESC
                 LIMIT %s
                 """,
-                (limit,),
+                (*args, limit),
             )
             items = []
             for row in cur.fetchall() or []:
@@ -163,17 +344,17 @@ def _load_from_mysql(limit: int) -> list[dict]:
         conn.close()
 
 
-def load_admin_gi_contributions(limit: int = 500) -> tuple[list[dict], str]:
+def load_admin_gi_contributions(limit: int = 500, *, phase: str | None = None) -> tuple[list[dict], str]:
     limit = clamp_limit(limit)
     mysql_err: Exception | None = None
     http_err: Exception | None = None
     try:
-        return _load_from_mysql(limit), "mysql"
+        return _load_from_mysql(limit, phase=phase), "mysql"
     except Exception as e:
         print(f"GI Contributions MySQL error: {e}")
         mysql_err = e
     try:
-        items = _load_from_http(limit)
+        items = _load_from_http(limit, phase=phase)
         base = app_server_base()
         return [_gi_row_to_admin_item(row, base) for row in items], "http"
     except Exception as e:
@@ -186,6 +367,30 @@ def load_admin_gi_contributions(limit: int = 500) -> tuple[list[dict], str]:
             http_error=http_err,
         )
     )
+
+
+def _patch_via_http(gi_id: int, fields: dict) -> int:
+    body: dict = {"gi_update_id": gi_id}
+    if "is_starred" in fields:
+        body["is_starred"] = fields["is_starred"]
+    if "is_read_admin" in fields:
+        body["is_read_admin"] = fields["is_read_admin"]
+    if "upload_status" in fields:
+        body["upload_status"] = fields["upload_status"]
+    data = app_http_patch_json("/api/admin_gi_contributions.php", body)
+    if data.get("ok") is False:
+        raise RuntimeError(str(data.get("detail") or data.get("error") or "HTTP patch failed"))
+    return int(data.get("updated") or 0)
+
+
+def _delete_via_http(gi_id: int) -> int:
+    data = app_http_delete_json(
+        "/api/admin_gi_contributions.php",
+        query={"gi_update_id": gi_id},
+    )
+    if data.get("ok") is False:
+        raise RuntimeError(str(data.get("detail") or data.get("error") or "HTTP delete failed"))
+    return int(data.get("deleted") or 0)
 
 
 def _patch_mysql(gi_id: int, fields: dict) -> int:
@@ -219,20 +424,269 @@ def _patch_mysql(gi_id: int, fields: dict) -> int:
         conn.close()
 
 
+def _farmer_ids_from_http() -> list[int]:
+    data = app_http_get_json("/api/admin_farmer_data.php", query={"limit": 2500}, timeout=15)
+    if not data.get("ok"):
+        raise RuntimeError(str(data.get("error") or "Could not load farmer list from app server"))
+    items = data.get("items")
+    if not isinstance(items, list):
+        return []
+    ids: list[int] = []
+    for row in items:
+        if not isinstance(row, dict):
+            continue
+        for key in ("farmer_id", "user_id", "NO.", "NO", "no"):
+            if key not in row:
+                continue
+            try:
+                n = int(row[key])
+                if n > 0:
+                    ids.append(n)
+                    break
+            except (TypeError, ValueError):
+                continue
+    return sorted(set(ids))
+
+
+def _list_active_farmer_ids() -> list[int]:
+    params = app_db_params()
+    if params:
+        try:
+            conn = connect_app_mysql(params)
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT farmer_id
+                        FROM farmers
+                        WHERE farmer_id IS NOT NULL
+                        ORDER BY farmer_id ASC
+                        """
+                    )
+                    rows = cur.fetchall() or []
+                    ids: list[int] = []
+                    for row in rows:
+                        try:
+                            fid = int(row.get("farmer_id") or 0)
+                        except (TypeError, ValueError):
+                            fid = 0
+                        if fid > 0:
+                            ids.append(fid)
+                    if ids:
+                        return ids
+            finally:
+                conn.close()
+        except Exception:
+            pass
+    if app_server_base():
+        return _farmer_ids_from_http()
+    raise RuntimeError("app_db_host or app_server_base required in settings.json")
+
+
+def _insert_admin_submission(
+    *,
+    farmer_id: int,
+    title: str,
+    content: str,
+    category: str,
+    attachments: list[dict],
+    sender_name: str = "Administrator",
+) -> int:
+    params = app_db_params()
+    if not params:
+        raise RuntimeError("app_db_host not set in settings.json")
+    preview = " ".join(content.split())[:200]
+    attachments_json = json.dumps(attachments) if attachments else None
+    conn = connect_app_mysql(params)
+    try:
+        with conn.cursor() as cur:
+            ensure_gi_updates_table(cur)
+            cur.execute(
+                """
+                INSERT INTO gi_updates (
+                  farmer_id, current_phase, title, content, category,
+                  sender_name, attachments_json, upload_status,
+                  is_starred, is_read_admin, progress_percent
+                ) VALUES (
+                  %s, 'admin_submission', %s, %s, %s,
+                  %s, %s, 'approved',
+                  0, 1, 0
+                )
+                """,
+                (
+                    farmer_id,
+                    title,
+                    content,
+                    category,
+                    sender_name,
+                    attachments_json,
+                ),
+            )
+            gid = int(cur.lastrowid or 0)
+            if "preview" in _gi_table_columns(cur):
+                try:
+                    cur.execute(
+                        "UPDATE gi_updates SET preview = %s WHERE gi_update_id = %s",
+                        (preview, gid),
+                    )
+                except Exception:
+                    pass
+            return gid
+    finally:
+        conn.close()
+
+
+def _gi_table_columns(cur) -> set[str]:
+    cur.execute("SHOW COLUMNS FROM gi_updates")
+    return {str(row.get("Field") or row[0]).lower() for row in (cur.fetchall() or [])}
+
+
+def handle_gi_contributions_send():
+    """Send a GI update with attachments to one farmer or all farmers (mobile app inbox)."""
+    if not is_authenticated():
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    send_to_all_raw = str(request.form.get("send_to_all") or request.form.get("broadcast") or "").strip().lower()
+    send_to_all = send_to_all_raw in ("1", "true", "yes", "all", "on")
+
+    try:
+        farmer_id = int(request.form.get("farmer_id") or 0)
+    except (TypeError, ValueError):
+        farmer_id = 0
+    if send_to_all:
+        farmer_id = 0
+
+    title = str(request.form.get("title") or request.form.get("subject") or "").strip()
+    content = str(request.form.get("content") or request.form.get("message") or "").strip()
+    category = str(request.form.get("category") or "general").strip().lower() or "general"
+    sender_name = str(request.form.get("sender_name") or "Administrator").strip() or "Administrator"
+
+    if not title:
+        title = "GI Update from Admin"
+    if not content:
+        return jsonify({"ok": False, "error": "Message content is required"}), 400
+
+    uploads = request.files.getlist("files") or request.files.getlist("file") or []
+    if not uploads and "file" in request.files:
+        uploads = [request.files["file"]]
+
+    http_err: Exception | None = None
+    mysql_err: Exception | None = None
+
+    if _prefer_http_for_gi_send() and _gi_http_bases():
+        try:
+            data = _send_gi_via_http(
+                send_to_all=send_to_all or farmer_id < 1,
+                farmer_id=farmer_id,
+                title=title[:255],
+                content=content,
+                category=category[:64],
+                sender_name=sender_name[:255],
+                uploads=uploads,
+            )
+            return jsonify({"ok": True, **data})
+        except Exception as e:
+            http_err = e
+
+    try:
+        attachments = _save_gi_upload_files(uploads)
+        if send_to_all or farmer_id < 1:
+            farmer_ids = _list_active_farmer_ids()
+            if not farmer_ids:
+                return jsonify({"ok": False, "error": "No farmers found in the database."}), 400
+            created_ids: list[int] = []
+            for fid in farmer_ids:
+                created_ids.append(
+                    _insert_admin_submission(
+                        farmer_id=fid,
+                        title=title[:255],
+                        content=content,
+                        category=category[:64],
+                        attachments=attachments,
+                        sender_name=sender_name[:255],
+                    )
+                )
+            return jsonify(
+                {
+                    "ok": True,
+                    "broadcast": True,
+                    "sent_count": len(created_ids),
+                    "gi_update_ids": created_ids,
+                    "attachments": attachments,
+                }
+            )
+
+        gi_id = _insert_admin_submission(
+            farmer_id=farmer_id,
+            title=title[:255],
+            content=content,
+            category=category[:64],
+            attachments=attachments,
+            sender_name=sender_name[:255],
+        )
+        base = _public_base_url()
+        item = _gi_row_to_admin_item(
+            {
+                "gi_update_id": gi_id,
+                "farmer_id": farmer_id,
+                "current_phase": "admin_submission",
+                "title": title,
+                "content": content,
+                "preview": " ".join(content.split())[:200],
+                "category": category,
+                "sender_name": sender_name,
+                "attachments_json": json.dumps(attachments) if attachments else None,
+                "upload_status": "approved",
+                "is_starred": 0,
+                "is_read_admin": 1,
+                "created_at": datetime.utcnow(),
+            },
+            base,
+        )
+        return jsonify({"ok": True, "gi_update_id": gi_id, "item": item, "attachments": attachments})
+    except Exception as e:
+        mysql_err = e
+
+    detail = friendly_load_failure(
+        module_label="GI update send",
+        mysql_error=mysql_err,
+        http_error=http_err,
+    )
+    return jsonify({"ok": False, "error": detail, "message": detail, "detail": detail}), 503
+
+
 def register_gi_contributions_routes(app) -> None:
     @app.route("/api/gi-contributions-list", methods=["GET"])
     def api_gi_contributions_list():
         if not is_authenticated():
             return jsonify({"ok": False, "error": "Unauthorized", "items": []}), 401
         limit = clamp_limit(request.args.get("limit", type=int) or 500)
+        phase = str(request.args.get("phase") or request.args.get("folder") or "inbox").strip().lower()
         try:
-            items, source = load_admin_gi_contributions(limit)
+            items, source = load_admin_gi_contributions(limit, phase=phase)
             if not isinstance(items, list):
                 items = []
-            return jsonify({"ok": True, "items": items, "count": len(items), "source": source})
+            return jsonify({"ok": True, "items": items, "count": len(items), "source": source, "phase": phase})
         except Exception as e:
             payload = load_error_payload("GI_CONTRIBUTIONS_LOAD_FAILED", str(e))
             return jsonify(payload), 503
+
+    @app.route("/api/gi-contributions-farmer-count", methods=["GET"])
+    def api_gi_contributions_farmer_count():
+        if not is_authenticated():
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+        try:
+            count = len(_list_active_farmer_ids())
+            return jsonify({"ok": True, "count": count})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e), "count": 0}), 500
+
+    for _send_path in (
+        "/api/gi-contributions-send",
+        "/api/gi-contributions/send",
+        "/api/gi-contributions/broadcast",
+    ):
+        app.add_url_rule(_send_path, endpoint=f"gi_contributions_send_{_send_path.strip('/').replace('/', '_')}", view_func=handle_gi_contributions_send, methods=["POST"])
 
     @app.route("/api/gi-contributions/<int:gi_id>", methods=["PATCH", "DELETE"])
     def api_gi_contribution_item(gi_id: int):
@@ -242,25 +696,44 @@ def register_gi_contributions_routes(app) -> None:
             return jsonify({"ok": False, "error": "Invalid contribution id"}), 400
 
         if request.method == "DELETE":
-            try:
-                params = app_db_params()
-                if not params:
-                    return jsonify({"ok": False, "error": "app_db_host not set in settings.json"}), 503
-                conn = connect_app_mysql(params)
+            deleted = 0
+            mysql_err: Exception | None = None
+            if app_db_params():
                 try:
-                    with conn.cursor() as cur:
-                        cur.execute(
-                            "DELETE FROM gi_updates WHERE gi_update_id = %s AND current_phase = 'farmer_submission'",
-                            (gi_id,),
-                        )
-                        deleted = int(cur.rowcount or 0)
-                finally:
-                    conn.close()
-                if deleted <= 0:
-                    return jsonify({"ok": False, "error": "Contribution not found"}), 404
-                return jsonify({"ok": True, "deleted": deleted})
-            except Exception as e:
-                return jsonify({"ok": False, "error": str(e), "message": str(e)}), 500
+                    params = app_db_params()
+                    conn = connect_app_mysql(params)
+                    try:
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                "DELETE FROM gi_updates WHERE gi_update_id = %s AND current_phase = 'farmer_submission'",
+                                (gi_id,),
+                            )
+                            deleted = int(cur.rowcount or 0)
+                    finally:
+                        conn.close()
+                except Exception as e:
+                    mysql_err = e
+            if deleted <= 0 and app_server_base():
+                try:
+                    deleted = _delete_via_http(gi_id)
+                except Exception as http_e:
+                    if mysql_err:
+                        return jsonify(
+                            {
+                                "ok": False,
+                                "error": friendly_load_failure(
+                                    module_label="GI contribution delete",
+                                    mysql_error=mysql_err,
+                                    http_error=http_e,
+                                ),
+                            }
+                        ), 503
+                    return jsonify({"ok": False, "error": str(http_e)}), 500
+            elif deleted <= 0 and mysql_err:
+                return jsonify({"ok": False, "error": str(mysql_err)}), 503
+            if deleted <= 0:
+                return jsonify({"ok": False, "error": "Contribution not found"}), 404
+            return jsonify({"ok": True, "deleted": deleted})
 
         body = request.get_json(silent=True) or {}
         if not isinstance(body, dict):
@@ -288,10 +761,31 @@ def register_gi_contributions_routes(app) -> None:
         if not fields:
             return jsonify({"ok": False, "error": "No valid fields to update"}), 400
 
-        try:
-            updated = _patch_mysql(gi_id, fields)
-            if updated <= 0:
-                return jsonify({"ok": False, "error": "Contribution not found"}), 404
-            return jsonify({"ok": True, "updated": updated})
-        except Exception as e:
-            return jsonify({"ok": False, "error": str(e), "message": str(e)}), 500
+        updated = 0
+        mysql_err: Exception | None = None
+        if app_db_params():
+            try:
+                updated = _patch_mysql(gi_id, fields)
+            except Exception as e:
+                mysql_err = e
+        if updated <= 0 and app_server_base():
+            try:
+                updated = _patch_via_http(gi_id, fields)
+            except Exception as http_e:
+                if mysql_err:
+                    return jsonify(
+                        {
+                            "ok": False,
+                            "error": friendly_load_failure(
+                                module_label="GI contribution update",
+                                mysql_error=mysql_err,
+                                http_error=http_e,
+                            ),
+                        }
+                    ), 503
+                return jsonify({"ok": False, "error": str(http_e)}), 500
+        elif mysql_err and updated <= 0:
+            return jsonify({"ok": False, "error": str(mysql_err)}), 503
+        if updated <= 0:
+            return jsonify({"ok": False, "error": "Contribution not found"}), 404
+        return jsonify({"ok": True, "updated": updated})
