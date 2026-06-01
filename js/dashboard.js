@@ -5578,7 +5578,7 @@ class DashboardApp {
     const prevLabel = completeBtn?.textContent || 'Complete Registration';
     if (completeBtn) {
       completeBtn.disabled = true;
-      completeBtn.textContent = 'Sending to GI Updates…';
+      completeBtn.textContent = 'Publishing files…';
     }
 
     try {

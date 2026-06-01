@@ -1,34 +1,86 @@
 #!/usr/bin/env python3
-"""Remove admin-published GI Updates (admin_submission + admin_progress) from app MySQL."""
+"""
+Delete GI Updates from app MySQL (admin posts shown on mobile news.php).
+
+Run from Beanthentic folder:
+  python scripts/clear_gi_admin_updates.py
+  python scripts/clear_gi_admin_updates.py --all
+"""
+from __future__ import annotations
+
+import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 from config.app_connection import app_db_params
 from config.mysql_app_bridge import connect_app_mysql
 
 
+def _count(cur, sql: str) -> int:
+    cur.execute(sql)
+    row = cur.fetchone()
+    if isinstance(row, dict):
+        return int(row.get("c") or row.get("COUNT(*)") or 0)
+    if row:
+        return int(row[0])
+    return 0
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Clear GI Updates in app MySQL")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Delete every row in gi_updates (admin + farmer submissions)",
+    )
+    args = parser.parse_args()
+
     params = app_db_params()
     if not params:
-        raise SystemExit("app_db_host not set in settings.json")
+        print("ERROR: settings.json has no connection.app_db_host")
+        print(f"Edit: {ROOT / 'settings.json'}")
+        raise SystemExit(1)
 
-    conn = connect_app_mysql(params)
+    host = params.get("host", "?")
+    db = params.get("database", "?")
+    print(f"Connecting to MySQL {host} / {db} ...")
+
+    try:
+        conn = connect_app_mysql(params)
+    except Exception as exc:
+        print(f"ERROR: Cannot connect to MySQL at {host}")
+        print(f"  {exc}")
+        print("Check: XAMPP/MySQL running on that PC, same Wi-Fi, settings.json app_db_host")
+        raise SystemExit(1) from exc
+
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "DELETE FROM gi_updates WHERE current_phase IN ('admin_submission', 'admin_progress')"
-            )
+            before = _count(cur, "SELECT COUNT(*) AS c FROM gi_updates")
+            if args.all:
+                cur.execute("DELETE FROM gi_updates")
+            else:
+                cur.execute(
+                    "DELETE FROM gi_updates "
+                    "WHERE current_phase IN ('admin_submission', 'admin_progress')"
+                )
             deleted = int(cur.rowcount or 0)
-            cur.execute("SELECT COUNT(*) AS c FROM gi_updates")
-            row = cur.fetchone() or {}
-            remaining = int(row.get("c") if isinstance(row, dict) else row[0] if row else 0)
+            after = _count(cur, "SELECT COUNT(*) AS c FROM gi_updates")
         conn.commit()
-        print(f"Deleted {deleted} admin GI update row(s).")
-        print(f"Remaining gi_updates rows: {remaining}")
+    except Exception as exc:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        print(f"ERROR during delete: {exc}")
+        raise SystemExit(1) from exc
     finally:
         conn.close()
+
+    print(f"Deleted {deleted} row(s). gi_updates: {before} -> {after}")
+    print("Done. Refresh GI Updates on the mobile app (close and reopen the page).")
 
 
 if __name__ == "__main__":

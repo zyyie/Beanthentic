@@ -390,12 +390,18 @@ def register_ipophl_routes(app):
                 existing_analysis.ai_score = int(existing_record.get("ai_score") or 0)
                 existing_analysis.ai_status = existing_record.get("ai_status") or "Not Ready"
 
+            raw_upload_name = (file.filename or "").strip()
+            stored_display_name = secure_filename(raw_upload_name) or f"document{file_ext}"
+
             if existing_analysis:
                 doc_analysis = existing_analysis
+                doc_analysis.original_filename = stored_display_name
+                doc_analysis.task_id = task_id
+                doc_analysis.ipophl_phase = ipophl_phase
             else:
                 doc_analysis = DocumentAnalysis(
                     file_uuid=file_uuid,
-                    original_filename=secure_filename(file.filename),
+                    original_filename=stored_display_name,
                     file_path=file_path,
                     file_type=file_ext,
                     file_size=os.path.getsize(str(file_path_obj)),

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import re
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -33,7 +34,7 @@ GI_ALLOWED_EXTENSIONS = frozenset(
 )
 GI_MAX_FILE_BYTES = 15 * 1024 * 1024
 GI_MAX_FILES = 5
-IPOPHL_GI_MAX_FILES = 10
+IPOPHL_GI_MAX_FILES = 30
 
 
 def _gi_http_bases() -> list[str]:
@@ -100,6 +101,29 @@ def _upload_files_for_http(uploads) -> list[tuple[str, str, bytes, str | None]]:
     return out
 
 
+def _display_filename(original: str, path: Path) -> str:
+    """Human-readable name for UI (may repeat); not used as multipart filename."""
+    raw = str(original or "").strip()
+    safe = secure_filename(raw)
+    if safe and safe not in ("uploaded.docx", "uploaded.pdf", "uploaded.doc", "file"):
+        return safe
+    return path.name
+
+
+def _unique_multipart_filename(original: str, path: Path) -> str:
+    """
+    Unique multipart filename so the app server keeps every file.
+    Duplicate 'uploaded.docx' parts would otherwise overwrite each other.
+    """
+    ext = path.suffix.lower() if path.suffix else ""
+    if ext not in GI_ALLOWED_EXTENSIONS:
+        ext = Path(_display_filename(original, path)).suffix.lower() or ".bin"
+    stem = path.stem[:36] if path.stem else uuid.uuid4().hex
+    label = Path(_display_filename(original, path)).stem[:60] or "document"
+    label = re.sub(r"[^a-zA-Z0-9._-]+", "_", label).strip("._") or "document"
+    return f"{label}_{stem}{ext}"
+
+
 def _multipart_files_from_disk(disk_files: list[tuple[str, Path]]) -> list[tuple[str, str, bytes, str | None]]:
     """Build HTTP multipart file tuples from files on disk (e.g. IPOPHL uploads on admin web.py)."""
     out: list[tuple[str, str, bytes, str | None]] = []
@@ -112,9 +136,9 @@ def _multipart_files_from_disk(disk_files: list[tuple[str, Path]]) -> list[tuple
         size = path.stat().st_size
         if size <= 0 or size > GI_MAX_FILE_BYTES:
             continue
-        name = secure_filename(original) or path.name
-        mime = mimetypes.guess_type(name)[0]
-        out.append(("files", name, path.read_bytes(), mime))
+        upload_name = _unique_multipart_filename(original, path)
+        mime = mimetypes.guess_type(upload_name)[0] or mimetypes.guess_type(path.name)[0]
+        out.append(("files", upload_name, path.read_bytes(), mime))
     return out
 
 
@@ -163,17 +187,17 @@ def _save_gi_attachments_from_paths(disk_files: list[tuple[str, Path]]) -> list[
         size = path.stat().st_size
         if size <= 0 or size > GI_MAX_FILE_BYTES:
             continue
-        name = secure_filename(original) or path.name
-        stored = f"{uuid.uuid4().hex}{ext}"
+        display = _display_filename(original, path)
+        stored = f"{path.stem[:36]}{ext}" if path.stem else f"{uuid.uuid4().hex}{ext}"
         dest = GI_CONTRIB_UPLOAD_DIR / stored
         dest.write_bytes(path.read_bytes())
         rel = f"uploads/gi_contributions/{stored}"
         url = f"{base_url.rstrip('/')}/{rel}" if base_url else rel
-        mime = mimetypes.guess_type(name)[0] or ""
+        mime = mimetypes.guess_type(display)[0] or ""
         attachments.append(
             {
-                "name": name,
-                "filename": name,
+                "name": display,
+                "filename": display,
                 "path": rel,
                 "url": url,
                 "mime": mime,
@@ -340,19 +364,22 @@ def publish_ipophl_registration_to_gi_updates(
     cards_published = 0
     last_attachments: list[dict] = []
 
+    file_entries: list[tuple[str, str, str, Path]] = []
     for task_id, disk_files in groups.items():
-        if not disk_files:
-            continue
-        card_title = (title or task_label(task_id)).strip()[:150]
-        file_names = ", ".join(n for n, _ in disk_files)
-        doc_content = (content or "").strip()
-        if not doc_content or len(groups) > 1:
-            doc_content = (
-                f"{card_title}\n\n"
-                f"Files: {file_names}\n\n"
-                f"Published: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC"
-            )
+        label = task_label(task_id)
+        for original, path in disk_files:
+            file_entries.append((task_id, label, original, path))
+
+    for task_id, label, original, path in file_entries:
+        display = _display_filename(original, path)
+        card_title = (title or label).strip()[:150]
+        doc_content = (
+            f"{label}\n\n"
+            f"File: {display}\n\n"
+            f"Published: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC"
+        )
         task_category = str(task_id)[:30]
+        single = [(original, path)]
 
         published_this_card = False
 
@@ -366,7 +393,8 @@ def publish_ipophl_registration_to_gi_updates(
                     category=task_category,
                     sender_name=sender_name[:255],
                     uploads=[],
-                    disk_files=disk_files,
+                    disk_files=single,
+                    http_timeout=45.0,
                 )
                 if data.get("gi_update_ids"):
                     all_created_ids.extend(
@@ -383,7 +411,7 @@ def publish_ipophl_registration_to_gi_updates(
 
         if not published_this_card and app_db_params():
             try:
-                attachments = _save_gi_attachments_from_paths(disk_files)
+                attachments = _save_gi_attachments_from_paths(single)
                 farmer_ids = _list_active_farmer_ids()
                 created_ids = _broadcast_admin_submissions_mysql(
                     farmer_ids=farmer_ids,
@@ -444,6 +472,7 @@ def _send_gi_via_http(
     sender_name: str,
     uploads,
     disk_files: list[tuple[str, Path]] | None = None,
+    http_timeout: float | None = None,
 ) -> dict:
     fields = {
         "send_to_all": "1" if send_to_all else "0",
@@ -458,10 +487,16 @@ def _send_gi_via_http(
     files.extend(_multipart_files_from_disk(disk_files or []))
     if len(files) > IPOPHL_GI_MAX_FILES:
         files = files[:IPOPHL_GI_MAX_FILES]
+    if http_timeout is None:
+        from config.app_connection import app_http_timeout
+
+        http_timeout = max(float(app_http_timeout()), 20.0 + len(files) * 8.0)
     last_err: Exception | None = None
     for base in _gi_http_bases():
         try:
-            data = app_http_post_multipart("/api/admin_gi_send.php", fields, files)
+            data = app_http_post_multipart(
+                "/api/admin_gi_send.php", fields, files, timeout=http_timeout
+            )
             if data.get("ok") or data.get("sent_count") or data.get("gi_update_ids"):
                 if not data.get("ok"):
                     data["ok"] = True
