@@ -5471,6 +5471,31 @@ class DashboardApp {
     return hasAttachments;
   }
 
+  collectIpophlPublishEntries() {
+    const entries = [];
+    const seen = new Set();
+    const zones = document.querySelectorAll('#ipophl-module .file-upload-zone[data-service]');
+    zones.forEach((zone) => {
+      const taskId = zone.dataset.service;
+      if (!taskId) return;
+      const container = document.getElementById(`${taskId}-files`);
+      if (!container) return;
+      container.querySelectorAll('[data-file-uuid]').forEach((el) => {
+        const id = el.getAttribute('data-file-uuid');
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        entries.push({ file_uuid: id, task_id: taskId });
+      });
+      container.querySelectorAll('.file-action-btn.ai-analysis').forEach((btn) => {
+        const match = (btn.getAttribute('onclick') || '').match(/loadAndShowFullAnalysis\('([^']+)'\)/);
+        if (!match || seen.has(match[1])) return;
+        seen.add(match[1]);
+        entries.push({ file_uuid: match[1], task_id: taskId });
+      });
+    });
+    return entries;
+  }
+
   collectPhase5FileUuids() {
     const services = ['phase5-cert', 'phase5-compliance'];
     const uuids = [];
@@ -5531,10 +5556,15 @@ class DashboardApp {
 
   async completeRegistration() {
     const phase5TaskIds = ['phase5-cert', 'phase5-compliance'];
-    let fileUuids = this.collectPhase5FileUuids();
+    let fileEntries = this.collectIpophlPublishEntries();
+    let fileUuids = fileEntries.map((e) => e.file_uuid);
 
     if (!fileUuids.length) {
+      fileUuids = this.collectPhase5FileUuids();
+    }
+    if (!fileUuids.length) {
       fileUuids = await this.fetchPhase5FileUuidsFromServer();
+      fileEntries = fileUuids.map((id) => ({ file_uuid: id, task_id: '' }));
     }
 
     if (!fileUuids.length) {
@@ -5558,6 +5588,7 @@ class DashboardApp {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           file_uuids: fileUuids,
+          file_entries: fileEntries,
           task_ids: phase5TaskIds,
         }),
       });
@@ -5572,10 +5603,13 @@ class DashboardApp {
       }
       const sent = data.sent_count || (data.gi_update_ids && data.gi_update_ids.length) || 0;
       const fileCount = data.file_count || fileUuids.length;
+      const cards = data.cards_published || 0;
       this.showIpophlNotification(
-        sent
-          ? `Done! ${fileCount} file(s) sent to GI Updates (news.php) for ${sent} farmer(s). Open the mobile app to view.`
-          : `Done! ${fileCount} file(s) sent to GI Updates (news.php). Open the mobile app to view.`
+        cards
+          ? `Done! ${cards} category card(s) (${fileCount} file(s)) sent to GI Updates for ${sent || 'all'} farmer(s).`
+          : sent
+            ? `Done! ${fileCount} file(s) sent to GI Updates for ${sent} farmer(s).`
+            : `Done! ${fileCount} file(s) sent to GI Updates.`
       );
 
       console.log('IPOPHL → GI Updates published:', {

@@ -18,6 +18,25 @@ _ALLOWED_UPLOAD_SUFFIXES = frozenset({".pdf", ".doc", ".docx", ".txt", ".md", ".
 STORE_PATH = Path(__file__).resolve().parent.parent / "data" / "ipophl_documents.json"
 UPLOADS_DIR = Path(__file__).resolve().parent.parent / "machinelearning" / "uploads"
 
+# Matches IPOPHL dashboard h4 titles (one GI Updates card per category).
+IPOPHL_TASK_LABELS: dict[str, str] = {
+    "phase1-product": "Product Documentation",
+    "phase1-entity": "Entity Documentation",
+    "phase1-stakeholders": "Consultation Records",
+    "phase2-mop": "MOP Documentation",
+    "phase2-cert": "Certification Documents",
+    "phase2-details": "Application Package",
+    "phase3-filing": "Filing Documents",
+    "phase3-payment": "Payment Documentation",
+    "phase4-exam": "Examination Documents",
+    "phase4-response": "Response Documents",
+    "phase4-pub": "Publication Documents",
+    "phase5-cert": "Registration Documents",
+    "phase5-compliance": "Compliance Documentation",
+}
+
+IPOPHL_TASK_ORDER: list[str] = list(IPOPHL_TASK_LABELS.keys())
+
 
 def _load() -> dict:
     if not STORE_PATH.exists():
@@ -97,12 +116,58 @@ def collect_registration_file_uuids(
         if tid.startswith("phase5-"):
             add(str(record.get("file_uuid") or ""))
 
-    # Recent uploads still visible in IPOPHL (e.g. wrong task_id metadata)
-    if not out:
-        for record in list_documents(limit=30):
-            add(str(record.get("file_uuid") or ""))
+    # Complete registration: include every uploaded IPOPHL file (all phases / categories).
+    for record in list_documents(limit=300):
+        add(str(record.get("file_uuid") or ""))
 
     return out
+
+
+def task_label(task_id: str) -> str:
+    tid = str(task_id or "").strip()
+    if tid in IPOPHL_TASK_LABELS:
+        return IPOPHL_TASK_LABELS[tid]
+    if tid.startswith("phase") and "-" in tid:
+        suffix = tid.split("-", 1)[-1].replace("-", " ").strip()
+        return suffix.title() + " Documentation" if suffix else "IPOPHL Document"
+    return "IPOPHL Document"
+
+
+def group_disk_files_by_task(
+    file_uuids: list[str],
+    *,
+    task_overrides: dict[str, str] | None = None,
+) -> dict[str, list[tuple[str, Path]]]:
+    """Group resolved upload paths by IPOPHL task_id for separate GI Update cards."""
+    groups: dict[str, list[tuple[str, Path]]] = {}
+    seen_paths: set[str] = set()
+
+    for raw in file_uuids:
+        file_uuid = str(raw or "").strip()
+        if not file_uuid:
+            continue
+        record = get_document(file_uuid)
+        task_id = str((task_overrides or {}).get(file_uuid) or "").strip()
+        if not task_id:
+            task_id = str((record or {}).get("task_id") or "ipophl-other").strip() or "ipophl-other"
+        hint = str((record or {}).get("original_filename") or "") if record else None
+        path = resolve_file_path(file_uuid, filename_hint=hint or None)
+        if not path or not path.is_file():
+            continue
+        key = path.resolve().as_posix()
+        if key in seen_paths:
+            continue
+        seen_paths.add(key)
+        name = str((record or {}).get("original_filename") or path.name)
+        groups.setdefault(task_id, []).append((name, path))
+
+    def sort_key(tid: str) -> tuple[int, int | str]:
+        try:
+            return (0, IPOPHL_TASK_ORDER.index(tid))
+        except ValueError:
+            return (1, tid)
+
+    return dict(sorted(groups.items(), key=lambda item: sort_key(item[0])))
 
 
 def list_documents(*, phase: str | None = None, task_id: str | None = None, limit: int = 200) -> list[dict]:

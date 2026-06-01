@@ -663,6 +663,19 @@ def register_ipophl_routes(app):
 
         file_uuids = collect_registration_file_uuids(file_uuids=client_uuids, task_ids=task_ids)
 
+        task_overrides: dict[str, str] = {}
+        raw_entries = body.get("file_entries")
+        if isinstance(raw_entries, list):
+            for entry in raw_entries:
+                if not isinstance(entry, dict):
+                    continue
+                uid = str(entry.get("file_uuid") or entry.get("id") or "").strip()
+                tid = str(entry.get("task_id") or entry.get("service") or "").strip()
+                if uid and tid:
+                    task_overrides[uid] = tid
+                    if uid not in file_uuids:
+                        file_uuids.append(uid)
+
         if not file_uuids:
             return jsonify(
                 {
@@ -681,6 +694,7 @@ def register_ipophl_routes(app):
                 title=title,
                 content=content,
                 category=category,
+                task_overrides=task_overrides or None,
             )
             try:
                 user_phone = get_current_user_phone()

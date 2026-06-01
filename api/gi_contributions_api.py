@@ -314,94 +314,124 @@ def publish_ipophl_registration_to_gi_updates(
     title: str | None = None,
     content: str | None = None,
     category: str = "ipophl_registration",
+    task_overrides: dict[str, str] | None = None,
 ) -> dict:
     """
-    Broadcast IPOPHL Phase 5 registration files to all farmers' GI Updates inbox (mobile app).
-    Writes to app MySQL first (with commit), then HTTP bridge as fallback.
+    Publish IPOPHL files to farmers' GI Updates — one feed card per document category
+    (Product Documentation, Filing Documents, etc.), like separate Facebook posts.
     """
-    disk_files = _load_ipophl_disk_files(file_uuids)
-    if not disk_files:
+    from config.ipophl_store import group_disk_files_by_task, task_label
+
+    groups = group_disk_files_by_task(file_uuids, task_overrides=task_overrides)
+    if not groups:
         if file_uuids:
             raise ValueError(
                 "Registration files were not found on this device or are empty (0 bytes). "
-                "Re-upload Phase 5 documents, then click Complete Registration again."
+                "Re-upload documents in IPOPHL, then click Complete Registration again."
             )
         raise ValueError(
-            "No registration files found. Upload documents in Phase 5 before completing registration."
+            "No registration files found. Upload documents in IPOPHL before completing registration."
         )
 
-    doc_title = (title or "GI Registration — IPOPHL Documents").strip()[:150]
-    names = ", ".join(n for n, _ in disk_files)
-    doc_content = (content or "").strip()
-    if not doc_content:
-        doc_content = (
-            "Official IPOPHL GI registration documents are now available in GI Updates.\n\n"
-            f"Attached files: {names}\n\n"
-            f"Published: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC"
-        )
     sender_name = "IPOPHL Administrator"
-
     http_err: Exception | None = None
     mysql_err: Exception | None = None
+    all_created_ids: list[int] = []
+    cards_published = 0
+    last_attachments: list[dict] = []
 
-    if _gi_http_bases():
-        try:
-            data = _send_gi_via_http(
-                send_to_all=True,
-                farmer_id=0,
-                title=doc_title,
-                content=doc_content,
-                category=category[:30],
-                sender_name=sender_name[:255],
-                uploads=[],
-                disk_files=disk_files,
+    for task_id, disk_files in groups.items():
+        if not disk_files:
+            continue
+        card_title = (title or task_label(task_id)).strip()[:150]
+        file_names = ", ".join(n for n, _ in disk_files)
+        doc_content = (content or "").strip()
+        if not doc_content or len(groups) > 1:
+            doc_content = (
+                f"{card_title}\n\n"
+                f"Files: {file_names}\n\n"
+                f"Published: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC"
             )
-            data["source"] = "app_server_http"
-            if data.get("sent_count") or data.get("gi_update_ids"):
-                try:
-                    farmer_ids = _list_active_farmer_ids()
-                    _set_gi_progress_mysql(
-                        farmer_ids,
-                        100.0,
-                        note="GI Registration complete — documents are available in GI Updates.",
-                        sender_name=sender_name[:255],
+        task_category = str(task_id)[:30]
+
+        published_this_card = False
+
+        if _gi_http_bases():
+            try:
+                data = _send_gi_via_http(
+                    send_to_all=True,
+                    farmer_id=0,
+                    title=card_title,
+                    content=doc_content,
+                    category=task_category,
+                    sender_name=sender_name[:255],
+                    uploads=[],
+                    disk_files=disk_files,
+                )
+                if data.get("gi_update_ids"):
+                    all_created_ids.extend(
+                        int(x) for x in data["gi_update_ids"] if int(x or 0) > 0
                     )
-                except Exception:
-                    pass
-                return data
-        except Exception as e:
-            http_err = e
+                elif data.get("gi_update_id"):
+                    all_created_ids.append(int(data["gi_update_id"]))
+                if data.get("sent_count") or data.get("gi_update_ids"):
+                    published_this_card = True
+                    last_attachments = data.get("attachments") or last_attachments
+            except Exception as e:
+                if http_err is None:
+                    http_err = e
 
-    if app_db_params():
-        try:
-            attachments = _save_gi_attachments_from_paths(disk_files)
-            farmer_ids = _list_active_farmer_ids()
-            created_ids = _broadcast_admin_submissions_mysql(
-                farmer_ids=farmer_ids,
-                title=doc_title,
-                content=doc_content,
-                category=category,
-                attachments=attachments,
-                sender_name=sender_name[:255],
-                set_progress_percent=100.0,
-            )
-            return {
-                "ok": True,
-                "broadcast": True,
-                "sent_count": len(created_ids),
-                "gi_update_ids": created_ids,
-                "attachments": attachments,
-                "source": "app_mysql",
-            }
-        except Exception as e:
-            mysql_err = e
+        if not published_this_card and app_db_params():
+            try:
+                attachments = _save_gi_attachments_from_paths(disk_files)
+                farmer_ids = _list_active_farmer_ids()
+                created_ids = _broadcast_admin_submissions_mysql(
+                    farmer_ids=farmer_ids,
+                    title=card_title,
+                    content=doc_content,
+                    category=task_category,
+                    attachments=attachments,
+                    sender_name=sender_name[:255],
+                    set_progress_percent=None,
+                )
+                all_created_ids.extend(created_ids)
+                last_attachments = attachments
+                published_this_card = True
+            except Exception as e:
+                mysql_err = e
 
-    detail = friendly_load_failure(
-        module_label="IPOPHL registration → GI Updates",
-        mysql_error=mysql_err,
-        http_error=http_err,
-    )
-    raise RuntimeError(detail)
+        if published_this_card:
+            cards_published += 1
+
+    if cards_published <= 0:
+        detail = friendly_load_failure(
+            module_label="IPOPHL registration → GI Updates",
+            mysql_error=mysql_err,
+            http_error=http_err,
+        )
+        raise RuntimeError(detail)
+
+    try:
+        farmer_ids = _list_active_farmer_ids()
+        _set_gi_progress_mysql(
+            farmer_ids,
+            100.0,
+            note="GI Registration complete — all IPOPHL document categories are in GI Updates.",
+            sender_name=sender_name[:255],
+        )
+    except Exception:
+        pass
+
+    farmer_count = len(_list_active_farmer_ids()) if cards_published else 0
+    return {
+        "ok": True,
+        "broadcast": True,
+        "cards_published": cards_published,
+        "sent_count": farmer_count,
+        "gi_update_ids": all_created_ids,
+        "attachments": last_attachments,
+        "source": "app_server_http" if _gi_http_bases() else "app_mysql",
+    }
 
 
 def _send_gi_via_http(
