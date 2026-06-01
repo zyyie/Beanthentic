@@ -274,13 +274,13 @@ class IPOPHLAnalyzer {
             this.showUploadProgress(attachedFilesContainer, file.name);
 
             // Extract phase and task from service name
-            const [phase, task] = this.parseServiceName(service);
+            const phase = service.startsWith('phase') ? service.split('-')[0] : 'unknown';
 
             // Create FormData for API request
             const formData = new FormData();
             formData.append('file', file);
             formData.append('phase', phase);
-            formData.append('task_id', service); // Use full service name as task_id for consistency
+            formData.append('task_id', service);
 
             // Upload and analyze file
             const response = await ipophlApi('/api/ipo-analyze', {

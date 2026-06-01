@@ -61,6 +61,50 @@ def delete_document(file_uuid: str) -> None:
         _save(data)
 
 
+def collect_registration_file_uuids(
+    *,
+    file_uuids: list[str] | None = None,
+    task_ids: list[str] | None = None,
+) -> list[str]:
+    """
+    Resolve file UUIDs for Complete Registration.
+    Phase 5 uploads may be stored under phase5-* or legacy/wrong task_id — gather all candidates.
+    """
+    bootstrap_orphan_uploads(limit=500)
+    seen: set[str] = set()
+    out: list[str] = []
+
+    def add(raw: str | None) -> None:
+        uid = str(raw or "").strip()
+        if uid and uid not in seen:
+            seen.add(uid)
+            out.append(uid)
+
+    if file_uuids:
+        for raw in file_uuids:
+            add(raw)
+
+    phase5_tasks = task_ids or ["phase5-cert", "phase5-compliance"]
+    for tid in phase5_tasks:
+        for record in list_documents(task_id=str(tid).strip(), limit=50):
+            add(str(record.get("file_uuid") or ""))
+
+    for record in list_documents(phase="phase5", limit=50):
+        add(str(record.get("file_uuid") or ""))
+
+    for record in list_documents(limit=300):
+        tid = str(record.get("task_id") or "")
+        if tid.startswith("phase5-"):
+            add(str(record.get("file_uuid") or ""))
+
+    # Recent uploads still visible in IPOPHL (e.g. wrong task_id metadata)
+    if not out:
+        for record in list_documents(limit=30):
+            add(str(record.get("file_uuid") or ""))
+
+    return out
+
+
 def list_documents(*, phase: str | None = None, task_id: str | None = None, limit: int = 200) -> list[dict]:
     items = list(_load().values())
     items = [item for item in items if isinstance(item, dict)]

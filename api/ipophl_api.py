@@ -44,7 +44,7 @@ from config.validation import (
 )
 from config.utils import get_current_user_phone, is_authenticated, log_activity
 from api.gi_contributions_api import publish_ipophl_registration_to_gi_updates
-from config.ipophl_store import list_documents
+from config.ipophl_store import collect_registration_file_uuids
 
 
 def _is_db_error(exc: BaseException) -> bool:
@@ -652,25 +652,16 @@ def register_ipophl_routes(app):
         if not isinstance(body, dict):
             body = {}
 
-        file_uuids: list[str] = []
         raw_uuids = body.get("file_uuids")
+        client_uuids: list[str] = []
         if isinstance(raw_uuids, list):
-            file_uuids = [str(u).strip() for u in raw_uuids if str(u).strip()]
+            client_uuids = [str(u).strip() for u in raw_uuids if str(u).strip()]
 
-        if not file_uuids:
-            task_ids = body.get("task_ids")
-            if not isinstance(task_ids, list) or not task_ids:
-                task_ids = ["phase5-cert", "phase5-compliance"]
-            seen: set[str] = set()
-            for task_id in task_ids:
-                tid = str(task_id or "").strip()
-                if not tid:
-                    continue
-                for record in list_documents(task_id=tid, limit=50):
-                    uid = str(record.get("file_uuid") or "").strip()
-                    if uid and uid not in seen:
-                        seen.add(uid)
-                        file_uuids.append(uid)
+        task_ids = body.get("task_ids")
+        if not isinstance(task_ids, list) or not task_ids:
+            task_ids = ["phase5-cert", "phase5-compliance"]
+
+        file_uuids = collect_registration_file_uuids(file_uuids=client_uuids, task_ids=task_ids)
 
         if not file_uuids:
             return jsonify(

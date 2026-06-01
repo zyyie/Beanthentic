@@ -140,9 +140,19 @@ def _load_ipophl_disk_files(file_uuids: list[str]) -> list[tuple[str, Path]]:
     return out
 
 
+def _gi_attachment_base_url() -> str:
+    """URLs for mobile must point at the app server (:8080), not the admin web.py host."""
+    from config.app_connection import app_server_base
+
+    base = (app_server_base() or "").strip().rstrip("/")
+    if base:
+        return base
+    return _public_base_url()
+
+
 def _save_gi_attachments_from_paths(disk_files: list[tuple[str, Path]]) -> list[dict]:
     GI_CONTRIB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    base_url = _public_base_url()
+    base_url = _gi_attachment_base_url()
     attachments: list[dict] = []
     for original, path in disk_files[:IPOPHL_GI_MAX_FILES]:
         if not path.is_file():
@@ -215,7 +225,7 @@ def _broadcast_admin_submissions_mysql(
                     """,
                     (
                         fid,
-                        title[:255],
+                        title[:150],
                         content,
                         cat,
                         sender_name[:255],
@@ -260,6 +270,44 @@ def _broadcast_admin_submissions_mysql(
     return created_ids
 
 
+def _set_gi_progress_mysql(
+    farmer_ids: list[int],
+    progress: float,
+    *,
+    note: str = "",
+    sender_name: str = "IPOPHL Administrator",
+) -> None:
+    params = app_db_params()
+    if not params or not farmer_ids:
+        return
+    progress = max(0.0, min(100.0, float(progress)))
+    body = note or f"GI Registration complete — {progress:.0f}%"
+    conn = connect_app_mysql(params)
+    try:
+        with conn.cursor() as cur:
+            ensure_gi_updates_table(cur)
+            for fid in farmer_ids:
+                cur.execute(
+                    """
+                    INSERT INTO gi_updates
+                      (farmer_id, title, content, upload_status, is_read_admin,
+                       category, current_phase, progress_percent, sender_name)
+                    VALUES
+                      (%s, 'GI Progress Update', %s, 'approved', 1,
+                       'general', 'admin_progress', %s, %s)
+                    """,
+                    (fid, body[:5000], progress, sender_name[:255]),
+                )
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    finally:
+        conn.close()
+
+
 def publish_ipophl_registration_to_gi_updates(
     *,
     file_uuids: list[str],
@@ -282,7 +330,7 @@ def publish_ipophl_registration_to_gi_updates(
             "No registration files found. Upload documents in Phase 5 before completing registration."
         )
 
-    doc_title = (title or "GI Registration — IPOPHL Documents").strip()[:255]
+    doc_title = (title or "GI Registration — IPOPHL Documents").strip()[:150]
     names = ", ".join(n for n, _ in disk_files)
     doc_content = (content or "").strip()
     if not doc_content:
@@ -295,6 +343,34 @@ def publish_ipophl_registration_to_gi_updates(
 
     http_err: Exception | None = None
     mysql_err: Exception | None = None
+
+    if _gi_http_bases():
+        try:
+            data = _send_gi_via_http(
+                send_to_all=True,
+                farmer_id=0,
+                title=doc_title,
+                content=doc_content,
+                category=category[:30],
+                sender_name=sender_name[:255],
+                uploads=[],
+                disk_files=disk_files,
+            )
+            data["source"] = "app_server_http"
+            if data.get("sent_count") or data.get("gi_update_ids"):
+                try:
+                    farmer_ids = _list_active_farmer_ids()
+                    _set_gi_progress_mysql(
+                        farmer_ids,
+                        100.0,
+                        note="GI Registration complete — documents are available in GI Updates.",
+                        sender_name=sender_name[:255],
+                    )
+                except Exception:
+                    pass
+                return data
+        except Exception as e:
+            http_err = e
 
     if app_db_params():
         try:
@@ -319,23 +395,6 @@ def publish_ipophl_registration_to_gi_updates(
             }
         except Exception as e:
             mysql_err = e
-
-    if _gi_http_bases():
-        try:
-            data = _send_gi_via_http(
-                send_to_all=True,
-                farmer_id=0,
-                title=doc_title,
-                content=doc_content,
-                category=category[:30],
-                sender_name=sender_name[:255],
-                uploads=[],
-                disk_files=disk_files,
-            )
-            data["source"] = "app_server_http"
-            return data
-        except Exception as e:
-            http_err = e
 
     detail = friendly_load_failure(
         module_label="IPOPHL registration → GI Updates",
@@ -428,7 +487,7 @@ def _public_base_url() -> str:
 
 def _save_gi_upload_files(file_items) -> list[dict]:
     GI_CONTRIB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    base_url = _public_base_url()
+    base_url = _gi_attachment_base_url()
     attachments: list[dict] = []
     for upload in file_items[:GI_MAX_FILES]:
         if not upload or not getattr(upload, "filename", None):

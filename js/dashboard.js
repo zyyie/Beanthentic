@@ -5502,27 +5502,29 @@ class DashboardApp {
   }
 
   async fetchPhase5FileUuidsFromServer() {
-    const services = ['phase5-cert', 'phase5-compliance'];
     const uuids = [];
     const seen = new Set();
-
-    for (const taskId of services) {
-      try {
-        const res = await fetch(
-          `/api/ipo-documents?task_id=${encodeURIComponent(taskId)}&limit=50`,
-          { credentials: 'same-origin' }
-        );
-        const data = await res.json().catch(() => ({}));
-        (data.items || []).forEach((doc) => {
-          const uid = String(doc.file_uuid || '').trim();
-          if (uid && !seen.has(uid)) {
-            seen.add(uid);
-            uuids.push(uid);
-          }
-        });
-      } catch (e) {
-        console.warn('Could not load IPOPHL documents for', taskId, e);
+    const add = (uid) => {
+      const id = String(uid || '').trim();
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        uuids.push(id);
       }
+    };
+
+    try {
+      const res = await fetch('/api/ipo-documents?limit=200', { credentials: 'same-origin' });
+      const data = await res.json().catch(() => ({}));
+      const items = data.items || [];
+      items.forEach((doc) => {
+        const tid = String(doc.task_id || '');
+        if (tid.startsWith('phase5-')) add(doc.file_uuid);
+      });
+      if (!uuids.length) {
+        items.slice(0, 20).forEach((doc) => add(doc.file_uuid));
+      }
+    } catch (e) {
+      console.warn('Could not load IPOPHL documents:', e);
     }
     return uuids;
   }
