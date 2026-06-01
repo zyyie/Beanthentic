@@ -741,10 +741,15 @@ def register_ipophl_routes(app):
                 pass
             db_rows = _count_admin_gi_rows()
             cards = int(result.get("cards_published") or 0)
-            resolved = int(result.get("files_resolved") or cards)
+            resolved = int(result.get("files_resolved") or 0)
             requested = int(result.get("files_requested") or len(file_uuids))
+            with_files = int(result.get("categories_with_files") or 0)
+            total_cats = int(result.get("categories_total") or 13)
             skipped = max(0, requested - resolved)
-            msg = f"Published {cards} of {requested} file(s) to GI Updates."
+            msg = (
+                f"Published {cards} GI Update card(s) ({total_cats} IPOPHL categories). "
+                f"{with_files} categor{'y' if with_files == 1 else 'ies'} include attached file(s)."
+            )
             if skipped:
                 msg += f" {skipped} file(s) were missing on this PC — re-upload in IPOPHL, then try again."
             return jsonify(

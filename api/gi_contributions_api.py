@@ -558,18 +558,31 @@ def publish_ipophl_registration_to_gi_updates(
     content: str | None = None,
     category: str = "ipophl_registration",
     task_overrides: dict[str, str] | None = None,
+    publish_all_categories: bool = True,
 ) -> dict:
     """
-    Publish IPOPHL files to farmers' GI Updates — one feed card per document category
-    (Product Documentation, Filing Documents, etc.), like separate Facebook posts.
+    Publish IPOPHL to farmers' GI Updates — one feed card per document category (13 groups).
+    Multiple files in the same zone share one card (multiple attachments).
     """
-    from config.ipophl_store import apply_task_overrides_to_store, build_publish_file_entries
+    from config.ipophl_store import (
+        OFFICIAL_IPOPHL_TASK_IDS,
+        apply_task_overrides_to_store,
+        build_publish_file_entries,
+        build_publish_task_groups,
+    )
 
     if task_overrides:
         apply_task_overrides_to_store(task_overrides)
 
+    task_groups = build_publish_task_groups(
+        file_uuids,
+        task_overrides=task_overrides,
+        include_all_categories=publish_all_categories,
+    )
     publish_rows = build_publish_file_entries(file_uuids, task_overrides=task_overrides)
-    if not publish_rows:
+    files_on_disk = sum(len(g.get("files") or []) for g in task_groups)
+
+    if not task_groups:
         if file_uuids:
             raise ValueError(
                 "Registration files were not found on this device or are empty (0 bytes). "
@@ -584,17 +597,8 @@ def publish_ipophl_registration_to_gi_updates(
     mysql_err: Exception | None = None
     all_created_ids: list[int] = []
     cards_published = 0
+    categories_with_files = 0
     last_attachments: list[dict] = []
-
-    file_entries: list[tuple[str, str, str, Path]] = [
-        (
-            str(row["task_id"]),
-            str(row["label"]),
-            str(row["original"]),
-            row["path"],
-        )
-        for row in publish_rows
-    ]
 
     farmer_ids: list[int] = []
     if app_db_params():
@@ -607,23 +611,38 @@ def publish_ipophl_registration_to_gi_updates(
             "No farmers in the app database. Add at least one farmer on the mobile app or app server first."
         )
 
-    for task_id, label, original, path in file_entries:
-        display = _display_filename(original, path)
+    published_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+
+    for group in task_groups:
+        task_id = str(group.get("task_id") or "ipophl-other")
+        label = str(group.get("label") or task_id)
+        disk_files: list[tuple[str, Path]] = list(group.get("files") or [])
         card_title = (title or label).strip()[:150]
-        doc_content = (
-            f"{label}\n\n"
-            f"File: {display}\n\n"
-            f"Published: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC"
-        )
         task_category = str(task_id)[:30]
-        single = [(original, path)]
+
+        if disk_files:
+            categories_with_files += 1
+            file_lines = "\n".join(
+                f"- {_display_filename(name, path)}" for name, path in disk_files
+            )
+            doc_content = (
+                f"{label}\n\n"
+                f"Files ({len(disk_files)}):\n{file_lines}\n\n"
+                f"Published: {published_at}"
+            )
+        else:
+            doc_content = (
+                f"{label}\n\n"
+                "No file attached for this category on the admin server yet. "
+                "Upload a document in this IPOPHL section, then click Complete Registration again.\n\n"
+                f"Published: {published_at}"
+            )
 
         published_this_card = False
 
-        # 1) MySQL first — always commits so Complete Registration saves even if :8080 HTTP fails.
         if app_db_params() and farmer_ids:
             try:
-                attachments = _prepare_ipophl_attachments(single)
+                attachments = _prepare_ipophl_attachments(disk_files) if disk_files else []
                 created_ids = _broadcast_admin_submissions_mysql(
                     farmer_ids=farmer_ids,
                     title=card_title,
@@ -634,12 +653,12 @@ def publish_ipophl_registration_to_gi_updates(
                     set_progress_percent=None,
                 )
                 all_created_ids.extend(created_ids)
-                last_attachments = attachments
+                if attachments:
+                    last_attachments = attachments
                 published_this_card = True
             except Exception as e:
                 mysql_err = e
 
-        # 2) HTTP fallback only if MySQL did not save this card (sync files to app server).
         if not published_this_card and _gi_http_bases():
             try:
                 data = _send_gi_via_http(
@@ -650,7 +669,7 @@ def publish_ipophl_registration_to_gi_updates(
                     category=task_category,
                     sender_name=sender_name[:255],
                     uploads=[],
-                    disk_files=single,
+                    disk_files=disk_files or None,
                     http_timeout=60.0,
                 )
                 if data.get("gi_update_ids"):
@@ -694,7 +713,10 @@ def publish_ipophl_registration_to_gi_updates(
         "ok": True,
         "broadcast": True,
         "cards_published": cards_published,
-        "files_resolved": len(publish_rows),
+        "categories_published": cards_published,
+        "categories_total": len(OFFICIAL_IPOPHL_TASK_IDS) if publish_all_categories else len(task_groups),
+        "categories_with_files": categories_with_files,
+        "files_resolved": files_on_disk or len(publish_rows),
         "files_requested": len(file_uuids),
         "sent_count": farmer_count,
         "gi_update_ids": all_created_ids,

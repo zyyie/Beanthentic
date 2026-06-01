@@ -120,11 +120,17 @@
         throw new Error(data.error || data.message || data.detail || 'Save failed (HTTP ' + res.status + ')');
       }
       const cards = data.cards_published || 0;
+      const totalCats = data.categories_total || 13;
+      const withFiles = data.categories_with_files != null ? data.categories_with_files : '';
       notify(
         data.message ||
-          'Saved to GI Updates (' +
+          'Saved ' +
             cards +
-            ' card(s)). Open GI Updates on the mobile app (app.py device).'
+            ' GI Update cards (' +
+            totalCats +
+            ' IPOPHL categories' +
+            (withFiles !== '' ? ', ' + withFiles + ' with file(s)' : '') +
+            '). Open GI Updates on the mobile app.'
       );
       if (window.dashboardApp) {
         if (typeof window.dashboardApp.switchModule === 'function') {
