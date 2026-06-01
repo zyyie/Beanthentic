@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import re
+import shutil
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -197,7 +198,16 @@ def _save_gi_attachments_from_paths(
         display = _display_filename(original, path)
         stored = f"{path.stem[:36]}{ext}" if path.stem else f"{uuid.uuid4().hex}{ext}"
         dest = GI_CONTRIB_UPLOAD_DIR / stored
-        dest.write_bytes(path.read_bytes())
+        # Speed up repeated publishes: avoid re-copying same-sized files.
+        # (User often clicks Complete multiple times while debugging.)
+        try:
+            if dest.exists() and dest.stat().st_size == size:
+                pass
+            else:
+                shutil.copy2(str(path), str(dest))
+        except Exception:
+            # Fallback if shutil copy fails for any reason.
+            dest.write_bytes(path.read_bytes())
         rel = f"uploads/gi_contributions/{stored}"
         url = f"{base_url.rstrip('/')}/{rel}" if base_url else rel
         mime = mimetypes.guess_type(display)[0] or ""
@@ -242,36 +252,52 @@ def _broadcast_admin_submissions_mysql(
             ensure_gi_updates_table(cur)
             has_preview = "preview" in _gi_table_columns(cur)
             for fid in farmer_ids:
-                cur.execute(
-                    """
-                    INSERT INTO gi_updates (
-                      farmer_id, current_phase, title, content, category,
-                      sender_name, attachments_json, upload_status,
-                      is_starred, is_read_admin, progress_percent
-                    ) VALUES (
-                      %s, 'admin_submission', %s, %s, %s,
-                      %s, %s, 'approved',
-                      0, 1, 0
-                    )
-                    """,
-                    (
-                        fid,
-                        title[:150],
-                        content,
-                        cat,
-                        sender_name[:255],
-                        attachments_json,
-                    ),
-                )
-                gid = int(cur.lastrowid or 0)
-                if gid and has_preview:
-                    try:
-                        cur.execute(
-                            "UPDATE gi_updates SET preview = %s WHERE gi_update_id = %s",
-                            (preview, gid),
+                if has_preview:
+                    cur.execute(
+                        """
+                        INSERT INTO gi_updates (
+                          farmer_id, current_phase, title, content, preview, category,
+                          sender_name, attachments_json, upload_status,
+                          is_starred, is_read_admin, progress_percent
+                        ) VALUES (
+                          %s, 'admin_submission', %s, %s, %s, %s,
+                          %s, %s, 'approved',
+                          0, 1, 0
                         )
-                    except Exception:
-                        pass
+                        """,
+                        (
+                            fid,
+                            title[:150],
+                            content,
+                            preview,
+                            cat,
+                            sender_name[:255],
+                            attachments_json,
+                        ),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        INSERT INTO gi_updates (
+                          farmer_id, current_phase, title, content, category,
+                          sender_name, attachments_json, upload_status,
+                          is_starred, is_read_admin, progress_percent
+                        ) VALUES (
+                          %s, 'admin_submission', %s, %s, %s,
+                          %s, %s, 'approved',
+                          0, 1, 0
+                        )
+                        """,
+                        (
+                            fid,
+                            title[:150],
+                            content,
+                            cat,
+                            sender_name[:255],
+                            attachments_json,
+                        ),
+                    )
+                gid = int(cur.lastrowid or 0)
                 if gid:
                     created_ids.append(gid)
             if set_progress_percent is not None and farmer_ids:
