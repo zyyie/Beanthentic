@@ -1601,7 +1601,7 @@
                 
                 <div class="phase-actions">
                   <button class="phase-btn prev-phase" data-prev="4">Back to Phase 4</button>
-                  <button class="phase-btn complete-btn">Complete Registration</button>
+                  <button type="button" class="phase-btn complete-btn" data-action="ipophl-complete-registration" aria-label="Complete registration and publish to GI Updates">Complete Registration</button>
                 </div>
               </div>
             </section>
@@ -2251,7 +2251,16 @@
   <script src="js/main.js"></script>
   <script src="js/navigation.js"></script>
   <script src="js/beanthentic_datetime.js?v=20260524-msgshort"></script>
-  <script src="js/dashboard.js?v=20260602gi-phase-all"></script>
+  <script src="js/dashboard.js?v=20260602gi-db-save"></script>
+  <script>
+    (function () {
+      if (!window.dashboardApp || typeof window.dashboardApp.completeRegistration !== 'function') return;
+      var src = window.dashboardApp.completeRegistration.toString();
+      if (src.indexOf('complete-registration') < 0 && src.indexOf('Email sent to IPOPHL') >= 0) {
+        console.warn('Stale dashboard.js detected. Press Ctrl+F5, then restart python web.py.');
+      }
+    })();
+  </script>
   <script src="js/ipophl-analyzer.js?v=20260602gi-topics"></script>
   
   <!-- Delete Confirmation Modal -->

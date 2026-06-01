@@ -669,6 +669,9 @@ def register_ipophl_routes(app):
         if not isinstance(task_ids, list) or not task_ids:
             task_ids = None
 
+        from config.ipophl_store import bootstrap_orphan_uploads
+
+        bootstrap_orphan_uploads(limit=500)
         file_uuids = collect_registration_file_uuids(file_uuids=client_uuids, task_ids=task_ids)
 
         task_overrides: dict[str, str] = {}
@@ -679,8 +682,9 @@ def register_ipophl_routes(app):
                     continue
                 uid = str(entry.get("file_uuid") or entry.get("id") or "").strip()
                 tid = str(entry.get("task_id") or entry.get("service") or "").strip()
-                if uid and tid:
-                    task_overrides[uid] = tid
+                if uid:
+                    if tid:
+                        task_overrides[uid] = tid
                     if uid not in file_uuids:
                         file_uuids.append(uid)
 

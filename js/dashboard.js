@@ -962,6 +962,8 @@ class DashboardApp {
     this.initAccountModule();
     // Initialize Farmer's Contribution module
     this.initBeanthenticContributions();
+    // IPOPHL Complete → GI Updates (delegated; survives cached/old phase button init)
+    this.initIpophlCompleteRegistration();
     // Initialize Farmer Profile tabs
     this.initFarmerProfileTabs();
     // Initialize Map Layer Toggles
@@ -5391,12 +5393,24 @@ class DashboardApp {
       });
     });
     
-    if (completeBtn && !completeBtn.dataset.completeBound) {
-      completeBtn.dataset.completeBound = '1';
-      completeBtn.addEventListener('click', () => {
-        this.completeRegistration();
-      });
-    }
+    // Complete Registration is bound once via initIpophlCompleteRegistration() (delegated).
+  }
+
+  initIpophlCompleteRegistration() {
+    if (this._ipophlCompleteDelegated) return;
+    this._ipophlCompleteDelegated = true;
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest(
+        '[data-action="ipophl-complete-registration"], #ipophl-module .complete-btn'
+      );
+      if (!btn) return;
+      const ipophlRoot = document.getElementById('ipophl-module');
+      if (!ipophlRoot || !ipophlRoot.contains(btn)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (btn.disabled || btn.classList.contains('is-loading')) return;
+      this.completeRegistration();
+    });
   }
 
   navigateToPhase(phaseNum) {
@@ -5489,8 +5503,8 @@ class DashboardApp {
 
     const add = (fileUuid, taskId) => {
       const id = String(fileUuid || '').trim();
-      const tid = String(taskId || '').trim();
-      if (!id || !tid) return;
+      if (!id) return;
+      const tid = String(taskId || 'ipophl-other').trim() || 'ipophl-other';
       byUuid.set(id, { file_uuid: id, task_id: tid });
     };
 
@@ -5550,8 +5564,8 @@ class DashboardApp {
     const entries = [];
     const seen = new Set();
     try {
-      const res = await fetch('/api/ipo-documents?limit=300', { credentials: 'same-origin' });
-      const data = await res.json().catch(() => ({}));
+      const res = await fetch(beanthenticApiUrl('/api/ipo-documents?limit=300'), { credentials: 'same-origin' });
+      const data = await beanthenticParseJsonResponse(res).catch(() => ({}));
       (data.items || []).forEach((doc) => {
         const id = String(doc.file_uuid || '').trim();
         const taskId = String(doc.task_id || '').trim();
@@ -5578,8 +5592,8 @@ class DashboardApp {
     };
 
     try {
-      const res = await fetch('/api/ipo-documents?limit=200', { credentials: 'same-origin' });
-      const data = await res.json().catch(() => ({}));
+      const res = await fetch(beanthenticApiUrl('/api/ipo-documents?limit=200'), { credentials: 'same-origin' });
+      const data = await beanthenticParseJsonResponse(res).catch(() => ({}));
       const items = data.items || [];
       items.forEach((doc) => {
         const tid = String(doc.task_id || '');
@@ -5616,6 +5630,9 @@ class DashboardApp {
   }
 
   async completeRegistration() {
+    // v2 — POST /api/ipophl/complete-registration → XAMPP gi_updates (not email-only).
+    this.setCompleteRegistrationLoading(true, 'Preparing IPOPHL documents…');
+
     const merged = new Map();
     const serverEntries = await this.fetchAllIpophlFileEntriesFromServer();
     serverEntries.forEach((e) => {
@@ -5626,7 +5643,7 @@ class DashboardApp {
       const prev = merged.get(e.file_uuid) || {};
       merged.set(e.file_uuid, {
         file_uuid: e.file_uuid,
-        task_id: e.task_id || prev.task_id || '',
+        task_id: e.task_id || prev.task_id || 'ipophl-other',
       });
     });
 
@@ -5636,20 +5653,19 @@ class DashboardApp {
     if (!fileUuids.length) {
       const phase5Ids = this.collectPhase5FileUuids();
       fileUuids = phase5Ids;
-      fileEntries = phase5Ids.map((id) => ({ file_uuid: id, task_id: '' }));
+      fileEntries = phase5Ids.map((id) => ({ file_uuid: id, task_id: 'ipophl-other' }));
     }
 
-    if (!fileUuids.length) {
-      this.showIpophlNotification(
-        'No IPOPHL files found. Upload documents in any IPOPHL phase first, then click Complete Registration.'
-      );
-      return;
-    }
-
-    this.setCompleteRegistrationLoading(true, `Publishing ${fileUuids.length} file(s) to GI Updates…`);
+    const publishCount = fileUuids.length;
+    this.setCompleteRegistrationLoading(
+      true,
+      publishCount
+        ? `Saving ${publishCount} file(s) to GI Updates (XAMPP)…`
+        : 'Saving to GI Updates (XAMPP)…'
+    );
 
     try {
-      const res = await fetch('/api/ipophl/complete-registration', {
+      const res = await fetch(beanthenticApiUrl('/api/ipophl/complete-registration'), {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
@@ -5658,7 +5674,7 @@ class DashboardApp {
           file_entries: fileEntries,
         }),
       });
-      const data = await res.json().catch(() => ({}));
+      const data = await beanthenticParseJsonResponse(res).catch(() => ({}));
       if (res.status === 401) {
         throw new Error('Session expired. Log in again, then click Complete Registration.');
       }
@@ -5673,10 +5689,10 @@ class DashboardApp {
       const cards = data.cards_published || 0;
       const resolved = data.files_resolved != null ? data.files_resolved : cards;
       const requested = data.files_requested != null ? data.files_requested : fileUuids.length;
-      this.showIpophlNotification(
+      const okMsg =
         data.message ||
-          `Published ${cards} of ${requested} file(s). Open Farmer's Contribution or GI Updates on the app.`
-      );
+        `Saved ${cards} of ${requested} document(s) to GI Updates (MySQL on app device). Check Farmer's Contribution here and GI Updates on the mobile app.`;
+      this.showIpophlNotification(okMsg);
 
       console.log('IPOPHL → GI Updates published:', {
         fileUuids,
@@ -9713,8 +9729,10 @@ class DashboardApp {
     this.contributionsLoading = true;
     this.contributionsLoadError = '';
     try {
-      const res = await fetch('/api/gi-contributions-list?limit=500&phase=all', { credentials: 'same-origin' });
-      const data = await res.json().catch(() => ({}));
+      const res = await fetch(beanthenticApiUrl('/api/gi-contributions-list?limit=500&phase=all'), {
+        credentials: 'same-origin',
+      });
+      const data = await beanthenticParseJsonResponse(res).catch(() => ({}));
       if (!res.ok || !data.ok) {
         throw new Error(
           this.formatAppLoadError(data, `Could not load contributions (HTTP ${res.status}).`)
