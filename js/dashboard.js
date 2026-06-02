@@ -5397,20 +5397,8 @@ class DashboardApp {
   }
 
   initIpophlCompleteRegistration() {
-    if (this._ipophlCompleteDelegated) return;
+    // Click + loading handled by js/ipophl-complete-gi.js (capture phase).
     this._ipophlCompleteDelegated = true;
-    document.addEventListener('click', (e) => {
-      const btn = e.target.closest(
-        '[data-action="ipophl-complete-registration"], #ipophl-module .complete-btn'
-      );
-      if (!btn) return;
-      const ipophlRoot = document.getElementById('ipophl-module');
-      if (!ipophlRoot || !ipophlRoot.contains(btn)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (btn.disabled || btn.classList.contains('is-loading')) return;
-      this.completeRegistration();
-    });
   }
 
   navigateToPhase(phaseNum) {
@@ -5444,7 +5432,9 @@ class DashboardApp {
     if (hasFiles || hasLinks) return true;
 
     const container = document.getElementById(`${service}-files`);
-    return Boolean(container?.querySelector('.file-item'));
+    return Boolean(
+      container?.querySelector('.file-item[data-file-uuid], .file-item.pending, .file-item.success')
+    );
   }
 
   isIpophlPhaseComplete(phaseNum) {
@@ -5630,7 +5620,10 @@ class DashboardApp {
   }
 
   async completeRegistration() {
-    // v2 — POST /api/ipophl/complete-registration → XAMPP gi_updates (not email-only).
+    if (typeof window.publishIpophlToGiUpdates === 'function') {
+      return window.publishIpophlToGiUpdates();
+    }
+    // Fallback if ipophl-complete-gi.js did not load.
     this.setCompleteRegistrationLoading(true, 'Preparing IPOPHL documents…');
 
     const merged = new Map();
@@ -5672,6 +5665,8 @@ class DashboardApp {
         body: JSON.stringify({
           file_uuids: fileUuids,
           file_entries: fileEntries,
+          force_publish: true,
+          publish_all_categories: false,
         }),
       });
       const data = await beanthenticParseJsonResponse(res).catch(() => ({}));
@@ -5721,27 +5716,13 @@ class DashboardApp {
     }
   }
 
-  sendRegistrationEmail(registrationData) {
-    try {
-      // Create email content
-      const emailContent = this.createEmailContent(registrationData);
-      
-      // Create Gmail web interface link with correct IPOPHL addresses
-      const subject = encodeURIComponent('GI Registration Application - Lipa City Products');
-      const body = encodeURIComponent(emailContent);
-      const to = encodeURIComponent('copyright@ipophl.gov.ph,csd@ipophl.gov.ph');
-      
-      // Redirect to Gmail web interface
-      const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`;
-      
-      // Open Gmail in new tab
-      window.open(gmailLink, '_blank');
-      
-      this.showIpophlNotification('Opening Gmail to send registration to IPOPHL...');
-    } catch (error) {
-      console.error('Error opening Gmail:', error);
-      this.showIpophlNotification('Failed to open Gmail. Please try again.');
+  sendRegistrationEmail(_registrationData) {
+    if (typeof window.publishIpophlToGiUpdates === 'function') {
+      return window.publishIpophlToGiUpdates();
     }
+    this.showIpophlNotification(
+      'Reload the dashboard (Ctrl+F5), then click Complete Registration to save to GI Updates.'
+    );
   }
 
   createEmailContent(registrationData) {

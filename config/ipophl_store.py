@@ -38,6 +38,23 @@ IPOPHL_TASK_LABELS: dict[str, str] = {
 
 IPOPHL_TASK_ORDER: list[str] = list(IPOPHL_TASK_LABELS.keys())
 
+# Thirteen IPOPHL upload zones on the dashboard (excludes ipophl-other).
+OFFICIAL_IPOPHL_TASK_IDS: list[str] = [
+    "phase1-product",
+    "phase1-entity",
+    "phase1-stakeholders",
+    "phase2-mop",
+    "phase2-cert",
+    "phase2-details",
+    "phase3-filing",
+    "phase3-payment",
+    "phase4-exam",
+    "phase4-response",
+    "phase4-pub",
+    "phase5-cert",
+    "phase5-compliance",
+]
+
 _TASK_ID_RE = re.compile(r"^phase[1-5]-[a-z0-9-]+$", re.I)
 
 
@@ -133,10 +150,22 @@ def _save(data: dict) -> None:
     STORE_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
+def _normalize_record_file_path(record: dict) -> dict:
+    """Store portable paths so publish works after folder moves."""
+    file_uuid = str(record.get("file_uuid") or "").strip()
+    raw_path = str(record.get("file_path") or "").strip()
+    if file_uuid and raw_path:
+        name = Path(raw_path).name
+        if _UUID_FILE_RE.match(name) or name.startswith(file_uuid):
+            record = {**record, "file_path": f"machinelearning/uploads/{name}"}
+    return record
+
+
 def upsert_document(record: dict) -> None:
     file_uuid = str(record.get("file_uuid") or "").strip()
     if not file_uuid:
         return
+    record = _normalize_record_file_path(dict(record))
     data = _load()
     data[file_uuid] = record
     _save(data)
@@ -249,6 +278,51 @@ def group_disk_files_by_task(
             return (1, tid)
 
     return dict(sorted(groups.items(), key=lambda item: sort_key(item[0])))
+
+
+def build_publish_task_groups(
+    file_uuids: list[str],
+    *,
+    task_overrides: dict[str, str] | None = None,
+    include_all_categories: bool = True,
+) -> list[dict]:
+    """
+    One GI Updates card per IPOPHL category (13 groups). Multiple files in the same
+    zone are bundled into a single card with multiple attachments.
+    """
+    grouped = group_disk_files_by_task(file_uuids, task_overrides=task_overrides)
+    out: list[dict] = []
+
+    if include_all_categories:
+        for task_id in OFFICIAL_IPOPHL_TASK_IDS:
+            files = grouped.get(task_id) or []
+            out.append(
+                {
+                    "task_id": task_id,
+                    "label": task_label(task_id),
+                    "files": files,
+                }
+            )
+        extra = [tid for tid in grouped if tid not in OFFICIAL_IPOPHL_TASK_IDS]
+        for task_id in sorted(extra):
+            out.append(
+                {
+                    "task_id": task_id,
+                    "label": task_label(task_id),
+                    "files": grouped.get(task_id) or [],
+                }
+            )
+        return out
+
+    for task_id, files in grouped.items():
+        out.append(
+            {
+                "task_id": task_id,
+                "label": task_label(task_id),
+                "files": files,
+            }
+        )
+    return out
 
 
 def list_documents(*, phase: str | None = None, task_id: str | None = None, limit: int = 200) -> list[dict]:

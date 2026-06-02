@@ -4,6 +4,7 @@ Dashboard and settings routes for Beanthentic application.
 
 import json
 import os
+import time
 from datetime import datetime
 
 from flask import jsonify, redirect, render_template, request, send_file, session, url_for
@@ -56,6 +57,7 @@ def register_dashboard_routes(app):
             user_full_name=full_name,
             google_maps_api_key=google_maps_api_key,
             google_maps_key_is_production=google_maps_key_is_production(google_maps_api_key),
+            static_cache_bust=int(time.time()),
         )
 
     @app.route("/settings")

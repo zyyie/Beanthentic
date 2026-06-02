@@ -40,10 +40,12 @@ def _app_http_request_json(
     query: dict | None = None,
     timeout: float | None = None,
     extra_headers: dict | None = None,
+    bases: list[str] | None = None,
 ) -> dict:
     if timeout is None:
         timeout = app_http_timeout()
-    bases = iter_app_server_bases()
+    if bases is None:
+        bases = iter_app_server_bases()
     if not bases:
         raise RuntimeError("app_server_base not set in settings.json")
     path = path if path.startswith("/") else f"/{path}"
@@ -88,8 +90,9 @@ def app_http_get_json(
     *,
     query: dict | None = None,
     timeout: float | None = None,
+    bases: list[str] | None = None,
 ) -> dict:
-    return _app_http_request_json("GET", path, query=query, timeout=timeout)
+    return _app_http_request_json("GET", path, query=query, timeout=timeout, bases=bases)
 
 
 def app_http_post_json(
@@ -138,6 +141,7 @@ def app_http_post_multipart(
     files: list[tuple[str, str, bytes, str | None]],
     *,
     timeout: float | None = None,
+    bases: list[str] | None = None,
 ) -> dict:
     """POST multipart/form-data to the app server (GI broadcast with attachments)."""
     import uuid
@@ -145,7 +149,8 @@ def app_http_post_multipart(
 
     if timeout is None:
         timeout = app_http_timeout()
-    bases = iter_app_server_bases()
+    if bases is None:
+        bases = iter_app_server_bases()
     if not bases:
         raise RuntimeError("app_server_base not set in settings.json")
 

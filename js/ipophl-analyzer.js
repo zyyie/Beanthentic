@@ -9,6 +9,8 @@ class IPOPHLAnalyzer {
         this.currentFile = null;
         this.currentAnalysis = null;
         this.isAnalyzing = false;
+        /** @type {Record<string, { file: File, key: string }[]>} */
+        this.pendingByTask = {};
         this.init();
     }
 
@@ -248,74 +250,144 @@ class IPOPHLAnalyzer {
                 zone.classList.remove('drag-over');
             });
 
-            zone.addEventListener('drop', async (e) => {
+            zone.addEventListener('drop', (e) => {
                 e.preventDefault();
                 zone.classList.remove('drag-over');
-                
+
                 const files = e.dataTransfer.files;
                 if (files.length > 0) {
-                    await this.handleFileUpload(files[0], service, attachedFiles);
+                    this.stageFileForComplete(files[0], service, attachedFiles);
                 }
             });
 
-            fileInput.addEventListener('change', async (e) => {
-                if (e.target.files.length > 0) {
-                    await this.handleFileUpload(e.target.files[0], service, attachedFiles);
+            fileInput.addEventListener('change', (e) => {
+                const list = e.target.files;
+                if (!list || !list.length) return;
+                for (let i = 0; i < list.length; i++) {
+                    this.stageFileForComplete(list[i], service, attachedFiles);
                 }
+                e.target.value = '';
             });
         });
     }
 
-    async handleFileUpload(file, service, attachedFilesContainer) {
-        // Check if this file is already being uploaded to prevent duplicate indicators
-        const existingUploading = Array.from(attachedFilesContainer.querySelectorAll('.file-item.uploading'))
-            .find(item => item.querySelector('.file-name').textContent === file.name);
-        
-        if (existingUploading) {
-            console.log(`File ${file.name} is already being analyzed.`);
+    /** Pick file locally — uploads to database only when admin clicks Complete Registration. */
+    stageFileForComplete(file, service, attachedFilesContainer) {
+        if (!file || !service) return;
+        const key = `${file.name}:${file.size}:${file.lastModified || 0}`;
+        if (!this.pendingByTask[service]) {
+            this.pendingByTask[service] = [];
+        }
+        if (this.pendingByTask[service].some((p) => p.key === key)) {
             return;
         }
-
-        try {
-            // Show loading state
-            this.showUploadProgress(attachedFilesContainer, file.name);
-
-            // Extract phase and task from service name
-            const phase = service.startsWith('phase') ? service.split('-')[0] : 'unknown';
-
-            // Create FormData for API request
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('phase', phase);
-            formData.append('task_id', service);
-
-            // Upload and analyze file
-            const response = await ipophlApi('/api/ipo-analyze', {
-                method: 'POST',
-                body: formData
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                // Display file with AI analysis
-                this.displayUploadedFile(attachedFilesContainer, result, file.name);
-                
-                // Show preview modal with full AI analysis
-                this.showFullAIAnalysis(result);
-            } else {
-                throw new Error(result.message || result.error || 'Upload failed');
+        this.pendingByTask[service].push({ file, key });
+        this.renderPendingCard(attachedFilesContainer, file, service);
+        if (window.dashboardApp && window.dashboardApp.ipophlFiles) {
+            if (!window.dashboardApp.ipophlFiles[service]) {
+                window.dashboardApp.ipophlFiles[service] = [];
             }
-
-        } catch (error) {
-            console.error('File upload error:', error);
-            let msg = error.message || 'Upload failed';
-            if (msg === 'Failed to fetch') {
-                msg =
-                    'Could not reach the admin server. Restart python web.py, stay on the same URL (e.g. http://127.0.0.1:5000), and try again. Large PDFs may take a minute.';
+            if (!window.dashboardApp.ipophlFiles[service].some((f) => f.pendingKey === key)) {
+                window.dashboardApp.ipophlFiles[service].push({
+                    id: `pending-${key}`,
+                    name: file.name,
+                    pendingKey: key,
+                });
             }
-            this.showUploadError(attachedFilesContainer, file.name, msg);
         }
+        this.refreshDashboardIndicator();
+        this.showToast(
+            'File selected. Click Complete Registration (Phase 5) to upload and send to GI Updates.',
+            'success'
+        );
+    }
+
+    renderPendingCard(container, file, service) {
+        if (!container) return;
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item pending';
+        fileItem.dataset.pendingKey = `${file.name}:${file.size}:${file.lastModified || 0}`;
+        fileItem.dataset.taskId = service;
+        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        const iconClass =
+            ext === 'pdf'
+                ? 'fa-file-pdf text-danger'
+                : ext === 'doc' || ext === 'docx'
+                  ? 'fa-file-word text-primary'
+                  : 'fa-file-lines text-success';
+        fileItem.innerHTML = `
+            <div class="file-info">
+                <i class="fa-solid ${iconClass}"></i>
+                <div class="file-details">
+                    <span class="file-name">${file.name}</span>
+                    <span class="file-meta">Ready — publishes when you click Complete Registration</span>
+                </div>
+            </div>
+            <div class="file-status-actions">
+                <div class="file-actions">
+                    <button type="button" class="file-action-btn delete" title="Remove">×</button>
+                </div>
+            </div>
+        `;
+        const del = fileItem.querySelector('.file-action-btn.delete');
+        if (del) {
+            del.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const k = fileItem.dataset.pendingKey;
+                this.pendingByTask[service] = (this.pendingByTask[service] || []).filter(
+                    (p) => p.key !== k
+                );
+                if (window.dashboardApp?.ipophlFiles?.[service]) {
+                    window.dashboardApp.ipophlFiles[service] = window.dashboardApp.ipophlFiles[
+                        service
+                    ].filter((f) => f.pendingKey !== k);
+                }
+                fileItem.remove();
+                this.refreshDashboardIndicator();
+            });
+        }
+        container.appendChild(fileItem);
+    }
+
+    collectPendingUploads() {
+        const out = [];
+        const seen = new Set();
+        const add = (file, taskId) => {
+            const tid = String(taskId || '').trim();
+            if (!file || !tid) return;
+            const sig = `${tid}:${file.name}:${file.size}`;
+            if (seen.has(sig)) return;
+            seen.add(sig);
+            out.push({ file, task_id: tid });
+        };
+        Object.keys(this.pendingByTask || {}).forEach((taskId) => {
+            (this.pendingByTask[taskId] || []).forEach((p) => add(p.file, taskId));
+        });
+        document.querySelectorAll('#ipophl-module .file-upload-zone[data-service]').forEach((zone) => {
+            const taskId = zone.dataset.service;
+            const input = zone.querySelector('.file-input');
+            if (!input?.files?.length) return;
+            for (let i = 0; i < input.files.length; i++) {
+                add(input.files[i], taskId);
+            }
+        });
+        return out;
+    }
+
+    clearPendingAfterPublish() {
+        this.pendingByTask = {};
+        document.querySelectorAll('#ipophl-module .file-item.pending').forEach((el) => el.remove());
+        document.querySelectorAll('#ipophl-module .file-input').forEach((input) => {
+            input.value = '';
+        });
+        if (window.dashboardApp?.ipophlFiles) {
+            Object.keys(window.dashboardApp.ipophlFiles).forEach((taskId) => {
+                window.dashboardApp.ipophlFiles[taskId] = (
+                    window.dashboardApp.ipophlFiles[taskId] || []
+                ).filter((f) => !f.pendingKey);
+            });
+        }
+        this.refreshDashboardIndicator();
     }
 
     parseServiceName(service) {
