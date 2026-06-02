@@ -36,11 +36,77 @@ GI_ALLOWED_EXTENSIONS = frozenset(
 GI_MAX_FILE_BYTES = 15 * 1024 * 1024
 GI_MAX_FILES = 5
 IPOPHL_GI_MAX_FILES = 30
+# PHP only keeps every file when the multipart field is files[] (not files).
+GI_MULTIPART_FILE_FIELD = "files[]"
 
 
-def _gi_http_bases() -> list[str]:
+def probe_gi_app_server(timeout: float = 4.0) -> tuple[bool, str, str]:
+    """
+    Quick check that Beanthentic-App (:8080) answers before a long Complete Registration.
+    Returns (reachable, base_used, error_message).
+    """
+    from urllib.error import HTTPError
+    from urllib.request import Request, urlopen
+
+    bases = _gi_app_server_bases()
+    if not bases:
+        return False, "", "app_server_base is not set in settings.json"
+    last_err = ""
+    probe_paths = (
+        "/api/admin_ipophl_documents.php?action=list&limit=1",
+        "/api/admin_farmer_data.php?limit=1",
+    )
+    for base in bases:
+        for path in probe_paths:
+            url = f"{base.rstrip('/')}{path}"
+            try:
+                req = Request(url, headers={"Accept": "application/json"})
+                with urlopen(req, timeout=timeout) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                if '"ok"' in raw and "true" in raw.lower():
+                    return True, base, ""
+                last_err = f"Unexpected response from {base}"
+            except HTTPError as e:
+                if e.code in (404, 405):
+                    return True, base, ""
+                last_err = f"HTTP {e.code} at {base}"
+            except Exception as e:
+                last_err = str(e)
+    cfg_base = (app_server_base() or bases[0]).strip()
+    return False, "", (
+        f"Cannot reach the app server at {cfg_base} (port 8080). "
+        f"On that PC: start XAMPP MySQL, run python app.py, copy deploy/xampp_api/*.php to Beanthentic-App/api/. "
+        f"Last error: {last_err}"
+    )
+
+
+def check_xampp_for_publish() -> dict:
+    """JSON for browser preflight before Complete Registration."""
+    prefer_http = _prefer_http_for_gi_send()
+    bases = _gi_app_server_bases()
+    reachable, used, err = probe_gi_app_server(timeout=4.0)
+    return {
+        "ok": reachable or not prefer_http,
+        "prefer_http": prefer_http,
+        "app_server_base": bases[0] if bases else "",
+        "reachable_base": used or "",
+        "xampp_reachable": reachable,
+        "error": None if reachable or not prefer_http else err,
+        "hint": (
+            "Start python app.py on the XAMPP PC and use the same Wi-Fi. "
+            "Open http://<XAMPP-IP>:8080 in a browser to confirm."
+        ),
+    }
+
+
+def _gi_app_server_bases() -> list[str]:
+    """
+    Beanthentic-App (:8080) URLs for GI / IPOPHL publish.
+    Uses connection.app_server_base first — never the SMS gateway phone host.
+    """
     ordered: list[str] = []
     seen: set[str] = set()
+    sms_gw_base = ""
 
     def add(url: str | None) -> None:
         base = (url or "").strip().rstrip("/")
@@ -55,24 +121,33 @@ def _gi_http_bases() -> list[str]:
             root = {}
     except Exception:
         root = {}
+    conn = root.get("connection") if isinstance(root.get("connection"), dict) else {}
+    app_base = str(conn.get("app_server_base") or app_server_base() or "").strip().rstrip("/")
     sms = root.get("sms") if isinstance(root.get("sms"), dict) else {}
     gw = sms.get("sms_gateway") if isinstance(sms.get("sms_gateway"), dict) else {}
-    add(str(gw.get("local_base_url") or ""))
-    conn = root.get("connection") if isinstance(root.get("connection"), dict) else {}
-    add(str(conn.get("app_server_base") or ""))
+    sms_gw_base = str(gw.get("local_base_url") or "").strip().rstrip("/")
+
+    add(app_base)
     for base in iter_app_server_bases():
+        if sms_gw_base and base == sms_gw_base:
+            continue
         add(base)
     return ordered
+
+
+def _gi_http_bases() -> list[str]:
+    """Backward-compatible alias — always the app server, not SMS gateway."""
+    return _gi_app_server_bases()
 
 
 def _prefer_http_for_gi_send() -> bool:
     params = app_db_params()
     if not params:
-        return bool(_gi_http_bases())
+        return bool(_gi_app_server_bases())
     host = str(params.get("host") or "").strip()
     if is_loopback_host(host):
         return False
-    return bool(_gi_http_bases())
+    return bool(_gi_app_server_bases())
 
 
 def _upload_files_for_http(uploads) -> list[tuple[str, str, bytes, str | None]]:
@@ -93,7 +168,7 @@ def _upload_files_for_http(uploads) -> list[tuple[str, str, bytes, str | None]]:
             continue
         out.append(
             (
-                "files",
+                GI_MULTIPART_FILE_FIELD,
                 original,
                 upload.read(),
                 upload.mimetype or mimetypes.guess_type(original)[0],
@@ -139,7 +214,7 @@ def _multipart_files_from_disk(disk_files: list[tuple[str, Path]]) -> list[tuple
             continue
         upload_name = _unique_multipart_filename(original, path)
         mime = mimetypes.guess_type(upload_name)[0] or mimetypes.guess_type(path.name)[0]
-        out.append(("files", upload_name, path.read_bytes(), mime))
+        out.append((GI_MULTIPART_FILE_FIELD, upload_name, path.read_bytes(), mime))
     return out
 
 
@@ -227,49 +302,47 @@ def _save_gi_attachments_from_paths(
 
 def _sync_attachments_to_app_server(disk_files: list[tuple[str, Path]]) -> list[dict]:
     """Upload files to app server :8080 so mobile GI Updates can preview/open them."""
-    if not disk_files or not _gi_http_bases():
+    if _prefer_http_for_gi_send():
+        return []
+    bases = _gi_app_server_bases()
+    if not disk_files or not bases:
         return []
     files = _multipart_files_from_disk(disk_files)
     if not files:
         return []
     fields = {"sync_only": "1"}
-    timeout = max(60.0, 12.0 * len(files))
-    last_err: Exception | None = None
-    for base in _gi_http_bases():
-        try:
-            data = app_http_post_multipart(
-                "/api/admin_gi_sync_files.php",
-                fields,
-                files,
-                timeout=timeout,
-            )
-            raw = data.get("attachments")
-            if not isinstance(raw, list) or not raw:
-                last_err = RuntimeError(str(data.get("error") or "No attachments returned"))
+    timeout = min(max(12.0, 6.0 * len(files)), 45.0)
+    try:
+        data = app_http_post_multipart(
+            "/api/admin_gi_sync_files.php",
+            fields,
+            files,
+            timeout=timeout,
+            bases=bases,
+        )
+        raw = data.get("attachments")
+        if not isinstance(raw, list) or not raw:
+            return []
+        base_url = bases[0].rstrip("/")
+        out: list[dict] = []
+        for item in raw:
+            if not isinstance(item, dict):
                 continue
-            base_url = base.rstrip("/")
-            out: list[dict] = []
-            for item in raw:
-                if not isinstance(item, dict):
-                    continue
-                path = str(item.get("path") or "").strip()
-                url = str(item.get("url") or "").strip()
-                if path and not url.startswith("http"):
-                    url = f"{base_url}{path if path.startswith('/') else '/' + path}"
-                out.append({**item, "path": path, "url": url})
-            if out:
-                return out
-        except Exception as e:
-            last_err = e
-    if last_err:
+            path = str(item.get("path") or "").strip()
+            url = str(item.get("url") or "").strip()
+            if path and not url.startswith("http"):
+                url = f"{base_url}{path if path.startswith('/') else '/' + path}"
+            out.append({**item, "path": path, "url": url})
+        return out
+    except Exception as e:
         import logging
 
-        logging.getLogger(__name__).warning("GI file sync to app server failed: %s", last_err)
-    return []
+        logging.getLogger(__name__).warning("GI file sync to app server failed: %s", e)
+        return []
 
 
 def _prepare_ipophl_attachments(disk_files: list[tuple[str, Path]]) -> list[dict]:
-    """Prefer app-server copies (mobile preview); fall back to admin-hosted files."""
+    """Prefer app-server copies (mobile preview); fall back to admin-hosted files on same PC."""
     synced = _sync_attachments_to_app_server(disk_files)
     if synced:
         return synced
@@ -472,9 +545,22 @@ def publish_gi_registration_fallback_to_gi_updates(
     so Complete Registration shows something in app.py GI Updates.
     """
     farmer_ids: list[int] = []
+    farmer_list_err: Exception | None = None
     if app_db_params():
-        farmer_ids = _list_active_farmer_ids()
-    if not farmer_ids:
+        try:
+            farmer_ids = _list_active_farmer_ids()
+        except Exception as e:
+            farmer_list_err = e
+    prefer_http = _prefer_http_for_gi_send() and bool(_gi_http_bases())
+    if not farmer_ids and not prefer_http:
+        if farmer_list_err:
+            raise RuntimeError(
+                friendly_load_failure(
+                    module_label="GI Updates (fallback publish)",
+                    mysql_error=farmer_list_err,
+                    http_error=None,
+                )
+            )
         raise ValueError(
             "No farmers in the app database. Add at least one farmer on the mobile app first."
         )
@@ -495,7 +581,26 @@ def publish_gi_registration_fallback_to_gi_updates(
     created_ids: list[int] = []
     attachments: list[dict] = []
 
-    if app_db_params():
+    if prefer_http and _gi_http_bases():
+        try:
+            data = _send_gi_via_http(
+                send_to_all=True,
+                farmer_id=0,
+                title=card_title,
+                content=body[:5000],
+                category="ipophl_registration",
+                sender_name=sender_name[:255],
+                uploads=[],
+                disk_files=disk_files[:1] if disk_files else None,
+                http_timeout=60.0,
+            )
+            if data.get("gi_update_ids"):
+                created_ids.extend(int(x) for x in data["gi_update_ids"] if int(x or 0) > 0)
+            attachments = data.get("attachments") or attachments
+        except Exception as e:
+            http_err = e
+
+    if not created_ids and app_db_params() and farmer_ids:
         try:
             attachments = _prepare_ipophl_attachments(disk_files[:1]) if disk_files else []
             created_ids = _broadcast_admin_submissions_mysql(
@@ -510,7 +615,7 @@ def publish_gi_registration_fallback_to_gi_updates(
         except Exception as e:
             mysql_err = e
 
-    if not created_ids and _gi_http_bases():
+    if not created_ids and not prefer_http and _gi_http_bases():
         try:
             data = _send_gi_via_http(
                 send_to_all=True,
@@ -582,6 +687,18 @@ def publish_ipophl_registration_to_gi_updates(
     publish_rows = build_publish_file_entries(file_uuids, task_overrides=task_overrides)
     files_on_disk = sum(len(g.get("files") or []) for g in task_groups)
 
+    if not task_groups and file_uuids:
+        disk_all = _load_ipophl_disk_files(file_uuids)
+        if disk_all:
+            task_groups = [
+                {
+                    "task_id": category or "ipophl_registration",
+                    "label": "GI Registration Documents",
+                    "files": disk_all,
+                }
+            ]
+            files_on_disk = len(disk_all)
+
     if not task_groups:
         if file_uuids:
             raise ValueError(
@@ -600,18 +717,32 @@ def publish_ipophl_registration_to_gi_updates(
     categories_with_files = 0
     last_attachments: list[dict] = []
 
+    prefer_http = _prefer_http_for_gi_send() and bool(_gi_app_server_bases())
+
     farmer_ids: list[int] = []
-    if app_db_params():
+    farmer_list_err: Exception | None = None
+    if app_db_params() and not prefer_http:
         try:
             farmer_ids = _list_active_farmer_ids()
         except Exception as e:
+            farmer_list_err = e
             mysql_err = e
-    if app_db_params() and not farmer_ids:
+    if not prefer_http and app_db_params() and not farmer_ids:
+        if farmer_list_err:
+            raise RuntimeError(
+                friendly_load_failure(
+                    module_label="IPOPHL registration (farmer list)",
+                    mysql_error=farmer_list_err,
+                    http_error=None,
+                )
+            )
         raise ValueError(
             "No farmers in the app database. Add at least one farmer on the mobile app or app server first."
         )
 
     published_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    used_http = False
+    http_sent_count = 0
 
     for group in task_groups:
         task_id = str(group.get("task_id") or "ipophl-other")
@@ -640,26 +771,10 @@ def publish_ipophl_registration_to_gi_updates(
 
         published_this_card = False
 
-        if app_db_params() and farmer_ids:
-            try:
-                attachments = _prepare_ipophl_attachments(disk_files) if disk_files else []
-                created_ids = _broadcast_admin_submissions_mysql(
-                    farmer_ids=farmer_ids,
-                    title=card_title,
-                    content=doc_content,
-                    category=task_category,
-                    attachments=attachments,
-                    sender_name=sender_name[:255],
-                    set_progress_percent=None,
-                )
-                all_created_ids.extend(created_ids)
-                if attachments:
-                    last_attachments = attachments
-                published_this_card = True
-            except Exception as e:
-                mysql_err = e
-
-        if not published_this_card and _gi_http_bases():
+        def _publish_card_via_http() -> None:
+            nonlocal published_this_card, http_err, last_attachments, used_http, http_sent_count
+            if not _gi_app_server_bases():
+                return
             try:
                 data = _send_gi_via_http(
                     send_to_all=True,
@@ -680,10 +795,45 @@ def publish_ipophl_registration_to_gi_updates(
                     all_created_ids.append(int(data["gi_update_id"]))
                 if data.get("sent_count") or data.get("gi_update_ids"):
                     published_this_card = True
+                    used_http = True
+                    http_sent_count = max(
+                        http_sent_count, int(data.get("sent_count") or 0)
+                    )
                     last_attachments = data.get("attachments") or last_attachments
             except Exception as e:
                 if http_err is None:
                     http_err = e
+
+        def _publish_card_via_mysql() -> None:
+            nonlocal published_this_card, mysql_err, last_attachments
+            if not app_db_params() or not farmer_ids:
+                return
+            try:
+                attachments = _prepare_ipophl_attachments(disk_files) if disk_files else []
+                created_ids = _broadcast_admin_submissions_mysql(
+                    farmer_ids=farmer_ids,
+                    title=card_title,
+                    content=doc_content,
+                    category=task_category,
+                    attachments=attachments,
+                    sender_name=sender_name[:255],
+                    set_progress_percent=None,
+                )
+                all_created_ids.extend(created_ids)
+                if attachments:
+                    last_attachments = attachments
+                published_this_card = True
+            except Exception as e:
+                mysql_err = e
+
+        if prefer_http:
+            _publish_card_via_http()
+            if not published_this_card:
+                _publish_card_via_mysql()
+        else:
+            _publish_card_via_mysql()
+            if not published_this_card:
+                _publish_card_via_http()
 
         if published_this_card:
             cards_published += 1
@@ -696,19 +846,24 @@ def publish_ipophl_registration_to_gi_updates(
         )
         raise RuntimeError(detail)
 
-    try:
-        farmer_ids = _list_active_farmer_ids()
-        _set_gi_progress_mysql(
-            farmer_ids,
-            100.0,
-            note="GI Registration complete — all IPOPHL document categories are in GI Updates.",
-            sender_name=sender_name[:255],
-        )
-    except Exception:
-        pass
+    if not prefer_http and app_db_params() and farmer_ids:
+        try:
+            _set_gi_progress_mysql(
+                farmer_ids,
+                100.0,
+                note="GI Registration complete — all IPOPHL document categories are in GI Updates.",
+                sender_name=sender_name[:255],
+            )
+        except Exception:
+            pass
 
-    farmer_count = len(farmer_ids) if farmer_ids else 0
-    source = "app_mysql" if app_db_params() and cards_published else "app_server_http"
+    if used_http and http_sent_count > 0:
+        farmer_count = http_sent_count
+    elif farmer_ids:
+        farmer_count = len(farmer_ids)
+    else:
+        farmer_count = len(all_created_ids)
+    source = "app_server_http" if used_http else ("app_mysql" if app_db_params() else "app_server_http")
     return {
         "ok": True,
         "broadcast": True,
@@ -726,10 +881,15 @@ def publish_ipophl_registration_to_gi_updates(
 
 
 def _count_admin_gi_rows() -> int:
+    if _prefer_http_for_gi_send():
+        return 0
     params = app_db_params()
     if not params:
         return 0
-    conn = connect_app_mysql(params)
+    try:
+        conn = connect_app_mysql(params)
+    except Exception:
+        return 0
     try:
         with conn.cursor() as cur:
             cur.execute(
@@ -770,23 +930,22 @@ def _send_gi_via_http(
     if http_timeout is None:
         from config.app_connection import app_http_timeout
 
-        http_timeout = max(float(app_http_timeout()), 20.0 + len(files) * 8.0)
-    last_err: Exception | None = None
-    for base in _gi_http_bases():
-        try:
-            data = app_http_post_multipart(
-                "/api/admin_gi_send.php", fields, files, timeout=http_timeout
-            )
-            if data.get("ok") or data.get("sent_count") or data.get("gi_update_ids"):
-                if not data.get("ok"):
-                    data["ok"] = True
-                return data
-            last_err = RuntimeError(str(data.get("detail") or data.get("error") or "GI send rejected"))
-        except Exception as e:
-            last_err = e
-    if last_err:
-        raise last_err
-    raise RuntimeError("No app server reachable for GI send (port 8080).")
+        http_timeout = min(max(float(app_http_timeout()), 20.0 + len(files) * 6.0), 120.0)
+    bases = _gi_app_server_bases()
+    if not bases:
+        raise RuntimeError("No app server reachable for GI send (port 8080).")
+    data = app_http_post_multipart(
+        "/api/admin_gi_send.php",
+        fields,
+        files,
+        timeout=http_timeout,
+        bases=bases,
+    )
+    if data.get("ok") or data.get("sent_count") or data.get("gi_update_ids"):
+        if not data.get("ok"):
+            data["ok"] = True
+        return data
+    raise RuntimeError(str(data.get("detail") or data.get("error") or "GI send rejected"))
 
 
 def ensure_gi_updates_table(cur) -> None:
@@ -1093,7 +1252,12 @@ def _patch_mysql(gi_id: int, fields: dict) -> int:
 
 
 def _farmer_ids_from_http() -> list[int]:
-    data = app_http_get_json("/api/admin_farmer_data.php", query={"limit": 2500}, timeout=15)
+    data = app_http_get_json(
+        "/api/admin_farmer_data.php",
+        query={"limit": 2500},
+        timeout=12,
+        bases=_gi_app_server_bases(),
+    )
     if not data.get("ok"):
         raise RuntimeError(str(data.get("error") or "Could not load farmer list from app server"))
     items = data.get("items")
@@ -1117,6 +1281,13 @@ def _farmer_ids_from_http() -> list[int]:
 
 
 def _list_active_farmer_ids() -> list[int]:
+    if _prefer_http_for_gi_send() and app_server_base():
+        try:
+            ids = _farmer_ids_from_http()
+            if ids:
+                return ids
+        except Exception:
+            pass
     params = app_db_params()
     if params:
         try:

@@ -691,6 +691,15 @@ def register_ipophl_routes(app):
         except Exception as e:
             return jsonify({"error": safe_error_message(e, public="Failed to list documents.")}), 500
 
+    @app.route("/api/ipophl/publish-preflight", methods=["GET"])
+    def api_ipophl_publish_preflight():
+        """Fast check before Complete Registration (browser can call this first)."""
+        if not is_authenticated():
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+        from api.gi_contributions_api import check_xampp_for_publish
+
+        return jsonify(check_xampp_for_publish())
+
     @app.route("/api/ipophl/complete-registration", methods=["POST"])
     def api_ipophl_complete_registration():
         """
@@ -714,14 +723,57 @@ def register_ipophl_routes(app):
                     body["file_uuids"] = parsed
             except Exception:
                 pass
+        if request.form.get("file_entries_json"):
+            try:
+                import json as _json
+
+                parsed = _json.loads(request.form.get("file_entries_json") or "[]")
+                if isinstance(parsed, list):
+                    body["file_entries"] = parsed
+            except Exception:
+                pass
 
         client_uuids: list[str] = []
+        task_overrides: dict[str, str] = {}
         raw_uuids = body.get("file_uuids")
         if isinstance(raw_uuids, list):
             client_uuids = [str(u).strip() for u in raw_uuids if str(u).strip()]
 
+        raw_entries = body.get("file_entries")
+        if isinstance(raw_entries, list):
+            for entry in raw_entries:
+                if not isinstance(entry, dict):
+                    continue
+                uid = str(entry.get("file_uuid") or entry.get("id") or "").strip()
+                tid = str(entry.get("task_id") or entry.get("service") or "").strip()
+                if uid and uid not in client_uuids:
+                    client_uuids.append(uid)
+                if uid:
+                    norm_tid = normalize_ipophl_task_id(tid)
+                    if norm_tid and norm_tid != "ipophl-other":
+                        task_overrides[uid] = norm_tid
+
+        from api.gi_contributions_api import check_xampp_for_publish
+
+        preflight = check_xampp_for_publish()
+        if preflight.get("prefer_http") and not preflight.get("xampp_reachable"):
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": preflight.get("error") or "App server (XAMPP :8080) is not reachable.",
+                    "hint": preflight.get("hint"),
+                    "app_server_base": preflight.get("app_server_base"),
+                    "xampp_reachable": False,
+                }
+            ), 503
+
         upload_errors: list[str] = []
-        uploads = request.files.getlist("files") or request.files.getlist("file") or []
+        uploads = (
+            request.files.getlist("files")
+            or request.files.getlist("files[]")
+            or request.files.getlist("file")
+            or []
+        )
         task_id_list = request.form.getlist("task_ids") or request.form.getlist("task_id") or []
         for index, upload in enumerate(uploads):
             if not upload or not getattr(upload, "filename", None) or upload.filename == "":
@@ -745,27 +797,15 @@ def register_ipophl_routes(app):
         from config.ipophl_store import bootstrap_orphan_uploads
 
         bootstrap_orphan_uploads(limit=500)
-        file_uuids = collect_registration_file_uuids(file_uuids=client_uuids, task_ids=task_ids)
-
-        task_overrides: dict[str, str] = {}
-        raw_entries = body.get("file_entries")
-        if isinstance(raw_entries, list):
-            for entry in raw_entries:
-                if not isinstance(entry, dict):
-                    continue
-                uid = str(entry.get("file_uuid") or entry.get("id") or "").strip()
-                tid = str(entry.get("task_id") or entry.get("service") or "").strip()
-                if uid:
-                    norm_tid = normalize_ipophl_task_id(tid)
-                    if norm_tid and norm_tid != "ipophl-other":
-                        task_overrides[uid] = norm_tid
-                    if uid not in file_uuids:
-                        file_uuids.append(uid)
+        file_uuids = collect_registration_file_uuids(
+            file_uuids=client_uuids if client_uuids else None,
+            task_ids=task_ids,
+        )
 
         publish_all_categories = str(
             body.get("publish_all_categories")
             or request.form.get("publish_all_categories")
-            or "true"
+            or "false"
         ).strip().lower() in (
             "1",
             "true",
@@ -773,7 +813,9 @@ def register_ipophl_routes(app):
             "on",
         )
 
-        force_publish = str(body.get("force_publish") or "").strip().lower() in (
+        force_publish = str(
+            body.get("force_publish") or request.form.get("force_publish") or ""
+        ).strip().lower() in (
             "1",
             "true",
             "yes",
@@ -821,7 +863,10 @@ def register_ipophl_routes(app):
                 )
             except Exception:
                 pass
-            db_rows = _count_admin_gi_rows()
+            try:
+                db_rows = _count_admin_gi_rows()
+            except Exception:
+                db_rows = 0
             cards = int(result.get("cards_published") or 0)
             resolved = int(result.get("files_resolved") or 0)
             requested = int(result.get("files_requested") or len(file_uuids))

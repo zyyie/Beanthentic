@@ -101,7 +101,49 @@
     return Array.from(uuids);
   }
 
-  async function fetchServerUuids() {
+  function collectFileEntries() {
+    const byUuid = new Map();
+
+    const add = (fileUuid, taskId) => {
+      const id = String(fileUuid || '').trim();
+      if (!id || id.startsWith('pending-')) return;
+      const tid = String(taskId || '').trim();
+      const prev = byUuid.get(id);
+      byUuid.set(id, {
+        file_uuid: id,
+        task_id: tid || prev?.task_id || 'ipophl-other',
+      });
+    };
+
+    if (window.dashboardApp?.collectIpophlPublishEntries) {
+      window.dashboardApp.collectIpophlPublishEntries().forEach((e) => add(e.file_uuid, e.task_id));
+    } else if (window.dashboardApp?.ipophlFiles) {
+      Object.keys(window.dashboardApp.ipophlFiles).forEach((taskId) => {
+        (window.dashboardApp.ipophlFiles[taskId] || []).forEach((f) =>
+          add(f.id || f.file_uuid, taskId)
+        );
+      });
+    }
+
+    document.querySelectorAll('#ipophl-module .file-upload-zone[data-service]').forEach((zone) => {
+      const zoneTaskId = zone.dataset.service;
+      if (!zoneTaskId) return;
+      const container = document.getElementById(zoneTaskId + '-files');
+      if (!container) return;
+      container.querySelectorAll('.file-item').forEach((el) => {
+        const id = (el.dataset && el.dataset.fileUuid) || el.getAttribute('data-file-uuid');
+        if (!id) return;
+        add(
+          id,
+          (el.dataset && el.dataset.taskId) || el.getAttribute('data-task-id') || zoneTaskId
+        );
+      });
+    });
+
+    return Array.from(byUuid.values());
+  }
+
+  async function fetchServerFileEntries() {
     try {
       const res = await fetch(API('/api/ipo-documents?limit=300'), { credentials: 'same-origin' });
       const data = await parseJson(res).catch(() => ({}));
@@ -109,9 +151,10 @@
       const seen = new Set();
       (data.items || []).forEach((doc) => {
         const id = String(doc.file_uuid || '').trim();
+        const taskId = String(doc.task_id || '').trim();
         if (id && !seen.has(id)) {
           seen.add(id);
-          out.push(id);
+          out.push({ file_uuid: id, task_id: taskId || 'ipophl-other' });
         }
       });
       return out;
@@ -119,6 +162,11 @@
       console.warn('Could not load saved IPOPHL documents:', e);
       return [];
     }
+  }
+
+  async function fetchServerUuids() {
+    const entries = await fetchServerFileEntries();
+    return entries.map((e) => e.file_uuid).filter(Boolean);
   }
 
   async function publishIpophlToGiUpdates() {
@@ -134,11 +182,28 @@
       window.ipophlAnalyzer && typeof window.ipophlAnalyzer.collectPendingUploads === 'function'
         ? window.ipophlAnalyzer.collectPendingUploads()
         : [];
-    let existingUuids = collectExistingUuids();
+    let fileEntries = collectFileEntries();
+    let existingUuids = fileEntries.map((e) => e.file_uuid).filter(Boolean);
 
     if (!pending.length && !existingUuids.length) {
       setLoading(true, 'Checking saved documents…');
-      existingUuids = await fetchServerUuids();
+      fileEntries = await fetchServerFileEntries();
+      existingUuids = fileEntries.map((e) => e.file_uuid).filter(Boolean);
+    } else if (fileEntries.length) {
+      const serverEntries = await fetchServerFileEntries();
+      const merged = new Map();
+      serverEntries.forEach((e) => merged.set(e.file_uuid, { ...e }));
+      fileEntries.forEach((e) => {
+        const prev = merged.get(e.file_uuid) || {};
+        const domTask = String(e.task_id || '').trim();
+        const useTask =
+          domTask && domTask !== 'ipophl-other' && domTask !== 'unknown'
+            ? domTask
+            : String(prev.task_id || domTask || 'ipophl-other').trim() || 'ipophl-other';
+        merged.set(e.file_uuid, { file_uuid: e.file_uuid, task_id: useTask });
+      });
+      fileEntries = Array.from(merged.values());
+      existingUuids = fileEntries.map((e) => e.file_uuid).filter(Boolean);
     }
 
     if (!pending.length && !existingUuids.length) {
@@ -178,14 +243,38 @@
     if (existingUuids.length) {
       form.append('file_uuids_json', JSON.stringify(existingUuids));
     }
-    form.append('publish_all_categories', 'true');
+    if (fileEntries.length) {
+      form.append('file_entries_json', JSON.stringify(fileEntries));
+    }
+    form.append('publish_all_categories', 'false');
     form.append('force_publish', 'true');
+
+    setLoading(true, 'Checking XAMPP app server…');
+    try {
+      const pre = await fetch(API('/api/ipophl/publish-preflight'), {
+        credentials: 'same-origin',
+      });
+      const preData = await parseJson(pre).catch(() => ({}));
+      if (preData.prefer_http && preData.xampp_reachable === false) {
+        throw new Error(
+          preData.error ||
+            'Hindi maabot ang app server (port 8080). I-start ang python app.py sa XAMPP PC.'
+        );
+      }
+    } catch (preErr) {
+      if (preErr.message && preErr.message.includes('8080')) {
+        setLoading(false);
+        setStatus('<strong>XAMPP hindi reachable</strong><p>' + preErr.message + '</p>', 'err');
+        notify(preErr.message);
+        return;
+      }
+    }
 
     setLoading(true, 'Saving to XAMPP MySQL…');
     busyStatus('Sending to GI Updates', [
       { text: `Found ${pending.length} new + ${existingUuids.length} saved file(s)`, done: true },
       { text: 'Upload to admin server', done: true },
-      { text: 'Writing to gi_updates on 192.168.100.210…', active: true },
+      { text: 'Writing to gi_updates (XAMPP)…', active: true },
       { text: 'Sync for mobile app', active: false },
     ]);
 
