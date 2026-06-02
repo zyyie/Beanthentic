@@ -895,6 +895,12 @@ def register_farmer_routes(app):
 
         try:
             rows = _app_fetch_farmer_rows(limit=2500)
+            try:
+                from config.farmer_registration_cursor import sync_new_farmer_registrations
+
+                sync_new_farmer_registrations(rows)
+            except Exception:
+                pass
         except Exception as e:
             items, err = _fetch_farmer_data_via_app_server()
             if items is not None:

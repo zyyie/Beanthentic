@@ -353,32 +353,142 @@ def _notifications_farmer_moderation_state() -> list[dict]:
     return out
 
 
-def _notifications_new_farmers() -> list[dict]:
+def _app_db_column_exists(conn, table: str, column: str) -> bool:
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT COUNT(*) AS c
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = %s
+                  AND COLUMN_NAME = %s
+                """,
+                (table, column),
+            )
+            return int((cur.fetchone() or {}).get("c") or 0) > 0
+    except Exception:
+        return False
+
+
+def _notifications_farmer_registration_activity() -> list[dict]:
+    """Activity log entries when a farmer registration was recorded."""
     if not _in_app_on("in_app_user_registrations"):
         return []
+    actions = (
+        "FARMER_REGISTERED",
+        "NEW_FARMER",
+        "FARMER_SIGNUP",
+        "FARMER_REGISTRATION",
+        "FARMER_REGISTER",
+    )
+    out: list[dict] = []
     try:
-        from api.farmer_api import _app_db_connect
+        entries = (
+            ActivityLogEntry.query.filter(ActivityLogEntry.action.in_(actions))
+            .order_by(ActivityLogEntry.timestamp.desc())
+            .limit(20)
+            .all()
+        )
     except Exception:
         return []
 
+    for entry in entries:
+        details = str(entry.details or "").strip()
+        fid = 0
+        m = re.search(r"farmer[_\s#]*(\d+)", details, re.I)
+        if m:
+            fid = int(m.group(1))
+        out.append(
+            _item(
+                nid=f"reg-act-{entry.id or entry.timestamp}",
+                icon="fa-user-plus",
+                title="Bagong farmer registration",
+                message=details or "May bagong farmer na nag-register.",
+                timestamp=entry.timestamp or datetime.now(),
+                category="registrations",
+                category_label="Registrations",
+                target_module="farmers-list",
+                ntype="info",
+                target_payload={"farmerId": fid, "farmerNo": fid} if fid else {},
+            )
+        )
+    return out
+
+
+def _notifications_new_farmers() -> list[dict]:
+    """Farmers recently registered in the Beanthentic app database."""
+    if not _in_app_on("in_app_user_registrations"):
+        return []
+    try:
+        from api.farmer_api import _app_db_connect, _app_fetch_farmer_rows
+        from config.farmer_registration_cursor import sync_new_farmer_registrations
+    except Exception:
+        return []
+
+    try:
+        all_rows = _app_fetch_farmer_rows(limit=2500)
+        sync_new_farmer_registrations(all_rows)
+    except Exception:
+        pass
+
     conn = None
+    rows: list[dict] = []
+    since = datetime.now() - timedelta(days=14)
     try:
         conn = _app_db_connect()
         if not conn:
             return []
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT f.farmer_id, f.status, pi.first_name, pi.last_name, u.phone_number
-                FROM farmers f
-                LEFT JOIN users u ON u.user_id = f.user_id
-                LEFT JOIN personal_information pi ON pi.farmer_id = f.farmer_id
-                WHERE LOWER(COALESCE(f.status, '')) IN ('pending', 'new', 'inactive')
-                ORDER BY f.farmer_id DESC
-                LIMIT 15
-                """
-            )
-            rows = cur.fetchall() or []
+            if _app_db_column_exists(conn, "users", "created_at"):
+                cur.execute(
+                    """
+                    SELECT f.farmer_id, f.status, pi.first_name, pi.last_name,
+                           u.phone_number, u.created_at AS registered_at
+                    FROM farmers f
+                    INNER JOIN users u ON u.user_id = f.user_id
+                    LEFT JOIN personal_information pi ON pi.farmer_id = f.farmer_id
+                    WHERE u.created_at >= %s
+                    ORDER BY u.created_at DESC
+                    LIMIT 25
+                    """,
+                    (since,),
+                )
+                rows = cur.fetchall() or []
+            elif _app_db_column_exists(conn, "farmers", "created_at"):
+                cur.execute(
+                    """
+                    SELECT f.farmer_id, f.status, pi.first_name, pi.last_name,
+                           u.phone_number, f.created_at AS registered_at
+                    FROM farmers f
+                    LEFT JOIN users u ON u.user_id = f.user_id
+                    LEFT JOIN personal_information pi ON pi.farmer_id = f.farmer_id
+                    WHERE f.created_at >= %s
+                    ORDER BY f.created_at DESC
+                    LIMIT 25
+                    """,
+                    (since,),
+                )
+                rows = cur.fetchall() or []
+            else:
+                cur.execute(
+                    """
+                    SELECT f.farmer_id, f.status, pi.first_name, pi.last_name, u.phone_number,
+                           NULL AS registered_at
+                    FROM farmers f
+                    LEFT JOIN users u ON u.user_id = f.user_id
+                    LEFT JOIN personal_information pi ON pi.farmer_id = f.farmer_id
+                    WHERE LOWER(COALESCE(f.status, '')) IN (
+                        'pending', 'new', 'inactive', 'registered', 'for review', ''
+                    )
+                       OR f.farmer_id >= (
+                            SELECT COALESCE(MAX(f2.farmer_id), 0) - 25 FROM farmers f2
+                       )
+                    ORDER BY f.farmer_id DESC
+                    LIMIT 25
+                    """
+                )
+                rows = cur.fetchall() or []
     except Exception:
         return []
     finally:
@@ -388,15 +498,22 @@ def _notifications_new_farmers() -> list[dict]:
     out: list[dict] = []
     for r in rows:
         fid = int(r.get("farmer_id") or 0)
+        if not fid:
+            continue
         fn = f"{(r.get('first_name') or '').strip()} {(r.get('last_name') or '').strip()}".strip() or f"Farmer #{fid}"
-        status = str(r.get("status") or "pending").strip()
+        status = str(r.get("status") or "new").strip() or "new"
+        phone = str(r.get("phone_number") or "").strip()
+        reg_ts = _parse_ts(r.get("registered_at")) or datetime.now()
+        msg = f"Status: {status}. I-review sa Farmer Records / Farmer's Profile."
+        if phone:
+            msg = f"{msg} Telepono: {phone}."
         out.append(
             _item(
                 nid=f"reg-pending-{fid}",
                 icon="fa-user-plus",
-                title=f"New farmer registration: {fn}",
-                message=f"Status: {status}. Review in Farmer's Profile.",
-                timestamp=datetime.now(),
+                title=f"Bagong farmer registration: {fn}",
+                message=msg,
+                timestamp=reg_ts,
                 category="registrations",
                 category_label="Registrations",
                 target_module="farmers-list",
@@ -538,11 +655,13 @@ def build_admin_notifications(*, admin_phone: str | None = None) -> list[dict]:
     parts.extend(_notifications_moderation_activity())
     parts.extend(_notifications_ipophl())
     parts.extend(_notifications_messages_local())
+    # Farmer registrations: run synchronously (avoid LAN DB timeout hiding new signups)
+    parts.extend(_notifications_farmer_registration_activity())
+    parts.extend(_notifications_new_farmers())
 
     remote_sources: list[Callable[[], list[dict]]] = [
         lambda: _notifications_messages(phone),
         _notifications_transactions,
-        _notifications_new_farmers,
         _notifications_farmer_moderation_state,
         _notifications_misconduct_reports,
         _notifications_gi_pending,
@@ -560,11 +679,19 @@ def build_admin_notifications(*, admin_phone: str | None = None) -> list[dict]:
             parts.extend(_safe_notification_source(fn))
 
     seen: set[str] = set()
+    seen_reg_farmers: set[int] = set()
     unique: list[dict] = []
     for n in parts:
         nid = str(n.get("id") or "")
         if not nid or nid in seen:
             continue
+        if str(n.get("category") or "") == "registrations":
+            payload = n.get("target_payload") if isinstance(n.get("target_payload"), dict) else {}
+            fid = int(payload.get("farmerId") or payload.get("farmerNo") or 0)
+            if fid and fid in seen_reg_farmers:
+                continue
+            if fid:
+                seen_reg_farmers.add(fid)
         seen.add(nid)
         unique.append(n)
 

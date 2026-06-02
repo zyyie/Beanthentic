@@ -147,8 +147,61 @@ class GIAnalyzer:
         self.document_feature_names = None
         self.explainer = None
 
+        # Synonyms help match real IPOPHL uploads (authorization letters, receipts, etc.)
+        self._term_synonyms = {
+            "manual of specifications": ["manual of specification", "mop", "specifications manual"],
+            "causal link": ["causal relationship", "link between", "geographical area and"],
+            "production process": ["production method", "processing method", "cultivation"],
+            "quality control": ["quality standards", "quality assurance", "qc "],
+            "labeling rules": ["labelling", "label requirements", "packaging rules"],
+            "applicant entity": ["applicant", "organization", "association", "cooperative"],
+            "producers organization": ["producers", "farmers association", "growers", "membership"],
+            "legal standing": ["authorization", "authorized", "hereby authorize", "legal capacity", "representative"],
+            "membership list": ["members", "member list", "roster", "directory"],
+            "stakeholder consultations": ["stakeholder", "consultation", "public hearing"],
+            "meeting minutes": ["minutes of meeting", "minutes of the", "meeting held"],
+            "consensus": ["agreed", "unanimous", "resolution"],
+            "governance board": ["board of directors", "governing board", "board resolution"],
+            "technical validation": ["technical certification", "validated by", "certified by"],
+            "government certification": ["department of agriculture", "bureau of", "da ", "certified"],
+            "independent verification": ["third party", "independent", "verified by"],
+            "application form": ["application for", "duly accomplished", "application to register"],
+            "applicant name": ["name of applicant", "applicant’s name", "applicant's name"],
+            "domicile": ["address", "residence", "located at", "domiciled"],
+            "industrial establishment": ["establishment", "place of business", "office at"],
+            "file application": ["filed application", "filing", "submit application", "submitted"],
+            "bureau of trademarks": ["ipophl", "intellectual property", "bureau of trademark"],
+            "application package": ["application documents", "complete application", "submission package"],
+            "cover letter": ["letter of transmittal", "transmittal letter"],
+            "official receipt": ["official receipt", "or number", "receipt no"],
+            "application fee": ["filing fee", "payment of fee", "registration fee"],
+            "proof of payment": ["proof of payment", "paid", "payment confirmation", "bank transfer"],
+            "formality examination": ["formality", "formal examination"],
+            "substantive examination": ["substantive", "substance examination"],
+            "ip code compliance": ["intellectual property code", "ip code", "republic act"],
+            "deficiency notice response": ["deficiency", "response to notice", "comply with"],
+            "timeframe compliance": ["within the period", "deadline", "days from"],
+            "corrective actions": ["corrective action", "remedy", "amended"],
+            "publication for opposition": ["publication", "opposition period", "published for opposition"],
+            "public notice period": ["public notice", "notice period"],
+            "opposition period": ["opposition", "third-party"],
+            "gi registration certificate": ["certificate of registration", "registration certificate", "gi certificate"],
+            "official notice of registration": ["notice of registration", "registered geographical indication"],
+            "registration number": ["reg. no", "registration no", "certificate no"],
+            "maintain quality standards": ["quality standards", "maintain quality", "compliance with standards"],
+            "regular compliance audits": ["audit", "compliance audit", "inspection"],
+            "monitoring records": ["monitoring", "records of", "documentation of"],
+            "lipa barako coffee": ["barako", "liberica", "lipa coffee", "batangas coffee"],
+            "flavor profile": ["flavor", "taste profile", "cup profile", "aroma"],
+            "geographical origin": ["geographical indication", "origin", "lipa city", "batangas", "grown in"],
+            "distinctive quality": ["distinctive", "unique quality", "reputation", "characteristic"],
+            "geographical indication": ["geographical indication", " gi ", "indication of origin"],
+            "gi": ["geographical indication", " gi registration", "protected gi"],
+        }
+
         if ML_AVAILABLE:
             self._initialize_models()
+            self._ensure_document_model()
 
     def _model_paths(self) -> list[Path]:
         names = ("gi_farmer_model.joblib", "gi_model.joblib")
@@ -185,11 +238,60 @@ class GIAnalyzer:
                     + self.gi_checklist["mandatory_terms"]
                     + self.gi_checklist["optional_terms"]
                 )
-                if hasattr(self.document_model, "predict_proba"):
-                    self.explainer = shap.TreeExplainer(self.document_model)
+                # SHAP explainer is created lazily on first explanation (slow to build)
             except Exception as e:
                 logging.warning("Failed to load document ML model: %s", e)
                 self.document_model = None
+
+    def _ensure_document_model(self) -> None:
+        """Train document classifier from bundled samples if missing."""
+        doc_path = self.ml_dir / "gi_document_model.joblib"
+        if doc_path.exists() or self.document_model is not None:
+            return
+        try:
+            import subprocess
+            import sys
+
+            script = self.ml_dir / "train_ai_model.py"
+            if not script.exists():
+                return
+            proc = subprocess.run(
+                [sys.executable, str(script), "--train-documents"],
+                capture_output=True,
+                text=True,
+                cwd=str(self.ml_dir),
+                timeout=300,
+            )
+            if proc.returncode == 0:
+                self._initialize_models()
+                logging.info("Auto-trained document ML model from IPOPHL sample dataset")
+            else:
+                logging.warning(
+                    "Document model auto-train failed: %s",
+                    (proc.stderr or proc.stdout or "")[-500:],
+                )
+        except Exception as e:
+            logging.warning("Could not auto-train document model: %s", e)
+
+    def _term_matches(self, text_lower: str, term: str) -> bool:
+        """Match mandatory/optional GI terms with phrase and synonym support."""
+        term_lower = term.lower().strip()
+        if not term_lower:
+            return False
+        if term_lower in text_lower:
+            return True
+        if " " not in term_lower:
+            if re.search(r"\b" + re.escape(term_lower) + r"\b", text_lower):
+                return True
+        for synonym in self._term_synonyms.get(term_lower, []):
+            syn = synonym.lower().strip()
+            if not syn:
+                continue
+            if syn in text_lower:
+                return True
+            if " " not in syn and re.search(r"\b" + re.escape(syn) + r"\b", text_lower):
+                return True
+        return False
 
     def ml_status(self) -> Dict:
         """Return whether trained models are available."""
@@ -204,19 +306,35 @@ class GIAnalyzer:
         return {
             "farmer_model_loaded": self.farmer_model is not None,
             "document_model_loaded": self.document_model is not None,
-            "document_analysis_default": "rule_based" if not self.document_model else "ml_based",
+            "document_analysis_default": (
+                "ml_hybrid" if self.document_model else "rule_based"
+            ),
             "training": meta,
         }
+
+    def _get_explainer(self):
+        """Lazy-load SHAP TreeExplainer for document model."""
+        if self.explainer is not None:
+            return self.explainer
+        if not ML_AVAILABLE or self.document_model is None:
+            return None
+        try:
+            self.explainer = shap.TreeExplainer(self.document_model)
+        except Exception as shap_err:
+            logging.warning("SHAP explainer unavailable: %s", shap_err)
+            self.explainer = None
+        return self.explainer
 
     def _generate_shap_explanation(self, features: List, readiness_score: int, task_id: str = None) -> str:
         """Generate an in-depth SHAP analysis in paragraph form with 3 paragraphs"""
         feature_names = self.document_feature_names or self.farmer_feature_names
-        if not self.explainer or not feature_names:
+        explainer = self._get_explainer()
+        if not explainer or not feature_names:
             return "Detailed AI analysis is currently unavailable. Please ensure all ML dependencies are installed."
 
         try:
             # Get SHAP values for the features
-            shap_values = self.explainer.shap_values(np.array([features]))
+            shap_values = explainer.shap_values(np.array([features]))
             
             # Link SHAP values with feature names
             if isinstance(shap_values, list):
@@ -473,9 +591,11 @@ class GIAnalyzer:
                 }
                 logging.info(f"Using task-specific checklist for: {task_id}")
 
+            rule_result = self._rule_based_analysis(text, checklist)
             if self.document_model is not None:
-                return self._ml_analysis(text, checklist, task_id)
-            return self._rule_based_analysis(text, checklist)
+                ml_result = self._ml_analysis(text, checklist, task_id)
+                return self._merge_analysis_results(rule_result, ml_result)
+            return rule_result
 
         except Exception as e:
             logging.error(f"Analysis error: {e}")
@@ -509,7 +629,7 @@ class GIAnalyzer:
         missing_mandatory = []
 
         for term in checklist["mandatory_terms"]:
-            if re.search(r'\b' + re.escape(term.lower()) + r'\b', text_lower):
+            if self._term_matches(text_lower, term):
                 detected_mandatory.append(term)
             else:
                 missing_mandatory.append(term)
@@ -517,7 +637,7 @@ class GIAnalyzer:
         # Check for optional terms
         detected_optional = []
         for term in checklist["optional_terms"]:
-            if re.search(r'\b' + re.escape(term.lower()) + r'\b', text_lower):
+            if self._term_matches(text_lower, term):
                 detected_optional.append(term)
 
         # Calculate readiness score
@@ -554,30 +674,50 @@ class GIAnalyzer:
             "shap_analysis": p1 + p2 + p3
         }
 
+    def _merge_analysis_results(self, rule_result: Dict, ml_result: Dict) -> Dict:
+        """Combine rule-based term detection with ML readiness probability."""
+        rule_score = int(rule_result.get("readiness_score") or 0)
+        ml_score = int(ml_result.get("readiness_score") or 0)
+        merged_score = min(100, round(0.45 * ml_score + 0.55 * rule_score))
+        detected = list(
+            dict.fromkeys(
+                (rule_result.get("detected_features") or [])
+                + (ml_result.get("detected_features") or [])
+            )
+        )
+        missing = [t for t in (rule_result.get("missing_requirements") or []) if t not in detected]
+        status = "Ready" if merged_score >= 75 else "Not Ready"
+        shap = ml_result.get("shap_analysis") or rule_result.get("shap_analysis") or ""
+        return {
+            "success": True,
+            "readiness_score": merged_score,
+            "status": status,
+            "detected_features": detected,
+            "missing_requirements": missing,
+            "text_length": rule_result.get("text_length") or ml_result.get("text_length") or 0,
+            "analysis_method": "ml_hybrid",
+            "shap_analysis": shap,
+            "ml_score": ml_score,
+            "rule_score": rule_score,
+        }
+
     def _ml_analysis(self, text: str, checklist: Dict = None, task_id: str = None) -> Dict:
         """ML-based analysis using Random Forest"""
         if checklist is None:
             checklist = self.gi_checklist
             
         try:
-            # Feature extraction (uses the standard checklist for ML features if model was trained on them)
-            # Note: The ML model expects features based on the standard checklist
             features = self._extract_features(text)
 
-            # Make prediction
             if hasattr(self.document_model, "predict_proba"):
                 probability = self.document_model.predict_proba([features])[0]
-                readiness_score = int(probability[1] * 100)
+                ready_idx = 1 if len(probability) > 1 else 0
+                readiness_score = int(round(float(probability[ready_idx]) * 100))
             else:
-                readiness_score = 75
+                readiness_score = int(self.document_model.predict([features])[0] * 100)
 
-            # Determine status
             status = "Ready" if readiness_score >= 75 else "Not Ready"
-
-            # Extract detected and missing terms using the provided checklist for the report
             detected_features, missing_requirements = self._analyze_terms(text, checklist)
-
-            # Generate SHAP explanation
             shap_analysis = self._generate_shap_explanation(features, readiness_score, task_id)
 
             return {
@@ -608,7 +748,7 @@ class GIAnalyzer:
         text_lower = text.lower()
 
         for term in all_terms:
-            features.append(1 if re.search(r'\b' + re.escape(term.lower()) + r'\b', text_lower) else 0)
+            features.append(1 if self._term_matches(text_lower, term) else 0)
 
         return features
 
@@ -623,14 +763,14 @@ class GIAnalyzer:
         missing = []
 
         for term in checklist["mandatory_terms"]:
-            if re.search(r'\b' + re.escape(term.lower()) + r'\b', text_lower):
+            if self._term_matches(text_lower, term):
                 detected.append(term)
             else:
                 missing.append(term)
         
         # Also check optional terms for "detected"
         for term in checklist["optional_terms"]:
-            if re.search(r'\b' + re.escape(term.lower()) + r'\b', text_lower):
+            if self._term_matches(text_lower, term):
                 detected.append(term)
 
         return detected, missing

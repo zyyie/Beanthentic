@@ -64,7 +64,7 @@ def register_ml_routes(app):
 
             script = Path(__file__).resolve().parents[1] / "machinelearning" / "train_ai_model.py"
             proc = subprocess.run(
-                [sys.executable, str(script), "--train-csv"],
+                [sys.executable, str(script), "--full-pipeline"],
                 capture_output=True,
                 text=True,
                 cwd=str(script.parent),
@@ -84,7 +84,12 @@ def register_ml_routes(app):
             engine_mod.gi_analyzer._initialize_models()
 
             user_phone = get_current_user_phone()
-            log_activity(user_phone, "ML_MODEL_TRAINED", "Farmer GI model retrained", request.remote_addr)
+            log_activity(
+                user_phone,
+                "ML_MODEL_TRAINED",
+                "Farmer and document GI models retrained",
+                request.remote_addr,
+            )
 
             return jsonify(
                 {

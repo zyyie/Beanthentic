@@ -1,5 +1,8 @@
 // Dashboard functionality for coffee database
 const NOTIFICATIONS_READ_STORAGE_KEY = 'beanthentic_dashboard_notification_read';
+const LAST_MAX_FARMER_ID_KEY = 'beanthentic_last_max_farmer_id';
+const KNOWN_FARMER_IDS_KEY = 'beanthentic_known_farmer_ids';
+const ADMIN_NOTIFICATIONS_POLL_MS = 60000;
 
 /** Prefix for API paths when the app is mounted under a subpath (e.g. /Beanthentic). */
 function beanthenticApiUrl(path) {
@@ -259,6 +262,54 @@ class DashboardApp {
     return { id, icon, title, meta, detail, read: false };
   }
 
+  async fetchAdminNotifications({ silent = false, showToastOnNewRegistration = false } = {}) {
+    try {
+      const res = await fetch(beanthenticApiUrl('/api/admin-notifications'));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const rows = Array.isArray(data.items) ? data.items : [];
+      const isRegistrationNotif = (id) =>
+        /^reg-(pending|local|act)-/i.test(String(id || ''));
+      const prevRegIds = new Set(
+        (this.notificationsFeed || [])
+          .filter((n) => isRegistrationNotif(n.id))
+          .map((n) => n.id)
+      );
+      const adminItems = rows.map((row, i) => this.mapAdminNotificationToFeedItem(row, i));
+      const merged =
+        adminItems.length > 0 ? adminItems : this.getDefaultNotifications();
+      this.notificationsFeed = this.applyReadStateToItems(merged);
+      this.renderNotificationsList();
+      this.updateNotificationBadges();
+
+      const newReg = adminItems.filter(
+        (n) =>
+          isRegistrationNotif(n.id) &&
+          !prevRegIds.has(n.id) &&
+          !n.read
+      );
+      if (showToastOnNewRegistration && newReg.length > 0) {
+        const first = newReg[0];
+        this.showNotification(
+          first.title || 'Bagong farmer registration',
+          'success'
+        );
+      }
+      if (!silent && adminItems.length > 0) {
+        this.showNotification('Notifications refreshed.', 'success');
+      }
+      return true;
+    } catch (e) {
+      console.warn('Admin notifications fetch failed:', e);
+      if (!silent) {
+        this.notificationsFeed = this.hydrateNotificationsFeed();
+        this.renderNotificationsList();
+        this.showNotification('Could not load latest notifications.', 'error');
+      }
+      return false;
+    }
+  }
+
   async refreshNotificationsModule() {
     const btn = document.getElementById('notificationsPageRefreshBtn');
     const markAllBtn = document.getElementById('notificationsMarkAllReadBtn');
@@ -268,20 +319,7 @@ class DashboardApp {
     }
     if (markAllBtn) markAllBtn.disabled = true;
     try {
-      const res = await fetch('/api/admin-notifications');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const rows = Array.isArray(data.items) ? data.items : [];
-      const adminItems = rows.map((row, i) => this.mapAdminNotificationToFeedItem(row, i));
-      const defaults = this.getDefaultNotifications();
-      this.notificationsFeed = this.applyReadStateToItems([...adminItems, ...defaults]);
-      this.renderNotificationsList();
-      this.showNotification('Notifications refreshed.', 'success');
-    } catch (e) {
-      console.warn('Notifications refresh failed:', e);
-      this.notificationsFeed = this.hydrateNotificationsFeed();
-      this.renderNotificationsList();
-      this.showNotification('Could not load latest activity. Showing saved list.', 'error');
+      await this.fetchAdminNotifications({ silent: false });
     } finally {
       if (btn) {
         btn.disabled = false;
@@ -289,6 +327,90 @@ class DashboardApp {
       }
       if (markAllBtn) markAllBtn.disabled = false;
     }
+  }
+
+  farmerIdFromRow(row) {
+    return Number(row?.farmer_id ?? row?.['NO.'] ?? row?.['no'] ?? 0) || 0;
+  }
+
+  loadKnownFarmerIds() {
+    try {
+      const raw = localStorage.getItem(KNOWN_FARMER_IDS_KEY);
+      if (!raw) return new Set();
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return new Set();
+      return new Set(parsed.map((x) => Number(x)).filter((n) => n > 0));
+    } catch {
+      return new Set();
+    }
+  }
+
+  saveKnownFarmerIds(idSet) {
+    try {
+      const arr = [...idSet].filter((n) => n > 0).sort((a, b) => a - b).slice(-2000);
+      localStorage.setItem(KNOWN_FARMER_IDS_KEY, JSON.stringify(arr));
+      const maxId = arr.length ? arr[arr.length - 1] : 0;
+      sessionStorage.setItem(LAST_MAX_FARMER_ID_KEY, String(maxId));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  detectNewFarmersFromData() {
+    if (!Array.isArray(this.data) || !this.data.length) return;
+    const known = this.loadKnownFarmerIds();
+    const isFirstBaseline = known.size === 0;
+    const newcomers = this.data.filter((r) => {
+      const fid = this.farmerIdFromRow(r);
+      return fid > 0 && !known.has(fid);
+    });
+
+    if (!isFirstBaseline && newcomers.length > 0) {
+      newcomers.forEach((row) => this.addLocalFarmerRegistrationNotification(row));
+    }
+
+    this.data.forEach((r) => {
+      const fid = this.farmerIdFromRow(r);
+      if (fid > 0) known.add(fid);
+    });
+    this.saveKnownFarmerIds(known);
+  }
+
+  addLocalFarmerRegistrationNotification(row) {
+    const fid = this.farmerIdFromRow(row);
+    if (!fid) return;
+    const name =
+      String(row['NAME OF FARMER'] || row['FIRST NAME'] || '').trim() ||
+      `Farmer #${fid}`;
+    const nid = `reg-local-${fid}`;
+    if ((this.notificationsFeed || []).some((n) => n.id === nid)) return;
+
+    const item = {
+      id: nid,
+      icon: 'fa-user-plus',
+      title: `Bagong farmer registration: ${name}`,
+      meta: this.formatNotificationMeta(new Date().toISOString()),
+      detail: `Bagong record sa Farmer's Profile / Farmer Records. I-review ang profile ni ${name}.`,
+      targetModule: 'farmers-list',
+      targetPayload: { farmerId: fid, farmerNo: fid },
+      read: false,
+      category: 'registrations',
+      categoryLabel: 'Registrations',
+    };
+    this.notificationsFeed = this.applyReadStateToItems([item, ...(this.notificationsFeed || [])]);
+    this.renderNotificationsList();
+    this.updateNotificationBadges();
+    this.showNotification(`Bagong farmer: ${name}`, 'success');
+  }
+
+  startNotificationPolling() {
+    setTimeout(() => {
+      this.fetchAdminNotifications({ silent: true, showToastOnNewRegistration: true });
+    }, 1200);
+    if (this._adminNotificationsPoll) clearInterval(this._adminNotificationsPoll);
+    this._adminNotificationsPoll = setInterval(() => {
+      this.fetchAdminNotifications({ silent: true, showToastOnNewRegistration: true });
+    }, ADMIN_NOTIFICATIONS_POLL_MS);
   }
 
   persistNotificationReadState() {
@@ -350,8 +472,7 @@ class DashboardApp {
       await this.loadExcelData();
       this.filterData('');
 
-      this.notificationsFeed = this.hydrateNotificationsFeed();
-      this.renderNotificationsList();
+      await this.fetchAdminNotifications({ silent: true, showToastOnNewRegistration: true });
 
       this.showNotification('Dashboard refreshed.', 'success');
     } catch (e) {
@@ -382,8 +503,10 @@ class DashboardApp {
       // Additional logic for specific modules
       if (n.targetModule === 'messaging' && n.targetPayload?.phone) {
         this.goToFarmerMessage(n.targetPayload.phone);
-      } else if (n.targetModule === 'farmers-list' && n.targetPayload?.farmerNo) {
-        this.openFarmerProfile(n.targetPayload.farmerNo);
+      } else if (n.targetModule === 'farmers-list') {
+        const farmerNo =
+          n.targetPayload?.farmerNo ?? n.targetPayload?.farmerId ?? null;
+        if (farmerNo != null) this.openFarmerProfile(farmerNo);
       }
     }
   }
@@ -956,6 +1079,7 @@ class DashboardApp {
       this.loadExcelData();
     }, 500);
     this.renderNotificationsList();
+    this.startNotificationPolling();
     // Initialize new dashboard features
     this.initNewDashboardFeatures();
     // Initialize Account module
@@ -3180,6 +3304,8 @@ class DashboardApp {
       this.updateStats();
       this.createCharts();
       this.updateTable();
+      this.detectNewFarmersFromData();
+      this.fetchAdminNotifications({ silent: true, showToastOnNewRegistration: true });
       
     } catch (error) {
       console.error('Error loading farmer data:', error);
@@ -4709,6 +4835,11 @@ class DashboardApp {
       'NCFRS': payload.ncfrs
     };
 
+    const nextNo =
+      Math.max(0, ...this.data.map((r) => this.farmerIdFromRow(r))) + 1;
+    newRow['NO.'] = nextNo;
+    newRow.farmer_id = nextNo;
+
     this.data.push(newRow);
     this.filteredData = [...this.data];
     this.totalRecords = this.data.length;
@@ -4716,7 +4847,8 @@ class DashboardApp {
     this.updateTable();
     this.updateStats();
     this.closeAddFarmerModal();
-    this.showNotification('New farmer row added!', 'success');
+    this.addLocalFarmerRegistrationNotification(newRow);
+    this.showNotification('Bagong farmer row na-add sa records.', 'success');
   }
 
   deleteFarmer(rowIndex) {
@@ -7176,7 +7308,7 @@ class DashboardApp {
     cancelBtn.addEventListener('click', () => this.closeFarmerActionModal());
     if (backdrop) backdrop.addEventListener('click', () => this.closeFarmerActionModal());
 
-    okBtn.addEventListener('click', () => {
+    okBtn.addEventListener('click', async () => {
       const reason = (document.getElementById('farmerActionReason')?.value || '').trim();
       if (!reason) {
         this.showNotification('Please enter a reason for this action.', 'error');
@@ -7187,23 +7319,54 @@ class DashboardApp {
       const idx = Number.parseInt(root.dataset.farmerIdx, 10);
       if (Number.isNaN(idx)) return;
 
-      if (action === 'warning') {
-        this.handleWarningFarmer(idx, reason).then(() => this.closeFarmerActionModal());
-        return;
-      }
-      if (action === 'suspend') {
-        this.handleBlockFarmer(idx, reason).then(() => {
+      const loadingLabel =
+        action === 'warning'
+          ? 'Sending warning…'
+          : action === 'suspend'
+            ? 'Suspending…'
+            : action === 'unsuspend'
+              ? 'Unsuspending…'
+              : 'Processing…';
+
+      if (!okBtn.dataset.originalHtml) okBtn.dataset.originalHtml = okBtn.innerHTML;
+      okBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> ${loadingLabel}`;
+      this.setBtnLoading(okBtn, true, { spinIcon: false });
+
+      try {
+        if (action === 'warning') {
+          await this.handleWarningFarmer(idx, reason);
+          this.closeFarmerActionModal();
+          return;
+        }
+        if (action === 'suspend') {
+          await this.handleBlockFarmer(idx, reason);
           this.updateProfileStatusButtons(true);
           this.renderFarmersListCards();
           this.renderTableBody();
           this.closeFarmerActionModal();
-        });
-        return;
-      }
+          return;
+        }
+        if (action === 'unsuspend') {
+          await this.handleUnblockFarmer(idx, reason);
+          this.updateProfileStatusButtons(false);
+          this.renderFarmersListCards();
+          this.renderTableBody();
+          this.closeFarmerActionModal();
+          return;
+        }
 
-      this.renderFarmersListCards();
-      this.renderTableBody();
-      this.closeFarmerActionModal();
+        this.renderFarmersListCards();
+        this.renderTableBody();
+        this.closeFarmerActionModal();
+      } catch (err) {
+        console.error('Farmer action failed:', err);
+      } finally {
+        if (okBtn.dataset.originalHtml) {
+          okBtn.innerHTML = okBtn.dataset.originalHtml;
+          delete okBtn.dataset.originalHtml;
+        }
+        this.setBtnLoading(okBtn, false, { spinIcon: false });
+      }
     });
 
     document.addEventListener('keydown', (e) => {
@@ -8016,6 +8179,83 @@ class DashboardApp {
     return data?.message || data?.error || `Request failed (HTTP ${status})`;
   }
 
+  /**
+   * Toggle loading state on a button (spinner + disabled).
+   * @param {HTMLElement|null} btn
+   * @param {boolean} loading
+   * @param {{ spinIcon?: boolean, label?: string }} opts
+   */
+  setBtnLoading(btn, loading, opts = {}) {
+    if (!btn) return;
+    const spinIcon = opts.spinIcon !== false;
+    if (loading) {
+      btn.disabled = true;
+      btn.setAttribute('aria-busy', 'true');
+      btn.classList.add('is-loading');
+      const icon = btn.querySelector('i');
+      if (icon && spinIcon && !btn.dataset.btnLoadingSaved) {
+        btn.dataset.btnLoadingIconClass = icon.className;
+        if (
+          icon.classList.contains('fa-rotate-right') ||
+          icon.classList.contains('fa-pen-to-square')
+        ) {
+          icon.classList.add('fa-spin');
+        } else {
+          icon.className = 'fa-solid fa-spinner fa-spin';
+        }
+        btn.dataset.btnLoadingSaved = '1';
+      }
+      if (opts.label && !btn.dataset.btnLoadingLabelSaved) {
+        btn.dataset.btnLoadingPrevLabel = btn.textContent.trim();
+        const labelEl = btn.querySelector('span') || btn;
+        if (labelEl.tagName === 'SPAN') {
+          labelEl.textContent = opts.label;
+        } else if (!icon) {
+          btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> ${opts.label}`;
+        }
+        btn.dataset.btnLoadingLabelSaved = '1';
+      }
+      return;
+    }
+    btn.disabled = false;
+    btn.removeAttribute('aria-busy');
+    btn.classList.remove('is-loading');
+    const icon = btn.querySelector('i');
+    if (icon && btn.dataset.btnLoadingIconClass) {
+      icon.className = btn.dataset.btnLoadingIconClass;
+      delete btn.dataset.btnLoadingIconClass;
+      delete btn.dataset.btnLoadingSaved;
+    }
+    if (btn.dataset.btnLoadingPrevLabel) {
+      const labelEl = btn.querySelector('span');
+      if (labelEl) labelEl.textContent = btn.dataset.btnLoadingPrevLabel;
+      else btn.textContent = btn.dataset.btnLoadingPrevLabel;
+      delete btn.dataset.btnLoadingPrevLabel;
+      delete btn.dataset.btnLoadingLabelSaved;
+    }
+  }
+
+  showMessagingConversationLoading(message = 'Loading conversation…') {
+    const bodyEl = document.getElementById('messagingDetailBody');
+    const pane = document.getElementById('messagingDetailPane');
+    if (pane) pane.classList.add('is-loading-conversation');
+    if (bodyEl) {
+      bodyEl.innerHTML = `<div class="messaging-conversation-loading" role="status" aria-live="polite">
+        <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+        <span>${this.escapeHtml(message)}</span>
+      </div>`;
+    }
+    const sendBtn = document.getElementById('msgInlineReplySendBtn');
+    const input = document.getElementById('msgInlineReplyInput');
+    if (sendBtn) sendBtn.disabled = true;
+    if (input) input.disabled = true;
+  }
+
+  hideMessagingConversationLoading() {
+    const pane = document.getElementById('messagingDetailPane');
+    if (pane) pane.classList.remove('is-loading-conversation');
+  }
+
   initMessagingModule() {
     if (this._messagingInitialized) return;
     this._messagingInitialized = true;
@@ -8025,6 +8265,7 @@ class DashboardApp {
     this.messagingSearchTerm = '';
     this.messagingMessages = [];
     this.messagingSelectedId = null;
+    this._messagingOpenSeq = 0;
 
     // Folder clicks
     const folderList = document.getElementById('messagingFolders');
@@ -8138,8 +8379,7 @@ class DashboardApp {
         const item = e.target.closest('.messaging-item');
         if (item) {
           if (this.messagingFolder === 'contacts') return;
-          const id = Number(item.getAttribute('data-msg-id'));
-          if (id) this.openMessagingDetail(id);
+          this.selectMessagingConversation(item);
         }
       };
     }
@@ -8225,6 +8465,9 @@ class DashboardApp {
     const listEl = document.getElementById('messagingList');
     if (!listEl) return;
 
+    const refreshBtn = document.getElementById('messagingRefreshBtn');
+    this.setBtnLoading(refreshBtn, true);
+
     listEl.innerHTML = '<li class="messaging-loading"><i class="fa-solid fa-spinner fa-spin"></i><span>Loading chats…</span></li>';
 
     try {
@@ -8305,6 +8548,8 @@ class DashboardApp {
       console.warn('Failed to load chats:', err);
       const hint = String(err.message || 'Could not load chats.');
       listEl.innerHTML = `<li class="messaging-list-empty"><i class="fa-solid fa-circle-exclamation"></i><p>${this.escapeHtml(hint)}</p><p style="margin-top:0.5rem;font-size:0.85rem;"><a href="${beanthenticApiUrl('/connection-settings')}">Connection Settings</a></p></li>`;
+    } finally {
+      this.setBtnLoading(refreshBtn, false);
     }
   }
 
@@ -8322,23 +8567,16 @@ class DashboardApp {
 
     const esc = (s) => this.escapeHtml(s);
     
-    // Normalize helper for active class comparison
-    const normalize = (p) => {
-      if (!p) return '';
-      let d = String(p).replace(/\D/g, '');
-      if (d.startsWith('0')) d = d.substring(1);
-      if (d.startsWith('63')) d = d.substring(2);
-      return d;
-    };
+    const selectedTail = this.messagingPhoneTail(this.messagingSelectedPhone || '');
 
     listEl.innerHTML = this.messagingConversations.map(c => {
       const m = c.latest_message;
       const isUnread = c.unread_count > 0;
       const unreadClass = isUnread ? ' is-unread' : '';
-      
-      const selectedPhone = normalize(this.messagingSelectedPhone);
-      const currentConvPhone = normalize(c.phone);
-      const activeClass = (this.messagingSelectedId && (m.id === this.messagingSelectedId || currentConvPhone === selectedPhone)) ? ' is-active' : '';
+
+      const currentConvPhone = this.messagingPhoneTail(c.phone);
+      const activeClass =
+        selectedTail && currentConvPhone === selectedTail ? ' is-active' : '';
       
       const displayName = c.name;
       const initials = this.getInitials(displayName);
@@ -8359,15 +8597,32 @@ class DashboardApp {
       </li>`;
     }).join('');
 
-    // Re-attach listeners to list items
-    listEl.querySelectorAll('.messaging-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const phone = item.getAttribute('data-phone');
-        const msgId = item.getAttribute('data-msg-id');
-        this.messagingSelectedPhone = phone;
-        this.openMessagingDetail(msgId);
-      });
+  }
+
+  /** Open a chat from the sidebar list (by phone + optional message id). */
+  selectMessagingConversation(item) {
+    if (!item) return;
+    const phone = item.getAttribute('data-phone') || '';
+    const msgIdRaw = item.getAttribute('data-msg-id');
+    const msgId = msgIdRaw ? Number(msgIdRaw) : null;
+
+    this.messagingSelectedPhone = phone;
+
+    document.querySelectorAll('.messaging-item').forEach((el) => {
+      el.classList.toggle('is-active', el === item);
     });
+
+    const conv = (this.messagingConversations || []).find(
+      (c) => this.messagingPhoneTail(c.phone) === this.messagingPhoneTail(phone)
+    );
+    const contact = conv
+      ? { phone: conv.phone, name: conv.name }
+      : null;
+
+    void this.openMessagingDetail(
+      Number.isFinite(msgId) && msgId > 0 ? msgId : null,
+      contact
+    );
   }
 
   renderMessagingContacts() {
@@ -8606,30 +8861,57 @@ class DashboardApp {
     }).join('');
   }
 
-  async sendInlineReply() {
-    console.log('sendInlineReply called, selectedId:', this.messagingSelectedId);
-    
-    if (!this.messagingSelectedId) {
-      console.log('No selected ID, returning');
-      return;
+  patchMessagingAfterSend(recipientPhone, replyData) {
+    const tail = this.messagingPhoneTail(recipientPhone);
+    if (!tail) return;
+
+    const saved = {
+      id: replyData.id || `local-${Date.now()}`,
+      body: replyData.body,
+      sender_name: replyData.sender_name || 'Administrator',
+      sender_phone: replyData.sender_phone || '',
+      sender_role: 'admin',
+      sender_type: 'admin',
+      recipient_phone: recipientPhone,
+      recipient_name: replyData.recipient_name || '',
+      created_at: replyData.created_at || new Date().toISOString(),
+      is_read: true,
+      category: 'farmers',
+    };
+    this.messagingMessages = this.messagingMessages || [];
+    this.messagingMessages.push(saved);
+
+    if (Array.isArray(this.messagingConversations)) {
+      const conv = this.messagingConversations.find(
+        (c) => this.messagingPhoneTail(c.phone) === tail
+      );
+      if (conv) {
+        conv.latest_message = saved;
+        conv.unread_count = 0;
+      }
     }
+    this.renderMessagingList();
+    document.querySelectorAll('.messaging-item').forEach((el) => {
+      const elTail = this.messagingPhoneTail(el.getAttribute('data-phone') || '');
+      el.classList.toggle('is-active', elTail === tail);
+    });
+    void this.updateMessagingBadge();
+  }
+
+  async sendInlineReply() {
+    if (!this.messagingSelectedId) return;
 
     const inlineReplyInput = document.getElementById('msgInlineReplyInput');
-    console.log('Reply input element:', inlineReplyInput);
-    
     const message = (inlineReplyInput?.value || '').trim();
-    console.log('Message content:', message);
-    
+
     if (!message) {
       this.showNotification('Message is required.', 'error');
       return;
     }
 
     const sendBtn = document.getElementById('msgInlineReplySendBtn');
-    if (sendBtn) {
-      sendBtn.disabled = true;
-      sendBtn.setAttribute('aria-busy', 'true');
-    }
+    if (sendBtn?.classList.contains('is-loading')) return;
+    this.setBtnLoading(sendBtn, true);
 
     try {
       // Use the correctly identified farmer phone as the recipient
@@ -8716,29 +8998,27 @@ class DashboardApp {
         setTimeout(() => bodyEl.scrollTop = bodyEl.scrollHeight, 50);
       }
 
-      this.showNotification('Message sent!', 'success');
-      
-      // Clear the input field locally
-      const inlineReplyInput = document.getElementById('msgInlineReplyInput');
       if (inlineReplyInput) {
         inlineReplyInput.value = '';
         inlineReplyInput.style.height = 'auto';
       }
 
-      // Refresh list and re-render full thread
-      this.loadMessagingFolder().then(() => {
-        if (this.messagingSelectedId) {
-          this.openMessagingDetail(this.messagingSelectedId);
-        }
+      this.setBtnLoading(sendBtn, false);
+      this.showNotification('Message sent!', 'success');
+      this.patchMessagingAfterSend(recipientPhone, {
+        ...replyData,
+        recipient_name:
+          (originalMessage &&
+            (normalize(originalMessage.sender_phone) === target
+              ? originalMessage.sender_name
+              : originalMessage.recipient_name)) ||
+          headerName,
       });
     } catch (err) {
       console.warn('Send reply failed:', err);
       this.showNotification(err.message || 'Could not send reply.', 'error');
     } finally {
-      if (sendBtn) {
-        sendBtn.disabled = false;
-        sendBtn.removeAttribute('aria-busy');
-      }
+      this.setBtnLoading(sendBtn, false);
     }
   }
 
@@ -9040,13 +9320,16 @@ class DashboardApp {
   }
 
   async openMessagingDetail(id, newContact = null) {
+    const openSeq = ++this._messagingOpenSeq;
+    this._messagingDetailBusy = true;
+
     this.closeMessagingCompose(); // Close compose if open
     this.messagingSelectedId = id;
-    
+
     const main = document.getElementById('messagingMain');
     const detail = document.getElementById('messagingDetail');
     const placeholder = document.getElementById('messagingNoChatSelected');
-    
+
     if (main) main.classList.add('has-detail');
     if (placeholder) placeholder.style.display = 'none';
     if (detail) {
@@ -9054,18 +9337,29 @@ class DashboardApp {
       detail.classList.add('is-visible');
     }
 
+    const displayNameHint =
+      newContact?.name ||
+      document.getElementById('messagingDetailSenderName')?.textContent ||
+      '';
+    this.showMessagingConversationLoading(
+      displayNameHint
+        ? `Loading chat with ${displayNameHint}…`
+        : 'Loading conversation…'
+    );
+
+    const selectedTail = this.messagingPhoneTail(
+      this.messagingSelectedPhone || newContact?.phone || ''
+    );
+    document.querySelectorAll('.messaging-item').forEach((el) => {
+      const elTail = this.messagingPhoneTail(el.getAttribute('data-phone') || '');
+      el.classList.toggle('is-active', !!selectedTail && elTail === selectedTail);
+    });
+
     // Find the message to get the phone number
     let msg = id ? this.messagingMessages.find(m => String(m.id) === String(id)) : null;
 
-    // Highlight in list
-    document.querySelectorAll('.messaging-item').forEach(el => {
-      const elId = el.getAttribute('data-msg-id');
-      const elPhone = el.getAttribute('data-phone');
-      const isActive = id ? String(elId) === String(id) : (newContact && elPhone === newContact.phone);
-      el.classList.toggle('is-active', isActive);
-    });
-
     try {
+      if (openSeq !== this._messagingOpenSeq) return;
       // If we have a new contact but no ID yet, create a dummy message object for rendering
       if (!id && newContact) {
         msg = {
@@ -9077,6 +9371,8 @@ class DashboardApp {
         };
       }
 
+      if (openSeq !== this._messagingOpenSeq) return;
+
       // If not found in local data and we have an ID, try API
       if (!msg && id) {
         const res = await this.messagingApi(`/api/messages/${id}`);
@@ -9086,7 +9382,23 @@ class DashboardApp {
         if (!msg) throw new Error('No message data');
       }
 
+      if (!msg && (this.messagingSelectedPhone || newContact?.phone)) {
+        const phone = this.messagingSelectedPhone || newContact.phone;
+        const name = newContact?.name || this.resolveFarmerName(phone, '');
+        msg = {
+          sender_phone: phone,
+          sender_name: name,
+          recipient_phone: phone,
+          recipient_name: name,
+          body: '',
+          created_at: new Date().toISOString(),
+          conversation: [],
+        };
+      }
+
       if (!msg) throw new Error('Message not found');
+
+      if (openSeq !== this._messagingOpenSeq) return;
 
       // Now that we have the message, set the selected phone correctly
       if (newContact) {
@@ -9145,6 +9457,7 @@ class DashboardApp {
           bodyEl.innerHTML = '<div class="messaging-list-empty"><p>No messages yet. Send a message to start the conversation!</p></div>';
         } else {
           let thread = await this.fetchConversationThread(this.messagingSelectedPhone);
+          if (openSeq !== this._messagingOpenSeq) return;
           if (!thread.length) {
             thread = this.buildConversationThreadForPhone(this.messagingSelectedPhone);
           }
@@ -9156,6 +9469,8 @@ class DashboardApp {
           setTimeout(() => bodyEl.scrollTop = bodyEl.scrollHeight, 50);
         }
       }
+
+      if (openSeq !== this._messagingOpenSeq) return;
 
       // Inline reply is always visible; enable only when we have a recipient
       const inlineReplySection = document.getElementById('messagingConversationReply');
@@ -9182,12 +9497,26 @@ class DashboardApp {
 
       if (this.messagingSelectedPhone && !newContact) {
         await this.markConversationRead(this.messagingSelectedPhone);
+        if (openSeq !== this._messagingOpenSeq) return;
         this.renderMessagingList();
+        document.querySelectorAll('.messaging-item').forEach((el) => {
+          const elTail = this.messagingPhoneTail(el.getAttribute('data-phone') || '');
+          el.classList.toggle(
+            'is-active',
+            elTail === this.messagingPhoneTail(this.messagingSelectedPhone)
+          );
+        });
       }
     } catch (err) {
+      if (openSeq !== this._messagingOpenSeq) return;
       console.warn('Failed to load message detail:', err);
       const bodyEl = document.getElementById('messagingDetailBody');
       if (bodyEl) bodyEl.innerHTML = '<div class="messaging-list-empty"><i class="fa-solid fa-circle-exclamation"></i><p>Could not load this message.</p></div>';
+    } finally {
+      if (openSeq === this._messagingOpenSeq) {
+        this._messagingDetailBusy = false;
+        this.hideMessagingConversationLoading();
+      }
     }
   }
 
@@ -9196,13 +9525,18 @@ class DashboardApp {
    */
   async goToFarmerMessage(phone) {
     if (!phone) return;
-    
-    // Switch to messaging module
+
     this.switchModule('messaging');
-    
+
     const targetPhone = String(phone).replace(/^\+63|^63|^0/, '');
-    
-    await this.loadMessagingFolder();
+    const messagingBtn = document.getElementById('messagingBtn');
+    this.setBtnLoading(messagingBtn, true);
+
+    try {
+      await this.loadMessagingFolder();
+    } finally {
+      this.setBtnLoading(messagingBtn, false);
+    }
     
     // Search for a conversation with this farmer
     const conv = this.messagingConversations.find(c => {
@@ -9211,7 +9545,19 @@ class DashboardApp {
     });
     
     if (conv) {
-      this.openMessagingDetail(conv.latest_message.id);
+      this.messagingSelectedPhone = conv.phone;
+      const listEl = document.getElementById('messagingList');
+      if (listEl) {
+        const tail = this.messagingPhoneTail(conv.phone);
+        const matchItem = [...listEl.querySelectorAll('.messaging-item')].find(
+          (el) => this.messagingPhoneTail(el.getAttribute('data-phone') || '') === tail
+        );
+        if (matchItem) matchItem.classList.add('is-active');
+      }
+      void this.openMessagingDetail(conv.latest_message.id, {
+        phone: conv.phone,
+        name: conv.name,
+      });
     } else {
       // If no conversation exists, open the compose panel
       this.openMessagingCompose(phone);
@@ -9228,6 +9574,12 @@ class DashboardApp {
   }
 
   async toggleMessagingArchive(id) {
+    const archiveBtn = document.getElementById('messagingDetailArchiveBtn');
+    const prevHtml = archiveBtn ? archiveBtn.innerHTML : '';
+    if (archiveBtn) {
+      archiveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Archiving…</span>';
+      this.setBtnLoading(archiveBtn, true, { spinIcon: false });
+    }
     try {
       const res = await this.messagingApi(`/api/messages/${id}/archive`, { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -9235,10 +9587,15 @@ class DashboardApp {
 
       this.showNotification(data.is_archived ? 'Message archived.' : 'Message unarchived.', 'success');
       this.closeMessagingDetail();
-      this.loadMessagingFolder();
+      await this.loadMessagingFolder();
     } catch (err) {
       console.warn('Archive toggle failed:', err);
       this.showNotification('Could not archive message.', 'error');
+    } finally {
+      if (archiveBtn) {
+        archiveBtn.innerHTML = prevHtml;
+        this.setBtnLoading(archiveBtn, false, { spinIcon: false });
+      }
     }
   }
 
@@ -9265,8 +9622,13 @@ class DashboardApp {
     };
 
     confirmBtn.onclick = async () => {
-      hideModal();
-      await this._performDelete(id);
+      this.setBtnLoading(confirmBtn, true, { label: 'Deleting…' });
+      try {
+        await this._performDelete(id);
+        hideModal();
+      } finally {
+        this.setBtnLoading(confirmBtn, false);
+      }
     };
 
     cancelBtn.onclick = hideModal;
@@ -9285,10 +9647,11 @@ class DashboardApp {
 
       this.showNotification('Message deleted.', 'success');
       this.closeMessagingDetail();
-      this.loadMessagingFolder();
+      await this.loadMessagingFolder();
     } catch (err) {
       console.warn('Delete failed:', err);
       this.showNotification('Could not delete message.', 'error');
+      throw err;
     }
   }
 
@@ -9483,10 +9846,7 @@ class DashboardApp {
     }
 
     const sendBtn = document.getElementById('messagingComposeSend');
-    if (sendBtn) {
-      sendBtn.disabled = true;
-      sendBtn.setAttribute('aria-busy', 'true');
-    }
+    this.setBtnLoading(sendBtn, true);
 
     try {
       const res = await this.messagingApi('/api/messages', {
@@ -9522,10 +9882,7 @@ class DashboardApp {
       console.warn('Send message failed:', err);
       this.showNotification(err.message || 'Could not send message.', 'error');
     } finally {
-      if (sendBtn) {
-        sendBtn.disabled = false;
-        sendBtn.removeAttribute('aria-busy');
-      }
+      this.setBtnLoading(sendBtn, false);
     }
   }
 
@@ -9561,10 +9918,7 @@ class DashboardApp {
     }
 
     const sendBtn = document.getElementById('msgReplySendBtn');
-    if (sendBtn) {
-      sendBtn.disabled = true;
-      sendBtn.setAttribute('aria-busy', 'true');
-    }
+    this.setBtnLoading(sendBtn, true);
 
     try {
       // Get the original message to extract recipient info
@@ -9616,10 +9970,7 @@ class DashboardApp {
       console.warn('Send reply failed:', err);
       this.showNotification(err.message || 'Could not send reply.', 'error');
     } finally {
-      if (sendBtn) {
-        sendBtn.disabled = false;
-        sendBtn.removeAttribute('aria-busy');
-      }
+      this.setBtnLoading(sendBtn, false);
     }
   }
 

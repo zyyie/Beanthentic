@@ -32,6 +32,9 @@
   background: #fff;
   width: 360px;
   flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
 }
 
 .messaging-list-header {
@@ -170,6 +173,76 @@
   font-weight: 600;
 }
 
+.messaging-loading .fa-spinner,
+.messaging-loading i {
+  animation: messagingBtnSpin 0.45s linear infinite;
+}
+
+.messaging-conversation-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  gap: 14px;
+  color: #2c7a3e;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.messaging-conversation-loading .fa-spinner {
+  font-size: 28px;
+  animation: messagingBtnSpin 0.45s linear infinite;
+}
+
+.messaging-detail-pane.is-loading-conversation .messaging-conversation__reply {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.messaging-refresh-btn.is-loading,
+.messaging-compose-icon-btn.is-loading,
+.messaging-reply-send.is-loading {
+  cursor: wait;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.messaging-refresh-btn[aria-busy='true'] .fa-rotate-right,
+.messaging-compose-icon-btn[aria-busy='true'] .fa-pen-to-square,
+.messaging-reply-send.is-loading i {
+  animation: messagingBtnSpin 0.45s linear infinite;
+}
+
+.messaging-detail__dropdown-item.is-loading {
+  opacity: 0.7;
+  cursor: wait;
+  pointer-events: none;
+}
+
+.messaging-detail__dropdown-item.is-loading .fa-spinner {
+  margin-right: 4px;
+}
+
+.confirm-dialog__btn.is-loading {
+  cursor: wait;
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+.confirm-dialog__btn.is-loading .fa-spinner {
+  margin-right: 6px;
+}
+
+@keyframes messagingBtnSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .messaging-item {
   display: flex;
   gap: 14px;
@@ -179,6 +252,8 @@
   transition: all 0.2s ease;
   position: relative;
   margin: 2px 0;
+  pointer-events: auto;
+  user-select: none;
 }
 
 .messaging-item:hover {
@@ -263,6 +338,7 @@
   background: #2c7a3e;
   border-radius: 50%;
   box-shadow: 0 0 0 3px #fff;
+  pointer-events: none;
 }
 
 /* ── Conversation Pane ─────────────────────────────── */

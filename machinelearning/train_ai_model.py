@@ -276,6 +276,40 @@ class GIDocumentTrainer:
                 "score": 30,
                 "source": "sample"
             },
+            {
+                "text": """
+                AUTHORIZATION LETTER
+
+                Date: February 27, 2026
+                To: HR Team
+
+                I, Arlyn Rubia, hereby authorize my sister Ma. Crestina Rubia
+                to process and claim my retirement pay on my behalf.
+
+                This authorization is given for administrative purposes.
+                Signed: Arlyn Rubia
+                """,
+                "label": "Not Ready",
+                "score": 35,
+                "source": "sample"
+            },
+            {
+                "text": """
+                LIPA BARAKO PRODUCERS ORGANIZATION
+
+                Applicant Entity: Lipa Barako Coffee Growers Association
+                Legal Standing: Duly registered cooperative with SEC
+
+                Membership List: Attached roster of 120 producer-members
+                Stakeholder Consultations held March 2025 with meeting minutes
+
+                The organization represents producers in Lipa City, Batangas
+                for Geographical Indication registration of Lipa Barako coffee.
+                """,
+                "label": "Ready",
+                "score": 78,
+                "source": "sample"
+            },
             # Borderline cases
             {
                 "text": """
@@ -477,15 +511,27 @@ class GIDocumentTrainer:
 
         return results
 
-    def save_model(self, results: Dict) -> None:
+    def train_document_model(self) -> Dict:
+        """Train Random Forest on GI document text features (keyword + length)."""
+        logger.info("Training document ML model...")
+        feature_matrix, labels = self.prepare_training_data()
+        results = self.train_model(feature_matrix, labels)
+        doc_path = self.models_dir / "gi_document_model.joblib"
+        joblib.dump(results["model"], doc_path)
+        logger.info("Document model saved to %s", doc_path)
+        results["document_model_path"] = str(doc_path)
+        return results
+
+    def save_model(self, results: Dict, *, model_name: str = "gi_farmer_model.joblib") -> None:
         """Save trained model and results."""
         logger.info("Saving trained model...")
 
         # Save model
-        model_path = self.models_dir / "gi_farmer_model.joblib"
+        model_path = self.models_dir / model_name
         joblib.dump(results['model'], model_path)
-        legacy_path = self.models_dir / "gi_model.joblib"
-        joblib.dump(results['model'], legacy_path)
+        if model_name == "gi_farmer_model.joblib":
+            legacy_path = self.models_dir / "gi_model.joblib"
+            joblib.dump(results['model'], legacy_path)
 
         # Save feature importance
         results['feature_importance'].to_csv(
@@ -585,7 +631,8 @@ def main():
     parser = argparse.ArgumentParser(description='Train Random Forest model for GI document analysis')
     parser.add_argument('--prepare-data', action='store_true', help='Prepare training data')
     parser.add_argument('--train', action='store_true', help='Train the model from JSON')
-    parser.add_argument('--train-csv', action='store_true', help='Train the model from CSV dataset')
+    parser.add_argument('--train-csv', action='store_true', help='Train farmer + document models (CSV + JSON samples)')
+    parser.add_argument('--train-documents', action='store_true', help='Train document model only from JSON samples')
     parser.add_argument('--evaluate', action='store_true', help='Evaluate the model')
     parser.add_argument('--full-pipeline', action='store_true', help='Run complete pipeline')
     parser.add_argument('--create-template', action='store_true', help='Create dataset template')
@@ -603,27 +650,49 @@ def main():
         logger.info("Running training pipeline from CSV...")
         results = trainer.train_model_from_csv()
         trainer.save_model(results)
+        doc_results = trainer.train_document_model()
         print("\nCSV Training completed successfully!")
-        print(f"Model accuracy: {results['accuracy']:.3f}")
+        print(f"Farmer model accuracy: {results['accuracy']:.3f}")
+        print(f"Document model accuracy: {doc_results['accuracy']:.3f}")
         print(f"Cross-validation score: {results['cv_mean']:.3f} ± {results['cv_std']:.3f}")
         return
 
     if args.full_pipeline:
-        logger.info("Running full training pipeline (CSV farmer GI model)...")
+        logger.info("Running full training pipeline (farmer CSV + document JSON)...")
         results = trainer.train_model_from_csv()
         trainer.save_model(results)
+        doc_results = trainer.train_document_model()
         print("\nTraining completed successfully!")
-        print(f"Model accuracy: {results['accuracy']:.3f}")
+        print(f"Farmer model accuracy: {results['accuracy']:.3f}")
+        print(f"Document model accuracy: {doc_results['accuracy']:.3f}")
         print(f"Cross-validation score: {results['cv_mean']:.3f} ± {results['cv_std']:.3f}")
-        print(f"Model saved to {trainer.models_dir / 'gi_farmer_model.joblib'}")
+        print(f"Farmer model: {trainer.models_dir / 'gi_farmer_model.joblib'}")
+        print(f"Document model: {trainer.models_dir / 'gi_document_model.joblib'}")
         return
 
     if args.prepare_data:
         trainer.prepare_training_data()
 
+    if args.train_documents:
+        doc_results = trainer.train_document_model()
+        training_results = {
+            "accuracy": doc_results["accuracy"],
+            "cv_mean": doc_results["cv_mean"],
+            "cv_std": doc_results["cv_std"],
+            "best_params": doc_results["best_params"],
+            "classification_report": doc_results["classification_report"],
+            "confusion_matrix": doc_results["confusion_matrix"],
+            "training_date": datetime.now().isoformat(),
+            "model_type": "document",
+        }
+        with open(trainer.models_dir / "document_training_results.json", "w", encoding="utf-8") as f:
+            json.dump(training_results, f, indent=2)
+        print(f"Document model accuracy: {doc_results['accuracy']:.3f}")
+        return
+
     if args.train:
         results = trainer.train_model()
-        trainer.save_model(results)
+        trainer.save_model(results, model_name="gi_document_model.joblib")
 
     if args.evaluate:
         evaluation = trainer.evaluate_model()

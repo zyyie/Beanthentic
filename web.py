@@ -242,6 +242,32 @@ register_platform_routes(app)
 register_ml_routes(app)
 register_farmer_portal_routes(app)
 
+
+def _log_ipophl_ml_readiness() -> None:
+    """Log whether document/farmer ML models are loaded (helps diagnose 0% analysis)."""
+    try:
+        from machinelearning.ai_engine import gi_analyzer
+
+        status = gi_analyzer.ml_status()
+        if not status.get("document_model_loaded"):
+            app.logger.warning(
+                "IPOPHL document ML model not loaded. Install deps and train: "
+                "pip install -r config/requirements.txt && "
+                "cd machinelearning && python train_ai_model.py --full-pipeline"
+            )
+        else:
+            app.logger.info(
+                "IPOPHL AI ready (farmer=%s, document=%s, mode=%s)",
+                status.get("farmer_model_loaded"),
+                status.get("document_model_loaded"),
+                status.get("document_analysis_default"),
+            )
+    except Exception as exc:
+        app.logger.warning("IPOPHL AI engine unavailable: %s", exc)
+
+
+_log_ipophl_ml_readiness()
+
 # Ensure GI broadcast POST is registered on the app (avoids 405 from static_folder when a module fails to load)
 from api.gi_contributions_api import handle_gi_contributions_send  # noqa: E402
 

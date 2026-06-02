@@ -241,6 +241,26 @@
   transform: scale(0.95);
 }
 
+.icon-action-btn.is-loading {
+  cursor: wait;
+  opacity: 0.88;
+  pointer-events: none;
+  transform: none;
+}
+
+.icon-action-btn.is-loading i {
+  animation: messagingHeaderIconSpin 0.65s linear infinite;
+}
+
+@keyframes messagingHeaderIconSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .icon-badge {
   position: absolute;
   top: -4px;

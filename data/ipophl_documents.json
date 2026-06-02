@@ -146,10 +146,10 @@
   "624527ed-89ef-46ca-a34e-5b7ac40751de": {
     "file_uuid": "624527ed-89ef-46ca-a34e-5b7ac40751de",
     "original_filename": "01_LE1_-_Rubia_Ma._Krisha_N.docx",
-    "file_path": "C:/Users/ARLYN/Desktop/final admin/Beanthentic/machinelearning/uploads/624527ed-89ef-46ca-a34e-5b7ac40751de.docx",
+    "file_path": "machinelearning/uploads/624527ed-89ef-46ca-a34e-5b7ac40751de.docx",
     "file_type": ".docx",
     "file_size": 276036,
-    "ai_score": 0,
+    "ai_score": 4,
     "ai_status": "Not Ready",
     "detected_features": [],
     "missing_requirements": [
@@ -158,44 +158,45 @@
       "Geographical Origin",
       "Distinctive Quality"
     ],
-    "analysis_method": "rule_based",
+    "analysis_method": "ml_hybrid",
     "text_length": 147,
-    "shap_analysis": "<p>The rule-based analysis has identified <strong>0</strong> out of <strong>4</strong> mandatory requirements within this document. This results in an initial readiness score of <strong>0%</strong>. Current findings indicate that the document lacks several critical structural elements and key technical terms that are essential for this part of the Geographical Indication application.</p><p>A detailed review of the missing components reveals that the following areas require immediate attention: <strong>Lipa Barako coffee, Flavor Profile, Geographical Origin</strong> and other related identifiers. The absence of these specific requirements may lead to formality examination deficiencies, as they are necessary to validate the document's relevance to the Lipa Barako coffee registration process.</p><p>To improve this document's standing, it is recommended to explicitly integrate the missing mandatory requirements identified above. Ensuring that all task-specific details are fully addressed will help achieve a higher compliance score and facilitate a smoother approval workflow with IPOPHL. Once updated, the document should be re-analyzed to verify readiness.</p>",
+    "shap_analysis": "<p>The AI model's comprehensive evaluation of the Phase1 Product has determined a status of <strong>insufficient</strong>, supported by a calculated readiness score of <strong>8%</strong>. The current assessment reflects a lack of critical terminology and structural requirements that the Random Forest model uses to verify compliance with IPOPHL standards.</p><p>A deeper technical analysis of the document's content structure reveals significant variances in expected metadata and descriptive terminology. Specifically, the absence or weak representation of <strong> and Meeting Minutes</strong> creates a negative impact on the SHAP interpretation values. In the context of GI registration, these missing components are vital for establishing a legally defensible link between the product's quality and its Batangas origin, and their omission suggests that the document may not yet meet the formality examination criteria.</p><p>To bridge these identified gaps, it is highly recommended to perform a targeted revision focusing on the explicit documentation of technical specifications and the causal relationship between the Lipa Barako flavor profile and the local soil composition. Providing more exhaustive details on the production process and quality control measures will not only improve the AI readiness score but also significantly reduce the likelihood of receiving deficiency notices from IPOPHL. Once these improvements are integrated, the document should be re-analyzed to verify that all mandatory parameters have been successfully satisfied.</p>",
     "upload_timestamp": "",
-    "analysis_timestamp": "2026-06-02T04:33:47.354929",
+    "analysis_timestamp": "2026-06-02T16:16:46.602891",
     "ipophl_phase": "phase1",
     "task_id": "phase1-product"
   },
   "cdfc0096-1faa-441b-8317-7adf8bebf44a": {
     "file_uuid": "cdfc0096-1faa-441b-8317-7adf8bebf44a",
     "original_filename": "authorization.docx",
-    "file_path": "C:/Users/ARLYN/Desktop/final admin/Beanthentic/machinelearning/uploads/cdfc0096-1faa-441b-8317-7adf8bebf44a.docx",
+    "file_path": "machinelearning/uploads/cdfc0096-1faa-441b-8317-7adf8bebf44a.docx",
     "file_type": ".docx",
     "file_size": 13986,
-    "ai_score": 0,
+    "ai_score": 14,
     "ai_status": "Not Ready",
-    "detected_features": [],
+    "detected_features": [
+      "Legal Standing"
+    ],
     "missing_requirements": [
       "Applicant Entity",
       "Producers Organization",
-      "Legal Standing",
       "Membership List"
     ],
-    "analysis_method": "rule_based",
+    "analysis_method": "ml_hybrid",
     "text_length": 554,
-    "shap_analysis": "<p>The rule-based analysis has identified <strong>0</strong> out of <strong>4</strong> mandatory requirements within this document. This results in an initial readiness score of <strong>0%</strong>. Current findings indicate that the document lacks several critical structural elements and key technical terms that are essential for this part of the Geographical Indication application.</p><p>A detailed review of the missing components reveals that the following areas require immediate attention: <strong>Applicant Entity, Producers Organization, Legal Standing</strong> and other related identifiers. The absence of these specific requirements may lead to formality examination deficiencies, as they are necessary to validate the document's relevance to the Lipa Barako coffee registration process.</p><p>To improve this document's standing, it is recommended to explicitly integrate the missing mandatory requirements identified above. Ensuring that all task-specific details are fully addressed will help achieve a higher compliance score and facilitate a smoother approval workflow with IPOPHL. Once updated, the document should be re-analyzed to verify readiness.</p>",
+    "shap_analysis": "<p>The AI model's comprehensive evaluation of the Phase1 Entity has determined a status of <strong>insufficient</strong>, supported by a calculated readiness score of <strong>10%</strong>. The current assessment reflects a lack of critical terminology and structural requirements that the Random Forest model uses to verify compliance with IPOPHL standards.</p><p>A deeper technical analysis of the document's content structure reveals significant variances in expected metadata and descriptive terminology. Specifically, the absence or weak representation of <strong> and Meeting Minutes</strong> creates a negative impact on the SHAP interpretation values. In the context of GI registration, these missing components are vital for establishing a legally defensible link between the product's quality and its Batangas origin, and their omission suggests that the document may not yet meet the formality examination criteria.</p><p>To bridge these identified gaps, it is highly recommended to perform a targeted revision focusing on the explicit documentation of technical specifications and the causal relationship between the Lipa Barako flavor profile and the local soil composition. Providing more exhaustive details on the production process and quality control measures will not only improve the AI readiness score but also significantly reduce the likelihood of receiving deficiency notices from IPOPHL. Once these improvements are integrated, the document should be re-analyzed to verify that all mandatory parameters have been successfully satisfied.</p>",
     "upload_timestamp": "",
-    "analysis_timestamp": "2026-06-02T04:34:17.100200",
+    "analysis_timestamp": "2026-06-02T16:17:06.835018",
     "ipophl_phase": "phase1",
     "task_id": "phase1-entity"
   },
   "2c7df6e3-82a0-4877-a9e9-91d7be15f1c2": {
     "file_uuid": "2c7df6e3-82a0-4877-a9e9-91d7be15f1c2",
     "original_filename": "I_read_all_instructions_before_starting.docx",
-    "file_path": "C:/Users/ARLYN/Desktop/final admin/Beanthentic/machinelearning/uploads/2c7df6e3-82a0-4877-a9e9-91d7be15f1c2.docx",
+    "file_path": "machinelearning/uploads/2c7df6e3-82a0-4877-a9e9-91d7be15f1c2.docx",
     "file_type": ".docx",
     "file_size": 13513,
-    "ai_score": 0,
+    "ai_score": 4,
     "ai_status": "Not Ready",
     "detected_features": [],
     "missing_requirements": [
@@ -204,21 +205,21 @@
       "Consensus",
       "Governance Board"
     ],
-    "analysis_method": "rule_based",
+    "analysis_method": "ml_hybrid",
     "text_length": 45,
-    "shap_analysis": "<p>The rule-based analysis has identified <strong>0</strong> out of <strong>4</strong> mandatory requirements within this document. This results in an initial readiness score of <strong>0%</strong>. Current findings indicate that the document lacks several critical structural elements and key technical terms that are essential for this part of the Geographical Indication application.</p><p>A detailed review of the missing components reveals that the following areas require immediate attention: <strong>Stakeholder Consultations, Meeting Minutes, Consensus</strong> and other related identifiers. The absence of these specific requirements may lead to formality examination deficiencies, as they are necessary to validate the document's relevance to the Lipa Barako coffee registration process.</p><p>To improve this document's standing, it is recommended to explicitly integrate the missing mandatory requirements identified above. Ensuring that all task-specific details are fully addressed will help achieve a higher compliance score and facilitate a smoother approval workflow with IPOPHL. Once updated, the document should be re-analyzed to verify readiness.</p>",
+    "shap_analysis": "<p>The AI model's comprehensive evaluation of the Phase1 Stakeholders has determined a status of <strong>insufficient</strong>, supported by a calculated readiness score of <strong>8%</strong>. The current assessment reflects a lack of critical terminology and structural requirements that the Random Forest model uses to verify compliance with IPOPHL standards.</p><p>A deeper technical analysis of the document's content structure reveals significant variances in expected metadata and descriptive terminology. Specifically, the absence or weak representation of <strong> and Meeting Minutes</strong> creates a negative impact on the SHAP interpretation values. In the context of GI registration, these missing components are vital for establishing a legally defensible link between the product's quality and its Batangas origin, and their omission suggests that the document may not yet meet the formality examination criteria.</p><p>To bridge these identified gaps, it is highly recommended to perform a targeted revision focusing on the explicit documentation of technical specifications and the causal relationship between the Lipa Barako flavor profile and the local soil composition. Providing more exhaustive details on the production process and quality control measures will not only improve the AI readiness score but also significantly reduce the likelihood of receiving deficiency notices from IPOPHL. Once these improvements are integrated, the document should be re-analyzed to verify that all mandatory parameters have been successfully satisfied.</p>",
     "upload_timestamp": "",
-    "analysis_timestamp": "2026-06-02T04:34:58.605266",
+    "analysis_timestamp": "2026-06-02T16:17:51.406885",
     "ipophl_phase": "phase1",
     "task_id": "phase1-stakeholders"
   },
   "cca0cd65-952d-4bb9-88c0-0e8c38da04a4": {
     "file_uuid": "cca0cd65-952d-4bb9-88c0-0e8c38da04a4",
     "original_filename": "Optimizing_QR_code_readability_for_curved_agro.docx",
-    "file_path": "C:/Users/ARLYN/Desktop/final admin/Beanthentic/machinelearning/uploads/cca0cd65-952d-4bb9-88c0-0e8c38da04a4.docx",
+    "file_path": "machinelearning/uploads/cca0cd65-952d-4bb9-88c0-0e8c38da04a4.docx",
     "file_type": ".docx",
     "file_size": 17747,
-    "ai_score": 0,
+    "ai_score": 4,
     "ai_status": "Not Ready",
     "detected_features": [],
     "missing_requirements": [
@@ -228,43 +229,44 @@
       "Quality Control",
       "Labeling Rules"
     ],
-    "analysis_method": "rule_based",
+    "analysis_method": "ml_hybrid",
     "text_length": 7997,
-    "shap_analysis": "<p>The rule-based analysis has identified <strong>0</strong> out of <strong>5</strong> mandatory requirements within this document. This results in an initial readiness score of <strong>0%</strong>. Current findings indicate that the document lacks several critical structural elements and key technical terms that are essential for this part of the Geographical Indication application.</p><p>A detailed review of the missing components reveals that the following areas require immediate attention: <strong>Manual of Specifications, Causal Link, Production Process</strong> and other related identifiers. The absence of these specific requirements may lead to formality examination deficiencies, as they are necessary to validate the document's relevance to the Lipa Barako coffee registration process.</p><p>To improve this document's standing, it is recommended to explicitly integrate the missing mandatory requirements identified above. Ensuring that all task-specific details are fully addressed will help achieve a higher compliance score and facilitate a smoother approval workflow with IPOPHL. Once updated, the document should be re-analyzed to verify readiness.</p>",
+    "shap_analysis": "<p>The AI model's comprehensive evaluation of the Phase2 Mop has determined a status of <strong>insufficient</strong>, supported by a calculated readiness score of <strong>10%</strong>. The current assessment reflects a lack of critical terminology and structural requirements that the Random Forest model uses to verify compliance with IPOPHL standards.</p><p>A deeper technical analysis of the document's content structure reveals significant variances in expected metadata and descriptive terminology. While no major technical gaps were explicitly flagged, the overall density of domain-specific information could be further optimized to ensure a smoother transition through the substantive examination phase of the registration process.</p><p>To bridge these identified gaps, it is highly recommended to perform a targeted revision focusing on the explicit documentation of technical specifications and the causal relationship between the Lipa Barako flavor profile and the local soil composition. Providing more exhaustive details on the production process and quality control measures will not only improve the AI readiness score but also significantly reduce the likelihood of receiving deficiency notices from IPOPHL. Once these improvements are integrated, the document should be re-analyzed to verify that all mandatory parameters have been successfully satisfied.</p>",
     "upload_timestamp": "",
-    "analysis_timestamp": "2026-06-02T04:35:05.899598",
+    "analysis_timestamp": "2026-06-02T16:18:16.843577",
     "ipophl_phase": "phase2",
     "task_id": "phase2-mop"
   },
   "6942a411-f214-4cb1-8667-421bb477f1f0": {
     "file_uuid": "6942a411-f214-4cb1-8667-421bb477f1f0",
     "original_filename": "Optimizing_QR_code_readability_for_curved_agro.docx",
-    "file_path": "C:/Users/ARLYN/Desktop/final admin/Beanthentic/machinelearning/uploads/6942a411-f214-4cb1-8667-421bb477f1f0.docx",
+    "file_path": "machinelearning/uploads/6942a411-f214-4cb1-8667-421bb477f1f0.docx",
     "file_type": ".docx",
     "file_size": 17747,
-    "ai_score": 0,
+    "ai_score": 17,
     "ai_status": "Not Ready",
-    "detected_features": [],
+    "detected_features": [
+      "Government Certification"
+    ],
     "missing_requirements": [
       "Technical Validation",
-      "Government Certification",
       "Independent Verification"
     ],
-    "analysis_method": "rule_based",
+    "analysis_method": "ml_hybrid",
     "text_length": 7997,
-    "shap_analysis": "<p>The rule-based analysis has identified <strong>0</strong> out of <strong>3</strong> mandatory requirements within this document. This results in an initial readiness score of <strong>0%</strong>. Current findings indicate that the document lacks several critical structural elements and key technical terms that are essential for this part of the Geographical Indication application.</p><p>A detailed review of the missing components reveals that the following areas require immediate attention: <strong>Technical Validation, Government Certification, Independent Verification</strong> and other related identifiers. The absence of these specific requirements may lead to formality examination deficiencies, as they are necessary to validate the document's relevance to the Lipa Barako coffee registration process.</p><p>To improve this document's standing, it is recommended to explicitly integrate the missing mandatory requirements identified above. Ensuring that all task-specific details are fully addressed will help achieve a higher compliance score and facilitate a smoother approval workflow with IPOPHL. Once updated, the document should be re-analyzed to verify readiness.</p>",
+    "shap_analysis": "<p>The AI model's comprehensive evaluation of the Phase2 Cert has determined a status of <strong>insufficient</strong>, supported by a calculated readiness score of <strong>10%</strong>. The current assessment reflects a lack of critical terminology and structural requirements that the Random Forest model uses to verify compliance with IPOPHL standards.</p><p>A deeper technical analysis of the document's content structure reveals significant variances in expected metadata and descriptive terminology. While no major technical gaps were explicitly flagged, the overall density of domain-specific information could be further optimized to ensure a smoother transition through the substantive examination phase of the registration process.</p><p>To bridge these identified gaps, it is highly recommended to perform a targeted revision focusing on the explicit documentation of technical specifications and the causal relationship between the Lipa Barako flavor profile and the local soil composition. Providing more exhaustive details on the production process and quality control measures will not only improve the AI readiness score but also significantly reduce the likelihood of receiving deficiency notices from IPOPHL. Once these improvements are integrated, the document should be re-analyzed to verify that all mandatory parameters have been successfully satisfied.</p>",
     "upload_timestamp": "",
-    "analysis_timestamp": "2026-06-02T04:35:22.767463",
+    "analysis_timestamp": "2026-06-02T16:20:59.679571",
     "ipophl_phase": "phase2",
     "task_id": "phase2-cert"
   },
   "13570809-26b2-4e51-880e-541bd49a6d15": {
     "file_uuid": "13570809-26b2-4e51-880e-541bd49a6d15",
     "original_filename": "Reveiwer-contemp-quiz.docx",
-    "file_path": "C:/Users/ARLYN/Desktop/final admin/Beanthentic/machinelearning/uploads/13570809-26b2-4e51-880e-541bd49a6d15.docx",
+    "file_path": "machinelearning/uploads/13570809-26b2-4e51-880e-541bd49a6d15.docx",
     "file_type": ".docx",
     "file_size": 30892,
-    "ai_score": 0,
+    "ai_score": 4,
     "ai_status": "Not Ready",
     "detected_features": [],
     "missing_requirements": [
@@ -273,11 +275,11 @@
       "Domicile",
       "Industrial Establishment"
     ],
-    "analysis_method": "rule_based",
+    "analysis_method": "ml_hybrid",
     "text_length": 17962,
-    "shap_analysis": "<p>The rule-based analysis has identified <strong>0</strong> out of <strong>4</strong> mandatory requirements within this document. This results in an initial readiness score of <strong>0%</strong>. Current findings indicate that the document lacks several critical structural elements and key technical terms that are essential for this part of the Geographical Indication application.</p><p>A detailed review of the missing components reveals that the following areas require immediate attention: <strong>Application Form, Applicant Name, Domicile</strong> and other related identifiers. The absence of these specific requirements may lead to formality examination deficiencies, as they are necessary to validate the document's relevance to the Lipa Barako coffee registration process.</p><p>To improve this document's standing, it is recommended to explicitly integrate the missing mandatory requirements identified above. Ensuring that all task-specific details are fully addressed will help achieve a higher compliance score and facilitate a smoother approval workflow with IPOPHL. Once updated, the document should be re-analyzed to verify readiness.</p>",
+    "shap_analysis": "<p>The AI model's comprehensive evaluation of the Phase2 Details has determined a status of <strong>insufficient</strong>, supported by a calculated readiness score of <strong>10%</strong>. The current assessment reflects a lack of critical terminology and structural requirements that the Random Forest model uses to verify compliance with IPOPHL standards.</p><p>A deeper technical analysis of the document's content structure reveals significant variances in expected metadata and descriptive terminology. While no major technical gaps were explicitly flagged, the overall density of domain-specific information could be further optimized to ensure a smoother transition through the substantive examination phase of the registration process.</p><p>To bridge these identified gaps, it is highly recommended to perform a targeted revision focusing on the explicit documentation of technical specifications and the causal relationship between the Lipa Barako flavor profile and the local soil composition. Providing more exhaustive details on the production process and quality control measures will not only improve the AI readiness score but also significantly reduce the likelihood of receiving deficiency notices from IPOPHL. Once these improvements are integrated, the document should be re-analyzed to verify that all mandatory parameters have been successfully satisfied.</p>",
     "upload_timestamp": "",
-    "analysis_timestamp": "2026-06-02T04:35:28.455594",
+    "analysis_timestamp": "2026-06-02T16:21:42.985917",
     "ipophl_phase": "phase2",
     "task_id": "phase2-details"
   },
@@ -373,10 +375,10 @@
   "53a75a8e-0b6f-4f7d-a93c-352a6afd607a": {
     "file_uuid": "53a75a8e-0b6f-4f7d-a93c-352a6afd607a",
     "original_filename": "excuse_letter.docx",
-    "file_path": "C:/Users/ARLYN/Desktop/final admin/Beanthentic/machinelearning/uploads/53a75a8e-0b6f-4f7d-a93c-352a6afd607a.docx",
+    "file_path": "machinelearning/uploads/53a75a8e-0b6f-4f7d-a93c-352a6afd607a.docx",
     "file_type": ".docx",
     "file_size": 13732,
-    "ai_score": 0,
+    "ai_score": 4,
     "ai_status": "Not Ready",
     "detected_features": [],
     "missing_requirements": [
@@ -384,11 +386,11 @@
       "Regular Compliance Audits",
       "Monitoring Records"
     ],
-    "analysis_method": "rule_based",
+    "analysis_method": "ml_hybrid",
     "text_length": 264,
-    "shap_analysis": "<p>The rule-based analysis has identified <strong>0</strong> out of <strong>3</strong> mandatory requirements within this document. This results in an initial readiness score of <strong>0%</strong>. Current findings indicate that the document lacks several critical structural elements and key technical terms that are essential for this part of the Geographical Indication application.</p><p>A detailed review of the missing components reveals that the following areas require immediate attention: <strong>Maintain Quality Standards, Regular Compliance Audits, Monitoring Records</strong> and other related identifiers. The absence of these specific requirements may lead to formality examination deficiencies, as they are necessary to validate the document's relevance to the Lipa Barako coffee registration process.</p><p>To improve this document's standing, it is recommended to explicitly integrate the missing mandatory requirements identified above. Ensuring that all task-specific details are fully addressed will help achieve a higher compliance score and facilitate a smoother approval workflow with IPOPHL. Once updated, the document should be re-analyzed to verify readiness.</p>",
+    "shap_analysis": "<p>The AI model's comprehensive evaluation of the Phase5 Compliance has determined a status of <strong>insufficient</strong>, supported by a calculated readiness score of <strong>8%</strong>. The current assessment reflects a lack of critical terminology and structural requirements that the Random Forest model uses to verify compliance with IPOPHL standards.</p><p>A deeper technical analysis of the document's content structure reveals significant variances in expected metadata and descriptive terminology. Specifically, the absence or weak representation of <strong> and Meeting Minutes</strong> creates a negative impact on the SHAP interpretation values. In the context of GI registration, these missing components are vital for establishing a legally defensible link between the product's quality and its Batangas origin, and their omission suggests that the document may not yet meet the formality examination criteria.</p><p>To bridge these identified gaps, it is highly recommended to perform a targeted revision focusing on the explicit documentation of technical specifications and the causal relationship between the Lipa Barako flavor profile and the local soil composition. Providing more exhaustive details on the production process and quality control measures will not only improve the AI readiness score but also significantly reduce the likelihood of receiving deficiency notices from IPOPHL. Once these improvements are integrated, the document should be re-analyzed to verify that all mandatory parameters have been successfully satisfied.</p>",
     "upload_timestamp": "",
-    "analysis_timestamp": "2026-06-02T04:42:18.922212",
+    "analysis_timestamp": "2026-06-02T22:42:41.926221",
     "ipophl_phase": "phase5",
     "task_id": "phase5-compliance"
   },
@@ -453,7 +455,7 @@
   "4b8a3b6f-ddcd-47de-8b4f-7923f00170b4": {
     "file_uuid": "4b8a3b6f-ddcd-47de-8b4f-7923f00170b4",
     "original_filename": "IAS_reviewer.docx",
-    "file_path": "C:/Users/ARLYN/Desktop/final admin/Beanthentic/machinelearning/uploads/4b8a3b6f-ddcd-47de-8b4f-7923f00170b4.docx",
+    "file_path": "machinelearning/uploads/4b8a3b6f-ddcd-47de-8b4f-7923f00170b4.docx",
     "file_type": ".docx",
     "file_size": 29105,
     "ai_score": 0,
@@ -469,7 +471,7 @@
     "shap_analysis": "<p>The rule-based analysis has identified <strong>0</strong> out of <strong>3</strong> mandatory requirements within this document. This results in an initial readiness score of <strong>0%</strong>. Current findings indicate that the document lacks several critical structural elements and key technical terms that are essential for this part of the Geographical Indication application.</p><p>A detailed review of the missing components reveals that the following areas require immediate attention: <strong>Publication for Opposition, Public Notice Period, Opposition Period</strong> and other related identifiers. The absence of these specific requirements may lead to formality examination deficiencies, as they are necessary to validate the document's relevance to the Lipa Barako coffee registration process.</p><p>To improve this document's standing, it is recommended to explicitly integrate the missing mandatory requirements identified above. Ensuring that all task-specific details are fully addressed will help achieve a higher compliance score and facilitate a smoother approval workflow with IPOPHL. Once updated, the document should be re-analyzed to verify readiness.</p>",
     "upload_timestamp": "",
     "analysis_timestamp": "2026-06-02T04:59:27.390820",
-    "ipophl_phase": "unknown",
+    "ipophl_phase": "phase4",
     "task_id": "phase4-pub"
   },
   "e94500d6-e0b8-40ae-96af-f94748be3c23": {

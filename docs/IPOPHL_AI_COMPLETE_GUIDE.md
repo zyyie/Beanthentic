@@ -149,7 +149,15 @@ readiness_score = (mandatory_found / mandatory_total) * 70 +
 
 ### 1. Install Dependencies
 ```bash
-pip install -r requirements.txt
+pip install -r config/requirements.txt
+```
+
+If analysis always shows **0%** and `analysis_method` is `rule_based`, the Python environment is missing ML libraries (`scikit-learn`, `python-docx`, etc.). Install the requirements above and restart the Flask app.
+
+Train or refresh models (farmer CSV + document samples):
+```bash
+cd machinelearning
+python train_ai_model.py --full-pipeline
 ```
 
 ### 2. Install Tesseract OCR (for scanned PDFs)

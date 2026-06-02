@@ -1638,8 +1638,8 @@
                     <div class="messaging-list-header__top">
                       <h2>Messaging</h2>
                       <div class="messaging-list-header__actions">
-                        <button type="button" class="messaging-refresh-btn" id="messagingRefreshBtn" title="Refresh">
-                          <i class="fa-solid fa-rotate-right"></i>
+                        <button type="button" class="messaging-refresh-btn" id="messagingRefreshBtn" title="Refresh" aria-label="Refresh conversations">
+                          <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
                         </button>
                         <button type="button" class="messaging-compose-icon-btn" id="messagingComposeBtn" title="New Message">
                           <i class="fa-solid fa-pen-to-square"></i>
@@ -1653,7 +1653,7 @@
                   </div>
                   <ul class="messaging-list" id="messagingList">
                     <li class="messaging-loading">
-                      <i class="fa-solid fa-spinner"></i>
+                      <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
                       <span>Loading chats…</span>
                     </li>
                   </ul>
@@ -1712,8 +1712,8 @@
                           placeholder="Type your message here..."
                           rows="1"
                         ></textarea>
-                        <button type="button" class="messaging-reply-send" id="msgInlineReplySendBtn" title="Send message">
-                          <i class="fa-solid fa-paper-plane"></i>
+                        <button type="button" class="messaging-reply-send" id="msgInlineReplySendBtn" title="Send message" aria-label="Send message">
+                          <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
                         </button>
                       </div>
                     </div>
