@@ -2614,6 +2614,77 @@ select:focus {
   }
 }
 
+body.dashboard-page #ipophl-module .phase-btn.complete-btn.is-loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-width: 16rem;
+  cursor: wait;
+  pointer-events: none;
+  opacity: 1;
+  background: linear-gradient(135deg, #b45309 0%, #d97706 100%) !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.35);
+  animation: complete-btn-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes complete-btn-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.2);
+  }
+}
+
+.ipophl-complete-status {
+  margin: 0.85rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  max-width: 42rem;
+}
+
+.ipophl-complete-status:not([hidden]) {
+  display: block;
+}
+
+.ipophl-complete-status.is-busy {
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  color: #92400e;
+}
+
+.ipophl-complete-status.is-ok {
+  background: #ecfdf5;
+  border: 1px solid #34d399;
+  color: #065f46;
+}
+
+.ipophl-complete-status.is-err {
+  background: #fef2f2;
+  border: 1px solid #f87171;
+  color: #991b1b;
+}
+
+.ipophl-complete-status .status-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.ipophl-complete-status .status-step:first-child {
+  margin-top: 0;
+}
+
+.ipophl-complete-status .status-step i {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
 .phase-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;

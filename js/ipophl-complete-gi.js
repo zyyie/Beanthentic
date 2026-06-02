@@ -1,6 +1,5 @@
 /**
- * IPOPHL Complete Registration — upload files + publish to app GI Updates (one step).
- * Same pattern as admin_gi_send / gi-contributions-send on the app server.
+ * IPOPHL Complete Registration — visible loading + upload to XAMPP gi_updates (GI Updates).
  */
 (function () {
   'use strict';
@@ -12,6 +11,26 @@
       return window.beanthenticParseJsonResponse(res);
     }
     return res.json();
+  }
+
+  function statusEl() {
+    return document.getElementById('ipophl-complete-status');
+  }
+
+  function setStatus(html, kind) {
+    const el = statusEl();
+    if (!el) return;
+    el.hidden = false;
+    el.className = 'ipophl-complete-status' + (kind ? ' is-' + kind : '');
+    el.innerHTML = html;
+  }
+
+  function clearStatus() {
+    const el = statusEl();
+    if (!el) return;
+    el.hidden = true;
+    el.className = 'ipophl-complete-status';
+    el.innerHTML = '';
   }
 
   function notify(msg) {
@@ -41,7 +60,7 @@
       btn.innerHTML =
         '<span class="complete-btn-spinner" aria-hidden="true"></span>' +
         '<span class="complete-btn-label">' +
-        (label || 'Uploading to GI Updates…') +
+        (label || 'Sending to XAMPP / GI Updates…') +
         '</span>';
     } else {
       btn.disabled = false;
@@ -49,6 +68,20 @@
       btn.removeAttribute('aria-busy');
       btn.textContent = btn.dataset.defaultLabel;
     }
+  }
+
+  function busyStatus(title, steps) {
+    const stepHtml = (steps || [])
+      .map(
+        (s) =>
+          '<div class="status-step"><i class="fa-solid ' +
+          (s.done ? 'fa-check' : s.active ? 'fa-spinner fa-spin' : 'fa-circle') +
+          '"></i><span>' +
+          s.text +
+          '</span></div>'
+      )
+      .join('');
+    setStatus('<strong>' + title + '</strong>' + stepHtml, 'busy');
   }
 
   function collectExistingUuids() {
@@ -68,26 +101,74 @@
     return Array.from(uuids);
   }
 
+  async function fetchServerUuids() {
+    try {
+      const res = await fetch(API('/api/ipo-documents?limit=300'), { credentials: 'same-origin' });
+      const data = await parseJson(res).catch(() => ({}));
+      const out = [];
+      const seen = new Set();
+      (data.items || []).forEach((doc) => {
+        const id = String(doc.file_uuid || '').trim();
+        if (id && !seen.has(id)) {
+          seen.add(id);
+          out.push(id);
+        }
+      });
+      return out;
+    } catch (e) {
+      console.warn('Could not load saved IPOPHL documents:', e);
+      return [];
+    }
+  }
+
   async function publishIpophlToGiUpdates() {
+    setLoading(true, 'Starting…');
+    busyStatus('Sending to GI Updates', [
+      { text: 'Collecting files from Phase 5…', active: true },
+      { text: 'Upload to admin server', active: false },
+      { text: 'Save to XAMPP MySQL (gi_updates)', active: false },
+      { text: 'Sync for mobile app', active: false },
+    ]);
+
     const pending =
       window.ipophlAnalyzer && typeof window.ipophlAnalyzer.collectPendingUploads === 'function'
         ? window.ipophlAnalyzer.collectPendingUploads()
         : [];
-    const existingUuids = collectExistingUuids();
+    let existingUuids = collectExistingUuids();
 
     if (!pending.length && !existingUuids.length) {
-      notify(
-        'Pumili muna ng file sa Phase 5 (o ibang phase), tapos click Complete Registration. Doon ia-upload sa database at lalabas sa GI Updates sa app.'
+      setLoading(true, 'Checking saved documents…');
+      existingUuids = await fetchServerUuids();
+    }
+
+    if (!pending.length && !existingUuids.length) {
+      setLoading(false);
+      busyStatus('Walang file na ipapadala', [
+        {
+          text: 'Pumili muna ng file sa Phase 5 (berdeng dashed card), tapos click ulit ang Complete Registration.',
+          active: false,
+        },
+      ]);
+      setStatus(
+        '<strong>Walang file</strong><p>Pumili ng file sa Phase 5, hintayin ang berdeng card na “Ready”, tapos click Complete Registration.</p>',
+        'err'
       );
+      notify('Pumili muna ng file sa Phase 5, tapos Complete Registration.');
       return;
     }
 
     setLoading(
       true,
       pending.length
-        ? `Uploading ${pending.length} file(s) and saving to GI Updates…`
-        : 'Publishing to GI Updates…'
+        ? `Uploading ${pending.length} file(s)…`
+        : `Saving ${existingUuids.length} file(s) to XAMPP…`
     );
+    busyStatus('Sending to GI Updates', [
+      { text: `Found ${pending.length} new + ${existingUuids.length} saved file(s)`, done: true },
+      { text: 'Uploading to admin server…', active: true },
+      { text: 'Save to XAMPP MySQL (gi_updates)', active: false },
+      { text: 'Sync for mobile app', active: false },
+    ]);
 
     const form = new FormData();
     pending.forEach(({ file, task_id }) => {
@@ -100,6 +181,14 @@
     form.append('publish_all_categories', 'true');
     form.append('force_publish', 'true');
 
+    setLoading(true, 'Saving to XAMPP MySQL…');
+    busyStatus('Sending to GI Updates', [
+      { text: `Found ${pending.length} new + ${existingUuids.length} saved file(s)`, done: true },
+      { text: 'Upload to admin server', done: true },
+      { text: 'Writing to gi_updates on 192.168.100.210…', active: true },
+      { text: 'Sync for mobile app', active: false },
+    ]);
+
     try {
       const res = await fetch(API('/api/ipophl/complete-registration'), {
         method: 'POST',
@@ -107,12 +196,42 @@
         body: form,
       });
       const data = await parseJson(res).catch(() => ({}));
+
       if (res.status === 401) {
         throw new Error('Session expired. Log in again.');
       }
       if (!res.ok || data.ok === false) {
-        throw new Error(data.error || data.message || data.detail || 'Save failed (HTTP ' + res.status + ')');
+        throw new Error(
+          data.error || data.message || data.detail || 'Save failed (HTTP ' + res.status + ')'
+        );
       }
+
+      setLoading(true, 'Done — opening GI inbox…');
+      busyStatus('Success', [
+        { text: 'Upload to admin server', done: true },
+        { text: 'XAMPP MySQL saved', done: true },
+        { text: 'Ready on mobile — refresh GI Updates', done: true },
+      ]);
+
+      const cards = data.cards_published != null ? data.cards_published : '?';
+      const dbRows = data.db_rows != null ? data.db_rows : '?';
+      const withFiles = data.categories_with_files != null ? data.categories_with_files : '?';
+
+      setStatus(
+        '<strong>Na-save sa database</strong>' +
+          '<p>' +
+          (data.message || 'Published to GI Updates.') +
+          '</p>' +
+          '<p><small>Cards: <strong>' +
+          cards +
+          '</strong> · Files with attachment: <strong>' +
+          withFiles +
+          '</strong> · Admin rows in DB: <strong>' +
+          dbRows +
+          '</strong></small></p>' +
+          '<p><small>Sa phone: GI Updates → pull to refresh (app :8080, same farmer account).</small></p>',
+        'ok'
+      );
 
       if (window.ipophlAnalyzer?.clearPendingAfterPublish) {
         window.ipophlAnalyzer.clearPendingAfterPublish();
@@ -123,7 +242,7 @@
 
       notify(
         data.message ||
-          'Done! Files are in the database. Sa phone: buksan GI Updates at i-refresh (app.py :8080).'
+          'Saved to XAMPP! GI Updates: ' + cards + ' card(s). I-refresh ang app.'
       );
 
       if (window.dashboardApp?.switchModule) {
@@ -136,8 +255,10 @@
       console.error('GI publish failed:', err);
       let msg = err.message || 'Could not save to GI Updates.';
       if (msg === 'Failed to fetch') {
-        msg = 'Cannot reach web.py. Restart python web.py on this PC, then Ctrl+Shift+R.';
+        msg =
+          'Hindi maabot ang web.py. I-restart ang python web.py sa PC na ito, tapos Ctrl+Shift+R.';
       }
+      setStatus('<strong>Hindi na-save</strong><p>' + msg + '</p>', 'err');
       notify(msg);
     } finally {
       setLoading(false);
@@ -155,6 +276,7 @@
       if (!root || !root.contains(btn)) return;
       e.preventDefault();
       e.stopImmediatePropagation();
+      e.stopPropagation();
       if (btn.disabled || btn.classList.contains('is-loading')) return;
       publishIpophlToGiUpdates();
     },
@@ -165,6 +287,7 @@
     if (!window.dashboardApp) return;
     window.dashboardApp.completeRegistration = publishIpophlToGiUpdates;
     window.dashboardApp.sendRegistrationEmail = publishIpophlToGiUpdates;
+    window.dashboardApp.setCompleteRegistrationLoading = setLoading;
   }
 
   if (document.readyState === 'loading') {
