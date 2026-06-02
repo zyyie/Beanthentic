@@ -323,7 +323,7 @@
           '</strong> · Admin rows in DB: <strong>' +
           dbRows +
           '</strong></small></p>' +
-          '<p><small>Sa phone: GI Updates → pull to refresh (app :8080, same farmer account).</small></p>',
+          '<p><small>Sa phone: GI Updates → refresh. Farmer messages (green envelope) → Farmer\'s Contribution sa admin.</small></p>',
         'ok'
       );
 
@@ -339,12 +339,7 @@
           'Saved to XAMPP! GI Updates: ' + cards + ' card(s). I-refresh ang app.'
       );
 
-      if (window.dashboardApp?.switchModule) {
-        await window.dashboardApp.switchModule('register');
-      }
-      if (window.dashboardApp?.loadContributionsFromApi) {
-        await window.dashboardApp.loadContributionsFromApi();
-      }
+      /* IPOPHL → mobile GI Updates only; farmer compose messages → Farmer's Contribution inbox */
     } catch (err) {
       console.error('GI publish failed:', err);
       let msg = err.message || 'Could not save to GI Updates.';

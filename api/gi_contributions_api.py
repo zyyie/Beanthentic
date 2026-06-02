@@ -1213,8 +1213,8 @@ def _gi_row_to_admin_item(row: dict, base: str) -> dict:
 
 def _load_from_http(limit: int, *, phase: str | None = None) -> list[dict]:
     phase_key = (phase or "inbox").strip().lower()
-    if phase_key in ("all", "both", "everything"):
-        phase_key = "all"
+    if phase_key in ("all", "both", "everything", "inbox", "farmer_submission"):
+        phase_key = "inbox"
     elif phase_key in ("sent", "admin_submission"):
         phase_key = "sent"
     elif phase_key in ("inbox", "farmer_submission"):
@@ -1243,8 +1243,8 @@ def _load_from_mysql(limit: int, *, phase: str | None = None) -> list[dict]:
             ensure_gi_updates_table(cur)
             where = "1=1"
             args: list = []
-            if phase in ("all", "both", "everything"):
-                where = "g.current_phase IN ('farmer_submission', 'admin_submission')"
+            if phase in ("all", "both", "everything", "inbox", "farmer_submission"):
+                where = "g.current_phase = 'farmer_submission'"
             elif phase == "farmer_submission":
                 where = "g.current_phase = 'farmer_submission'"
             elif phase == "admin_submission":

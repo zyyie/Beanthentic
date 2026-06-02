@@ -5818,7 +5818,7 @@ class DashboardApp {
       const requested = data.files_requested != null ? data.files_requested : fileUuids.length;
       const okMsg =
         data.message ||
-        `Saved ${cards} of ${requested} document(s) to GI Updates (MySQL on app device). Check Farmer's Contribution here and GI Updates on the mobile app.`;
+        `Saved ${cards} of ${requested} document(s) to GI Updates on the mobile app. Farmer messages from the app appear in Farmer's Contribution.`;
       this.showIpophlNotification(okMsg);
 
       console.log('IPOPHL → GI Updates published:', {
@@ -5830,8 +5830,6 @@ class DashboardApp {
         completedAt: new Date().toISOString(),
       });
 
-      this.setCompleteRegistrationLoading(true, 'Opening GI Updates inbox…');
-      await this.switchModule('register');
       if (typeof this.loadContributionsFromApi === 'function') {
         await this.loadContributionsFromApi();
       }
@@ -10061,7 +10059,7 @@ class DashboardApp {
     this.contributionsLoading = true;
     this.contributionsLoadError = '';
     try {
-      const res = await fetch(beanthenticApiUrl('/api/gi-contributions-list?limit=500&phase=all'), {
+      const res = await fetch(beanthenticApiUrl('/api/gi-contributions-list?limit=500&phase=inbox'), {
         credentials: 'same-origin',
       });
       const data = await beanthenticParseJsonResponse(res).catch(() => ({}));
@@ -10073,7 +10071,9 @@ class DashboardApp {
       if (!Array.isArray(data.items)) {
         throw new Error('Invalid response from server.');
       }
-      this.contributions = data.items.map((item) => this.mapGiContributionItem(item));
+      this.contributions = data.items
+        .map((item) => this.mapGiContributionItem(item))
+        .filter((c) => !c.fromAdmin);
     } catch (err) {
       this.contributionsLoadError =
         err && err.message
