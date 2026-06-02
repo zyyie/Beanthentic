@@ -189,24 +189,11 @@
       setLoading(true, 'Checking saved documents…');
       fileEntries = await fetchServerFileEntries();
       existingUuids = fileEntries.map((e) => e.file_uuid).filter(Boolean);
-    } else if (fileEntries.length) {
-      const serverEntries = await fetchServerFileEntries();
-      const merged = new Map();
-      serverEntries.forEach((e) => merged.set(e.file_uuid, { ...e }));
-      fileEntries.forEach((e) => {
-        const prev = merged.get(e.file_uuid) || {};
-        const domTask = String(e.task_id || '').trim();
-        const useTask =
-          domTask && domTask !== 'ipophl-other' && domTask !== 'unknown'
-            ? domTask
-            : String(prev.task_id || domTask || 'ipophl-other').trim() || 'ipophl-other';
-        merged.set(e.file_uuid, { file_uuid: e.file_uuid, task_id: useTask });
-      });
-      fileEntries = Array.from(merged.values());
-      existingUuids = fileEntries.map((e) => e.file_uuid).filter(Boolean);
     }
 
-    if (!pending.length && !existingUuids.length) {
+    const fileCount = pending.length + existingUuids.length;
+
+    if (!fileCount) {
       setLoading(false);
       busyStatus('Walang file na ipapadala', [
         {
@@ -229,10 +216,10 @@
         : `Saving ${existingUuids.length} file(s) to XAMPP…`
     );
     busyStatus('Sending to GI Updates', [
-      { text: `Found ${pending.length} new + ${existingUuids.length} saved file(s)`, done: true },
-      { text: 'Uploading to admin server…', active: true },
-      { text: 'Save to XAMPP MySQL (gi_updates)', active: false },
-      { text: 'Sync for mobile app', active: false },
+      { text: `Publishing ${fileCount} file(s) from IPOPHL zones…`, done: true },
+      { text: 'Sync files to app server (one batch)', active: true },
+      { text: 'Save to gi_updates', active: false },
+      { text: 'Ready on mobile', active: false },
     ]);
 
     const form = new FormData();
@@ -249,25 +236,43 @@
     form.append('publish_all_categories', 'false');
     form.append('force_publish', 'true');
 
-    setLoading(true, 'Checking XAMPP app server…');
+    setLoading(true, 'Checking MySQL + app server…');
     try {
       const pre = await fetch(API('/api/ipophl/publish-preflight'), {
         credentials: 'same-origin',
       });
       const preData = await parseJson(pre).catch(() => ({}));
-      if (preData.prefer_http && preData.xampp_reachable === false) {
-        throw new Error(
-          preData.error ||
-            'Hindi maabot ang app server (port 8080). I-start ang python app.py sa XAMPP PC.'
-        );
+      if (preData.ok === false) {
+        const parts = [];
+        if (preData.mysql_reachable === false && preData.mysql_error) {
+          parts.push('MySQL: ' + preData.mysql_error);
+        }
+        if (preData.xampp_reachable === false) {
+          parts.push(
+            preData.error ||
+              'App server (port 8080) hindi maabot. I-start ang python app.py sa XAMPP PC.'
+          );
+        }
+        throw new Error(parts.join(' ') || preData.error || 'Connection check failed.');
       }
+      busyStatus('Sending to GI Updates', [
+        { text: `Found ${pending.length} new + ${existingUuids.length} saved file(s)`, done: true },
+        {
+          text:
+            'MySQL ' +
+            (preData.mysql_reachable ? 'OK' : '—') +
+            ' · App :8080 ' +
+            (preData.xampp_reachable ? 'OK' : '—'),
+          done: true,
+        },
+        { text: 'Uploading and saving…', active: true },
+        { text: 'Sync for mobile app', active: false },
+      ]);
     } catch (preErr) {
-      if (preErr.message && preErr.message.includes('8080')) {
-        setLoading(false);
-        setStatus('<strong>XAMPP hindi reachable</strong><p>' + preErr.message + '</p>', 'err');
-        notify(preErr.message);
-        return;
-      }
+      setLoading(false);
+      setStatus('<strong>Connection failed</strong><p>' + (preErr.message || preErr) + '</p>', 'err');
+      notify(preErr.message || String(preErr));
+      return;
     }
 
     setLoading(true, 'Saving to XAMPP MySQL…');

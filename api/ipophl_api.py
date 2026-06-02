@@ -756,14 +756,16 @@ def register_ipophl_routes(app):
         from api.gi_contributions_api import check_xampp_for_publish
 
         preflight = check_xampp_for_publish()
-        if preflight.get("prefer_http") and not preflight.get("xampp_reachable"):
+        if not preflight.get("ok"):
             return jsonify(
                 {
                     "ok": False,
-                    "error": preflight.get("error") or "App server (XAMPP :8080) is not reachable.",
+                    "error": preflight.get("error")
+                    or "Cannot reach app MySQL or app server (port 8080).",
                     "hint": preflight.get("hint"),
                     "app_server_base": preflight.get("app_server_base"),
-                    "xampp_reachable": False,
+                    "xampp_reachable": preflight.get("xampp_reachable"),
+                    "mysql_reachable": preflight.get("mysql_reachable"),
                 }
             ), 503
 
@@ -801,6 +803,9 @@ def register_ipophl_routes(app):
             file_uuids=client_uuids if client_uuids else None,
             task_ids=task_ids,
         )
+        from config.ipophl_store import filter_uuids_on_disk
+
+        file_uuids = filter_uuids_on_disk(file_uuids)
 
         publish_all_categories = str(
             body.get("publish_all_categories")

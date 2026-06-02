@@ -23,7 +23,13 @@ function gi_request_base(): string
 function gi_collect_uploaded_files(): array
 {
     $out = [];
-    foreach (['files', 'file'] as $key) {
+    $keys = array_keys($_FILES);
+    sort($keys);
+    foreach ($keys as $key) {
+        $base = preg_replace('/\[\]$/', '', (string)$key);
+        if (!in_array($base, ['files', 'file'], true)) {
+            continue;
+        }
         if (!isset($_FILES[$key]) || !is_array($_FILES[$key])) {
             continue;
         }

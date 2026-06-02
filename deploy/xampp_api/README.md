@@ -9,6 +9,7 @@ Copy each PHP file to **`Beanthentic-App/api/`** on the PC running XAMPP and `py
 | `admin_shared_messages.php` | Messages / `shared_messages` (read) |
 | `admin_send_message.php` | Admin → farmer message send |
 | `admin_gi_send.php` | GI broadcast multipart upload |
+| `admin_farmer_data.php` | Farmer list for GI broadcast (required for connection preflight) |
 | `admin_gi_sync_files.php` | Copy attachments to app server for MySQL-only admin path |
 | `admin_ipophl_documents.php` | IPOPHL ML metadata / `document_analysis` |
 

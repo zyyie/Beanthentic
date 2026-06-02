@@ -33,6 +33,19 @@ try {
         json_fail('Message content is required.', 400);
     }
 
+    $preAttachments = [];
+    $rawAtt = trim((string)($_POST['attachments_json'] ?? ''));
+    if ($rawAtt !== '') {
+        $decoded = json_decode($rawAtt, true);
+        if (is_array($decoded)) {
+            foreach ($decoded as $row) {
+                if (is_array($row)) {
+                    $preAttachments[] = $row;
+                }
+            }
+        }
+    }
+
     $farmerId = (int)($_POST['farmer_id'] ?? 0);
     if ($sendToAll) {
         $farmerId = 0;
@@ -70,7 +83,7 @@ try {
             json_fail('No farmers found in the database.', 400);
         }
         $created = [];
-        $attachments = [];
+        $attachments = $preAttachments;
         foreach ($farmerIds as $fid) {
             $gid = $insertRow($fid, []);
             if (count($attachments) === 0 && count($files) > 0) {
@@ -94,7 +107,10 @@ try {
     }
 
     $gid = $insertRow($farmerId, []);
-    $attachments = gi_save_upload_files($farmerId, $gid, $files);
+    $attachments = $preAttachments;
+    if (count($attachments) === 0 && count($files) > 0) {
+        $attachments = gi_save_upload_files($farmerId, $gid, $files);
+    }
     if (count($attachments) > 0) {
         $upd = $pdo->prepare('UPDATE gi_updates SET attachments_json = ? WHERE gi_update_id = ?');
         $upd->execute([json_encode($attachments, JSON_UNESCAPED_UNICODE), $gid]);

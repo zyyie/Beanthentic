@@ -467,5 +467,23 @@
     "analysis_timestamp": "2026-06-01T22:45:24",
     "ipophl_phase": "unknown",
     "task_id": "ipophl-other"
+  },
+  "82660ecd-80f8-4834-9ec8-4969980b85dd": {
+    "file_uuid": "82660ecd-80f8-4834-9ec8-4969980b85dd",
+    "original_filename": "uploaded.txt",
+    "file_path": "C:/Users/nicoo/OneDrive/Desktop/capstone final/Beanthentic/machinelearning/uploads/82660ecd-80f8-4834-9ec8-4969980b85dd.txt",
+    "file_type": ".txt",
+    "file_size": 22,
+    "ai_score": 10,
+    "ai_status": "Uploaded - pending review",
+    "detected_features": [],
+    "missing_requirements": [],
+    "analysis_method": "disk_bootstrap",
+    "text_length": 0,
+    "shap_analysis": "Recovered from uploads folder",
+    "upload_timestamp": "2026-06-01T23:46:41",
+    "analysis_timestamp": "2026-06-01T23:46:41",
+    "ipophl_phase": "unknown",
+    "task_id": "ipophl-other"
   }
 }

@@ -233,6 +233,23 @@ def collect_registration_file_uuids(
     return out
 
 
+def filter_uuids_on_disk(file_uuids: list[str]) -> list[str]:
+    """Keep only UUIDs whose file exists on this admin PC (skip stale JSON metadata)."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in file_uuids:
+        file_uuid = str(raw or "").strip()
+        if not file_uuid or file_uuid in seen:
+            continue
+        record = get_document(file_uuid)
+        hint = str((record or {}).get("original_filename") or "") if record else None
+        path = resolve_file_path(file_uuid, filename_hint=hint or None)
+        if path and path.is_file() and path.stat().st_size > 0:
+            seen.add(file_uuid)
+            out.append(file_uuid)
+    return out
+
+
 def task_label(task_id: str) -> str:
     tid = str(task_id or "").strip()
     if tid in IPOPHL_TASK_LABELS:
