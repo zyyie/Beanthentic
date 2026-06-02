@@ -163,6 +163,33 @@ with app.app_context():
 
 # Register all route modules
 register_auth_routes(app)
+
+from config.sms import SMS_BUILD_ID, sms_config, send_otp_sms  # noqa: E402
+
+print(f"[Beanthentic] SMS module loaded: {SMS_BUILD_ID}")
+
+
+@app.route("/api/sms-ping")
+def sms_ping():
+    """Verify the running server uses the latest SMS code (check sms_build in JSON)."""
+    cfg = sms_config()
+    from config.sms import _gateway_attempts
+
+    gw = (_read_settings().get("sms") or {}).get("sms_gateway") or {}
+    return jsonify(
+        {
+            "ok": True,
+            "sms_build": SMS_BUILD_ID,
+            "gateway_mode": cfg.get("gateway_mode"),
+            "has_cloud_password": bool(cfg.get("gateway_password")),
+            "has_local_password": bool(cfg.get("gateway_local_password")),
+            "attempts": [a[0] for a in _gateway_attempts(cfg)],
+            "settings_path": str(SETTINGS_PATH),
+            "local_base_url": gw.get("local_base_url"),
+        }
+    )
+
+
 register_transactions_routes(app)
 register_client_reports_routes(app)
 register_gi_contributions_routes(app)
@@ -275,10 +302,12 @@ def connection_settings():
         if public_base and not public_base.startswith(("http://", "https://")):
             form_error = form_error or "Public base URL must start with http:// or https."
 
-        gw_mode = (request.form.get("gateway_mode") or "local").strip().lower()
-        if gw_mode not in ("local", "cloud"):
-            gw_mode = "local"
+        gw_mode = (request.form.get("gateway_mode") or "auto").strip().lower()
+        if gw_mode not in ("local", "cloud", "auto"):
+            gw_mode = "auto"
         gw_local = (request.form.get("gateway_local_base_url") or "").strip().rstrip("/")
+        gw_local_user = (request.form.get("gateway_local_username") or "").strip()
+        gw_local_pass = request.form.get("gateway_local_password")
         gw_user = (request.form.get("gateway_username") or "").strip()
         gw_pass = request.form.get("gateway_password")
         try:
@@ -312,6 +341,11 @@ def connection_settings():
                 if gw_pass is None or gw_pass == ""
                 else gw_pass
             )
+            gw_local_password = (
+                gw_prev.get("local_password")
+                if gw_local_pass is None or gw_local_pass == ""
+                else gw_local_pass
+            )
             _write_sms_settings(
                 {
                     "enabled": sms_enabled,
@@ -320,10 +354,13 @@ def connection_settings():
                     "public_base_url": public_base or str(sms_prev.get("public_base_url") or "").strip(),
                     "sms_gateway": {
                         "mode": gw_mode,
-                        "local_base_url": gw_local,
-                        "local_path": "/message",
+                        "local_base_url": gw_local or str(gw_prev.get("local_base_url") or "").strip(),
+                        "local_path": str(gw_prev.get("local_path") or "/message"),
+                        "local_username": gw_local_user or str(gw_prev.get("local_username") or "sms").strip(),
+                        "local_password": gw_local_password if gw_local_password is not None else "",
                         "cloud_url": "https://api.sms-gate.app/3rdparty/v1/messages",
-                        "username": gw_user,
+                        "cloud_device_id": str(gw_prev.get("cloud_device_id") or gw_prev.get("device_id") or "").strip(),
+                        "username": gw_user or str(gw_prev.get("username") or "").strip(),
                         "password": gw_password if gw_password is not None else "",
                         "sim_number": max(1, min(3, gw_sim)),
                     },
@@ -345,8 +382,9 @@ def connection_settings():
     sms_sender = str(sms.get("sender_name") or "Beanthentic")
     public_base = str(sms.get("public_base_url") or "http://127.0.0.1:5000")
     gw = sms.get("sms_gateway") if isinstance(sms.get("sms_gateway"), dict) else {}
-    gw_mode = str(gw.get("mode") or "local")
+    gw_mode = str(gw.get("mode") or "auto")
     gw_local = str(gw.get("local_base_url") or "")
+    gw_local_user = str(gw.get("local_username") or "sms")
     gw_user = str(gw.get("username") or "")
     return f"""<!doctype html>
 <html>
@@ -400,14 +438,19 @@ def connection_settings():
     <p style="font-size:0.85rem;color:#4b5563;">App → Local Server ON. Copy username/password from the app. Default port 8080.</p>
     <label>Gateway mode</label>
     <select name="gateway_mode" style="width:100%;padding:8px;margin-top:6px;">
-      <option value="local" {"selected" if gw_mode == "local" else ""}>local (phone on Wi‑Fi)</option>
-      <option value="cloud" {"selected" if gw_mode == "cloud" else ""}>cloud (api.sms-gate.app)</option>
+      <option value="auto" {"selected" if gw_mode == "auto" else ""}>auto (cloud, then local — recommended)</option>
+      <option value="cloud" {"selected" if gw_mode == "cloud" else ""}>cloud only (api.sms-gate.app)</option>
+      <option value="local" {"selected" if gw_mode == "local" else ""}>local only (phone on Wi‑Fi)</option>
     </select>
-    <label>Local base URL (local mode)</label>
-    <input name="gateway_local_base_url" value="{gw_local}" placeholder="http://192.168.1.20:8080" />
-    <label>Gateway username</label>
-    <input name="gateway_username" value="{gw_user}" placeholder="from SMS Gateway app" />
-    <label>Gateway password</label>
+    <label>Local base URL (from app → Local address)</label>
+    <input name="gateway_local_base_url" value="{gw_local}" placeholder="http://192.168.100.63:8080" />
+    <label>Local username (Local Server in app, usually sms)</label>
+    <input name="gateway_local_username" value="{gw_local_user}" placeholder="sms" />
+    <label>Local password</label>
+    <input name="gateway_local_password" type="password" value="" placeholder="(leave blank to keep current)" />
+    <label>Cloud username (Cloud Server in app)</label>
+    <input name="gateway_username" value="{gw_user}" placeholder="B4U_TR" />
+    <label>Cloud password</label>
     <input name="gateway_password" type="password" value="" placeholder="(leave blank to keep current)" />
     <label>SIM number (1–3)</label>
     <input name="gateway_sim_number" value="{gw.get('sim_number', 1)}" placeholder="1" />
@@ -430,9 +473,12 @@ def health():
     from config.ipophl_store import STORE_PATH
     from config.mysql_app_bridge import connect_app_mysql
 
+    from config.sms import SMS_BUILD_ID  # noqa: E402
+
     payload: dict = {
         "status": "healthy",
         "admin_server": "up",
+        "sms_build": SMS_BUILD_ID,
         "database": "disconnected",
         "app_mysql": "not_configured",
         "app_server_http": "not_configured",

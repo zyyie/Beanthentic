@@ -7,8 +7,9 @@ Handles user signup, login, logout, and password reset functionality.
 from flask import flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from config.password_reset import consume_reset_token, create_password_reset, verify_reset_token
-from config.sms import build_reset_url, send_password_reset_sms
+from config.otp import OTP_PURPOSE_ADMIN, consume_otp, create_otp, verify_otp
+from config.password_reset import consume_reset_token, verify_reset_token
+from config.sms import send_otp_sms
 from config.validation import validate_full_name, validate_password, validate_phone
 from config.utils import (
     has_admin_account,
@@ -17,6 +18,11 @@ from config.utils import (
     resolve_user_phone_key,
     save_users,
 )
+
+ADMIN_RESET_PHONE = "admin_reset_phone"
+ADMIN_RESET_USER_KEY = "admin_reset_user_key"
+ADMIN_RESET_DEV_OTP = "admin_reset_dev_otp"
+
 
 def register_auth_routes(app):
     """Register authentication routes with the Flask app."""
@@ -120,7 +126,7 @@ def register_auth_routes(app):
 
     @app.route("/forgot-password", methods=["GET", "POST"])
     def forgot_password():
-        """Request a password reset link for a registered admin phone number."""
+        """Send OTP via SMS for admin password reset."""
         if session.get("user_phone"):
             return redirect(url_for("dashboard"))
 
@@ -137,34 +143,104 @@ def register_auth_routes(app):
                 if not user_key:
                     error = "Phone number not found in our system."
                 else:
-                    token = create_password_reset(user_key)
-                    reset_url = build_reset_url(
-                        token,
-                        request_base_url=request.url_root.rstrip("/"),
+                    code, otp_err = create_otp(
+                        OTP_PURPOSE_ADMIN,
+                        phone,
+                        subject_id=user_key,
                     )
-                    sms_result = send_password_reset_sms(phone, reset_url)
-                    if not sms_result.ok:
-                        log_activity(
-                            user_key,
-                            "PASSWORD_RESET_SMS_FAILED",
-                            sms_result.error or "SMS send failed",
-                            request.remote_addr,
-                        )
-                        error = sms_result.error or "Could not send SMS. Check SMS settings and try again."
+                    if otp_err:
+                        error = otp_err
                     else:
-                        log_activity(
-                            user_key,
-                            "PASSWORD_RESET_REQUESTED",
-                            f"Reset SMS sent via {sms_result.provider}",
-                            request.remote_addr,
-                        )
-                        return render_template(
-                            "admin/forgot-password-sent.html",
-                            phone_display=f"+63{phone}",
-                            dev_reset_link=sms_result.dev_message,
-                        )
+                        sms_result = send_otp_sms(phone, code)
+                        if not sms_result.ok:
+                            log_activity(
+                                user_key,
+                                "PASSWORD_RESET_SMS_FAILED",
+                                sms_result.error or "SMS send failed",
+                                request.remote_addr,
+                            )
+                            error = sms_result.error or "Could not send SMS. Check SMS settings and try again."
+                        else:
+                            session[ADMIN_RESET_PHONE] = phone
+                            session[ADMIN_RESET_USER_KEY] = user_key
+                            if sms_result.dev_message:
+                                session[ADMIN_RESET_DEV_OTP] = sms_result.dev_message
+                            else:
+                                session.pop(ADMIN_RESET_DEV_OTP, None)
+                            log_activity(
+                                user_key,
+                                "PASSWORD_RESET_REQUESTED",
+                                f"Reset OTP sent via {sms_result.provider}",
+                                request.remote_addr,
+                            )
+                            return redirect(url_for("admin_verify_reset_otp"))
 
         return render_template("admin/forgot-password.html", error=error)
+
+    @app.route("/forgot-password-sent")
+    def forgot_password_sent_legacy():
+        """Old link-based success page — always go to OTP entry."""
+        return redirect(url_for("admin_verify_reset_otp"))
+
+    @app.route("/verify-reset-otp", methods=["GET", "POST"])
+    def admin_verify_reset_otp():
+        """Enter OTP from SMS and set a new admin password."""
+        if session.get("user_phone"):
+            return redirect(url_for("dashboard"))
+
+        phone = session.get(ADMIN_RESET_PHONE) or ""
+        user_key = session.get(ADMIN_RESET_USER_KEY) or ""
+        if not phone or not user_key:
+            flash("Request a verification code first.", "error")
+            return redirect(url_for("forgot_password"))
+
+        error = ""
+        dev_otp = session.get(ADMIN_RESET_DEV_OTP)
+
+        if request.method == "POST":
+            otp = (request.form.get("otp") or "").strip()
+            new_password = request.form.get("newPassword", "")
+            confirm_password = request.form.get("confirmPassword", "")
+
+            ok_pwd, pwd_err = validate_password(new_password, confirm_password)
+            if not otp or len(otp) != 6 or not otp.isdigit():
+                error = "Enter the 6-digit code from your SMS."
+            elif not ok_pwd:
+                error = pwd_err
+            else:
+                ok_otp, otp_err = verify_otp(OTP_PURPOSE_ADMIN, phone, otp)
+                if not ok_otp:
+                    error = otp_err or "Invalid code."
+                else:
+                    consumed, consume_err, subject_id = consume_otp(OTP_PURPOSE_ADMIN, phone, otp)
+                    if not consumed:
+                        error = consume_err or "Invalid code."
+                    else:
+                        resolved_key = str(subject_id or user_key).strip()
+                        users = load_users()
+                        if resolved_key not in users:
+                            error = "This account no longer exists."
+                        else:
+                            users[resolved_key]["password_hash"] = generate_password_hash(new_password)
+                            save_users(users)
+                            session.pop(ADMIN_RESET_PHONE, None)
+                            session.pop(ADMIN_RESET_USER_KEY, None)
+                            session.pop(ADMIN_RESET_DEV_OTP, None)
+                            log_activity(
+                                resolved_key,
+                                "PASSWORD_RESET_COMPLETED",
+                                "Password reset via OTP",
+                                request.remote_addr,
+                            )
+                            flash("Your password has been updated. You can log in now.", "success")
+                            return redirect(url_for("login"))
+
+        return render_template(
+            "admin/verify-reset-otp.html",
+            phone_display=f"+63{phone}",
+            error=error,
+            dev_otp=dev_otp,
+        )
 
     @app.route("/reset-password/<token>", methods=["GET", "POST"])
     def reset_password(token):

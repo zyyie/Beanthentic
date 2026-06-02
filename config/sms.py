@@ -17,15 +17,39 @@ import base64
 import json
 import logging
 import os
+import ssl
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.parse import urlencode, urlparse
+from urllib.request import HTTPSHandler, Request, build_opener, urlopen
 
 logger = logging.getLogger(__name__)
 
 _SETTINGS_PATH = Path(__file__).resolve().parents[1] / "settings.json"
+SMS_BUILD_ID = "2026-06-02-otp-v3"
+
+# Used only when settings.json fields are blank (e.g. after saving connection form without passwords).
+_GATEWAY_DEFAULTS: dict[str, str] = {
+    "mode": "cloud",
+    "local_base_url": "http://192.168.100.63:8080",
+    "local_username": "sms",
+    "local_password": "0_bjRllk",
+    "username": "B4U_TR",
+    "password": "olg6-_sexnmprd",
+    "cloud_device_id": "Vwtew_Bqu2e8cQvbG5n2M",
+    "cloud_url": "https://api.sms-gate.app/3rdparty/v1/messages",
+}
+
+
+def _gw_setting(gw: dict, key: str, *, env_key: str = "") -> str:
+    env_val = os.getenv(env_key, "").strip() if env_key else ""
+    if env_val:
+        return env_val
+    val = str(gw.get(key) or "").strip()
+    if val:
+        return val
+    return str(_GATEWAY_DEFAULTS.get(key) or "").strip()
 
 
 @dataclass
@@ -80,32 +104,24 @@ def sms_config() -> dict:
             or str(block.get("public_base_url") or "").strip().rstrip("/")
         ),
         # SMS Gateway for Android
-        "gateway_mode": (
-            os.getenv("SMS_GATEWAY_MODE", "").strip().lower()
-            or str(gw.get("mode") or "local").strip().lower()
-        ),
-        "gateway_local_base_url": (
-            os.getenv("SMS_GATEWAY_BASE_URL", "").strip().rstrip("/")
-            or str(gw.get("local_base_url") or "").strip().rstrip("/")
-        ),
+        "gateway_mode": _gw_setting(gw, "mode", env_key="SMS_GATEWAY_MODE").lower() or "cloud",
+        "gateway_local_base_url": _gw_setting(gw, "local_base_url", env_key="SMS_GATEWAY_BASE_URL").rstrip("/"),
         "gateway_local_path": (
             os.getenv("SMS_GATEWAY_LOCAL_PATH", "").strip()
             or str(gw.get("local_path") or "/message").strip()
             or "/message"
         ),
-        "gateway_cloud_url": (
-            os.getenv("SMS_GATEWAY_CLOUD_URL", "").strip().rstrip("/")
-            or str(gw.get("cloud_url") or "https://api.sms-gate.app/3rdparty/v1/messages").strip()
-        ),
-        "gateway_username": (
-            os.getenv("SMS_GATEWAY_USERNAME", "").strip()
-            or str(gw.get("username") or "").strip()
-        ),
-        "gateway_password": (
-            os.getenv("SMS_GATEWAY_PASSWORD", "").strip()
-            or str(gw.get("password") or "").strip()
-        ),
+        "gateway_cloud_url": _gw_setting(gw, "cloud_url", env_key="SMS_GATEWAY_CLOUD_URL"),
+        "gateway_username": _gw_setting(gw, "username", env_key="SMS_GATEWAY_USERNAME"),
+        "gateway_password": _gw_setting(gw, "password", env_key="SMS_GATEWAY_PASSWORD"),
+        "gateway_local_username": _gw_setting(gw, "local_username", env_key="SMS_GATEWAY_LOCAL_USERNAME"),
+        "gateway_local_password": _gw_setting(gw, "local_password", env_key="SMS_GATEWAY_LOCAL_PASSWORD"),
         "gateway_sim_number": int(os.getenv("SMS_GATEWAY_SIM_NUMBER", str(gw.get("sim_number") or 1))),
+        "gateway_cloud_device_id": _gw_setting(
+            gw,
+            "cloud_device_id",
+            env_key="SMS_GATEWAY_DEVICE_ID",
+        ) or _gw_setting(gw, "device_id"),
         # Cloud SMS APIs
         "semaphore_api_key": os.getenv("SEMAPHORE_API_KEY", "").strip(),
         "twilio_account_sid": os.getenv("TWILIO_ACCOUNT_SID", "").strip(),
@@ -158,6 +174,30 @@ def build_reset_url(token: str, *, request_base_url: str | None = None) -> str:
     return f"{base}{path}" if base else path
 
 
+def _normalize_cloud_url(url: str) -> str:
+    raw = (url or "").strip().rstrip("/")
+    if not raw:
+        return "https://api.sms-gate.app/3rdparty/v1/messages"
+    if raw.startswith("http://") or raw.startswith("https://"):
+        return raw
+    if ":" in raw and not raw.startswith("/"):
+        return f"https://{raw}/3rdparty/v1/messages"
+    return f"https://{raw}"
+
+
+def _is_sms_gate_host(url: str) -> bool:
+    host = (urlparse(url).hostname or "").lower()
+    return host.endswith("sms-gate.app")
+
+
+def _is_ssl_verify_error(exc: BaseException) -> bool:
+    reason = getattr(exc, "reason", exc)
+    if isinstance(reason, ssl.SSLCertVerificationError):
+        return True
+    text = str(reason).lower()
+    return "certificate verify failed" in text or "ssl" in text
+
+
 def _password_reset_message(reset_url: str) -> str:
     return (
         "Beanthentic password reset.\n"
@@ -174,6 +214,7 @@ def _http_json_request(
     basic_user: str | None = None,
     basic_pass: str | None = None,
     timeout: int = 25,
+    ssl_verify: bool = True,
 ) -> tuple[int, str]:
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     headers = {"Content-Type": "application/json; charset=utf-8"}
@@ -181,59 +222,164 @@ def _http_json_request(
         token = base64.b64encode(f"{basic_user}:{basic_pass}".encode()).decode("ascii")
         headers["Authorization"] = f"Basic {token}"
     req = Request(url, data=body, method=method, headers=headers)
-    with urlopen(req, timeout=timeout) as resp:
-        return resp.status, resp.read().decode("utf-8", errors="replace")
+
+    def _open(verify: bool):
+        parsed = urlparse(url)
+        if parsed.scheme == "https":
+            # sms-gate.app cert often fails on Windows/Python 3.13+; skip verify for that host.
+            if _is_sms_gate_host(url) or not verify:
+                ctx = ssl._create_unverified_context()
+            else:
+                ctx = ssl.create_default_context()
+            opener = build_opener(HTTPSHandler(context=ctx))
+            with opener.open(req, timeout=timeout) as resp:
+                return resp.status, resp.read().decode("utf-8", errors="replace")
+        with urlopen(req, timeout=timeout) as resp:
+            return resp.status, resp.read().decode("utf-8", errors="replace")
+
+    try:
+        return _open(ssl_verify)
+    except HTTPError as exc:
+        return exc.code, exc.read().decode("utf-8", errors="replace")
+    except URLError as exc:
+        # api.sms-gate.app cert chain fails on some Python/OpenSSL builds (3.13+)
+        if ssl_verify and _is_ssl_verify_error(exc) and _is_sms_gate_host(url):
+            logger.warning("SMS Gateway cloud SSL verify failed; retrying without verify for %s", url)
+            try:
+                return _open(False)
+            except HTTPError as retry_exc:
+                return retry_exc.code, retry_exc.read().decode("utf-8", errors="replace")
+        raise
 
 
-def _send_sms_gateway(phone_digits: str, message: str, cfg: dict) -> SmsSendResult:
-    user = cfg.get("gateway_username") or ""
-    password = cfg.get("gateway_password") or ""
-    if not user or not password:
-        return SmsSendResult(
-            False,
-            "sms_gateway",
-            "Set sms_gateway.username and sms_gateway.password (from the SMS Gateway app).",
-        )
+def _gateway_attempts(cfg: dict) -> list[tuple[str, str, str, bool]]:
+    """Build (url, username, password, is_local) attempts in priority order."""
+    mode = (cfg.get("gateway_mode") or "auto").strip().lower()
+    local_base = (cfg.get("gateway_local_base_url") or "").strip().rstrip("/")
+    cloud_url = _normalize_cloud_url(cfg.get("gateway_cloud_url") or "")
 
-    to_number = format_ph_e164(phone_digits)
-    sim_number = max(1, min(3, int(cfg.get("gateway_sim_number") or 1)))
-    payload = {
+    cloud_user = (cfg.get("gateway_username") or "").strip()
+    cloud_pass = (cfg.get("gateway_password") or "").strip()
+    # Never use cloud credentials on the local server — that returns 401 Unauthorized.
+    local_user = (cfg.get("gateway_local_username") or "").strip()
+    local_pass = (cfg.get("gateway_local_password") or "").strip()
+
+    local_path = (cfg.get("gateway_local_path") or "/message").strip() or "/message"
+    local_urls: list[str] = []
+    if local_base:
+        local_urls.append(f"{local_base}{local_path if local_path.startswith('/') else '/' + local_path}")
+
+    attempts: list[tuple[str, str, str, bool, int]] = []
+
+    def add_local():
+        if not local_base or not local_user or not local_pass:
+            return
+        for url in local_urls:
+            attempts.append((url, local_user, local_pass, True, 6))
+
+    def add_cloud():
+        if cloud_user and cloud_pass:
+            attempts.append((cloud_url, cloud_user, cloud_pass, False, 30))
+
+    if mode == "local":
+        add_local()
+        add_cloud()
+    elif mode == "cloud":
+        add_cloud()
+        add_local()
+    else:
+        # auto: cloud first (works from any PC), then local (same Wi‑Fi, faster)
+        add_cloud()
+        add_local()
+
+    seen: set[str] = set()
+    unique: list[tuple[str, str, str, bool, int]] = []
+    for item in attempts:
+        if item[0] not in seen:
+            seen.add(item[0])
+            unique.append(item)
+    return unique
+
+
+def _build_gateway_payload(
+    message: str,
+    to_number: str,
+    sim_number: int,
+    *,
+    device_id: str = "",
+    is_cloud: bool = False,
+) -> dict:
+    payload: dict = {
         "textMessage": {"text": message},
         "phoneNumbers": [to_number],
         "simNumber": sim_number,
     }
+    if is_cloud and device_id:
+        payload["deviceId"] = device_id
+    return payload
 
-    mode = (cfg.get("gateway_mode") or "local").strip().lower()
-    local_base = (cfg.get("gateway_local_base_url") or "").strip().rstrip("/")
-    if mode == "cloud":
-        url = cfg.get("gateway_cloud_url") or "https://api.sms-gate.app/3rdparty/v1/messages"
-    else:
-        if not local_base:
-            return SmsSendResult(
-                False,
-                "sms_gateway",
-                "Set sms_gateway.local_base_url (e.g. http://192.168.1.20:8080).",
-            )
-        path = cfg.get("gateway_local_path") or "/message"
-        url = f"{local_base}{path if path.startswith('/') else '/' + path}"
 
-    try:
-        status, body = _http_json_request(url, payload, basic_user=user, basic_pass=password)
-        if status < 400:
-            return SmsSendResult(True, "sms_gateway")
-        if status == 404 and mode != "cloud" and local_base:
-            alt = f"{local_base}/3rdparty/v1/messages"
-            status2, body2 = _http_json_request(
-                alt, payload, basic_user=user, basic_pass=password
+def _send_sms_gateway(phone_digits: str, message: str, cfg: dict) -> SmsSendResult:
+    attempts = _gateway_attempts(cfg)
+    if not attempts:
+        return SmsSendResult(
+            False,
+            "sms_gateway",
+            "Set sms_gateway credentials and local_base_url or cloud mode in settings.json.",
+        )
+
+    to_number = format_ph_e164(phone_digits)
+    sim_number = max(1, min(3, int(cfg.get("gateway_sim_number") or 1)))
+    device_id = (cfg.get("gateway_cloud_device_id") or "").strip()
+
+    errors: list[str] = []
+    for url, user, password, is_local, timeout in attempts:
+        payload = _build_gateway_payload(
+            message,
+            to_number,
+            sim_number,
+            device_id=device_id,
+            is_cloud=not is_local,
+        )
+        try:
+            status, body = _http_json_request(
+                url,
+                payload,
+                basic_user=user,
+                basic_pass=password,
+                timeout=timeout,
             )
-            if status2 < 400:
+            if status in (200, 201, 202):
+                logger.info("SMS sent via %s (%s)", "local" if is_local else "cloud", url)
                 return SmsSendResult(True, "sms_gateway")
-            body = body2
-            status = status2
-        return SmsSendResult(False, "sms_gateway", f"SMS Gateway HTTP {status}: {body[:180]}")
-    except URLError as exc:
-        hint = "Enable Local Server in SMS Gateway app and use the phone LAN IP."
-        return SmsSendResult(False, "sms_gateway", f"Cannot reach SMS Gateway: {exc.reason}. {hint}")
+            if status == 401:
+                errors.append(
+                    f"{'Local' if is_local else 'Cloud'} server rejected login (401). "
+                    f"Check {'local_username/local_password' if is_local else 'username/password'} in settings.json."
+                )
+            else:
+                errors.append(f"{'local' if is_local else 'cloud'} HTTP {status}: {body[:120]}")
+        except HTTPError as exc:
+            if exc.code == 401:
+                errors.append(
+                    f"{'Local' if is_local else 'Cloud'} login failed (401). "
+                    "Use Local Server username/password for local, Cloud Server credentials for cloud."
+                )
+            else:
+                errors.append(f"{'local' if is_local else 'cloud'} HTTP {exc.code}: {exc.reason}")
+        except URLError as exc:
+            if _is_ssl_verify_error(exc) and not is_local and _is_sms_gate_host(url):
+                errors.append("cloud: SSL error (retry failed)")
+            else:
+                label = "local phone" if is_local else "cloud"
+                errors.append(f"{label}: {exc.reason}")
+
+    detail = "; ".join(errors[-2:]) if errors else "SMS Gateway unreachable."
+    hint = (
+        "In SMS Gateway app: tap ONLINE to restart. Cloud uses username B4U_TR; "
+        "local uses username sms and the phone IP (e.g. http://192.168.100.63:8080)."
+    )
+    return SmsSendResult(False, "sms_gateway", f"Cannot send SMS. {detail} {hint}")
 
 
 def _send_semaphore(number: str, message: str, cfg: dict) -> SmsSendResult:

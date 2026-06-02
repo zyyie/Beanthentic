@@ -5,7 +5,7 @@ Beanthentic sends SMS through **SMS Gateway for Android** (local or cloud).
 | Flow | What is sent |
 |------|----------------|
 | **Farmer** forgot password | 6-digit OTP (`/farmer/forgot-password`) |
-| **Admin** forgot password | Reset link (`/forgot-password`) |
+| **Admin** forgot password | 6-digit OTP (`/forgot-password` → `/verify-reset-otp`) |
 
 Both use the same `sms_gateway` settings in `settings.json`.
 

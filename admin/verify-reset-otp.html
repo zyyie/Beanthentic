@@ -22,12 +22,12 @@
 
         <div class="login-card-right">
           <div class="card-header">
-            <h2 class="card-title">Enter Code</h2>
+            <h2 class="card-title">Reset Password</h2>
             <p class="card-desc">Enter the 6-digit code sent to <strong>{{ phone_display }}</strong>, then choose a new
               password.</p>
           </div>
 
-          <form class="form" action="{{ url_for('farmer_verify_reset_otp') }}" method="post">
+          <form class="form" action="{{ url_for('admin_verify_reset_otp') }}" method="post">
             {% if error %}
             <p class="fineprint form-alert form-alert-error">{{ error }}</p>
             {% endif %}
@@ -62,9 +62,9 @@
 
             <div class="login-form-footer">
               <p class="fineprint">
-                <a class="link" href="{{ url_for('farmer_forgot_password') }}">Request a new code</a>
+                <a class="link" href="{{ url_for('forgot_password') }}">Request a new code</a>
                 ·
-                <a class="link" href="{{ url_for('farmer_login') }}">Back to Login</a>
+                <a class="link" href="{{ url_for('login') }}">Back to Login</a>
               </p>
             </div>
           </form>

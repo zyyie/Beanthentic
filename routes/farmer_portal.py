@@ -88,11 +88,11 @@ def register_farmer_portal_routes(app):
                                 )
                             except Exception:
                                 pass
-                            return render_template(
-                                "farmer/forgot-password-otp-sent.html",
-                                phone_display=f"+63{phone}",
-                                dev_otp=sms.dev_message,
-                            )
+                            if sms.dev_message:
+                                session["farmer_reset_dev_otp"] = sms.dev_message
+                            else:
+                                session.pop("farmer_reset_dev_otp", None)
+                            return redirect(url_for("farmer_verify_reset_otp"))
 
         return render_template("farmer/forgot-password.html", error=error)
 
@@ -106,6 +106,7 @@ def register_farmer_portal_routes(app):
             return redirect(url_for("farmer_forgot_password"))
 
         error = ""
+        dev_otp = session.get("farmer_reset_dev_otp")
         if request.method == "POST":
             otp = (request.form.get("otp") or "").strip()
             new_password = request.form.get("newPassword", "")
@@ -134,6 +135,7 @@ def register_farmer_portal_routes(app):
                         else:
                             session.pop(OTP_SESSION_PHONE, None)
                             session.pop(OTP_SESSION_USER_ID, None)
+                            session.pop("farmer_reset_dev_otp", None)
                             try:
                                 log_activity(
                                     phone,
@@ -150,6 +152,7 @@ def register_farmer_portal_routes(app):
             "farmer/verify-reset-otp.html",
             phone_display=f"+63{phone}",
             error=error,
+            dev_otp=dev_otp,
         )
 
     @app.route("/farmer/logout")
