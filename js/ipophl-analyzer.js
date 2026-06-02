@@ -95,12 +95,16 @@ class IPOPHLAnalyzer {
         fileItem.className = 'file-item success ai-enhanced';
         fileItem.dataset.fileUuid = doc.file_uuid;
         fileItem.dataset.taskId = zoneTaskId || doc.task_id || '';
+        const meta =
+            doc.ai_score != null
+                ? `AI ${doc.ai_score}% · ${doc.ai_status || 'Analyzed'}`
+                : this.formatFileSize(doc.file_size || 0);
         fileItem.innerHTML = `
             <div class="file-info">
                 <i class="fa-solid ${iconClass}"></i>
                 <div class="file-details">
                     <span class="file-name">${doc.filename}</span>
-                    <span class="file-meta">${this.formatFileSize(doc.file_size)}</span>
+                    <span class="file-meta">${meta}</span>
                 </div>
             </div>
             <div class="file-status-actions">
@@ -157,12 +161,13 @@ class IPOPHLAnalyzer {
     async loadAndShowFullAnalysis(fileUuid) {
         try {
             const response = await ipophlApi(`/api/ipo-analysis/${fileUuid}`);
-            const result = await response.json();
+            const result = await this.parseApiResponse(response);
             
             if (result.success) {
+                const fname = result.filename || fileUuid;
                 const fileData = {
-                    file_info: { filename: result.filename },
-                    preview_url: `/api/file-preview/${fileUuid}`,
+                    file_info: { filename: fname },
+                    preview_url: this.resolvePreviewUrl(fileUuid, fname),
                     analysis: result.analysis,
                     file_uuid: fileUuid
                 };
@@ -194,7 +199,10 @@ class IPOPHLAnalyzer {
         // Show the full AI analysis modal
         const modal = document.getElementById('filePreviewModal');
         if (modal) {
+            modal.removeAttribute('hidden');
+            modal.setAttribute('aria-hidden', 'false');
             modal.classList.add('active');
+            document.body.classList.add('modal-open');
             
             // Set file name
             const nameEl = document.getElementById('previewFileName');
@@ -256,19 +264,93 @@ class IPOPHLAnalyzer {
 
                 const files = e.dataTransfer.files;
                 if (files.length > 0) {
-                    this.stageFileForComplete(files[0], service, attachedFiles);
+                    void this.uploadAndAnalyzeFile(files[0], service, attachedFiles);
                 }
             });
 
             fileInput.addEventListener('change', (e) => {
                 const list = e.target.files;
                 if (!list || !list.length) return;
-                for (let i = 0; i < list.length; i++) {
-                    this.stageFileForComplete(list[i], service, attachedFiles);
-                }
+                (async () => {
+                    for (let i = 0; i < list.length; i++) {
+                        await this.uploadAndAnalyzeFile(list[i], service, attachedFiles);
+                    }
+                })();
                 e.target.value = '';
             });
         });
+    }
+
+    resolvePreviewUrl(fileUuid, filename) {
+        const urlFn =
+            typeof window.beanthenticApiUrl === 'function' ? window.beanthenticApiUrl : (p) => p;
+        const name = String(filename || '');
+        const ext = name.includes('.') ? '.' + name.split('.').pop().toLowerCase() : '';
+        return urlFn(`/api/file-preview/${fileUuid}${ext}`);
+    }
+
+    async parseApiResponse(response) {
+        if (typeof window.beanthenticParseJsonResponse === 'function') {
+            return window.beanthenticParseJsonResponse(response);
+        }
+        return response.json();
+    }
+
+    fileAlreadyInContainer(container, filename) {
+        if (!container || !filename) return false;
+        return Array.from(
+            container.querySelectorAll('.file-item:not(.uploading):not(.error) .file-name')
+        ).some((el) => el.textContent === filename);
+    }
+
+    /** Upload to server, run ML analysis, show brain/delete icons, open AI panel. */
+    async uploadAndAnalyzeFile(file, service, attachedFilesContainer) {
+        if (!file || !service || !attachedFilesContainer) return;
+
+        if (this.fileAlreadyInContainer(attachedFilesContainer, file.name)) {
+            this.showToast(`"${file.name}" is already in this list.`, 'error');
+            return;
+        }
+
+        const [phase] = this.parseServiceName(service);
+        this.showUploadProgress(attachedFilesContainer, file.name);
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('phase', phase);
+        formData.append('task_id', service);
+
+        try {
+            const response = await ipophlApi('/api/ipo-analyze', {
+                method: 'POST',
+                body: formData,
+            });
+            const result = await this.parseApiResponse(response);
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || result.message || `Upload failed (HTTP ${response.status})`);
+            }
+
+            this.displayUploadedFile(attachedFilesContainer, result, file.name);
+
+            const fileData = {
+                file_info: { filename: result.filename || file.name },
+                preview_url: this.resolvePreviewUrl(result.file_uuid, result.filename || file.name),
+                analysis: result.analysis,
+                file_uuid: result.file_uuid,
+            };
+            this.showFullAIAnalysis(fileData);
+            this.showToast('Document uploaded and analyzed.', 'success');
+        } catch (error) {
+            console.error('IPOPHL upload/analyze failed:', error);
+            const msg = error.message || 'Upload or analysis failed';
+            this.showUploadError(attachedFilesContainer, file.name, msg);
+            this.showToast(msg, 'error');
+        }
+    }
+
+    /** Called from dashboard.js when a phase file is added. */
+    handleFileUpload(file, service, attachedFilesContainer) {
+        return this.uploadAndAnalyzeFile(file, service, attachedFilesContainer);
     }
 
     /** Pick file locally — uploads to database only when admin clicks Complete Registration. */
@@ -325,7 +407,12 @@ class IPOPHLAnalyzer {
             </div>
             <div class="file-status-actions">
                 <div class="file-actions">
-                    <button type="button" class="file-action-btn delete" title="Remove">×</button>
+                    <button type="button" class="file-action-btn ai-analysis pending-analyze" title="Upload first for AI analysis" disabled>
+                        <i class="fa-solid fa-brain"></i>
+                    </button>
+                    <button type="button" class="file-action-btn delete" title="Remove">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
                 </div>
             </div>
         `;
@@ -438,10 +525,14 @@ class IPOPHLAnalyzer {
                 </div>
                 <div class="file-status-actions">
                     <div class="file-actions">
-                        <i class="fa-solid fa-circle-xmark" style="color: #dc2626; margin-right: 10px;"></i>
+                        <button type="button" class="file-action-btn delete" title="Remove">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
                     </div>
                 </div>
             `;
+            const del = fileItem.querySelector('.file-action-btn.delete');
+            if (del) del.addEventListener('click', () => fileItem.remove());
         }
     }
 
@@ -455,12 +546,13 @@ class IPOPHLAnalyzer {
         }
         
         const taskId = container.id.replace('-files', '');
+        const analysis = result.analysis || {};
         const doc = {
             filename: result.filename,
-            file_size: result.analysis.text_length * 2,
+            file_size: analysis.text_length ? analysis.text_length * 2 : 0,
             file_uuid: result.file_uuid,
-            ai_score: result.analysis.readiness_score,
-            ai_status: result.analysis.status,
+            ai_score: analysis.readiness_score,
+            ai_status: analysis.status,
             task_id: taskId
         };
 
@@ -534,7 +626,7 @@ class IPOPHLAnalyzer {
         if (isWordDoc) {
             try {
                 // Use mammoth.js for local Word document rendering
-                const response = await fetch(previewUrl);
+                const response = await fetch(previewUrl, { credentials: 'same-origin' });
                 const arrayBuffer = await response.arrayBuffer();
                 
                 const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
@@ -689,8 +781,31 @@ class IPOPHLAnalyzer {
         if (improvedPara) improvedPara.innerHTML = '<p class="placeholder">Generating in-depth analysis and improvement recommendations...</p>';
     }
 
+    /** Keep SHAP narrative % in sync with Document Quality Score (fixes legacy mismatches). */
+    syncShapScoreInHtml(html, score) {
+        if (!html || score == null || score === '') return html || '';
+        const n = Math.max(0, Math.min(100, parseInt(score, 10) || 0));
+        const statusLabel =
+            n >= 85 ? 'highly compliant' : n >= 70 ? 'conditionally sufficient' : 'insufficient';
+        let out = String(html);
+        out = out.replace(
+            /(readiness score of\s*<strong>)\d+(%<\/strong>)/gi,
+            `$1${n}$2`
+        );
+        out = out.replace(
+            /(initial readiness score of\s*<strong>)\d+(%<\/strong>)/gi,
+            `$1${n}$2`
+        );
+        out = out.replace(
+            /status of\s*<strong>[^<]*<\/strong>/i,
+            `status of <strong>${statusLabel}</strong>`
+        );
+        return out;
+    }
+
     displayAnalysisResults(analysis) {
         this.currentAnalysis = analysis;
+        const score = analysis.readiness_score ?? 0;
         
         // Hide loading state immediately
         const resultsEl = document.getElementById('analysisResults');
@@ -702,7 +817,7 @@ class IPOPHLAnalyzer {
         }
 
         // Update progress indicator (Document Quality Score)
-        this.updateProgressIndicator(analysis.readiness_score || 0);
+        this.updateProgressIndicator(score);
         
         // Update status badge
         this.updateStatusBadge(analysis.status || 'Analyzed');
@@ -714,7 +829,10 @@ class IPOPHLAnalyzer {
         const improvementContainer = document.getElementById('improvementAnalysisParagraph');
         if (improvementContainer) {
             if (analysis.shap_analysis) {
-                improvementContainer.innerHTML = `<p>${analysis.shap_analysis}</p>`;
+                improvementContainer.innerHTML = this.syncShapScoreInHtml(
+                    analysis.shap_analysis,
+                    score
+                );
             } else {
                 improvementContainer.innerHTML = `<p class="placeholder">Detailed improvement analysis is currently unavailable for this document.</p>`;
             }
@@ -843,10 +961,15 @@ class IPOPHLAnalyzer {
 
     closeFilePreview() {
         const modal = document.getElementById('filePreviewModal');
-        modal.classList.remove('active');
-        
-        // Clear iframe
-        document.getElementById('filePreviewFrame').src = '';
+        if (modal) {
+            modal.classList.remove('active');
+            modal.setAttribute('hidden', '');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+        document.body.classList.remove('modal-open');
+
+        const frame = document.getElementById('filePreviewFrame');
+        if (frame) frame.src = '';
         
         // Reset current file
         this.currentFile = null;

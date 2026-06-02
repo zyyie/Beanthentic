@@ -377,6 +377,52 @@ class GIAnalyzer:
             logging.error(f"SHAP explanation generation failed: {e}")
             return "<p>An error occurred while generating the detailed AI analysis. The basic score and feature detection are still available.</p>"
 
+    @staticmethod
+    def _compliance_status_label(score: int) -> str:
+        if score >= 85:
+            return "highly compliant"
+        if score >= 70:
+            return "conditionally sufficient"
+        return "insufficient"
+
+    def _align_shap_readiness_text(self, html: str, score: int) -> str:
+        """Ensure narrative text uses the same readiness % as the score bar."""
+        if not html:
+            return html
+        score = max(0, min(100, int(score)))
+        status_label = self._compliance_status_label(score)
+        out = re.sub(
+            r"(readiness score of\s*<strong>)\d+(%</strong>)",
+            rf"\g<1>{score}\g<2>",
+            html,
+            flags=re.IGNORECASE,
+        )
+        out = re.sub(
+            r"(initial readiness score of\s*<strong>)\d+(%</strong>)",
+            rf"\g<1>{score}\g<2>",
+            out,
+            flags=re.IGNORECASE,
+        )
+        out = re.sub(
+            r"status of\s*<strong>[^<]*</strong>",
+            f"status of <strong>{status_label}</strong>",
+            out,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+        return out
+
+    def normalize_analysis_payload(self, payload: Dict) -> Dict:
+        """Single canonical readiness_score across UI fields and SHAP narrative."""
+        if not payload:
+            return payload
+        normalized = dict(payload)
+        score = int(normalized.get("readiness_score") or 0)
+        shap = normalized.get("shap_analysis") or ""
+        if shap:
+            normalized["shap_analysis"] = self._align_shap_readiness_text(shap, score)
+        return normalized
+
     def _encode_farmer_profile(self, profile_data: Dict):
         """Return feature matrix aligned to training columns."""
         if not self.column_structure:
@@ -594,8 +640,10 @@ class GIAnalyzer:
             rule_result = self._rule_based_analysis(text, checklist)
             if self.document_model is not None:
                 ml_result = self._ml_analysis(text, checklist, task_id)
-                return self._merge_analysis_results(rule_result, ml_result)
-            return rule_result
+                return self._merge_analysis_results(
+                    rule_result, ml_result, text=text, task_id=task_id
+                )
+            return self.normalize_analysis_payload(rule_result)
 
         except Exception as e:
             logging.error(f"Analysis error: {e}")
@@ -674,7 +722,14 @@ class GIAnalyzer:
             "shap_analysis": p1 + p2 + p3
         }
 
-    def _merge_analysis_results(self, rule_result: Dict, ml_result: Dict) -> Dict:
+    def _merge_analysis_results(
+        self,
+        rule_result: Dict,
+        ml_result: Dict,
+        *,
+        text: str = None,
+        task_id: str = None,
+    ) -> Dict:
         """Combine rule-based term detection with ML readiness probability."""
         rule_score = int(rule_result.get("readiness_score") or 0)
         ml_score = int(ml_result.get("readiness_score") or 0)
@@ -687,8 +742,21 @@ class GIAnalyzer:
         )
         missing = [t for t in (rule_result.get("missing_requirements") or []) if t not in detected]
         status = "Ready" if merged_score >= 75 else "Not Ready"
-        shap = ml_result.get("shap_analysis") or rule_result.get("shap_analysis") or ""
-        return {
+
+        shap = ""
+        if text and self.document_model is not None:
+            try:
+                features = self._extract_features(text)
+                shap = self._generate_shap_explanation(features, merged_score, task_id)
+            except Exception as exc:
+                logging.warning("Merged SHAP regeneration failed: %s", exc)
+                shap = ml_result.get("shap_analysis") or rule_result.get("shap_analysis") or ""
+                shap = self._align_shap_readiness_text(shap, merged_score)
+        else:
+            raw_shap = ml_result.get("shap_analysis") or rule_result.get("shap_analysis") or ""
+            shap = self._align_shap_readiness_text(raw_shap, merged_score) if raw_shap else ""
+
+        return self.normalize_analysis_payload({
             "success": True,
             "readiness_score": merged_score,
             "status": status,
@@ -699,7 +767,7 @@ class GIAnalyzer:
             "shap_analysis": shap,
             "ml_score": ml_score,
             "rule_score": rule_score,
-        }
+        })
 
     def _ml_analysis(self, text: str, checklist: Dict = None, task_id: str = None) -> Dict:
         """ML-based analysis using Random Forest"""
@@ -720,7 +788,7 @@ class GIAnalyzer:
             detected_features, missing_requirements = self._analyze_terms(text, checklist)
             shap_analysis = self._generate_shap_explanation(features, readiness_score, task_id)
 
-            return {
+            return self.normalize_analysis_payload({
                 "success": True,
                 "readiness_score": readiness_score,
                 "status": status,
@@ -728,12 +796,12 @@ class GIAnalyzer:
                 "missing_requirements": missing_requirements,
                 "text_length": len(text),
                 "analysis_method": "ml_based",
-                "shap_analysis": shap_analysis
-            }
+                "shap_analysis": shap_analysis,
+            })
 
         except Exception as e:
             logging.error(f"ML analysis failed, falling back to rule-based: {e}")
-            return self._rule_based_analysis(text, checklist)
+            return self.normalize_analysis_payload(self._rule_based_analysis(text, checklist))
 
     def _extract_features(self, text: str) -> List:
         """Extract ML features from text based on standard checklist"""

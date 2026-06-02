@@ -344,7 +344,9 @@ def _list_documents(phase: str | None, task_id: str | None, limit: int) -> tuple
 
 
 def _analysis_response(doc) -> dict:
-    return {
+    from machinelearning.ai_engine import gi_analyzer
+
+    payload = {
         "readiness_score": doc.ai_score,
         "status": doc.ai_status,
         "detected_features": doc.detected_features_list,
@@ -358,6 +360,7 @@ def _analysis_response(doc) -> dict:
             else doc.analysis_timestamp
         ),
     }
+    return gi_analyzer.normalize_analysis_payload(payload)
 
 
 def register_ipophl_routes(app):

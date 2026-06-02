@@ -380,7 +380,7 @@ def analysis_payload_from_record(record: dict) -> dict:
             missing = json.loads(missing)
         except json.JSONDecodeError:
             missing = []
-    return {
+    payload = {
         "readiness_score": int(record.get("ai_score") or 0),
         "status": record.get("ai_status") or "Not Ready",
         "detected_features": detected if isinstance(detected, list) else [],
@@ -390,6 +390,12 @@ def analysis_payload_from_record(record: dict) -> dict:
         "shap_analysis": record.get("shap_analysis") or "",
         "analysis_timestamp": record.get("analysis_timestamp"),
     }
+    try:
+        from machinelearning.ai_engine import gi_analyzer
+
+        return gi_analyzer.normalize_analysis_payload(payload)
+    except Exception:
+        return payload
 
 
 def bootstrap_orphan_uploads(*, limit: int = 500) -> int:
