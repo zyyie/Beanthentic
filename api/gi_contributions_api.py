@@ -380,6 +380,13 @@ def _sync_attachments_to_app_server(disk_files: list[tuple[str, Path]]) -> list[
             timeout=timeout,
             bases=bases,
         )
+        if isinstance(data, dict) and data.get("ok") is False:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "GI file sync rejected: %s", data.get("error") or data
+            )
+            return []
         raw = data.get("attachments")
         if not isinstance(raw, list) or not raw:
             return []
@@ -422,12 +429,6 @@ def _build_ipophl_attachment_cache(disk_files: list[tuple[str, Path]]) -> dict[s
         return {}
     cache: dict[str, dict] = {}
     synced = _sync_attachments_to_app_server(unique)
-    if unique and not synced and _gi_app_server_bases():
-        raise RuntimeError(
-            "Could not upload documents to the app server for mobile preview. "
-            "On the XAMPP PC, restart python app.py (port 8080) and ensure "
-            "admin_gi_sync_files.php is deployed under Beanthentic-App/api/."
-        )
     if synced and len(synced) < len(unique):
         import logging
 
@@ -973,6 +974,9 @@ def publish_ipophl_registration_to_gi_updates(
         card_attachments = (
             _attachments_from_cache(disk_files, attachment_cache) if disk_files else []
         )
+        files_on_app_server = (not disk_files) or (
+            len(card_attachments) >= len(disk_files)
+        )
 
         def _publish_card_via_http() -> None:
             nonlocal published_this_card, http_err, last_attachments, used_http, http_sent_count
@@ -1036,7 +1040,10 @@ def publish_ipophl_registration_to_gi_updates(
             except Exception as e:
                 mysql_err = e
 
-        if use_mysql_first:
+        if disk_files and not files_on_app_server:
+            # Batch sync failed — upload files with each card via app server :8080.
+            _publish_card_via_http()
+        elif use_mysql_first:
             _publish_card_via_mysql()
             if not published_this_card:
                 _publish_card_via_http()
@@ -1060,12 +1067,15 @@ def publish_ipophl_registration_to_gi_updates(
         )
         raise RuntimeError(detail)
 
-    _set_gi_progress_after_ipophl_publish(
-        farmer_ids,
-        progress_percent=100.0,
-        note="GI Registration complete — documents are in GI Updates.",
-        sender_name=sender_name[:255],
-    )
+    try:
+        _set_gi_progress_after_ipophl_publish(
+            farmer_ids,
+            progress_percent=100.0,
+            note="GI Registration complete — documents are in GI Updates.",
+            sender_name=sender_name[:255],
+        )
+    except Exception:
+        pass
 
     if used_http and http_sent_count > 0:
         farmer_count = http_sent_count

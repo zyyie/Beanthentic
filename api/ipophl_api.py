@@ -899,16 +899,20 @@ def register_ipophl_routes(app):
                 }
             )
         except ValueError as e:
-            return jsonify({"ok": False, "error": str(e)}), 400
+            return jsonify({"ok": False, "error": str(e), "detail": str(e)}), 400
+        except RuntimeError as e:
+            err_text = str(e).strip() or "Publish failed."
+            return jsonify({"ok": False, "error": err_text, "detail": err_text}), 503
         except Exception as e:
-            err_text = str(e)
+            err_text = str(e).strip()
+            public = safe_error_message(
+                e,
+                public="Could not save to GI Updates. Check MySQL (settings.json app_db_host) and app server :8080.",
+            )
             return jsonify(
                 {
                     "ok": False,
-                    "error": safe_error_message(
-                        e,
-                        public="Could not save to GI Updates. Check MySQL (settings.json app_db_host) and app server :8080.",
-                    ),
-                    "detail": err_text,
+                    "error": err_text if err_text and err_text != public else public,
+                    "detail": err_text or public,
                 }
             ), 503

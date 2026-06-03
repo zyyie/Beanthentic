@@ -295,8 +295,9 @@
         throw new Error('Session expired. Log in again.');
       }
       if (!res.ok || data.ok === false) {
+        const detail = data.detail || data.error || data.message;
         throw new Error(
-          data.error || data.message || data.detail || 'Save failed (HTTP ' + res.status + ')'
+          detail || 'Save failed (HTTP ' + res.status + ')'
         );
       }
 
