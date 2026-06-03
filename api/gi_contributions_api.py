@@ -210,23 +210,59 @@ def _display_filename(original: str, path: Path) -> str:
     return path.name
 
 
-def _unique_multipart_filename(original: str, path: Path) -> str:
-    """
-    Unique multipart filename so the app server keeps every file.
-    Duplicate 'uploaded.docx' parts would otherwise overwrite each other.
-    """
-    ext = path.suffix.lower() if path.suffix else ""
-    if ext not in GI_ALLOWED_EXTENSIONS:
-        ext = Path(_display_filename(original, path)).suffix.lower() or ".bin"
-    stem = path.stem[:36] if path.stem else uuid.uuid4().hex
-    label = Path(_display_filename(original, path)).stem[:60] or "document"
-    label = re.sub(r"[^a-zA-Z0-9._-]+", "_", label).strip("._") or "document"
-    return f"{label}_{stem}{ext}"
+def _normalize_gi_attachment(att: dict) -> dict:
+    """Ensure attachment JSON paths work with mobile preview + gi_attachment.php."""
+    out = dict(att)
+    path = str(out.get("path") or "").strip()
+    if path.startswith("http://") or path.startswith("https://"):
+        try:
+            from urllib.parse import urlparse
+
+            path = urlparse(path).path or path
+        except Exception:
+            pass
+    if path and not path.startswith("/"):
+        if "uploads/gi_contributions/" in path:
+            path = "/" + path.lstrip("/")
+        else:
+            path = f"/uploads/gi_contributions/{path.lstrip('/')}"
+    if path:
+        out["path"] = path
+    name = str(out.get("name") or out.get("filename") or "").strip()
+    if not name and path:
+        name = os.path.basename(path)
+    if name:
+        out["name"] = name
+        out["filename"] = name
+    url = str(out.get("url") or "").strip()
+    if path and path.startswith("/") and not url.startswith("http"):
+        base = _gi_attachment_base_url(prefer_app_server=True)
+        if base:
+            out["url"] = f"{base.rstrip('/')}{path}"
+    return out
+
+
+def _multipart_upload_filename(original: str, path: Path, used: set[str]) -> str:
+    """Stable upload name on the app server (matches display name when possible)."""
+    display = _display_filename(original, path)
+    upload = secure_filename(display) or secure_filename(path.name) or "document"
+    ext = path.suffix.lower()
+    if ext and not upload.lower().endswith(ext):
+        upload = f"{upload}{ext}"
+    candidate = upload
+    n = 1
+    while candidate.lower() in used:
+        stem, suffix = os.path.splitext(upload)
+        candidate = f"{stem}_{n}{suffix}"
+        n += 1
+    used.add(candidate.lower())
+    return candidate
 
 
 def _multipart_files_from_disk(disk_files: list[tuple[str, Path]]) -> list[tuple[str, str, bytes, str | None]]:
     """Build HTTP multipart file tuples from files on disk (e.g. IPOPHL uploads on admin web.py)."""
     out: list[tuple[str, str, bytes, str | None]] = []
+    used_names: set[str] = set()
     for original, path in disk_files[:IPOPHL_GI_MAX_FILES]:
         if not path.is_file():
             continue
@@ -236,7 +272,7 @@ def _multipart_files_from_disk(disk_files: list[tuple[str, Path]]) -> list[tuple
         size = path.stat().st_size
         if size <= 0 or size > GI_MAX_FILE_BYTES:
             continue
-        upload_name = _unique_multipart_filename(original, path)
+        upload_name = _multipart_upload_filename(original, path, used_names)
         mime = mimetypes.guess_type(upload_name)[0] or mimetypes.guess_type(path.name)[0]
         out.append((GI_MULTIPART_FILE_FIELD, upload_name, path.read_bytes(), mime))
     return out
@@ -295,7 +331,7 @@ def _save_gi_attachments_from_paths(
         if size <= 0 or size > GI_MAX_FILE_BYTES:
             continue
         display = _display_filename(original, path)
-        stored = f"{path.stem[:36]}{ext}" if path.stem else f"{uuid.uuid4().hex}{ext}"
+        stored = secure_filename(display) or (f"{path.stem[:36]}{ext}" if path.stem else f"{uuid.uuid4().hex}{ext}")
         dest = GI_CONTRIB_UPLOAD_DIR / stored
         # Speed up repeated publishes: avoid re-copying same-sized files.
         # (User often clicks Complete multiple times while debugging.)
@@ -307,19 +343,21 @@ def _save_gi_attachments_from_paths(
         except Exception:
             # Fallback if shutil copy fails for any reason.
             dest.write_bytes(path.read_bytes())
-        rel = f"uploads/gi_contributions/{stored}"
-        url = f"{base_url.rstrip('/')}/{rel}" if base_url else rel
+        rel = f"/uploads/gi_contributions/{stored}"
+        url = f"{base_url.rstrip('/')}{rel}" if base_url else rel
         mime = mimetypes.guess_type(display)[0] or ""
         attachments.append(
-            {
-                "name": display,
-                "filename": display,
-                "path": rel,
-                "url": url,
-                "mime": mime,
-                "type": mime,
-                "size": size,
-            }
+            _normalize_gi_attachment(
+                {
+                    "name": display,
+                    "filename": display,
+                    "path": rel,
+                    "url": url,
+                    "mime": mime,
+                    "type": mime,
+                    "size": size,
+                }
+            )
         )
     return attachments
 
@@ -354,7 +392,7 @@ def _sync_attachments_to_app_server(disk_files: list[tuple[str, Path]]) -> list[
             url = str(item.get("url") or "").strip()
             if path and not url.startswith("http"):
                 url = f"{base_url}{path if path.startswith('/') else '/' + path}"
-            out.append({**item, "path": path, "url": url})
+            out.append(_normalize_gi_attachment({**item, "path": path, "url": url}))
         return out
     except Exception as e:
         import logging
@@ -384,15 +422,45 @@ def _build_ipophl_attachment_cache(disk_files: list[tuple[str, Path]]) -> dict[s
         return {}
     cache: dict[str, dict] = {}
     synced = _sync_attachments_to_app_server(unique)
+    if unique and not synced and _gi_app_server_bases():
+        raise RuntimeError(
+            "Could not upload documents to the app server for mobile preview. "
+            "On the XAMPP PC, restart python app.py (port 8080) and ensure "
+            "admin_gi_sync_files.php is deployed under Beanthentic-App/api/."
+        )
+    if synced and len(synced) < len(unique):
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "GI file sync: only %s of %s files reached the app server",
+            len(synced),
+            len(unique),
+        )
     if synced:
+        by_display: dict[str, dict] = {}
+        by_basename: dict[str, dict] = {}
+        for att in synced:
+            if not isinstance(att, dict):
+                continue
+            norm = _normalize_gi_attachment(att)
+            label = str(norm.get("name") or norm.get("filename") or "").strip()
+            if label:
+                by_display[label.lower()] = norm
+            p = str(norm.get("path") or "")
+            if p:
+                by_basename[os.path.basename(p).lower()] = norm
         for i, (name, path) in enumerate(unique):
-            if i >= len(synced):
-                break
             key = path.resolve().as_posix()
             display = _display_filename(name, path)
-            att = dict(synced[i])
-            att["name"] = display
-            att["filename"] = display
+            att = (
+                by_display.get(display.lower())
+                or by_basename.get(secure_filename(display).lower())
+                or by_basename.get(path.name.lower())
+                or (dict(synced[i]) if i < len(synced) else None)
+            )
+            if not att:
+                continue
+            att = _normalize_gi_attachment({**att, "name": display, "filename": display})
             cache[key] = att
         if cache:
             return cache
@@ -413,7 +481,7 @@ def _attachments_from_cache(
         att = cache.get(key)
         if att:
             display = _display_filename(name, path)
-            out.append({**att, "name": display, "filename": display})
+            out.append(_normalize_gi_attachment({**att, "name": display, "filename": display}))
     return out
 
 
@@ -534,6 +602,46 @@ def _broadcast_admin_submissions_mysql(
     finally:
         conn.close()
     return created_ids
+
+
+def _set_gi_progress_after_ipophl_publish(
+    farmer_ids: list[int],
+    *,
+    progress_percent: float = 100.0,
+    note: str = "",
+    sender_name: str = "IPOPHL Administrator",
+) -> None:
+    """Write admin_progress row(s) so mobile GI Process Update bar moves (MySQL or HTTP)."""
+    if not farmer_ids:
+        return
+    if app_db_params():
+        try:
+            _set_gi_progress_mysql(
+                farmer_ids,
+                progress_percent,
+                note=note,
+                sender_name=sender_name,
+            )
+            return
+        except Exception:
+            pass
+    if not app_server_base():
+        return
+    body_note = note or f"GI Registration — {progress_percent:.0f}%"
+    for fid in farmer_ids:
+        try:
+            app_http_patch_json(
+                "/api/admin_gi_contributions.php",
+                {
+                    "action": "set_progress",
+                    "farmer_id": fid,
+                    "progress_percent": progress_percent,
+                    "note": body_note,
+                },
+                timeout=12.0,
+            )
+        except Exception:
+            continue
 
 
 def _set_gi_progress_mysql(
@@ -952,16 +1060,12 @@ def publish_ipophl_registration_to_gi_updates(
         )
         raise RuntimeError(detail)
 
-    if not prefer_http and app_db_params() and farmer_ids:
-        try:
-            _set_gi_progress_mysql(
-                farmer_ids,
-                100.0,
-                note="GI Registration complete — all IPOPHL document categories are in GI Updates.",
-                sender_name=sender_name[:255],
-            )
-        except Exception:
-            pass
+    _set_gi_progress_after_ipophl_publish(
+        farmer_ids,
+        progress_percent=100.0,
+        note="GI Registration complete — documents are in GI Updates.",
+        sender_name=sender_name[:255],
+    )
 
     if used_http and http_sent_count > 0:
         farmer_count = http_sent_count

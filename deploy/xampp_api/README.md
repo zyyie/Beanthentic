@@ -11,6 +11,7 @@ Copy each PHP file to **`Beanthentic-App/api/`** on the PC running XAMPP and `py
 | `admin_gi_send.php` | GI broadcast multipart upload |
 | `admin_farmer_data.php` | Farmer list for GI broadcast (required for connection preflight) |
 | `admin_gi_sync_files.php` | Copy attachments to app server for MySQL-only admin path |
+| `gi_attachment.php` | CORS-safe attachment fetch for mobile PDF/DOCX previews |
 | `admin_ipophl_documents.php` | IPOPHL ML metadata / `document_analysis` |
 
 Ensure `settings.json` on the admin web has:

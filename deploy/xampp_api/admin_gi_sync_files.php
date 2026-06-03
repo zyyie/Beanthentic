@@ -41,16 +41,25 @@ try {
         if ($ext === '') {
             $ext = 'bin';
         }
-        $safe = preg_replace('/[^a-zA-Z0-9._-]+/', '_', $orig) ?: 'file';
-        $fname = 'gi_sync_' . bin2hex(random_bytes(6)) . '.' . $ext;
+        $safe = preg_replace('/[^a-zA-Z0-9._-]+/', '_', $orig) ?: ('file.' . $ext);
+        $fname = $safe;
+        if (!preg_match('/\.[a-z0-9]{2,5}$/i', $fname)) {
+            $fname .= '.' . $ext;
+        }
         $dest = $uploadDir . '/' . $fname;
+        if (is_file($dest)) {
+            $stem = pathinfo($fname, PATHINFO_FILENAME);
+            $fname = $stem . '_' . bin2hex(random_bytes(3)) . '.' . $ext;
+            $dest = $uploadDir . '/' . $fname;
+        }
         if (!move_uploaded_file($f['tmp_name'], $dest)) {
             continue;
         }
         $rel = '/uploads/gi_contributions/' . $fname;
+        $display = gi_display_filename($orig, $fname);
         $attachments[] = [
-            'name' => $safe,
-            'filename' => $safe,
+            'name' => $display,
+            'filename' => $display,
             'path' => $rel,
             'url' => rtrim($base, '/') . $rel,
             'mime' => (string)($f['type'] ?? 'application/octet-stream'),
