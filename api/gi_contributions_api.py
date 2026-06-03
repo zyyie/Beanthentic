@@ -1,11 +1,12 @@
 """
-GI Farmer contributions — mobile app (gi_updates) ↔ admin Farmer's Contribution inbox.
+GI Farmer contributions — farmer messages in gi_farmers_contribution; IPOPHL/admin in gi_updates.
 """
 
 from __future__ import annotations
 
 import json
 import mimetypes
+import os
 import re
 import shutil
 import uuid
@@ -1171,6 +1172,72 @@ def _send_gi_via_http(
     raise RuntimeError(str(data.get("detail") or data.get("error") or "GI send rejected"))
 
 
+def ensure_gi_farmers_contribution_table(cur) -> None:
+    """Farmer compose → admin Farmer's Contribution (not gi_updates)."""
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS gi_farmers_contribution (
+          gi_farmer_contribution_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          farmer_id BIGINT UNSIGNED NOT NULL,
+          title VARCHAR(150) NOT NULL DEFAULT '',
+          content TEXT NOT NULL,
+          attachments_json TEXT NULL,
+          sender_name VARCHAR(255) NULL,
+          category VARCHAR(30) NOT NULL DEFAULT 'general',
+          is_read_admin TINYINT(1) NOT NULL DEFAULT 0,
+          is_starred TINYINT(1) NOT NULL DEFAULT 0,
+          ipophi_id VARCHAR(100) NULL,
+          gi_document VARCHAR(255) NULL,
+          images TEXT NULL,
+          upload_status VARCHAR(32) NOT NULL DEFAULT 'pending',
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_gi_fc_farmer (farmer_id),
+          INDEX idx_gi_fc_status (upload_status, is_read_admin)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+    )
+    for col, ddl in (
+        ("title", "VARCHAR(150) NOT NULL DEFAULT ''"),
+        ("content", "TEXT NOT NULL"),
+        ("attachments_json", "TEXT NULL"),
+        ("sender_name", "VARCHAR(255) NULL"),
+        ("category", "VARCHAR(30) NOT NULL DEFAULT 'general'"),
+        ("is_read_admin", "TINYINT(1) NOT NULL DEFAULT 0"),
+        ("is_starred", "TINYINT(1) NOT NULL DEFAULT 0"),
+    ):
+        try:
+            cur.execute(f"ALTER TABLE gi_farmers_contribution ADD COLUMN {col} {ddl}")
+        except Exception:
+            pass
+    try:
+        cur.execute(
+            "SELECT COUNT(*) AS c FROM gi_farmers_contribution"
+        )
+        have = int((cur.fetchone() or {}).get("c") or 0)
+        cur.execute(
+            "SELECT COUNT(*) AS c FROM gi_updates WHERE current_phase = 'farmer_submission'"
+        )
+        legacy = int((cur.fetchone() or {}).get("c") or 0)
+        if have == 0 and legacy > 0:
+            cur.execute(
+                """
+                INSERT INTO gi_farmers_contribution
+                  (farmer_id, title, content, attachments_json, upload_status, sender_name,
+                   category, is_read_admin, is_starred, images, created_at, updated_at)
+                SELECT
+                  farmer_id, COALESCE(NULLIF(title, ''), 'GI Update'), content, attachments_json,
+                  upload_status, sender_name, COALESCE(NULLIF(category, ''), 'general'),
+                  COALESCE(is_read_admin, 0), COALESCE(is_starred, 0), attachments_json,
+                  created_at, updated_at
+                FROM gi_updates
+                WHERE current_phase = 'farmer_submission'
+                """
+            )
+    except Exception:
+        pass
+
+
 def ensure_gi_updates_table(cur) -> None:
     cur.execute(
         """
@@ -1355,38 +1422,50 @@ def _load_from_mysql(limit: int, *, phase: str | None = None) -> list[dict]:
     try:
         with conn.cursor() as cur:
             ensure_gi_updates_table(cur)
-            where = "1=1"
+            ensure_gi_farmers_contribution_table(cur)
             args: list = []
-            if phase in ("all", "both", "everything", "inbox", "farmer_submission"):
-                where = "g.current_phase = 'farmer_submission'"
-            elif phase == "farmer_submission":
-                where = "g.current_phase = 'farmer_submission'"
-            elif phase == "admin_submission":
-                where = "g.current_phase = 'admin_submission'"
-            elif phase == "inbox":
-                where = "g.current_phase = 'farmer_submission'"
-            elif phase == "sent":
-                where = "g.current_phase = 'admin_submission'"
-            cur.execute(
-                f"""
-                SELECT g.*, u.email, u.username, u.phone_number,
-                       pi.first_name, pi.last_name
-                FROM gi_updates g
-                LEFT JOIN farmers f ON f.farmer_id = g.farmer_id
-                LEFT JOIN users u ON u.user_id = f.user_id
-                LEFT JOIN personal_information pi ON pi.farmer_id = f.farmer_id
-                WHERE {where}
-                ORDER BY g.created_at DESC, g.gi_update_id DESC
-                LIMIT %s
-                """,
-                (*args, limit),
-            )
+            if phase in ("sent", "admin_submission"):
+                cur.execute(
+                    """
+                    SELECT g.*, u.email, u.username, u.phone_number,
+                           pi.first_name, pi.last_name
+                    FROM gi_updates g
+                    LEFT JOIN farmers f ON f.farmer_id = g.farmer_id
+                    LEFT JOIN users u ON u.user_id = f.user_id
+                    LEFT JOIN personal_information pi ON pi.farmer_id = f.farmer_id
+                    WHERE g.current_phase = 'admin_submission'
+                    ORDER BY g.created_at DESC, g.gi_update_id DESC
+                    LIMIT %s
+                    """,
+                    (limit,),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT g.gi_farmer_contribution_id AS gi_update_id,
+                           g.gi_farmer_contribution_id, g.farmer_id, g.title, g.content,
+                           g.attachments_json, g.upload_status, g.category, g.sender_name,
+                           g.is_starred, g.is_read_admin, g.created_at,
+                           u.email, u.username, u.phone_number,
+                           pi.first_name, pi.last_name
+                    FROM gi_farmers_contribution g
+                    LEFT JOIN farmers f ON f.farmer_id = g.farmer_id
+                    LEFT JOIN users u ON u.user_id = f.user_id
+                    LEFT JOIN personal_information pi ON pi.farmer_id = f.farmer_id
+                    ORDER BY g.created_at DESC, g.gi_farmer_contribution_id DESC
+                    LIMIT %s
+                    """,
+                    (limit,),
+                )
             items = []
             for row in cur.fetchall() or []:
                 fn = str(row.get("first_name") or "").strip()
                 ln = str(row.get("last_name") or "").strip()
                 farmer_name = (fn + " " + ln).strip() or str(row.get("sender_name") or "Farmer")
-                items.append(_gi_row_to_admin_item({**row, "farmer_name": farmer_name}, base))
+                item = _gi_row_to_admin_item({**row, "farmer_name": farmer_name}, base)
+                if phase not in ("sent", "admin_submission"):
+                    item["current_phase"] = "farmer_submission"
+                items.append(item)
             return items
     finally:
         conn.close()
@@ -1448,7 +1527,7 @@ def _patch_mysql(gi_id: int, fields: dict) -> int:
     conn = connect_app_mysql(params)
     try:
         with conn.cursor() as cur:
-            ensure_gi_updates_table(cur)
+            ensure_gi_farmers_contribution_table(cur)
             sets = []
             args: list = []
             if "is_starred" in fields:
@@ -1464,7 +1543,7 @@ def _patch_mysql(gi_id: int, fields: dict) -> int:
                 return 0
             args.append(gi_id)
             cur.execute(
-                f"UPDATE gi_updates SET {', '.join(sets)} WHERE gi_update_id = %s AND current_phase = 'farmer_submission'",
+                f"UPDATE gi_farmers_contribution SET {', '.join(sets)} WHERE gi_farmer_contribution_id = %s",
                 tuple(args),
             )
             updated = int(cur.rowcount or 0)
@@ -1768,8 +1847,9 @@ def register_gi_contributions_routes(app) -> None:
                     conn = connect_app_mysql(params)
                     try:
                         with conn.cursor() as cur:
+                            ensure_gi_farmers_contribution_table(cur)
                             cur.execute(
-                                "DELETE FROM gi_updates WHERE gi_update_id = %s AND current_phase = 'farmer_submission'",
+                                "DELETE FROM gi_farmers_contribution WHERE gi_farmer_contribution_id = %s",
                                 (gi_id,),
                             )
                             deleted = int(cur.rowcount or 0)
