@@ -688,20 +688,30 @@ def health():
 
     base = app_server_base()
     if base:
+        from config.app_connection import probe_app_server_http
+
         payload["app_server_http"] = "disconnected"
         payload["app_server_base"] = base
-        try:
-            from config.ipophl_app_bridge import _request_bridge
-
-            _request_bridge(action="list", query={"limit": 1}, timeout=4)
+        http_ok, http_used, http_err = probe_app_server_http(timeout=4.0)
+        if http_ok:
             payload["app_server_http"] = "connected"
+            payload["app_server_http_base"] = http_used
             if payload["database"] != "connected":
                 payload["database"] = "http_only"
-        except Exception as e:
-            payload["app_server_http_error"] = str(e)
+            try:
+                from config.ipophl_app_bridge import _request_bridge
+
+                _request_bridge(action="list", query={"limit": 1}, timeout=4)
+                payload["ipophl_http_bridge"] = "connected"
+            except Exception as ipophl_exc:
+                payload["ipophl_http_bridge"] = "disconnected"
+                payload["ipophl_http_bridge_error"] = str(ipophl_exc)
+        else:
+            payload["app_server_http_error"] = http_err
             hints.append(
-                f"Cannot reach app server at {base}. On the XAMPP device run python app.py on port 8080 "
-                "and copy deploy/xampp_api/*.php into Beanthentic-App/api/."
+                f"Cannot reach app server at {base}. On the XAMPP PC: "
+                "pip install -r requirements.txt && python app.py (port 8080). "
+                "Allow Windows Firewall inbound TCP 8080 on that PC."
             )
 
     if STORE_PATH.exists():

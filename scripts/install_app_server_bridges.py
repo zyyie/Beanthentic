@@ -18,11 +18,16 @@ ROOT = Path(__file__).resolve().parents[1]
 BRIDGES_SRC = ROOT / "deploy" / "app_server" / "admin_bridges.py"
 MARKER = "register_admin_bridges(app)"
 SNIPPET = """
+_ADMIN_BRIDGES_LOADED = False
 try:
     from admin_bridges import register_admin_bridges
     register_admin_bridges(app)
+    _ADMIN_BRIDGES_LOADED = True
 except ImportError:
     pass
+except Exception as admin_bridge_err:
+    import warnings
+    warnings.warn(f"admin_bridges not loaded: {admin_bridge_err!s}")
 """
 
 
@@ -35,9 +40,15 @@ def patch_app_py(app_dir: Path) -> bool:
     if MARKER in text:
         print("app.py already patched.")
         return True
+    anchor = "register_farm_module = RegisterFarmModule(app)"
+    if anchor in text:
+        text = text.replace(anchor, SNIPPET + "\n\n" + anchor, 1)
+        app_py.write_text(text, encoding="utf-8")
+        print("Patched app.py (after MySQL routes)")
+        return True
     anchor = 'if __name__ == "__main__":'
     if anchor not in text:
-        print("ERROR: Could not find if __name__ block in app.py — add manually:")
+        print("ERROR: Could not find patch anchor in app.py — add manually:")
         print(SNIPPET)
         return False
     text = text.replace(anchor, SNIPPET + "\n\n" + anchor, 1)

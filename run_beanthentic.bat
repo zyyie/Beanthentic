@@ -17,6 +17,15 @@ echo   - Beanthentic-App = port 8080 on the XAMPP PC (python app.py)
 echo   - Phone Server URL must use the XAMPP PC IP :8080 (same as settings.json app_server_base)
 echo   - After start, open http://YOUR-LAN-IP:5000/api/connection-status
 echo.
-echo Starting Beanthentic (SMS build otp-v4)...
+echo [1/2] Installing Python packages...
+python -m pip install -r requirements.txt
+if errorlevel 1 (
+  echo ERROR: pip install failed. Install Python 3.10+ and try again.
+  pause
+  exit /b 1
+)
+
+echo.
+echo [2/2] Starting Beanthentic admin web.py on 0.0.0.0:5000 ...
 python web.py
 pause
