@@ -57,6 +57,7 @@
                     type="text"
                     autocomplete="username"
                     placeholder="9123456789"
+                    value="{{ saved_phone or '' }}"
                     required
                   />
                 </div>
@@ -82,8 +83,8 @@
 
               <div class="row">
                 <label class="checkbox">
-                  <input type="checkbox" name="remember" />
-                  <span>Remember me</span>
+                  <input type="checkbox" name="remember" id="remember" {% if remember_checked %}checked{% endif %} />
+                  <span>Remember me on this device</span>
                 </label>
                 <a class="forgot-link" href="{{ url_for('forgot_password') }}">Forgot Password?</a>
               </div>
@@ -101,6 +102,7 @@
       </div>
     </main>
     <script src="../js/auth-password-toggle.js"></script>
+    <script src="../js/login-remember.js"></script>
     <script>
       initPasswordToggles([["togglePassword", "password"]]);
 

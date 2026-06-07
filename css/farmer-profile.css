@@ -279,6 +279,16 @@
     margin: 0 auto 16px;
     border: 4px solid #ffffff;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    position: relative;
+}
+
+.farmer-profile-avatar-large .farmer-profile-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+    inset: 0;
 }
 
 .farmer-profile-avatar-large i {

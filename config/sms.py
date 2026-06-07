@@ -27,7 +27,7 @@ from urllib.request import HTTPSHandler, Request, build_opener, urlopen
 logger = logging.getLogger(__name__)
 
 _SETTINGS_PATH = Path(__file__).resolve().parents[1] / "settings.json"
-SMS_BUILD_ID = "2026-06-02-otp-v4"
+SMS_BUILD_ID = "2026-06-03-urlfix-v5"
 
 # Used when settings.json fields are blank or stale (e.g. after saving connection form).
 _GATEWAY_DEFAULTS: dict[str, str] = {
@@ -119,13 +119,17 @@ def sms_config() -> dict:
         ),
         # SMS Gateway for Android
         "gateway_mode": _gw_setting(gw, "mode", env_key="SMS_GATEWAY_MODE").lower() or "cloud",
-        "gateway_local_base_url": _gw_setting(gw, "local_base_url", env_key="SMS_GATEWAY_BASE_URL").rstrip("/"),
+        "gateway_local_base_url": _normalize_local_base_url(
+            _gw_setting(gw, "local_base_url", env_key="SMS_GATEWAY_BASE_URL")
+        ),
         "gateway_local_path": (
             os.getenv("SMS_GATEWAY_LOCAL_PATH", "").strip()
             or str(gw.get("local_path") or "/message").strip()
             or "/message"
         ),
-        "gateway_cloud_url": _gw_setting(gw, "cloud_url", env_key="SMS_GATEWAY_CLOUD_URL"),
+        "gateway_cloud_url": _normalize_cloud_url(
+            _gw_setting(gw, "cloud_url", env_key="SMS_GATEWAY_CLOUD_URL")
+        ),
         "gateway_username": _gw_setting(gw, "username", env_key="SMS_GATEWAY_USERNAME", cloud=True),
         "gateway_password": _gw_setting(gw, "password", env_key="SMS_GATEWAY_PASSWORD", cloud=True),
         "gateway_local_username": _gw_setting(gw, "local_username", env_key="SMS_GATEWAY_LOCAL_USERNAME"),
@@ -188,15 +192,43 @@ def build_reset_url(token: str, *, request_base_url: str | None = None) -> str:
     return f"{base}{path}" if base else path
 
 
+_CLOUD_MESSAGES_PATH = "/3rdparty/v1/messages"
+_CLOUD_DEFAULT = f"https://api.sms-gate.app{_CLOUD_MESSAGES_PATH}"
+
+
 def _normalize_cloud_url(url: str) -> str:
+    """
+    Always return a full https URL for the SMS Gate cloud API.
+
+    Bare values like ``api.sms-gate.app`` (no scheme) make urllib report
+    ``unknown url type: api.sms-gate.app`` — treat those as hostnames.
+    """
+    raw = (url or "").strip()
+    if not raw:
+        return _CLOUD_DEFAULT
+    if not raw.startswith(("http://", "https://")):
+        raw = f"https://{raw.lstrip('/')}"
+    parsed = urlparse(raw)
+    if not parsed.netloc:
+        return _CLOUD_DEFAULT
+    host = (parsed.hostname or "").lower()
+    path = (parsed.path or "").strip()
+    if (not path or path == "/") and host.endswith("sms-gate.app"):
+        return f"{parsed.scheme}://{parsed.netloc}{_CLOUD_MESSAGES_PATH}"
+    return raw.rstrip("/")
+
+
+def _normalize_local_base_url(url: str) -> str:
+    """Ensure local SMS Gateway base URL has http:// and is not a cloud hostname."""
     raw = (url or "").strip().rstrip("/")
     if not raw:
-        return "https://api.sms-gate.app/3rdparty/v1/messages"
+        return ""
+    lower = raw.lower()
+    if "sms-gate.app" in lower:
+        return ""
     if raw.startswith("http://") or raw.startswith("https://"):
-        return raw
-    if ":" in raw and not raw.startswith("/"):
-        return f"https://{raw}/3rdparty/v1/messages"
-    return f"https://{raw}"
+        return raw.rstrip("/")
+    return f"http://{raw.lstrip('/')}"
 
 
 def _is_sms_gate_host(url: str) -> bool:
@@ -269,7 +301,7 @@ def _http_json_request(
 def _gateway_attempts(cfg: dict) -> list[tuple[str, str, str, bool]]:
     """Build (url, username, password, is_local) attempts in priority order."""
     mode = (cfg.get("gateway_mode") or "auto").strip().lower()
-    local_base = (cfg.get("gateway_local_base_url") or "").strip().rstrip("/")
+    local_base = _normalize_local_base_url(cfg.get("gateway_local_base_url") or "")
     cloud_url = _normalize_cloud_url(cfg.get("gateway_cloud_url") or "")
 
     cloud_user = (cfg.get("gateway_username") or "").strip()
@@ -383,13 +415,24 @@ def _send_sms_gateway(phone_digits: str, message: str, cfg: dict) -> SmsSendResu
                 errors.append(f"{'local' if is_local else 'cloud'} HTTP {exc.code}: {detail}")
                 break
             except URLError as exc:
-                label = "local phone" if is_local else "cloud"
-                errors.append(f"{label}: {exc.reason}")
+                label = "Local phone" if is_local else "Cloud"
+                reason = str(getattr(exc, "reason", exc) or exc)
+                if "unknown url type" in reason.lower():
+                    errors.append(
+                        f"{label}: invalid URL (missing http:// or https://). "
+                        f"Use https://api.sms-gate.app/3rdparty/v1/messages for cloud, "
+                        f"or http://PHONE_LAN_IP:8080 for local."
+                    )
+                else:
+                    errors.append(f"{label}: {reason}")
                 break
 
     detail = "; ".join(errors[-3:]) if errors else "SMS Gateway unreachable."
-    hint = "Open SMS Gateway app → tap ONLINE. Phone IP must match local_base_url in settings.json."
-    return SmsSendResult(False, "sms_gateway", f"Cannot send SMS. {detail} {hint}")
+    hint = (
+        "Enable Local Server in the SMS Gateway app and set sms.local_base_url to "
+        "http://YOUR_PHONE_IP:8080 in settings.json (same Wi‑Fi as this PC)."
+    )
+    return SmsSendResult(False, "sms_gateway", f"Cannot reach SMS Gateway: {detail} {hint}")
 
 
 def _send_semaphore(number: str, message: str, cfg: dict) -> SmsSendResult:

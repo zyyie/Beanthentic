@@ -67,8 +67,18 @@ def _write_connection_settings(payload: dict) -> None:
 
 
 def _write_sms_settings(payload: dict) -> None:
+    from config.sms import _normalize_cloud_url, _normalize_local_base_url
+
+    sms = dict(payload) if isinstance(payload, dict) else {}
+    gw = sms.get("sms_gateway")
+    if isinstance(gw, dict):
+        gw = dict(gw)
+        if gw.get("local_base_url"):
+            gw["local_base_url"] = _normalize_local_base_url(str(gw["local_base_url"]))
+        gw["cloud_url"] = _normalize_cloud_url(str(gw.get("cloud_url") or ""))
+        sms["sms_gateway"] = gw
     settings = _read_settings()
-    settings["sms"] = payload
+    settings["sms"] = sms
     SETTINGS_PATH.write_text(json.dumps(settings, indent=2), encoding="utf-8")
 
 
@@ -167,6 +177,41 @@ register_auth_routes(app)
 from config.sms import SMS_BUILD_ID, sms_config, send_otp_sms  # noqa: E402
 
 print(f"[Beanthentic] SMS module loaded: {SMS_BUILD_ID}")
+
+
+def _repair_sms_settings_on_disk() -> None:
+    """Normalize SMS Gateway URLs in settings.json (fixes missing https:// on cloud_url)."""
+    try:
+        settings = _read_settings()
+        sms = settings.get("sms")
+        if not isinstance(sms, dict):
+            return
+        gw = sms.get("sms_gateway")
+        if not isinstance(gw, dict):
+            return
+        from config.sms import _normalize_cloud_url, _normalize_local_base_url
+
+        fixed = dict(gw)
+        changed = False
+        cloud = _normalize_cloud_url(str(gw.get("cloud_url") or ""))
+        if cloud != str(gw.get("cloud_url") or "").strip():
+            fixed["cloud_url"] = cloud
+            changed = True
+        local = _normalize_local_base_url(str(gw.get("local_base_url") or ""))
+        if local != str(gw.get("local_base_url") or "").strip().rstrip("/"):
+            fixed["local_base_url"] = local
+            changed = True
+        if changed:
+            sms = dict(sms)
+            sms["sms_gateway"] = fixed
+            settings["sms"] = sms
+            SETTINGS_PATH.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+            print("[Beanthentic] Repaired SMS URLs in settings.json")
+    except Exception as exc:
+        print(f"[Beanthentic] SMS settings repair skipped: {exc}")
+
+
+_repair_sms_settings_on_disk()
 
 
 @app.route("/api/sms-ping")
@@ -332,6 +377,12 @@ def connection_settings():
         if gw_mode not in ("local", "cloud", "auto"):
             gw_mode = "auto"
         gw_local = (request.form.get("gateway_local_base_url") or "").strip().rstrip("/")
+        if gw_local and not gw_local.startswith(("http://", "https://")):
+            gw_local = f"http://{gw_local.lstrip('/')}"
+        if gw_local and "sms-gate.app" in gw_local.lower():
+            form_error = form_error or (
+                "Local base URL must be your phone IP (e.g. http://192.168.x.x:8080), not api.sms-gate.app."
+            )
         gw_local_user = (request.form.get("gateway_local_username") or "").strip()
         gw_local_pass = request.form.get("gateway_local_password")
         gw_user = (request.form.get("gateway_username") or "").strip()
@@ -384,7 +435,10 @@ def connection_settings():
                         "local_path": str(gw_prev.get("local_path") or "/message"),
                         "local_username": gw_local_user or str(gw_prev.get("local_username") or "sms").strip(),
                         "local_password": gw_local_password if gw_local_password is not None else "",
-                        "cloud_url": "https://api.sms-gate.app/3rdparty/v1/messages",
+                        "cloud_url": (
+                            str(gw_prev.get("cloud_url") or "").strip()
+                            or "https://api.sms-gate.app/3rdparty/v1/messages"
+                        ),
                         "cloud_device_id": str(gw_prev.get("cloud_device_id") or gw_prev.get("device_id") or "").strip(),
                         "username": gw_user or str(gw_prev.get("username") or "").strip(),
                         "password": gw_password if gw_password is not None else "",

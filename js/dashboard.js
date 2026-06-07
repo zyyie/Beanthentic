@@ -2,6 +2,7 @@
 const NOTIFICATIONS_READ_STORAGE_KEY = 'beanthentic_dashboard_notification_read';
 const LAST_MAX_FARMER_ID_KEY = 'beanthentic_last_max_farmer_id';
 const KNOWN_FARMER_IDS_KEY = 'beanthentic_known_farmer_ids';
+const NOTIFIED_COMPLETE_FARMER_IDS_KEY = 'beanthentic_notified_complete_farmer_ids';
 const ADMIN_NOTIFICATIONS_POLL_MS = 60000;
 
 /** Prefix for API paths when the app is mounted under a subpath (e.g. /Beanthentic). */
@@ -54,7 +55,7 @@ class DashboardApp {
     this.pageSize = 10;
     this.totalRecords = 0;
     this.farmerTableView = 'basic';
-    this.mapVarietyFilter = 'liberica';
+    this.mapVarietyFilter = 'all';
     this.mapSearchTerm = '';
     this.googleMap = null;
     this.googleMapMarkers = [];
@@ -202,6 +203,27 @@ class DashboardApp {
     };
   }
 
+  isRegistrationNotificationId(id) {
+    return /^reg-(pending|local|act)-/i.test(String(id || ''));
+  }
+
+  mergeAdminNotificationFeed(apiRows) {
+    const apiItems = (apiRows || []).map((row, i) => this.mapAdminNotificationToFeedItem(row, i));
+    const preserved = (this.notificationsFeed || []).filter((n) =>
+      this.isRegistrationNotificationId(n.id)
+    );
+    const byId = new Map();
+    for (const n of [...apiItems, ...preserved]) {
+      if (n?.id) byId.set(n.id, n);
+    }
+    const merged = [...byId.values()].sort((a, b) => {
+      const ta = Date.parse(a.meta || '') || 0;
+      const tb = Date.parse(b.meta || '') || 0;
+      return tb - ta;
+    });
+    return merged.length > 0 ? merged : this.getDefaultNotifications();
+  }
+
   hydrateNotificationsFeed() {
     return this.applyReadStateToItems(this.getDefaultNotifications());
   }
@@ -268,23 +290,20 @@ class DashboardApp {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const rows = Array.isArray(data.items) ? data.items : [];
-      const isRegistrationNotif = (id) =>
-        /^reg-(pending|local|act)-/i.test(String(id || ''));
       const prevRegIds = new Set(
         (this.notificationsFeed || [])
-          .filter((n) => isRegistrationNotif(n.id))
+          .filter((n) => this.isRegistrationNotificationId(n.id))
           .map((n) => n.id)
       );
       const adminItems = rows.map((row, i) => this.mapAdminNotificationToFeedItem(row, i));
-      const merged =
-        adminItems.length > 0 ? adminItems : this.getDefaultNotifications();
+      const merged = this.mergeAdminNotificationFeed(adminItems);
       this.notificationsFeed = this.applyReadStateToItems(merged);
       this.renderNotificationsList();
       this.updateNotificationBadges();
 
-      const newReg = adminItems.filter(
+      const newReg = merged.filter(
         (n) =>
-          isRegistrationNotif(n.id) &&
+          this.isRegistrationNotificationId(n.id) &&
           !prevRegIds.has(n.id) &&
           !n.read
       );
@@ -356,19 +375,138 @@ class DashboardApp {
     }
   }
 
+  loadNotifiedCompleteFarmerIds() {
+    try {
+      const raw = localStorage.getItem(NOTIFIED_COMPLETE_FARMER_IDS_KEY);
+      if (!raw) return new Set();
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return new Set();
+      return new Set(parsed.map((x) => Number(x)).filter((n) => n > 0));
+    } catch {
+      return new Set();
+    }
+  }
+
+  saveNotifiedCompleteFarmerIds(idSet) {
+    try {
+      const arr = [...idSet].filter((n) => n > 0).sort((a, b) => a - b).slice(-2000);
+      localStorage.setItem(NOTIFIED_COMPLETE_FARMER_IDS_KEY, JSON.stringify(arr));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  looksLikePhoneNumber(value) {
+    const s = String(value || '').replace(/[\s\-()]/g, '');
+    if (!s) return false;
+    return /^(\+?63)?9\d{9}$/.test(s) || /^09\d{9}$/.test(s);
+  }
+
+  farmerDisplayNameFromRow(row) {
+    const fid = this.farmerIdFromRow(row);
+    const first = String(row['FIRST NAME'] || row.first_name || '').trim();
+    const last = String(row['LAST NAME'] || row.last_name || '').trim();
+    const full = `${first} ${last}`.trim();
+    if (full && !this.looksLikePhoneNumber(full) && !this.looksLikePhoneNumber(first)) {
+      return full;
+    }
+    const legal = String(row['NAME OF FARMER'] || '').trim();
+    if (legal && !this.looksLikePhoneNumber(legal)) return legal;
+    return fid ? `Farmer #${fid}` : 'Farmer';
+  }
+
+  farmerProfilePhotoUrl(row) {
+    const explicit = this.getValue(row, [
+      'profile_photo_url',
+      'profile_photo_data',
+      'PHOTO',
+      'photo',
+      'photo_url',
+      'image',
+    ]);
+    if (explicit) {
+      const s = String(explicit).trim();
+      if (s && s !== 'undefined') {
+        if (/^data:image\//i.test(s)) return s;
+        if (/^https?:\/\//i.test(s)) return s;
+        return beanthenticApiUrl(s.startsWith('/') ? s : `/${s}`);
+      }
+    }
+    const fid = Number(row?.farmer_id ?? row?.['NO.'] ?? 0);
+    if (fid > 0) return beanthenticApiUrl(`/api/farmer-profile-photo/${fid}`);
+    return '';
+  }
+
+  applyFarmerProfileAvatar(row) {
+    const wrap = document.querySelector('.farmer-profile-avatar-large');
+    if (!wrap) return;
+    let img = wrap.querySelector('img.farmer-profile-avatar-img');
+    let icon = wrap.querySelector('i');
+    const url = this.farmerProfilePhotoUrl(row);
+    if (!img) {
+      img = document.createElement('img');
+      img.className = 'farmer-profile-avatar-img';
+      img.alt = '';
+      wrap.insertBefore(img, wrap.firstChild);
+    }
+    if (!url) {
+      img.hidden = true;
+      img.removeAttribute('src');
+      if (icon) icon.style.display = '';
+      return;
+    }
+    img.onerror = () => {
+      img.hidden = true;
+      if (icon) icon.style.display = '';
+    };
+    img.onload = () => {
+      img.hidden = false;
+      if (icon) icon.style.display = 'none';
+    };
+    img.src = url;
+    if (img.complete && img.naturalWidth > 0) {
+      img.hidden = false;
+      if (icon) icon.style.display = 'none';
+    }
+  }
+
+  isFarmerRegistrationComplete(row) {
+    const first = String(row['FIRST NAME'] || row.first_name || '').trim();
+    const last = String(row['LAST NAME'] || row.last_name || '').trim();
+    if (!first || !last) return false;
+    if (this.looksLikePhoneNumber(first) || this.looksLikePhoneNumber(last)) return false;
+
+    const barangay = String(row['ADDRESS (BARANGAY)'] || row.barangay || '').trim();
+    const farmHa = Number(row['TOTAL AREA PLANTED (HA.)'] ?? row['Total Area Planted (HA.)'] ?? row.farm_size_ha ?? 0);
+    const trees = Number(row['TOTAL TREES'] ?? row.total_bearing_trees ?? 0);
+    return Boolean(barangay || farmHa > 0 || trees > 0);
+  }
+
   detectNewFarmersFromData() {
     if (!Array.isArray(this.data) || !this.data.length) return;
-    const known = this.loadKnownFarmerIds();
-    const isFirstBaseline = known.size === 0;
-    const newcomers = this.data.filter((r) => {
-      const fid = this.farmerIdFromRow(r);
-      return fid > 0 && !known.has(fid);
-    });
+    const notifiedComplete = this.loadNotifiedCompleteFarmerIds();
+    const isFirstBaseline = notifiedComplete.size === 0;
 
-    if (!isFirstBaseline && newcomers.length > 0) {
-      newcomers.forEach((row) => this.addLocalFarmerRegistrationNotification(row));
+    if (isFirstBaseline) {
+      this.data.forEach((r) => {
+        const fid = this.farmerIdFromRow(r);
+        if (fid > 0 && this.isFarmerRegistrationComplete(r)) {
+          notifiedComplete.add(fid);
+        }
+      });
+      this.saveNotifiedCompleteFarmerIds(notifiedComplete);
+    } else {
+      this.data.forEach((r) => {
+        const fid = this.farmerIdFromRow(r);
+        if (fid <= 0 || !this.isFarmerRegistrationComplete(r)) return;
+        if (notifiedComplete.has(fid)) return;
+        this.addLocalFarmerRegistrationNotification(r);
+        notifiedComplete.add(fid);
+      });
+      this.saveNotifiedCompleteFarmerIds(notifiedComplete);
     }
 
+    const known = this.loadKnownFarmerIds();
     this.data.forEach((r) => {
       const fid = this.farmerIdFromRow(r);
       if (fid > 0) known.add(fid);
@@ -378,19 +516,17 @@ class DashboardApp {
 
   addLocalFarmerRegistrationNotification(row) {
     const fid = this.farmerIdFromRow(row);
-    if (!fid) return;
-    const name =
-      String(row['NAME OF FARMER'] || row['FIRST NAME'] || '').trim() ||
-      `Farmer #${fid}`;
+    if (!fid || !this.isFarmerRegistrationComplete(row)) return;
+    const name = this.farmerDisplayNameFromRow(row);
     const nid = `reg-local-${fid}`;
     if ((this.notificationsFeed || []).some((n) => n.id === nid)) return;
 
     const item = {
       id: nid,
       icon: 'fa-user-plus',
-      title: `Bagong farmer registration: ${name}`,
+      title: `New farmer registration: ${name}`,
       meta: this.formatNotificationMeta(new Date().toISOString()),
-      detail: `Bagong record sa Farmer's Profile / Farmer Records. I-review ang profile ni ${name}.`,
+      detail: `New registration submitted. Review ${name} in Farmer Records.`,
       targetModule: 'farmers-list',
       targetPayload: { farmerId: fid, farmerNo: fid },
       read: false,
@@ -400,7 +536,7 @@ class DashboardApp {
     this.notificationsFeed = this.applyReadStateToItems([item, ...(this.notificationsFeed || [])]);
     this.renderNotificationsList();
     this.updateNotificationBadges();
-    this.showNotification(`Bagong farmer: ${name}`, 'success');
+    this.showNotification(`New farmer: ${name}`, 'success');
   }
 
   startNotificationPolling() {
@@ -3284,12 +3420,15 @@ class DashboardApp {
 
       console.log('Received data length:', Array.isArray(apiData) ? apiData.length : 0);
       this.data = Array.isArray(apiData)
-        ? apiData.slice(0, this.maxFarmers).map((row) => this.applyOwnershipFlags(row))
+        ? apiData
+            .filter((row) => this.isFarmerRegistrationComplete(row))
+            .slice(0, this.maxFarmers)
+            .map((row) => this.applyOwnershipFlags(row))
         : [];
 
       if (this.data.length === 0) {
         this.showNotification(
-          'Walang farmer records mula sa database (0 rows). Check app_db_host sa settings.json at XAMPP MySQL.',
+          'No completed farmer registrations yet. Records appear here only after a farmer finishes the full app registration.',
           'brown'
         );
       }
@@ -3313,20 +3452,28 @@ class DashboardApp {
       // 1. Try to fallback to browser backup first
       const saved = this.loadSavedFarmers();
       if (Array.isArray(saved) && saved.length) {
-        this.data = saved.slice(0, this.maxFarmers);
+        this.data = saved
+          .filter((row) => this.isFarmerRegistrationComplete(row))
+          .slice(0, this.maxFarmers);
         this.filteredData = [...this.data];
         this.totalRecords = this.data.length;
         this.updateStats();
         this.createCharts();
         this.updateTable();
-        this.showNotification('Database unreachable. Loaded browser backup data.', 'error');
+        this.showNotification(
+          'Could not reach the app server. Loaded browser backup data. Check settings.json app_server_base (port 8080).',
+          'error'
+        );
         return;
       }
 
       // 2. If no backup, fallback to sample data for demo purposes
       console.log('API and Backup unavailable. Falling back to sample data...');
       this.loadSampleData();
-      this.showNotification('Database unreachable. Showing sample farmer records.', 'brown');
+      this.showNotification(
+        'App connection failed. Showing sample farmer records. Set app_server_base to http://<XAMPP-PC-IP>:8080 and restart python web.py.',
+        'brown'
+      );
       
       this.updateStats();
       this.createCharts();
@@ -3535,8 +3682,8 @@ class DashboardApp {
         grid.innerHTML = `
           <div class="placeholder-content" style="grid-column: 1 / -1; padding: 4rem 2rem;">
             <div class="placeholder-icon"><i class="fa-solid fa-people-group"></i></div>
-            <h3>No Farmers Found</h3>
-            <p>There are currently no farmer records in the database.</p>
+            <h3>No completed registrations yet</h3>
+            <p>Farmers appear here only after they finish the full registration in the mobile app.</p>
           </div>
         `;
         return;
@@ -3586,12 +3733,7 @@ class DashboardApp {
     }
 
     const formatNo = (row) => Number(row?.['NO.'] ?? row?.no ?? 0) || 0;
-    const buildName = (row) =>
-      this.getValue(row, ['NAME OF FARMER', 'name', 'FULL NAME', 'full_name', 'Name']) ||
-      [this.getValue(row, ['FIRST NAME', 'first_name', 'firstName']), this.getValue(row, ['LAST NAME', 'last_name', 'lastName'])]
-        .filter(Boolean)
-        .join(' ')
-        .trim();
+    const buildName = (row) => this.farmerDisplayNameFromRow(row);
 
     grid.innerHTML = pageData
       .map((row) => {
@@ -3600,7 +3742,7 @@ class DashboardApp {
         const dob = this.getValue(row, ['BIRTHDAY', 'birthday', 'Date of Birth']);
         const phone = this.getValue(row, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']);
         const address = this.getValue(row, ['ADDRESS (BARANGAY)', 'barangay', 'BARANGAY', 'address']) || 'Address not set';
-        const photo = this.getValue(row, ['PHOTO', 'photo', 'photo_url', 'image']);
+        const photoUrl = this.farmerProfilePhotoUrl(row);
         const isBlocked = row.is_blocked === true || row.is_blocked === 'true';
         
         return `<article class="farmer-card" aria-label="${esc(fullName)}">
@@ -3631,7 +3773,7 @@ class DashboardApp {
   </div>
   <div class="farmer-card__media">
     <div class="farmer-card__avatar-circle">
-      ${photo ? `<img class="farmer-card__image" src="${esc(photo)}" alt="${esc(fullName)}" loading="lazy" />` : `<i class="fa-solid fa-user" style="font-size: 2rem; color: #cbd5e1;"></i>`}
+      ${photoUrl ? `<img class="farmer-card__image" src="${esc(photoUrl)}" alt="${esc(fullName)}" loading="lazy" onerror="this.remove();" /><i class="fa-solid fa-user farmer-card__avatar-fallback" style="font-size: 2rem; color: #cbd5e1;"></i>` : `<i class="fa-solid fa-user farmer-card__avatar-fallback" style="font-size: 2rem; color: #cbd5e1;"></i>`}
     </div>
   </div>
   <div class="farmer-card__identity">
@@ -3716,6 +3858,7 @@ class DashboardApp {
     const nameParts = this.splitFarmerName(fullName);
 
     setText('farmerProfileName', fullName);
+    this.applyFarmerProfileAvatar(farmer);
     setText('farmerProfileNo', `No. #${farmerNo}`);
     setText('farmerProfileDob', this.getValue(farmer, ['BIRTHDAY', 'birthday']) || '—');
     setText('farmerProfilePhone', this.getValue(farmer, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']) || '—');
@@ -4164,10 +4307,10 @@ class DashboardApp {
                 this.createInputCell(displayNo, 'number'),
                 this.createInputCell(nameParts.last, 'text'),
                 this.createInputCell(nameParts.first, 'text'),
-                this.createOwnershipCell(this.getValue(row, ['OWNER_OPERATOR', 'Owner-Operator', 'A'])),
-                this.createOwnershipCell(this.getValue(row, ['LESSOR', 'Lessor', 'B'])),
-                this.createOwnershipCell(this.getValue(row, ['LESSEE', 'Lessee', 'C'])),
-                this.createOwnershipCell(this.getValue(row, ['SHAREHOLDER', 'Shareholder', 'D'])),
+                this.createOwnershipCell(this.getValue(row, ['LANDOWNER', 'OWNER_OPERATOR', 'Owner-Operator', 'A'])),
+                this.createOwnershipCell(this.getValue(row, ['CLOA', 'LESSOR', 'Lessor', 'B'])),
+                this.createOwnershipCell(this.getValue(row, ['LEASE', 'LESSEE', 'Lessee', 'C'])),
+                this.createOwnershipCell(this.getValue(row, ['SEASONAL', 'SHAREHOLDER', 'Shareholder', 'D'])),
                 this.createOwnershipCell(this.getValue(row, ['OTHERS', 'Others', 'E'])),
                 this.createInputCell(this.getValue(row, ['Total Area Planted (HA.)', 'TOTAL AREA PLANTED (HA.)', 'area']), 'number')
               ]
@@ -4891,27 +5034,71 @@ class DashboardApp {
     )
       .trim()
       .toLowerCase();
-    const map = {
-      landowner: { LANDOWNER: 'X' },
-      cloa_holder: { CLOA: 'X' },
-      'cloa holder': { CLOA: 'X' },
-      list_holder: { LEASE: 'X' },
-      'list holder': { LEASE: 'X' },
-      sessional_farm_worker: { SEASONAL: 'X' },
-      'sessional farm worker': { SEASONAL: 'X' },
-      others: { OTHERS: 'X' },
-      owner: { LANDOWNER: 'X' },
-      owned: { LANDOWNER: 'X' },
-      tenant: { SEASONAL: 'X' },
-      lessee: { LEASE: 'X' },
-      'co-owner': { CLOA: 'X' },
-      co_owner: { CLOA: 'X' },
-      coowner: { CLOA: 'X' },
-      other: { OTHERS: 'X' },
+
+    const out = { ...row };
+    const mark = (col) => {
+      out[col] = 'X';
     };
-    const flags = map[status];
-    if (!flags) return row;
-    return { ...row, ...flags };
+
+    const exact = {
+      landowner: 'LANDOWNER',
+      cloa_holder: 'CLOA',
+      'cloa holder': 'CLOA',
+      list_holder: 'LEASE',
+      'list holder': 'LEASE',
+      sessional_farm_worker: 'SEASONAL',
+      'sessional farm worker': 'SEASONAL',
+      others: 'OTHERS',
+      owner: 'LANDOWNER',
+      owned: 'LANDOWNER',
+      tenant: 'SEASONAL',
+      lessee: 'LEASE',
+      'co-owner': 'CLOA',
+      co_owner: 'CLOA',
+      coowner: 'CLOA',
+      other: 'OTHERS',
+      a: 'LANDOWNER',
+      b: 'CLOA',
+      c: 'LEASE',
+      d: 'SEASONAL',
+      e: 'OTHERS',
+    };
+
+    if (exact[status]) {
+      mark(exact[status]);
+    } else if (status.includes('landowner')) {
+      mark('LANDOWNER');
+    } else if (status.includes('cloa')) {
+      mark('CLOA');
+    } else if (status.includes('lease') || status.includes('list') || status.includes('lessee')) {
+      mark('LEASE');
+    } else if (status.includes('seasonal') || status.includes('sessional')) {
+      mark('SEASONAL');
+    } else if (status) {
+      mark('OTHERS');
+    }
+
+    if (out.LANDOWNER) {
+      out.OWNER_OPERATOR = 'X';
+      out.A = 'X';
+    }
+    if (out.CLOA) {
+      out.LESSOR = 'X';
+      out.B = 'X';
+    }
+    if (out.LEASE) {
+      out.LESSEE = 'X';
+      out.C = 'X';
+    }
+    if (out.SEASONAL) {
+      out.SHAREHOLDER = 'X';
+      out.D = 'X';
+    }
+    if (out.OTHERS) {
+      out.E = 'X';
+    }
+
+    return out;
   }
 
   getValue(row, possibleKeys) {
@@ -6728,6 +6915,8 @@ class DashboardApp {
       'rizal/ p bata': 'rizal',
       'pag-olingin west': 'pag olingin west',
       'pag olingin west': 'pag olingin west',
+      pagolingin: 'pag olingin west',
+      'pagolingin east': 'pag olingin west',
       'san jose': 'san jose',
       'san jose ': 'san jose',
     };
@@ -6782,7 +6971,8 @@ class DashboardApp {
   }
 
   getMapVarietyLabel(variety) {
-    const key = (variety || this.mapVarietyFilter || 'liberica').toString().trim().toLowerCase();
+    const key = (variety || this.mapVarietyFilter || 'all').toString().trim().toLowerCase();
+    if (key === 'all') return 'All varieties';
     if (key === 'robusta') return 'Robusta';
     if (key === 'excelsa') return 'Excelsa';
     return 'Liberica';
@@ -6800,9 +6990,9 @@ class DashboardApp {
 
     const stats = [
       {
-        icon: 'fa-users',
-        value: farmers.toLocaleString(),
-        label: farmers === 1 ? 'Farmer' : 'Farmers',
+        icon: point.isFarmerPin ? 'fa-user' : 'fa-users',
+        value: point.isFarmerPin ? this.escapeHtml(point.farmerName || 'Farmer') : farmers.toLocaleString(),
+        label: point.isFarmerPin ? `Farmer #${point.farmerId || ''}` : farmers === 1 ? 'Farmer' : 'Farmers',
       },
     ];
     if (Number.isFinite(areaHa) && areaHa > 0) {
@@ -6954,6 +7144,17 @@ class DashboardApp {
   }
 
   isVarietyMatch(row, variety) {
+    if (variety === 'all') return true;
+    const hasAnyTrees =
+      Number(this.getValue(row, ['LIBERICA BEARING']) || 0) +
+        Number(this.getValue(row, ['ROBUSTA BEARING']) || 0) +
+        Number(this.getValue(row, ['EXCELSA BEARING']) || 0) +
+        Number(this.getValue(row, ['LIBERICA NON-BEARING']) || 0) +
+        Number(this.getValue(row, ['ROBUSTA NON-BEARING']) || 0) +
+        Number(this.getValue(row, ['EXCELSA NON-BEARING']) || 0) >
+      0;
+    const barangay = this.getValue(row, ['ADDRESS (BARANGAY)', 'BARANGAY', 'barangay', 'address']);
+    if (!hasAnyTrees && barangay) return true;
     if (variety === 'liberica') {
       return (
         Number(this.getValue(row, ['LIBERICA BEARING']) || 0) > 0 ||
@@ -6989,6 +7190,42 @@ class DashboardApp {
       const varietyOk = this.isVarietyMatch(row, this.mapVarietyFilter || 'liberica');
       return lipaBarangayOk && searchOk && varietyOk;
     });
+  }
+
+  buildMapFarmerPoints(rows) {
+    const coordsByBarangay = this.getBarangayCoordinates();
+    const bounds = this.getLipaCityBounds();
+    const center = this.getLipaCityCenter();
+    const points = [];
+
+    const toFallbackCoordinate = (name, seed) => {
+      let hash = Number(seed) || 0;
+      for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+      const lat = bounds.south + ((hash % 1000) / 1000) * (bounds.north - bounds.south);
+      const lng = bounds.west + ((((hash >> 10) % 1000) / 1000) * (bounds.east - bounds.west));
+      return { lat: Number.isFinite(lat) ? lat : center.lat, lng: Number.isFinite(lng) ? lng : center.lng };
+    };
+
+    rows.forEach((row) => {
+      const raw = this.getValue(row, ['ADDRESS (BARANGAY)', 'BARANGAY', 'barangay', 'address']) || '';
+      const canonical = this.getCanonicalLipaBarangay(raw);
+      if (!canonical) return;
+      const fid = Number(row.farmer_id ?? row['NO.'] ?? 0);
+      const base = coordsByBarangay[canonical] || toFallbackCoordinate(canonical, fid);
+      const jitterLat = (((fid * 17) % 11) - 5) * 0.00028;
+      const jitterLng = (((fid * 23) % 11) - 5) * 0.00028;
+      points.push({
+        barangay: this.formatBarangayLabel(canonical),
+        canonical,
+        lat: base.lat + jitterLat,
+        lng: base.lng + jitterLng,
+        count: 1,
+        farmerId: fid,
+        farmerName: this.farmerDisplayNameFromRow(row),
+        isFarmerPin: true,
+      });
+    });
+    return points;
   }
 
   buildMapBarangayPoints(rows) {
@@ -7105,11 +7342,15 @@ class DashboardApp {
 
   getBarangayPinIcon(point) {
     const opacity = point.count > 0 ? 1 : 0.72;
-    // Simple green map-pin SVG with white center.
+    const label = point.isFarmerPin ? '' : String(point.count || '');
+    const labelSvg = label
+      ? `<text x="22" y="25" text-anchor="middle" font-size="11" font-weight="700" fill="#047857" font-family="Arial,sans-serif">${label}</text>`
+      : '';
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="44" height="64" viewBox="0 0 44 64">
         <path d="M22 2C11.5 2 3 10.5 3 21c0 14 19 41 19 41s19-27 19-41C41 10.5 32.5 2 22 2z" fill="#047857" stroke="#065f46" stroke-width="2"/>
         <circle cx="22" cy="21" r="9.5" fill="#ffffff"/>
+        ${labelSvg}
       </svg>
     `.trim();
     const encoded = encodeURIComponent(svg);
@@ -7157,7 +7398,9 @@ class DashboardApp {
       const marker = new window.google.maps.Marker({
         position: { lat: point.lat, lng: point.lng },
         map: this.mapLayers.farmerLocations ? this.googleMap : null,
-        title: `${point.barangay} (${point.count})`,
+        title: point.isFarmerPin
+          ? `${point.farmerName || 'Farmer'} · ${point.barangay}`
+          : `${point.barangay} (${point.count})`,
         icon: {
           url: pinIcon.url,
           scaledSize: pinIcon.scaledSize,
@@ -7195,7 +7438,7 @@ class DashboardApp {
     const hasKey = !!(window.__GOOGLE_MAPS_API_KEY__ || '').trim();
     const ready = this.googleMapsReady || !!window.__BEANTHENTIC_GOOGLE_MAPS_READY__;
     const rows = this.getFilteredMapRows();
-    const points = this.buildMapBarangayPoints(rows);
+    const points = rows.length ? this.buildMapFarmerPoints(rows) : this.buildMapBarangayPoints(rows);
 
     this.updateMapInsights(points, rows);
     this.updateMapCoordPill(this.getLipaCityCenter().lat, this.getLipaCityCenter().lng);

@@ -4,7 +4,9 @@ Authentication routes for Beanthentic application.
 Handles user signup, login, logout, and password reset functionality.
 """
 
-from flask import flash, redirect, render_template, request, session, url_for
+import json
+
+from flask import flash, make_response, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from config.otp import OTP_PURPOSE_ADMIN, consume_otp, create_otp, verify_otp
@@ -90,8 +92,28 @@ def register_auth_routes(app):
             return redirect(url_for("signup"))
 
         error = ""
+        remember_checked = False
+        saved_phone = ""
+        saved_name = ""
+
+        def _saved_login_from_cookie():
+            nonlocal saved_phone, saved_name
+            try:
+                raw = (request.cookies.get("bt_saved_login") or "").strip()
+                if not raw:
+                    return
+                data = json.loads(raw)
+                if isinstance(data, dict):
+                    saved_phone = str(data.get("phone", "")).strip()[:10]
+                    saved_name = str(data.get("name", "")).strip()
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
+
+        if request.method == "GET":
+            _saved_login_from_cookie()
 
         if request.method == "POST":
+            remember_checked = request.form.get("remember") in ("on", "true", "1", "yes")
             phone = request.form.get("phone", "").strip()
             password = request.form.get("password", "")
 
@@ -106,22 +128,52 @@ def register_auth_routes(app):
                 user = users.get(user_key) if user_key else None
 
                 if not user or not check_password_hash(user.get("password_hash", ""), password):
-                    error = "Invalid phone number or password."
+                    error = (
+                        "Invalid phone number or password. "
+                        "If you reset your password recently, enter the new password or use Forgot Password."
+                    )
                     log_activity(phone, "LOGIN_FAILED", "Failed login attempt", request.remote_addr)
                 elif user.get("deactivated"):
                     error = "This account has been deactivated. Contact another administrator to restore access."
                     log_activity(user_key or phone, "LOGIN_BLOCKED", "Deactivated account sign-in attempt", request.remote_addr)
                 else:
                     session.clear()
+                    remember = request.form.get("remember") in ("on", "true", "1", "yes")
+                    session.permanent = remember
                     session["user_phone"] = user_key
                     session["user_name"] = user.get("full_name", "Admin")
                     log_activity(user_key, "LOGIN", "User logged in successfully", request.remote_addr)
-                    return redirect(url_for("dashboard"))
+                    response = make_response(redirect(url_for("dashboard")))
+                    if remember:
+                        payload = json.dumps(
+                            {"phone": user_key, "name": user.get("full_name", "")},
+                            ensure_ascii=False,
+                        )
+                        response.set_cookie(
+                            "bt_saved_login",
+                            payload,
+                            max_age=30 * 24 * 60 * 60,
+                            samesite="Lax",
+                            httponly=False,
+                        )
+                    return response
+
+        if request.method == "POST":
+            if not saved_phone:
+                _saved_login_from_cookie()
+            if not saved_phone:
+                phone_raw = request.form.get("phone", "").strip()
+                ok_phone, _, norm = validate_phone(phone_raw)
+                if ok_phone:
+                    saved_phone = norm
 
         return render_template(
             "admin/login.html",
             error=error,
             signup_open=True,
+            remember_checked=remember_checked,
+            saved_phone=saved_phone,
+            saved_name=saved_name,
         )
 
     @app.route("/forgot-password", methods=["GET", "POST"])

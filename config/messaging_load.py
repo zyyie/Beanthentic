@@ -127,9 +127,10 @@ def _read_settings_root() -> dict:
 
 
 def _messaging_http_bases() -> list[str]:
-    """App-server URLs for messages — prefers sms_gateway.local_base_url (XAMPP device)."""
+    """App-server URLs for messages — connection.app_server_base first (not SMS gateway host)."""
     ordered: list[str] = []
     seen: set[str] = set()
+    sms_gw_base = ""
 
     def add(url: str | None) -> None:
         base = (url or "").strip().rstrip("/")
@@ -140,9 +141,12 @@ def _messaging_http_bases() -> list[str]:
     root = _read_settings_root()
     sms = root.get("sms") if isinstance(root.get("sms"), dict) else {}
     gw = sms.get("sms_gateway") if isinstance(sms.get("sms_gateway"), dict) else {}
-    add(str(gw.get("local_base_url") or ""))
-    add(str(sms.get("public_base_url") or "").replace(":5000", ":8080"))
+    sms_gw_base = str(gw.get("local_base_url") or "").strip().rstrip("/")
+
+    add(app_server_base())
     for base in iter_app_server_bases():
+        if sms_gw_base and base == sms_gw_base:
+            continue
         add(base)
     return ordered
 

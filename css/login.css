@@ -239,6 +239,37 @@
   text-decoration: underline;
 }
 
+.saved-accounts-field {
+  margin-bottom: 0.15rem;
+}
+
+.saved-accounts-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.saved-accounts-row select.input {
+  flex: 1;
+  min-width: 0;
+}
+
+.saved-accounts-row .btn-ghost {
+  flex-shrink: 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid #cccccc;
+  background: #f7f7f7;
+  color: #444444;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.saved-accounts-row .btn-ghost:hover {
+  background: #eeeeee;
+}
+
 .form .btn {
   margin-top: 0.6rem;
   width: 100%;

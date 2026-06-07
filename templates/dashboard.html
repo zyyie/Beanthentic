@@ -610,6 +610,7 @@
                       <!-- Top Section: Basic Info -->
                       <div class="profile-card-top-section">
                         <div class="farmer-profile-avatar-large">
+                          <img class="farmer-profile-avatar-img" alt="" hidden />
                           <i class="fa-solid fa-user"></i>
                         </div>
                         <h2 class="farmer-profile-name" id="farmerProfileName">Full Name</h2>
@@ -868,12 +869,6 @@
 
           <!-- Maps Module -->
           <div class="module hidden" id="maps-module" data-module="maps">
-            {% if not google_maps_key_is_production %}
-            <div class="maps-api-key-banner" role="status">
-              <p><strong>Google Maps API key required</strong> to load the interactive map.</p>
-              <p>Add your key in <code>settings.json</code> → <code>maps.google_api_key</code>, or set <code>GOOGLE_MAPS_API_KEY</code>. Enable billing and <strong>Maps JavaScript API</strong> in Google Cloud.</p>
-            </div>
-            {% endif %}
             <section class="maps-toolbar" aria-label="Map filters">
               <div class="maps-toolbar-container">
                 <label class="maps-toolbar__search" for="mapsSearchInput">
@@ -881,7 +876,8 @@
                   <input id="mapsSearchInput" type="search" placeholder="Search barangay.." autocomplete="off" />
                 </label>
                 <div class="maps-toolbar__variety" role="tablist" aria-label="Coffee variety filter">
-                  <button type="button" class="maps-variety-btn is-active" role="tab" aria-selected="true">Liberica</button>
+                  <button type="button" class="maps-variety-btn is-active" role="tab" aria-selected="true">All</button>
+                  <button type="button" class="maps-variety-btn" role="tab" aria-selected="false">Liberica</button>
                   <button type="button" class="maps-variety-btn" role="tab" aria-selected="false">Robusta</button>
                   <button type="button" class="maps-variety-btn" role="tab" aria-selected="false">Excelsa</button>
                 </div>

@@ -12,12 +12,18 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from flask import jsonify, request
+from flask import Response, jsonify, request
 import pymysql
 from pymysql.cursors import DictCursor
 
 from config.app_connection import app_db_params as _shared_app_db_params
-from config.app_connection import app_http_timeout, app_server_base, friendly_load_failure, iter_app_server_bases
+from config.app_connection import (
+    app_http_timeout,
+    app_server_base,
+    friendly_load_failure,
+    iter_app_server_bases,
+    prefer_app_http_bridge,
+)
 from config.farmer_moderation import (
     apply_suspend,
     apply_unsuspend,
@@ -724,6 +730,165 @@ def _rsbsa_status_label(raw) -> str:
     return ""
 
 
+_PHOTOS_MANIFEST_CACHE: dict[str, object] = {"at": 0.0, "data": {}}
+
+
+def _http_body_is_php_source(body: bytes) -> bool:
+    head = body[:64].lstrip()
+    return head.startswith(b"<?php") or head.startswith(b"<?")
+
+
+def _fetch_farmer_photos_manifest_via_http() -> dict[int, str]:
+    """Load farmer_id -> data URL from app server (admin_bridges.py or PHP manifest)."""
+    import time
+
+    now = time.time()
+    cached_at = float(_PHOTOS_MANIFEST_CACHE.get("at") or 0)
+    cached = _PHOTOS_MANIFEST_CACHE.get("data")
+    if isinstance(cached, dict) and now - cached_at < 300:
+        return cached
+
+    manifest: dict[int, str] = {}
+    if not iter_app_server_bases():
+        _PHOTOS_MANIFEST_CACHE["at"] = now
+        _PHOTOS_MANIFEST_CACHE["data"] = manifest
+        return manifest
+
+    timeout = min(app_http_timeout(), 20.0)
+    for base in iter_app_server_bases():
+        url = f"{base}/api/admin_farmer_photos.php"
+        try:
+            req = Request(url, headers={"Accept": "application/json"})
+            with urlopen(req, timeout=timeout) as resp:
+                raw = resp.read()
+            if _http_body_is_php_source(raw):
+                continue
+            data = json.loads(raw.decode("utf-8", errors="replace")) if raw else None
+            if not isinstance(data, dict) or data.get("ok") is not True:
+                continue
+            items = data.get("items")
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                fid = int(item.get("farmer_id") or 0)
+                photo = str(
+                    item.get("photo")
+                    or item.get("data_url")
+                    or item.get("profile_photo_data")
+                    or ""
+                ).strip()
+                if fid > 0 and photo:
+                    manifest[fid] = photo
+            if manifest:
+                break
+        except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
+            continue
+
+    _PHOTOS_MANIFEST_CACHE["at"] = now
+    _PHOTOS_MANIFEST_CACHE["data"] = manifest
+    return manifest
+
+
+def _attach_farmer_photo_fields(rows: list) -> list[dict]:
+    """Embed photo data URLs or API paths on each farmer row."""
+    from config.farmer_profile_photo import farmer_profile_photo_api_path
+
+    manifest = _fetch_farmer_photos_manifest_via_http()
+    out: list[dict] = []
+    for item in rows:
+        if not isinstance(item, dict):
+            continue
+        row = dict(item)
+        fid = int(row.get("farmer_id") or row.get("NO.") or 0)
+        if fid > 0:
+            inline = manifest.get(fid) or str(
+                row.get("profile_photo_data")
+                or row.get("PHOTO")
+                or row.get("profile_photo_url")
+                or ""
+            ).strip()
+            if inline.startswith("data:image/"):
+                row["profile_photo_url"] = inline
+                row["photo_url"] = inline
+                row["PHOTO"] = inline
+            else:
+                url = farmer_profile_photo_api_path(fid)
+                row["profile_photo_url"] = url
+                row["photo_url"] = url
+                row["PHOTO"] = url
+        out.append(row)
+    return out
+
+
+def _farmer_profile_photo_via_http(farmer_id: int) -> tuple[bytes, str] | None:
+    if not iter_app_server_bases():
+        return None
+    fid = int(farmer_id or 0)
+    if fid < 1:
+        return None
+
+    manifest = _fetch_farmer_photos_manifest_via_http()
+    inline = manifest.get(fid)
+    if inline and inline.startswith("data:image/"):
+        from config.farmer_profile_photo import _parse_data_url
+
+        parsed = _parse_data_url(inline)
+        if parsed:
+            return parsed
+
+    timeout = min(app_http_timeout(), 12.0)
+    for base in iter_app_server_bases():
+        url = f"{base}/api/admin_farmer_profile_photo.php?farmer_id={fid}"
+        try:
+            req = Request(url, headers={"Accept": "image/*,*/*"})
+            with urlopen(req, timeout=timeout) as resp:
+                ctype = (resp.headers.get("Content-Type") or "image/jpeg").split(";")[0].strip()
+                body = resp.read()
+                if _http_body_is_php_source(body):
+                    continue
+                if body and ctype.startswith("image/"):
+                    return body, ctype
+        except HTTPError as e:
+            if e.code == 404:
+                continue
+        except (URLError, TimeoutError, ValueError):
+            continue
+    return None
+
+
+def _serve_farmer_profile_photo_bytes(farmer_id: int) -> tuple[bytes, str] | None:
+    from config.farmer_profile_photo import fetch_farmer_photo_record
+
+    fid = int(farmer_id or 0)
+    if fid < 1:
+        return None
+
+    http = _farmer_profile_photo_via_http(fid)
+    if http:
+        return http
+
+    if not _app_db_params():
+        return None
+    conn = None
+    try:
+        conn = _app_db_connect()
+        if not conn:
+            return None
+        rec = fetch_farmer_photo_record(conn, fid)
+        if not rec:
+            return None
+        if rec.get("kind") == "blob":
+            return bytes(rec["value"]), str(rec.get("mime") or "image/jpeg")
+        return _farmer_profile_photo_via_http(fid)
+    except Exception:
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+
 def _app_fetch_farmer_rows(limit: int = 2000) -> list[dict]:
     """
     Fetch farmer dataset from XAMPP MySQL schema used by Beanthentic-App.
@@ -820,6 +985,10 @@ def register_farmer_routes(app):
                 }
             ), 200
 
+        from api.gi_contributions_api import probe_app_mysql, probe_gi_app_server
+
+        mysql_ok, mysql_err = probe_app_mysql(timeout=4.0)
+        http_ok, http_base, http_err = probe_gi_app_server(timeout=4.0)
         out = {
             "ok": False,
             "configured": True,
@@ -827,8 +996,31 @@ def register_farmer_routes(app):
             "port": params["port"],
             "database": params["database"],
             "user": params["user"],
+            "app_server_base": app_server_base() or None,
+            "mysql_reachable": mysql_ok,
+            "mysql_error": None if mysql_ok else mysql_err,
+            "http_reachable": http_ok,
+            "http_base": http_base or None,
+            "http_error": None if http_ok else http_err,
+            "prefer_http_bridge": prefer_app_http_bridge(),
+            "hint": (
+                "When http_reachable is true, farmer data, messages, transactions, and reports "
+                "sync over port 8080. MySQL on port 3306 is optional on the admin PC."
+            ),
         }
+        if http_ok or mysql_ok:
+            out["ok"] = True
+
+        if http_ok:
+            try:
+                items, _err = _fetch_farmer_data_via_app_server()
+                out["farmers_count_http"] = len(items) if items else 0
+            except Exception:
+                out["farmers_count_http"] = None
+
         conn = None
+        if not mysql_ok:
+            return jsonify(out), 200
         try:
             conn = connect_app_mysql(params)
             with conn.cursor() as cur:
@@ -864,11 +1056,10 @@ def register_farmer_routes(app):
                     """
                 )
                 out["app_transactions_history_count"] = int((cur.fetchone() or {}).get("c") or 0)
-            out["ok"] = True
             return jsonify(out), 200
         except Exception as e:
-            out["error"] = safe_error_message(e, public="Could not connect to app database.")
-            out["hint"] = "Check app_db_host in settings.json (XAMPP LAN IP) and MySQL remote access."
+            if not out.get("http_reachable"):
+                out["error"] = safe_error_message(e, public="Could not connect to app database.")
             return jsonify(out), 200
         finally:
             if conn:
@@ -877,14 +1068,78 @@ def register_farmer_routes(app):
     @app.route("/api/farmer-data", methods=["GET"])
     def api_farmer_data():
         """Provide farmer data for dashboard from XAMPP beanthentic_app."""
+        from config.farmer_registration_complete import (
+            farmer_display_name,
+            filter_completed_registration_rows,
+        )
+
         if not is_authenticated():
             return jsonify({"error": "Unauthorized", "message": "Admin login required."}), 401
 
+        def _sync_registrations(rows: list[dict]) -> None:
+            try:
+                from config.farmer_registration_cursor import sync_new_farmer_registrations
+
+                sync_new_farmer_registrations(rows)
+            except Exception:
+                pass
+
+        def _http_farmer_rows() -> list[dict]:
+            items, err = _fetch_farmer_data_via_app_server()
+            if items is None:
+                raise RuntimeError(err or "APP_SERVER_UNREACHABLE")
+            return filter_completed_registration_rows(items)
+
         app_db = _app_db_params()
+        def _apply_ownership_to_rows(items: list[dict]) -> list[dict]:
+            supplement = _fetch_ownership_supplement_via_app_server() or {}
+            sqlite_by_name = supplement.get("by_name") if isinstance(supplement.get("by_name"), dict) else {}
+            sqlite_by_phone = supplement.get("by_phone") if isinstance(supplement.get("by_phone"), dict) else {}
+            sqlite_by_email = supplement.get("by_email") if isinstance(supplement.get("by_email"), dict) else {}
+            out_rows: list[dict] = []
+            for r in items:
+                if not isinstance(r, dict):
+                    continue
+                row = dict(r)
+                first = (row.get("first_name") or row.get("FIRST NAME") or "").strip()
+                last = (row.get("last_name") or row.get("LAST NAME") or "").strip()
+                own_raw = resolve_ownership_status(
+                    row.get("ownership_status") or row.get("STATUS OF OWNERSHIP"),
+                    first_name=first,
+                    last_name=last,
+                    phone=(row.get("phone_number") or row.get("PHONE") or ""),
+                    email=(row.get("user_email") or row.get("email") or ""),
+                    sqlite_by_name=sqlite_by_name,
+                    sqlite_by_phone=sqlite_by_phone,
+                    sqlite_by_email=sqlite_by_email,
+                    row_flags=row,
+                )
+                if own_raw:
+                    row["STATUS OF OWNERSHIP"] = own_raw
+                    row.update(ownership_columns(own_raw))
+                out_rows.append(row)
+            return out_rows
+
+        if prefer_app_http_bridge():
+            try:
+                rows = _attach_farmer_photo_fields(_apply_ownership_to_rows(_http_farmer_rows()))
+                _sync_registrations(rows)
+                return jsonify(rows)
+            except Exception as http_exc:
+                if not app_db:
+                    load_msg = friendly_load_failure(
+                        module_label="farmer data", http_error=http_exc
+                    )
+                    return jsonify({"error": "APP_LOAD_FAILED", "detail": load_msg}), 503
+
         if not app_db:
             items, err = _fetch_farmer_data_via_app_server()
             if items is not None:
-                return jsonify(items)
+                filtered = _attach_farmer_photo_fields(
+                    _apply_ownership_to_rows(filter_completed_registration_rows(items))
+                )
+                _sync_registrations(filtered)
+                return jsonify(filtered)
             return jsonify(
                 {
                     "error": "APP_DB_NOT_CONFIGURED",
@@ -894,17 +1149,53 @@ def register_farmer_routes(app):
             ), 503
 
         try:
-            rows = _app_fetch_farmer_rows(limit=2500)
-            try:
-                from config.farmer_registration_cursor import sync_new_farmer_registrations
-
-                sync_new_farmer_registrations(rows)
-            except Exception:
-                pass
+            rows = _attach_farmer_photo_fields(
+                filter_completed_registration_rows(_app_fetch_farmer_rows(limit=2500))
+            )
+            _sync_registrations(rows)
+            return jsonify(rows)
         except Exception as e:
             items, err = _fetch_farmer_data_via_app_server()
             if items is not None:
-                return jsonify(items)
+                items = _attach_farmer_photo_fields(
+                    _apply_ownership_to_rows(filter_completed_registration_rows(items))
+                )
+                _sync_registrations(items)
+                if items and (items[0].get("FIRST NAME") or items[0].get("first_name")):
+                    return jsonify(items)
+                mapped = []
+                for r in items:
+                    fid = int(r.get("farmer_id") or 0)
+                    first = (r.get("first_name") or r.get("FIRST NAME") or "").strip()
+                    last = (r.get("last_name") or r.get("LAST NAME") or "").strip()
+                    display = farmer_display_name(r, farmer_id=fid)
+                    phone_raw = (r.get("phone_number") or r.get("contact_number") or "").strip()
+                    trees = int(r.get("total_bearing_trees") or 0)
+                    mapped.append(
+                        {
+                            "NO.": fid,
+                            "farmer_id": fid,
+                            "first_name": first,
+                            "last_name": last,
+                            "barangay": (r.get("barangay") or "").strip(),
+                            "farm_size_ha": r.get("farm_size_ha"),
+                            "total_bearing_trees": trees,
+                            "FIRST NAME": first,
+                            "LAST NAME": last,
+                            "NAME OF FARMER": display,
+                            "CONTACT NUMBER": phone_raw,
+                            "PHONE": phone_raw,
+                            "phone_number": phone_raw,
+                            "ADDRESS (BARANGAY)": (r.get("barangay") or "").strip(),
+                            "TOTAL AREA PLANTED (HA.)": float(r.get("farm_size_ha") or 0)
+                            if r.get("farm_size_ha") is not None
+                            else 0,
+                            "TOTAL TREES": trees,
+                            "STATUS": r.get("status") or "",
+                            "status": r.get("status") or "",
+                        }
+                    )
+                return jsonify(_attach_farmer_photo_fields(mapped))
             load_msg = friendly_load_failure(module_label="farmer data", mysql_error=e)
             if err:
                 load_msg = f"{load_msg} App server fallback: {err}"
@@ -926,14 +1217,8 @@ def register_farmer_routes(app):
         for r in rows:
             first = (r.get("first_name") or "").strip()
             last = (r.get("last_name") or "").strip()
-            legal_name = (first + " " + last).strip()
-            display = legal_name
-            if not display:
-                display = (r.get("username") or "").strip()
-            if not display:
-                display = (r.get("phone_number") or "").strip()
-            if not display:
-                display = f"Farmer #{int(r.get('farmer_id') or 0)}"
+            fid = int(r.get("farmer_id") or 0)
+            display = farmer_display_name(r, farmer_id=fid)
 
             rb = int(r.get("robusta_bearing") or 0)
             rn = int(r.get("robusta_non_bearing") or 0)
@@ -957,7 +1242,6 @@ def register_farmer_routes(app):
 
             phone_raw = (r.get("phone_number") or r.get("contact_number") or "").strip()
 
-            fid = int(r.get("farmer_id") or 0)
             is_susp = int(r.get("is_suspended") or 0) == 1
             until_raw = r.get("suspended_until")
             active_susp = False
@@ -1039,7 +1323,22 @@ def register_farmer_routes(app):
                 }
             )
 
-        return jsonify(out)
+        return jsonify(_attach_farmer_photo_fields(out))
+
+    @app.route("/api/farmer-profile-photo/<int:farmer_id>", methods=["GET"])
+    def api_farmer_profile_photo(farmer_id: int):
+        """Serve farmer profile image from Beanthentic-App DB (HTTP bridge or direct MySQL)."""
+        if not is_authenticated():
+            return jsonify({"error": "Unauthorized"}), 401
+        served = _serve_farmer_profile_photo_bytes(farmer_id)
+        if not served:
+            return jsonify({"error": "not_found"}), 404
+        data, mime = served
+        return Response(
+            data,
+            mimetype=mime,
+            headers={"Cache-Control": "private, max-age=3600"},
+        )
 
     @app.route("/api/farmer-account-action", methods=["POST"])
     def api_farmer_account_action():
@@ -1130,23 +1429,24 @@ def register_farmer_routes(app):
     @app.route("/api/farmer-picker", methods=["GET"])
     def api_farmer_picker():
         """Minimal farmer list for admin selects (coffee transactions, etc.)."""
+        from config.farmer_registration_complete import (
+            farmer_display_name,
+            filter_completed_registration_rows,
+        )
+
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
         if _app_db_params():
             try:
-                rows = _app_fetch_farmer_rows(limit=2500)
+                rows = filter_completed_registration_rows(
+                    _app_fetch_farmer_rows(limit=2500)
+                )
             except Exception as e:
                 return jsonify({"error": "APP_DB_UNREACHABLE", "detail": str(e)}), 503
             items = []
             for r in rows:
                 fid = int(r.get("farmer_id") or 0)
-                nm = (r.get("username") or "").strip()
-                if not nm:
-                    fn = (r.get("first_name") or "").strip()
-                    ln = (r.get("last_name") or "").strip()
-                    nm = (fn + " " + ln).strip()
-                if not nm:
-                    nm = (r.get("phone_number") or "").strip()
+                nm = farmer_display_name(r, farmer_id=fid)
                 items.append({"id": fid, "no": fid, "name": nm})
             return jsonify({"items": items})
 

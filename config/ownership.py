@@ -13,11 +13,24 @@ def resolve_ownership_status(
     sqlite_by_name: dict | None = None,
     sqlite_by_phone: dict | None = None,
     sqlite_by_email: dict | None = None,
+    row_flags: dict | None = None,
 ) -> str:
-    """Pick best ownership string: MySQL value first, then register-farm SQLite fallback."""
+    """Pick best ownership string: MySQL value first, then boolean flags, then SQLite fallback."""
     raw = str(mysql_raw or "").strip()
     if raw:
         return raw
+
+    flags = row_flags if isinstance(row_flags, dict) else {}
+    if flags.get("is_landowner") in (True, 1, "1"):
+        return "landowner"
+    if flags.get("is_cloa_holder") in (True, 1, "1"):
+        return "cloa_holder"
+    if flags.get("is_leaseholder") in (True, 1, "1"):
+        return "list_holder"
+    if flags.get("is_seasonal_farm_worker") in (True, 1, "1"):
+        return "sessional_farm_worker"
+    if flags.get("is_others") in (True, 1, "1"):
+        return "others"
 
     fn = str(first_name or "").strip().lower()
     ln = str(last_name or "").strip().lower()

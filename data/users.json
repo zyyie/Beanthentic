@@ -13,7 +13,7 @@
   },
   "9493380766": {
     "full_name": "Eliaza Mae Malibiran",
-    "password_hash": "scrypt:32768:8:1$qdVvuiKkVV67UU94$713931535439d934bdad37fbbf2ca93f62e6acb0cae5ba918c46c039e107063676239e8262c8db3e0dfb880c9f531ae91fd649816f57bf90034ec139f7ef27c8",
+    "password_hash": "scrypt:32768:8:1$0ajTYNRA6eLy39Ym$95f87d40c3770a29a1dbd3b1937862fa6932fa8443fe0b3404705ce3cf4fbbd56147ebc3b9de3da6485b13516af2c5ad3533ba6ac527cac00312a559656bde31",
     "first_name": "Eliaza",
     "last_name": "Mae Malibiran"
   },
@@ -28,5 +28,13 @@
   "9930152544": {
     "full_name": "Eliaza Mae Malibiran",
     "password_hash": "scrypt:32768:8:1$j1xKDmX5IM9xX64T$b27c999b4ee8d077811d549387c4e2971601f8b512f0df9fb45a310d8b9c9362e935581a6bf873457908b39eba816c9aee2fc8f23bb727a48611220a14a3f7f5"
+  },
+  "9704953895": {
+    "full_name": "Anne Hathaway",
+    "password_hash": "scrypt:32768:8:1$xdkF4mLeGNr6rRfy$f88177cf8db3d8de48ea2701fa602698a4e8793180e60171eebcefc311de80ce559ed4dcbe7c59cd02dafb691b034c092f20aed7a6ac9892d763b1787d956648"
+  },
+  "9292929292": {
+    "full_name": "Meryl Streep",
+    "password_hash": "scrypt:32768:8:1$YTWAwDZy1fBTvLg5$a1418bdc5581984f894230da526cc2dee3829a35c49eb1269840aa06130c8a1003c8f29dd88968d244417aabddca6b021d64fc4a247359998f9afec2039c67fd"
   }
 }

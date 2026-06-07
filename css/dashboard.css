@@ -5808,6 +5808,7 @@ body.dashboard-page #farmers-list-module .farmer-card__media {
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__avatar-circle {
+  position: relative;
   width: 80px;
   height: 80px;
   border-radius: 50%;
@@ -5824,6 +5825,13 @@ body.dashboard-page #farmers-list-module .farmer-card__image {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  position: absolute;
+  inset: 0;
+}
+
+body.dashboard-page #farmers-list-module .farmer-card__avatar-fallback {
+  position: relative;
+  z-index: 0;
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__identity {

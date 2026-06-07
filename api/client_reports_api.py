@@ -7,8 +7,6 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
 
 from flask import jsonify, request
 from pymysql.cursors import DictCursor
@@ -19,8 +17,10 @@ from config.app_connection import (
     clamp_limit,
     friendly_load_failure,
     load_error_payload,
+    prefer_app_http_bridge,
 )
-from config.app_http_bridge import app_http_patch_json
+from config.app_data_load import load_with_app_bridge
+from config.app_http_bridge import app_http_get_json, app_http_patch_json
 from config.mysql_app_bridge import connect_app_mysql
 from config.utils import is_authenticated
 
@@ -142,19 +142,12 @@ def _load_from_mysql(limit: int, status: str, q: str) -> list[dict]:
 
 
 def _load_from_app_http(limit: int, status: str, q: str) -> list[dict]:
-    base = app_server_base()
-    if not base:
-        raise RuntimeError("app_server_base not set in settings.json")
-    query = {"limit": int(limit)}
+    query: dict = {"limit": int(limit)}
     if status:
         query["status"] = status
     if q:
         query["q"] = q
-    url = f"{base}/api/admin_client_reports.php?{urlencode(query)}"
-    req = Request(url, headers={"Accept": "application/json"})
-    with urlopen(req, timeout=15) as resp:
-        raw = resp.read().decode("utf-8", errors="replace")
-    data = json.loads(raw) if raw else {}
+    data = app_http_get_json("/api/admin_client_reports.php", query=query, timeout=15)
     if not isinstance(data, dict) or data.get("ok") is not True:
         err = (data or {}).get("error") if isinstance(data, dict) else None
         raise RuntimeError(err or "Bad response from app server")
@@ -169,24 +162,12 @@ def _load_from_app_http(limit: int, status: str, q: str) -> list[dict]:
 
 
 def load_admin_client_reports(limit: int = 500, status: str = "", q: str = "") -> tuple[list[dict], str]:
-    """MySQL first, HTTP fallback — reads client_misconduct_report only."""
+    """MySQL or HTTP bridge — reads client_misconduct_report only."""
     limit = clamp_limit(limit or 500, maximum=1000)
-    mysql_err: Exception | None = None
-    http_err: Exception | None = None
-    try:
-        return _load_from_mysql(limit, status, q), "app_mysql"
-    except Exception as e:
-        mysql_err = e
-    try:
-        return _load_from_app_http(limit, status, q), "app_server_http"
-    except Exception as e:
-        http_err = e
-    raise RuntimeError(
-        friendly_load_failure(
-            module_label="client reports",
-            mysql_error=mysql_err,
-            http_error=http_err,
-        )
+    return load_with_app_bridge(
+        module_label="client reports",
+        mysql_loader=lambda: _load_from_mysql(limit, status, q),
+        http_loader=lambda: _load_from_app_http(limit, status, q),
     )
 
 
@@ -210,55 +191,72 @@ def update_report_status(report_id: int, status: str) -> dict:
     if status not in ALLOWED_STATUSES:
         raise ValueError("Invalid status")
 
-    mysql_err: Exception | None = None
-    params = app_db_params()
-    if params:
+    def _mysql_update() -> dict:
+        params = app_db_params()
+        if not params:
+            raise RuntimeError("app_db_host not set in settings.json")
+        conn = connect_app_mysql(params)
         try:
-            conn = connect_app_mysql(params)
-            try:
-                _ensure_table(conn)
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "UPDATE client_misconduct_report SET status = %s WHERE report_id = %s",
-                        (status, int(report_id)),
-                    )
-                    if cur.rowcount <= 0:
-                        raise LookupError("Report not found")
-                    cur.execute(
-                        "SELECT * FROM client_misconduct_report WHERE report_id = %s LIMIT 1",
-                        (int(report_id),),
-                    )
-                    row = cur.fetchone()
-                if not row:
+            _ensure_table(conn)
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE client_misconduct_report SET status = %s WHERE report_id = %s",
+                    (status, int(report_id)),
+                )
+                if cur.rowcount <= 0:
                     raise LookupError("Report not found")
-                return _row_to_item(row)
-            finally:
-                conn.close()
-        except LookupError:
-            raise
-        except ValueError:
-            raise
-        except Exception as e:
-            mysql_err = e
+                cur.execute(
+                    "SELECT * FROM client_misconduct_report WHERE report_id = %s LIMIT 1",
+                    (int(report_id),),
+                )
+                row = cur.fetchone()
+            if not row:
+                raise LookupError("Report not found")
+            return _row_to_item(row)
+        finally:
+            conn.close()
 
-    if app_server_base():
+    if prefer_app_http_bridge() and app_server_base():
         try:
             return _update_report_via_http(report_id, status)
         except LookupError:
             raise
-        except Exception as http_err:
-            if mysql_err:
-                raise RuntimeError(
-                    friendly_load_failure(
-                        module_label="client report update",
-                        mysql_error=mysql_err,
-                        http_error=http_err,
-                    )
-                ) from http_err
+        except Exception:
+            pass
+        try:
+            return _mysql_update()
+        except LookupError:
             raise
+        except Exception as mysql_err:
+            raise RuntimeError(
+                friendly_load_failure(module_label="client report update", mysql_error=mysql_err)
+            ) from mysql_err
 
-    if mysql_err:
-        raise RuntimeError(friendly_load_failure(module_label="client report update", mysql_error=mysql_err))
+    if app_db_params():
+        try:
+            return _mysql_update()
+        except LookupError:
+            raise
+        except Exception as mysql_err:
+            if app_server_base():
+                try:
+                    return _update_report_via_http(report_id, status)
+                except LookupError:
+                    raise
+                except Exception as http_err:
+                    raise RuntimeError(
+                        friendly_load_failure(
+                            module_label="client report update",
+                            mysql_error=mysql_err,
+                            http_error=http_err,
+                        )
+                    ) from http_err
+            raise RuntimeError(
+                friendly_load_failure(module_label="client report update", mysql_error=mysql_err)
+            ) from mysql_err
+
+    if app_server_base():
+        return _update_report_via_http(report_id, status)
     raise RuntimeError("app_db_host or app_server_base required in settings.json")
 
 

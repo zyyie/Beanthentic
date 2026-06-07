@@ -1473,27 +1473,30 @@ def _load_from_mysql(limit: int, *, phase: str | None = None) -> list[dict]:
 
 def load_admin_gi_contributions(limit: int = 500, *, phase: str | None = None) -> tuple[list[dict], str]:
     limit = clamp_limit(limit)
-    mysql_err: Exception | None = None
-    http_err: Exception | None = None
-    try:
-        return _load_from_mysql(limit, phase=phase), "mysql"
-    except Exception as e:
-        print(f"GI Contributions MySQL error: {e}")
-        mysql_err = e
-    try:
+
+    def _http_pack() -> list[dict]:
         items = _load_from_http(limit, phase=phase)
         base = app_server_base()
-        return [_gi_row_to_admin_item(row, base) for row in items], "http"
-    except Exception as e:
-        print(f"GI Contributions HTTP error: {e}")
-        http_err = e
-    raise RuntimeError(
-        friendly_load_failure(
-            module_label="GI contributions",
-            mysql_error=mysql_err,
-            http_error=http_err,
-        )
+        return [_gi_row_to_admin_item(row, base) for row in items]
+
+    source_label = "app_server_http"
+
+    def _http_loader() -> list[dict]:
+        return _http_pack()
+
+    def _mysql_loader() -> list[dict]:
+        return _load_from_mysql(limit, phase=phase)
+
+    from config.app_data_load import load_with_app_bridge
+
+    rows, source = load_with_app_bridge(
+        module_label="GI contributions",
+        mysql_loader=_mysql_loader,
+        http_loader=_http_loader,
     )
+    if source == "app_server_http":
+        return rows, source_label
+    return rows, "app_mysql"
 
 
 def _patch_via_http(gi_id: int, fields: dict) -> int:
@@ -1587,38 +1590,56 @@ def _farmer_ids_from_http() -> list[int]:
 
 
 def _list_active_farmer_ids() -> list[int]:
-    """Load farmer_id list — MySQL first (split-PC admin), then app server HTTP."""
-    params = app_db_params()
-    if params:
+    """Load farmer_id list — HTTP first when LAN MySQL is usually blocked."""
+    from config.app_connection import prefer_app_http_bridge
+
+    def _from_mysql() -> list[int]:
+        params = app_db_params()
+        if not params:
+            raise RuntimeError("app_db_host not set")
+        conn = connect_app_mysql(params)
         try:
-            conn = connect_app_mysql(params)
-            try:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        SELECT farmer_id
-                        FROM farmers
-                        WHERE farmer_id IS NOT NULL
-                        ORDER BY farmer_id ASC
-                        """
-                    )
-                    rows = cur.fetchall() or []
-                    ids: list[int] = []
-                    for row in rows:
-                        try:
-                            fid = int(row.get("farmer_id") or 0)
-                        except (TypeError, ValueError):
-                            fid = 0
-                        if fid > 0:
-                            ids.append(fid)
-                    if ids:
-                        return ids
-            finally:
-                conn.close()
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT farmer_id
+                    FROM farmers
+                    WHERE farmer_id IS NOT NULL
+                    ORDER BY farmer_id ASC
+                    """
+                )
+                rows = cur.fetchall() or []
+                ids: list[int] = []
+                for row in rows:
+                    try:
+                        fid = int(row.get("farmer_id") or 0)
+                    except (TypeError, ValueError):
+                        fid = 0
+                    if fid > 0:
+                        ids.append(fid)
+                if not ids:
+                    raise RuntimeError("No farmers in app database")
+                return ids
+        finally:
+            conn.close()
+
+    if prefer_app_http_bridge() and app_server_base():
+        try:
+            return _farmer_ids_from_http()
         except Exception:
             pass
-    if app_server_base():
-        return _farmer_ids_from_http()
+        try:
+            return _from_mysql()
+        except Exception:
+            pass
+    else:
+        if app_db_params():
+            try:
+                return _from_mysql()
+            except Exception:
+                pass
+        if app_server_base():
+            return _farmer_ids_from_http()
     raise RuntimeError("app_db_host or app_server_base required in settings.json")
 
 

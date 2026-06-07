@@ -5,6 +5,7 @@ Security helpers: auth guards, safe API errors, session configuration.
 from __future__ import annotations
 
 import os
+from datetime import timedelta
 from functools import wraps
 
 from flask import Flask, jsonify, redirect, request, session, url_for
@@ -21,6 +22,7 @@ def configure_app_security(app: Flask) -> None:
             "Using default secret key. Set FLASK_SECRET_KEY in production."
         )
 
+    app.config.setdefault("PERMANENT_SESSION_LIFETIME", timedelta(days=30))
     app.config.setdefault("SESSION_COOKIE_HTTPONLY", True)
     app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
     secure_cookies = os.getenv("SESSION_COOKIE_SECURE", "").strip().lower() in ("1", "true", "yes")

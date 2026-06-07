@@ -8,12 +8,8 @@ from datetime import date, datetime
 
 from flask import jsonify, request
 
-from config.app_connection import (
-    app_db_params,
-    clamp_limit,
-    friendly_load_failure,
-    load_error_payload,
-)
+from config.app_connection import app_db_params, clamp_limit, load_error_payload
+from config.app_data_load import load_with_app_bridge
 from config.app_http_bridge import app_http_get_json
 from config.mysql_app_bridge import connect_app_mysql
 from config.utils import is_authenticated
@@ -170,29 +166,14 @@ def _load_from_app_http(limit: int, farmer_id: int | None) -> list[dict]:
 
 
 def load_admin_transactions(limit: int = 500, farmer_id: int | None = None) -> tuple[list[dict], str]:
-    """MySQL first, HTTP fallback — never touches admin SQLAlchemy models."""
+    """MySQL or HTTP bridge on the app device — never touches admin SQLAlchemy models."""
     limit = clamp_limit(limit or 500)
     if farmer_id is not None and farmer_id < 1:
         farmer_id = None
-    mysql_err: Exception | None = None
-    http_err: Exception | None = None
-
-    try:
-        return _load_from_mysql(limit, farmer_id), "app_mysql"
-    except Exception as e:
-        mysql_err = e
-
-    try:
-        return _load_from_app_http(limit, farmer_id), "app_server_http"
-    except Exception as e:
-        http_err = e
-
-    raise RuntimeError(
-        friendly_load_failure(
-            module_label="transactions",
-            mysql_error=mysql_err,
-            http_error=http_err,
-        )
+    return load_with_app_bridge(
+        module_label="transactions",
+        mysql_loader=lambda: _load_from_mysql(limit, farmer_id),
+        http_loader=lambda: _load_from_app_http(limit, farmer_id),
     )
 
 

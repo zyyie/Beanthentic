@@ -112,6 +112,11 @@ def iter_app_server_bases() -> list[str]:
 
     add(primary)
 
+    conn = read_connection_settings()
+    db_host = str(conn.get("app_db_host") or "").strip()
+    if db_host and not is_loopback_host(db_host):
+        add(f"http://{db_host}:8080")
+
     root = _read_settings_root()
     sms = root.get("sms") if isinstance(root.get("sms"), dict) else {}
     gw = sms.get("sms_gateway") if isinstance(sms.get("sms_gateway"), dict) else {}
@@ -154,6 +159,22 @@ def app_server_base() -> str:
         return base.rstrip("/")
     cfg = read_connection_settings()
     return str(cfg.get("app_server_base") or "").strip().rstrip("/")
+
+
+def prefer_app_http_bridge() -> bool:
+    """
+    True when admin should load app data over HTTP (:8080) before remote MySQL.
+
+    Typical setup: XAMPP + python app.py on 192.168.x.x; admin laptop on same Wi‑Fi
+    can reach :8080 but not MySQL :3306 unless remote grants/firewall are opened.
+    """
+    if not app_server_base():
+        return False
+    params = app_db_params()
+    if not params:
+        return True
+    host = str(params.get("host") or "").strip()
+    return not is_loopback_host(host)
 
 
 def app_db_connect_timeout(default: int = 8) -> int:

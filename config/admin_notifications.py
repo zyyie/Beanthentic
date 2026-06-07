@@ -371,6 +371,54 @@ def _app_db_column_exists(conn, table: str, column: str) -> bool:
         return False
 
 
+def _load_farmer_rows_for_registrations() -> list[dict]:
+    """App DB farmers via MySQL, or HTTP admin_farmer_data.php when LAN MySQL times out."""
+    rows: list[dict] = []
+    try:
+        from api.farmer_api import _app_fetch_farmer_rows, _fetch_farmer_data_via_app_server
+
+        try:
+            rows = list(_app_fetch_farmer_rows(limit=2500) or [])
+        except Exception:
+            rows = []
+        if not rows:
+            items, _err = _fetch_farmer_data_via_app_server()
+            if items:
+                rows = list(items)
+    except Exception:
+        return []
+    return rows
+
+
+def _registration_item_from_row(r: dict, *, nid_prefix: str = "reg-pending") -> dict | None:
+    from config.farmer_registration_complete import (
+        farmer_display_name,
+        is_farmer_registration_complete,
+    )
+
+    fid = int(r.get("farmer_id") or r.get("NO.") or 0)
+    if not fid or not is_farmer_registration_complete(r):
+        return None
+    fn = farmer_display_name(r, farmer_id=fid)
+    status = str(r.get("status") or "new").strip() or "new"
+    reg_ts = _parse_ts(r.get("registered_at") or r.get("created_at")) or datetime.now()
+    msg = f"{fn} completed registration. Review in Farmer Records."
+    if status:
+        msg = f"{msg} Status: {status}."
+    return _item(
+        nid=f"{nid_prefix}-{fid}",
+        icon="fa-user-plus",
+        title=f"New farmer registration: {fn}",
+        message=msg,
+        timestamp=reg_ts,
+        category="registrations",
+        category_label="Registrations",
+        target_module="farmers-list",
+        ntype="info",
+        target_payload={"farmerId": fid, "farmerNo": fid},
+    )
+
+
 def _notifications_farmer_registration_activity() -> list[dict]:
     """Activity log entries when a farmer registration was recorded."""
     if not _in_app_on("in_app_user_registrations"):
@@ -395,16 +443,26 @@ def _notifications_farmer_registration_activity() -> list[dict]:
 
     for entry in entries:
         details = str(entry.details or "").strip()
+        if "completed registration" not in details.lower() and "completed registration:" not in details.lower():
+            if "New farmer registration farmer #" in details and ":" not in details.split("#", 1)[-1]:
+                continue
         fid = 0
         m = re.search(r"farmer[_\s#]*(\d+)", details, re.I)
         if m:
             fid = int(m.group(1))
+        name = ""
+        m_name = re.search(r"completed registration:\s*(.+?)(?:\s*\(|$)", details, re.I)
+        if m_name:
+            name = m_name.group(1).strip()
+        elif ":" in details:
+            name = details.split(":", 1)[-1].split("(")[0].strip()
+        title = f"New farmer registration: {name}" if name else "New farmer registration"
         out.append(
             _item(
                 nid=f"reg-act-{entry.id or entry.timestamp}",
                 icon="fa-user-plus",
-                title="Bagong farmer registration",
-                message=details or "May bagong farmer na nag-register.",
+                title=title,
+                message=details or "A farmer completed registration in the app.",
                 timestamp=entry.timestamp or datetime.now(),
                 category="registrations",
                 category_label="Registrations",
@@ -417,110 +475,22 @@ def _notifications_farmer_registration_activity() -> list[dict]:
 
 
 def _notifications_new_farmers() -> list[dict]:
-    """Farmers recently registered in the Beanthentic app database."""
+    """Farmers who just completed the app registration wizard (not signup/login only)."""
     if not _in_app_on("in_app_user_registrations"):
         return []
+    rows = _load_farmer_rows_for_registrations()
     try:
-        from api.farmer_api import _app_db_connect, _app_fetch_farmer_rows
         from config.farmer_registration_cursor import sync_new_farmer_registrations
+
+        newly_completed = sync_new_farmer_registrations(rows) or []
     except Exception:
         return []
-
-    try:
-        all_rows = _app_fetch_farmer_rows(limit=2500)
-        sync_new_farmer_registrations(all_rows)
-    except Exception:
-        pass
-
-    conn = None
-    rows: list[dict] = []
-    since = datetime.now() - timedelta(days=14)
-    try:
-        conn = _app_db_connect()
-        if not conn:
-            return []
-        with conn.cursor() as cur:
-            if _app_db_column_exists(conn, "users", "created_at"):
-                cur.execute(
-                    """
-                    SELECT f.farmer_id, f.status, pi.first_name, pi.last_name,
-                           u.phone_number, u.created_at AS registered_at
-                    FROM farmers f
-                    INNER JOIN users u ON u.user_id = f.user_id
-                    LEFT JOIN personal_information pi ON pi.farmer_id = f.farmer_id
-                    WHERE u.created_at >= %s
-                    ORDER BY u.created_at DESC
-                    LIMIT 25
-                    """,
-                    (since,),
-                )
-                rows = cur.fetchall() or []
-            elif _app_db_column_exists(conn, "farmers", "created_at"):
-                cur.execute(
-                    """
-                    SELECT f.farmer_id, f.status, pi.first_name, pi.last_name,
-                           u.phone_number, f.created_at AS registered_at
-                    FROM farmers f
-                    LEFT JOIN users u ON u.user_id = f.user_id
-                    LEFT JOIN personal_information pi ON pi.farmer_id = f.farmer_id
-                    WHERE f.created_at >= %s
-                    ORDER BY f.created_at DESC
-                    LIMIT 25
-                    """,
-                    (since,),
-                )
-                rows = cur.fetchall() or []
-            else:
-                cur.execute(
-                    """
-                    SELECT f.farmer_id, f.status, pi.first_name, pi.last_name, u.phone_number,
-                           NULL AS registered_at
-                    FROM farmers f
-                    LEFT JOIN users u ON u.user_id = f.user_id
-                    LEFT JOIN personal_information pi ON pi.farmer_id = f.farmer_id
-                    WHERE LOWER(COALESCE(f.status, '')) IN (
-                        'pending', 'new', 'inactive', 'registered', 'for review', ''
-                    )
-                       OR f.farmer_id >= (
-                            SELECT COALESCE(MAX(f2.farmer_id), 0) - 25 FROM farmers f2
-                       )
-                    ORDER BY f.farmer_id DESC
-                    LIMIT 25
-                    """
-                )
-                rows = cur.fetchall() or []
-    except Exception:
-        return []
-    finally:
-        if conn:
-            conn.close()
 
     out: list[dict] = []
-    for r in rows:
-        fid = int(r.get("farmer_id") or 0)
-        if not fid:
-            continue
-        fn = f"{(r.get('first_name') or '').strip()} {(r.get('last_name') or '').strip()}".strip() or f"Farmer #{fid}"
-        status = str(r.get("status") or "new").strip() or "new"
-        phone = str(r.get("phone_number") or "").strip()
-        reg_ts = _parse_ts(r.get("registered_at")) or datetime.now()
-        msg = f"Status: {status}. I-review sa Farmer Records / Farmer's Profile."
-        if phone:
-            msg = f"{msg} Telepono: {phone}."
-        out.append(
-            _item(
-                nid=f"reg-pending-{fid}",
-                icon="fa-user-plus",
-                title=f"Bagong farmer registration: {fn}",
-                message=msg,
-                timestamp=reg_ts,
-                category="registrations",
-                category_label="Registrations",
-                target_module="farmers-list",
-                ntype="info",
-                target_payload={"farmerId": fid, "farmerNo": fid},
-            )
-        )
+    for r in newly_completed:
+        item = _registration_item_from_row(r, nid_prefix="reg-pending")
+        if item:
+            out.append(item)
     return out
 
 
