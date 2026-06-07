@@ -6,9 +6,11 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 from pymysql.cursors import DictCursor
 from pymysql.err import OperationalError, ProgrammingError
@@ -97,9 +99,165 @@ def lan_mysql_fallback_hosts() -> list[str]:
     return lan_fallback_hosts(include_request_host=False)
 
 
+def guess_lan_ip() -> str:
+    """Best-effort LAN IPv4 of this machine (admin PC running web.py)."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.5)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        if ip and not ip.startswith("127."):
+            return ip
+    except OSError:
+        pass
+    return ""
+
+
+def normalize_app_server_base_url(raw: str, *, db_host: str = "") -> str:
+    """
+    Normalize Beanthentic-App HTTP base (:8080).
+
+    Fixes common mistakes when web.py moves to another PC:
+    - empty base → http://{app_db_host}:8080
+    - loopback base with LAN db_host → http://{app_db_host}:8080
+    - port 5000 (admin web) → 8080 (farmer app server)
+    """
+    host = (db_host or "").strip()
+    base = (raw or "").strip().rstrip("/")
+    if not base:
+        if host and not is_loopback_host(host):
+            return f"http://{host}:8080"
+        return ""
+
+    try:
+        parsed = urlparse(base if "://" in base else f"http://{base}")
+        scheme = parsed.scheme or "http"
+        hostname = (parsed.hostname or "").strip()
+        port = parsed.port or 8080
+
+        if port == 5000:
+            port = 8080
+
+        if is_loopback_host(hostname):
+            if host and not is_loopback_host(host):
+                hostname = host
+            else:
+                for alt in lan_fallback_hosts():
+                    return f"{scheme}://{alt}:{port}"
+
+        if hostname:
+            return f"{scheme}://{hostname}:{port}"
+    except Exception:
+        pass
+    return base
+
+
+def repair_connection_block(conn: dict, *, admin_lan_ip: str = "") -> tuple[dict, list[str]]:
+    """
+    Auto-fix stale loopback / wrong-port values when admin web runs on a different device.
+    Returns (repaired_connection_dict, list_of_human_notes).
+    """
+    out = dict(conn) if isinstance(conn, dict) else {}
+    notes: list[str] = []
+    db_host = str(out.get("app_db_host") or "").strip()
+
+    prev_base = str(out.get("app_server_base") or "").strip()
+    fixed_base = normalize_app_server_base_url(prev_base, db_host=db_host)
+    if fixed_base and fixed_base != prev_base.rstrip("/"):
+        out["app_server_base"] = fixed_base
+        if prev_base:
+            notes.append(f"app_server_base: {prev_base} → {fixed_base}")
+        else:
+            notes.append(f"app_server_base set to {fixed_base}")
+
+    if is_loopback_host(db_host):
+        for alt in lan_mysql_fallback_hosts():
+            if alt and not is_loopback_host(alt):
+                out["app_db_host"] = alt
+                notes.append(f"app_db_host was loopback; using LAN host {alt}")
+                db_host = alt
+                break
+
+    return out, notes
+
+
+def repair_settings_on_disk(settings_path: Path | None = None) -> list[str]:
+    """Persist connection + SMS public_base_url repairs. Returns log lines."""
+    path = settings_path or _SETTINGS_PATH
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    if not isinstance(raw, dict):
+        return []
+
+    conn = raw.get("connection") if isinstance(raw.get("connection"), dict) else {}
+    repaired_conn, notes = repair_connection_block(conn)
+    changed = repaired_conn != conn
+
+    sms = raw.get("sms") if isinstance(raw.get("sms"), dict) else {}
+    lan = guess_lan_ip()
+    public = str(sms.get("public_base_url") or "").strip().rstrip("/")
+    if lan and public:
+        try:
+            parsed = urlparse(public if "://" in public else f"http://{public}")
+            if is_loopback_host(parsed.hostname or ""):
+                port = parsed.port or 5000
+                fixed_public = f"http://{lan}:{port}"
+                sms = dict(sms)
+                sms["public_base_url"] = fixed_public
+                notes.append(f"public_base_url: {public} → {fixed_public}")
+                changed = True
+        except Exception:
+            pass
+    elif lan and not public:
+        sms = dict(sms)
+        sms["public_base_url"] = f"http://{lan}:5000"
+        notes.append(f"public_base_url set to http://{lan}:5000")
+        changed = True
+
+    if not changed:
+        return notes
+
+    raw["connection"] = repaired_conn
+    if sms:
+        raw["sms"] = sms
+    path.write_text(json.dumps(raw, indent=2), encoding="utf-8")
+    return notes
+
+
+def probe_app_server_http(timeout: float = 4.0) -> tuple[bool, str, str]:
+    """Quick GET admin_farmer_data.php on each candidate base. Returns (ok, base_used, error)."""
+    last_err = ""
+    for base in iter_app_server_bases():
+        url = f"{base.rstrip('/')}/api/admin_farmer_data.php"
+        try:
+            req = Request(url, headers={"Accept": "application/json"})
+            with urlopen(req, timeout=timeout) as resp:
+                raw = resp.read().decode("utf-8", errors="replace")
+            data = json.loads(raw) if raw else {}
+            if isinstance(data, dict) and data.get("ok") is True:
+                return True, base, ""
+            last_err = str(data.get("error") or data.get("detail") or f"Unexpected response from {url}")
+        except HTTPError as exc:
+            last_err = f"HTTP {exc.code} at {url}"
+        except URLError as exc:
+            last_err = f"Cannot reach {url}: {getattr(exc, 'reason', exc)}"
+        except Exception as exc:
+            last_err = str(exc)
+    cfg = app_server_base() or "(not set)"
+    return False, "", (
+        f"Cannot reach Beanthentic-App at {cfg} (port 8080). "
+        f"On the XAMPP PC run: python app.py. Last error: {last_err}"
+    )
+
+
 def iter_app_server_bases() -> list[str]:
-    """Primary app_server_base plus LAN alternates when settings still use localhost."""
-    primary = app_server_base()
+    """Beanthentic-App (:8080) URLs — app_db_host first, then configured base, then LAN fallbacks."""
+    conn = read_connection_settings()
+    db_host = str(conn.get("app_db_host") or "").strip()
+    primary = normalize_app_server_base_url(app_server_base(), db_host=db_host)
     bases: list[str] = []
     seen: set[str] = set()
 
@@ -110,17 +268,17 @@ def iter_app_server_bases() -> list[str]:
         seen.add(b)
         bases.append(b)
 
-    add(primary)
-
-    conn = read_connection_settings()
-    db_host = str(conn.get("app_db_host") or "").strip()
     if db_host and not is_loopback_host(db_host):
         add(f"http://{db_host}:8080")
+
+    add(primary)
 
     root = _read_settings_root()
     sms = root.get("sms") if isinstance(root.get("sms"), dict) else {}
     gw = sms.get("sms_gateway") if isinstance(sms.get("sms_gateway"), dict) else {}
-    add(str(gw.get("local_base_url") or "").strip().rstrip("/"))
+    gw_base = str(gw.get("local_base_url") or "").strip().rstrip("/")
+    if gw_base and gw_base != primary:
+        add(gw_base)
 
     if primary:
         try:

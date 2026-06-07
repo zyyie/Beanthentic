@@ -11,7 +11,7 @@ import os
 import re
 from pathlib import Path
 
-from flask import Flask, jsonify, redirect, request
+from flask import Flask, jsonify, redirect, request, make_response
 from sqlalchemy import text
 
 from config.app_connection import app_db_connect_timeout
@@ -43,7 +43,88 @@ configure_app_security(app)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
+
+@app.after_request
+def _add_cors_for_lan_api(response):
+    """Allow Beanthentic-App / phones on the same Wi‑Fi to call admin JSON APIs."""
+    try:
+        path = request.path or ""
+    except RuntimeError:
+        return response
+    if path.startswith("/api/") or path in ("/health", "/api/connection-status"):
+        origin = (request.headers.get("Origin") or "").strip()
+        if origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Vary"] = "Origin"
+        else:
+            response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = (
+            "Content-Type, Authorization, Accept, X-HTTP-Method-Override, X-Beanthentic-Client-Host"
+        )
+        response.headers["Access-Control-Max-Age"] = "86400"
+    return response
+
+
+@app.route("/api/connection-status", methods=["GET", "OPTIONS"])
+def api_connection_status():
+    """
+    Public LAN diagnostic — no admin login required.
+    Use from browser on admin PC or phone: http://<admin-LAN-IP>:5000/api/connection-status
+    """
+    if request.method == "OPTIONS":
+        return make_response("", 204)
+
+    from api.gi_contributions_api import probe_app_mysql, probe_gi_app_server
+    from config.app_connection import (
+        app_db_params,
+        app_server_base,
+        guess_lan_ip,
+        iter_app_server_bases,
+        read_connection_settings,
+    )
+
+    conn = read_connection_settings()
+    mysql_ok, mysql_err = probe_app_mysql(timeout=4.0)
+    http_ok, http_base, http_err = probe_gi_app_server(timeout=4.0)
+    admin_lan = guess_lan_ip()
+    bases = iter_app_server_bases()
+    payload = {
+        "ok": bool(http_ok or mysql_ok),
+        "admin_lan_ip": admin_lan or None,
+        "admin_port": int(os.getenv("PORT", "5000")),
+        "connection": conn,
+        "app_server_bases_tried": bases,
+        "mysql_reachable": mysql_ok,
+        "mysql_error": None if mysql_ok else mysql_err,
+        "http_reachable": http_ok,
+        "http_base": http_base or None,
+        "http_error": None if http_ok else http_err,
+        "app_server_base": app_server_base() or None,
+        "hint": (
+            "Beanthentic-App (phone) must use the SAME host as app_server_base on port 8080 — "
+            "not this admin port 5000. In the app: Server URL → http://<XAMPP-PC-IP>:8080"
+        ),
+    }
+    code = 200 if payload["ok"] else 503
+    return jsonify(payload), code
+
 SETTINGS_PATH = Path(__file__).resolve().parent / "settings.json"
+
+
+def _repair_cross_device_settings() -> None:
+    """Fix loopback / :5000 mistakes in settings.json when web.py runs on another PC."""
+    try:
+        from config.app_connection import repair_settings_on_disk
+
+        notes = repair_settings_on_disk(SETTINGS_PATH)
+        for line in notes:
+            print(f"[Beanthentic] Connection repair: {line}")
+    except Exception as exc:
+        print(f"[Beanthentic] Connection repair skipped: {exc}")
+
+
+_repair_cross_device_settings()
 
 
 def _read_settings() -> dict:
@@ -353,9 +434,13 @@ def connection_settings():
         elif not user or len(user) > 64 or not re.match(r"^[\w.\-]+$", user):
             form_error = "Database user must be 1–64 characters (letters, numbers, underscore, dot, hyphen)."
         else:
+            from config.app_connection import normalize_app_server_base_url
+
             server_base = (request.form.get("app_server_base") or "").strip().rstrip("/")
             if server_base and not server_base.startswith(("http://", "https://")):
-                form_error = "App server base URL must start with http:// or https://."
+                form_error = "App server base URL must start with http:// or https://"
+            else:
+                server_base = normalize_app_server_base_url(server_base, db_host=host)
 
         sms_enabled = request.form.get("sms_enabled") == "1"
         sms_provider = (request.form.get("sms_provider") or "auto").strip().lower()
@@ -448,10 +533,19 @@ def connection_settings():
             )
             return redirect("/connection-settings?saved=1")
 
+    from config.app_connection import guess_lan_ip, probe_app_server_http
+
     conn = _read_connection_settings()
     sms = _read_settings().get("sms")
     sms = sms if isinstance(sms, dict) else {}
     saved = (request.args.get("saved") or "").strip() == "1"
+    admin_lan = guess_lan_ip() or "(unknown — check Wi‑Fi)"
+    http_ok, http_used, http_err = probe_app_server_http(timeout=4.0)
+    probe_line = (
+        f"<p class='ok'>App server OK: <code>{http_used}</code></p>"
+        if http_ok
+        else f"<p style='color:#b91c1c;'>App server not reachable: {http_err}</p>"
+    )
     host = str(conn.get("app_db_host") or "")
     port = str(conn.get("app_db_port") or 3306)
     user = str(conn.get("app_db_user") or "root")
@@ -485,8 +579,11 @@ def connection_settings():
 </head>
 <body>
   <h1>Admin Web Connection Settings</h1>
-  <p>Ilagay dito ang IP ng device na may XAMPP + Beanthentic-App DB.</p>
+  <p>Ilagay dito ang IP ng device na may XAMPP + <code>python app.py</code> (port <strong>8080</strong>) — hindi ang admin port 5000.</p>
+  <p>Admin PC LAN IP (web.py): <code>{admin_lan}</code> — buksan <a href="/api/connection-status">/api/connection-status</a> para sa diagnostic.</p>
+  <p style="font-size:0.9rem;">Sa phone (Beanthentic-App): Server URL = <code>http://&lt;XAMPP-PC-IP&gt;:8080</code> (pareho sa <code>app_server_base</code> sa baba).</p>
   {"<div class='ok'>Saved. Re-run or refresh dashboard.</div>" if saved else ""}
+  {probe_line}
   {f"<div style='color:#b91c1c;margin-bottom:12px;'>{form_error}</div>" if form_error else ""}
   <form method="post">
     <label>App DB Host (IP)</label>
@@ -645,4 +742,33 @@ def health():
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
     debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
+    try:
+        from config.app_connection import (
+            app_server_base,
+            guess_lan_ip,
+            probe_app_server_http,
+            read_connection_settings,
+        )
+
+        lan = guess_lan_ip()
+        conn = read_connection_settings()
+        print("[Beanthentic] Cross-device setup:")
+        print(f"  Admin web (this PC): http://{lan or '127.0.0.1'}:{port}")
+        print(f"  app_db_host: {conn.get('app_db_host') or '(not set)'}")
+        print(f"  app_server_base: {app_server_base() or '(not set)'}")
+        http_ok, http_used, http_err = probe_app_server_http(timeout=5.0)
+        if http_ok:
+            print(f"  Beanthentic-App HTTP: OK @ {http_used}")
+        else:
+            print(f"  Beanthentic-App HTTP: FAIL — {http_err}")
+            print(
+                "  Fix: On the XAMPP PC run python app.py, then set app_server_base "
+                "in /connection-settings to http://<XAMPP-LAN-IP>:8080"
+            )
+        print(
+            f"  Phone Server URL must match app_server_base (port 8080), not admin :{port}."
+        )
+        print(f"  Diagnostic: http://{lan or '127.0.0.1'}:{port}/api/connection-status")
+    except Exception as boot_exc:
+        print(f"[Beanthentic] Startup diagnostic skipped: {boot_exc}")
     app.run(host="0.0.0.0", port=port, debug=debug, threaded=True)
