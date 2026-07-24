@@ -344,6 +344,213 @@ def _default_matcher(text_lower: str, term: str) -> bool:
     return bool(re.search(rf"(?<![a-z0-9]){re.escape(t)}(?![a-z0-9])", text_lower))
 
 
+# Kapeng Barako / Liberica identity — required for Ready on every zone.
+# Generic GI structure alone (history, soil, reputation, traceability) is not enough.
+KAPENG_BARAKO_IDENTITY_SIGNALS: list[str] = [
+    "kapeng barako",
+    "kape barako",
+    "lipa barako",
+    "batangas barako",
+    "barako coffee",
+    "coffea liberica",
+    "coffee liberica",
+    "liberica coffee",
+    "batangas liberica",
+    "lipa liberica",
+    "batangas coffee",
+    "lipa coffee",
+]
+
+# Must appear for Ready when a competing GI product is also mentioned.
+KAPENG_BARAKO_PRIMARY_SIGNALS: list[str] = [
+    "kapeng barako",
+    "kape barako",
+    "lipa barako",
+    "batangas barako",
+    "barako coffee",
+    "coffea liberica",
+    "coffee liberica",
+    "liberica coffee",
+]
+
+# Single-token cues that only count when paired with coffee / Batangas context.
+KAPENG_BARAKO_WEAK_TOKENS: list[str] = ["barako", "liberica"]
+
+# Other GI / specialty products that must not pass as Kapeng Barako filings.
+OFF_PRODUCT_SIGNALS: list[str] = [
+    "guimaras mango",
+    "guimaras mangoes",
+    "carabao mango",
+    "mangoes of guimaras",
+    "mango geographical indication",
+    "mango gi",
+    "mango growers",
+    "mango production",
+    "mango industry",
+    "mango-producing",
+    "mango producing",
+    "guimaras",
+    "mangoes",
+    " mango ",
+    "tnalak",
+    "t'nalak",
+    "tboli tnalak",
+    "t'boli",
+    "piña cloth",
+    "pina cloth",
+    "abel iloco",
+    "inabel",
+    "basey banig",
+    "bicol pili",
+    "pili nut",
+    "quezon lambanog",
+    "cebu dried mango",
+    "tabon-tabon",
+    "blue crab",
+    "bangus",
+    "dagupan bangus",
+    "south cotabato weaving",
+    "pineapple fiber",
+    "handwoven abaca",
+]
+
+
+def _collect_hits(text_lower: str, signals: Iterable[str], matcher: TermMatcher) -> list[str]:
+    hits: list[str] = []
+    for signal in signals:
+        sig = (signal or "").strip().lower()
+        if not sig:
+            continue
+        # Spaced sentinel tokens like " mango " need substring checks on padded text.
+        if sig.startswith(" ") or sig.endswith(" "):
+            padded = f" {text_lower} "
+            if sig in padded:
+                hits.append(sig.strip())
+            continue
+        if matcher(text_lower, sig):
+            hits.append(sig)
+    return hits
+
+
+def _occurrence_count(text_lower: str, phrases: Iterable[str]) -> int:
+    total = 0
+    padded = f" {text_lower} "
+    for phrase in phrases:
+        p = (phrase or "").strip().lower()
+        if not p:
+            continue
+        if " " in p or "-" in p:
+            total += text_lower.count(p)
+        else:
+            total += len(re.findall(rf"(?<![a-z0-9]){re.escape(p)}(?![a-z0-9])", text_lower))
+            if p == "mango":
+                total += padded.count(" mango ")
+    return total
+
+
+def assess_kapeng_barako_product_focus(
+    text: str,
+    *,
+    term_matches: TermMatcher | None = None,
+) -> dict:
+    """
+    Gate: this analyzer is for Kapeng Barako GI readiness only.
+
+    Documents that follow a GI outline for another product (e.g. Guimaras mangoes,
+    Tnalak) must be Not Ready even if structural themes look complete.
+
+    Uses the strict default matcher (not synonym expansion) so generic GI wording
+    cannot invent a false Kapeng Barako identity.
+    """
+    # Never use synonym-expanded matchers here — they can falsely treat other GI
+    # filings as Barako-related via shared terms like "origin" / "coffee".
+    matcher = _default_matcher
+    _ = term_matches  # retained for call-site compatibility
+    text_lower = (text or "").lower()
+
+    primary_hits = _collect_hits(text_lower, KAPENG_BARAKO_PRIMARY_SIGNALS, matcher)
+    identity_hits = list(primary_hits)
+    identity_hits.extend(_collect_hits(text_lower, KAPENG_BARAKO_IDENTITY_SIGNALS, matcher))
+    for token in KAPENG_BARAKO_WEAK_TOKENS:
+        if not matcher(text_lower, token):
+            continue
+        coffee_ctx = matcher(text_lower, "coffee") or matcher(text_lower, "kape") or matcher(
+            text_lower, "coffea"
+        )
+        geo_ctx = (
+            matcher(text_lower, "batangas")
+            or matcher(text_lower, "lipa")
+            or matcher(text_lower, "bacoffed")
+            or matcher(text_lower, "taal")
+        )
+        if coffee_ctx and geo_ctx:
+            identity_hits.append(token)
+
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    identity_hits = [h for h in identity_hits if not (h in seen or seen.add(h))]
+    seen_p: set[str] = set()
+    primary_hits = [h for h in primary_hits if not (h in seen_p or seen_p.add(h))]
+
+    off_hits = _collect_hits(text_lower, OFF_PRODUCT_SIGNALS, matcher)
+    # Extra hard tokens for mango / Guimaras even if list matching misses punctuation.
+    for hard in ("guimaras", "mango", "mangoes", "tnalak", "t'nalak"):
+        if hard in text_lower and hard not in off_hits and hard.replace("'", "") not in [
+            x.replace("'", "") for x in off_hits
+        ]:
+            if hard == "mango" and "mango" not in " ".join(off_hits):
+                # Avoid double-count noise from "mangoes" already hit
+                if "mangoes" not in off_hits and "guimaras mango" not in off_hits:
+                    off_hits.append("mango")
+            elif hard != "mango":
+                off_hits.append(hard)
+
+    has_primary = len(primary_hits) > 0
+    has_identity = len(identity_hits) > 0
+    has_off_product = len(off_hits) > 0
+    off_count = _occurrence_count(text_lower, off_hits or ["guimaras", "mango", "tnalak"])
+    primary_count = _occurrence_count(text_lower, primary_hits or KAPENG_BARAKO_PRIMARY_SIGNALS)
+
+    # Competing product is a hard reject unless Kapeng Barako is clearly primary.
+    if has_off_product and not has_primary:
+        wrong_product = True
+    elif has_off_product and has_primary and off_count >= primary_count:
+        wrong_product = True
+    else:
+        wrong_product = False
+
+    missing_identity = not has_identity
+    ok = has_identity and not wrong_product and not missing_identity
+
+    reason = ""
+    if wrong_product:
+        reason = (
+            "This document appears to describe another product "
+            f"({', '.join(off_hits[:5])}), not Kapeng Barako / Coffea liberica from Batangas. "
+            "The AI analysis only evaluates Geographical Indication readiness for Kapeng Barako. "
+            "A Guimaras mango, Tnalak, or other non-Barako filing cannot be graded Ready here."
+        )
+    elif missing_identity:
+        reason = (
+            "No clear Kapeng Barako / Liberica / Batangas coffee product identity was found. "
+            "A document may follow a GI outline (history, territory, production, control) but "
+            "still be Not Ready unless it is specifically about Kapeng Barako."
+        )
+
+    return {
+        "ok": ok,
+        "has_identity": has_identity,
+        "has_primary": has_primary,
+        "wrong_product": wrong_product,
+        "missing_identity": missing_identity,
+        "identity_hits": identity_hits[:8],
+        "primary_hits": primary_hits[:8],
+        "off_product_hits": off_hits[:8],
+        "reason": reason,
+        "label": "Kapeng Barako product focus",
+    }
+
+
 def _themes_for_task(task_id: str | None) -> list[dict]:
     if not task_id:
         return list(REFERENCE_THEMES)
@@ -382,6 +589,7 @@ def evaluate_against_reference(
     words = re.findall(r"[A-Za-z0-9']+", raw)
     word_count = len(words)
     themes = _themes_for_task(task_id)
+    product_focus = assess_kapeng_barako_product_focus(raw, term_matches=matcher)
 
     assessed: list[dict] = []
     for theme in themes:
@@ -399,6 +607,17 @@ def evaluate_against_reference(
             }
         )
 
+    # If the filing is not about Kapeng Barako, do not treat MoP themes as Ready coverage.
+    if not product_focus.get("ok"):
+        for theme in assessed:
+            if theme["coverage"] == "well_covered":
+                theme["coverage"] = "partial"
+            theme["evidence_signals"] = list(theme.get("evidence_signals") or [])
+            if product_focus.get("wrong_product"):
+                theme["evidence_signals"] = [
+                    f"blocked: wrong product ({', '.join((product_focus.get('off_product_hits') or [])[:3])})"
+                ] + theme["evidence_signals"][:6]
+
     critical = [t for t in assessed if t["critical"]]
     focus = critical or assessed
     missing_critical = [t for t in focus if t["coverage"] == "missing"]
@@ -409,7 +628,9 @@ def evaluate_against_reference(
     # Ready when critical themes for this upload zone are covered.
     # Short outline-style MoP sections (e.g. Specific Description, Control) can be
     # Ready when every required theme is well covered, even under 80 words.
-    if not focus:
+    if not product_focus.get("ok"):
+        status = "Not Ready"
+    elif not focus:
         status = "Not Ready"
     elif missing_critical:
         status = "Not Ready"
@@ -422,10 +643,16 @@ def evaluate_against_reference(
     else:
         status = "Ready"
 
+    # Hard gate: Kapeng Barako only — reject other GI products / missing identity.
+    if not product_focus.get("ok"):
+        status = "Not Ready"
+
     strengths = [t["label"] for t in strong]
     gaps = [t["label"] for t in assessed if t["coverage"] != "well_covered"]
     missing_labels = [t["label"] for t in assessed if t["coverage"] == "missing"]
     partial_labels = [t["label"] for t in assessed if t["coverage"] == "partial"]
+    if not product_focus.get("ok"):
+        missing_labels = [product_focus["label"], *missing_labels]
 
     doc_type = (task_id or "manual-of-specifications").replace("-", " ").title()
     narrative = _build_narrative(
@@ -436,9 +663,10 @@ def evaluate_against_reference(
         strengths=strengths,
         missing_labels=missing_labels,
         partial_labels=partial_labels,
+        product_focus=product_focus,
     )
 
-    improvements = _build_improvements(assessed, status)
+    improvements = _build_improvements(assessed, status, product_focus=product_focus)
 
     return {
         "status": status,
@@ -450,6 +678,7 @@ def evaluate_against_reference(
         "detected_features": strengths + [s for t in assessed for s in t["evidence_signals"][:2]],
         "improvements": improvements,
         "shap_analysis": narrative,
+        "product_focus": product_focus,
         "reference_source": (
             "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling "
             "for Batangas Kapeng Barako"
@@ -467,19 +696,40 @@ def _build_narrative(
     strengths: list[str],
     missing_labels: list[str],
     partial_labels: list[str],
+    product_focus: dict | None = None,
 ) -> str:
     ready = status == "Ready"
+    product_focus = product_focus or {}
     p1 = (
         f"<p>This review evaluates the uploaded <strong>{doc_type}</strong> document against the "
         f"Batangas Kapeng Barako Manual of Specifications drafting basis "
         f"(Part I Justification, Part II Technical description and production process, and "
         f"Part III–IV Control, Traceability, and Labelling). "
+        f"<strong>Scope:</strong> Kapeng Barako / Coffea liberica only — other GI products "
+        f"(for example Guimaras mangoes or Tnalak) are out of scope even if their document "
+        f"structure looks similar. "
         f"About <strong>{word_count:,}</strong> words were extracted for review. "
         f"Overall classification: <strong>{'Ready' if ready else 'Not Ready'}</strong> — "
         f"{'the text substantively addresses the critical MoP themes expected for this filing zone'
            if ready else
-           'critical MoP themes are still missing or only thinly addressed, so the document is not yet registration-ready'}.</p>"
+           'critical MoP themes are still missing, only thinly addressed, or the document is not about Kapeng Barako'}.</p>"
     )
+
+    if product_focus.get("reason"):
+        p_product = (
+            f"<p><strong>Product focus check failed:</strong> {product_focus['reason']} "
+            f"{'Identity cues found: none.' if not product_focus.get('identity_hits') else ''}"
+            f"{(' Competing product cues: <strong>' + ', '.join(product_focus.get('off_product_hits') or []) + '</strong>.') if product_focus.get('off_product_hits') else ''}"
+            "</p>"
+        )
+    elif product_focus.get("identity_hits"):
+        p_product = (
+            "<p><strong>Product focus check:</strong> Kapeng Barako / Liberica identity cues were "
+            f"detected ({', '.join(product_focus.get('identity_hits') or [])}). "
+            "The document is treated as a Kapeng Barako GI filing candidate.</p>"
+        )
+    else:
+        p_product = ""
 
     if strengths:
         p2 = (
@@ -515,7 +765,7 @@ def _build_narrative(
             + ". For GI examination, examiners look for a clear causal link to Batangas territory, "
             "Liberica morphological and sensory identity, a reproducible production process, "
             "BaCoFFed/PTWG control and traceability, and rules for the distinctive seal — "
-            "not just naming “Barako” or “Lipa”.</p>"
+            "not just naming “Barako” or “Lipa”, and not filings for unrelated GI goods.</p>"
         )
     else:
         p3 = (
@@ -537,11 +787,23 @@ def _build_narrative(
         f"<ul>{''.join(detail_rows)}</ul>"
     )
 
-    return p1 + p2 + p3 + p4
+    return p1 + p_product + p2 + p3 + p4
 
 
-def _build_improvements(assessed: Iterable[dict], status: str) -> list[str]:
+def _build_improvements(
+    assessed: Iterable[dict],
+    status: str,
+    *,
+    product_focus: dict | None = None,
+) -> list[str]:
     recs: list[str] = []
+    product_focus = product_focus or {}
+    if product_focus.get("reason"):
+        recs.append(product_focus["reason"])
+        recs.append(
+            "Replace or rewrite the document so it is specifically about Kapeng Barako "
+            "(Coffea liberica / Batangas–Lipa coffee), then re-run analysis."
+        )
     for t in assessed:
         if t["coverage"] == "well_covered":
             continue
@@ -552,7 +814,7 @@ def _build_improvements(assessed: Iterable[dict], status: str) -> list[str]:
             "Cross-check companion uploads so Part I reputation/history/link, Part II technical/"
             "process, and Part III–IV control/labelling remain consistent across the full package."
         )
-    else:
+    elif not product_focus.get("reason"):
         recs.append(
             "Revise using the Kapeng Barako MoP drafting package (PART 1, PART 2, and "
             "CONTROL & TRACEABILITY & LABELLING), then re-run analysis."

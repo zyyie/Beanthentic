@@ -1664,140 +1664,6 @@
     "ipophl_phase": "phase1",
     "task_id": "phase1-history"
   },
-  "df82c3d7-3657-4e74-ab3d-da238ed3f17b": {
-    "file_uuid": "df82c3d7-3657-4e74-ab3d-da238ed3f17b",
-    "original_filename": "Physical_link_to_the_territory.docx",
-    "file_path": "machinelearning/uploads/df82c3d7-3657-4e74-ab3d-da238ed3f17b.docx",
-    "file_type": ".docx",
-    "file_size": 1594373,
-    "ai_score": 100,
-    "ai_status": "Ready",
-    "detected_features": [
-      "Physical / causal link to the territory",
-      "volcanic",
-      "soil"
-    ],
-    "missing_requirements": [],
-    "analysis_method": "mop_reference_qualitative",
-    "text_length": 14727,
-    "shap_analysis": "<p>This review evaluates the uploaded <strong>Phase1 Physical Link</strong> document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About <strong>2,321</strong> words were extracted for review. Overall classification: <strong>Ready</strong> \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.</p><p><strong>What is already working:</strong> The document shows useful coverage of <strong>Physical / causal link to the territory</strong>. These sections align with how an approved GI specification presents product identity, territorial link, technical description, and/or control systems for Liberica Barako.</p><p><strong>Completeness:</strong> Critical themes appear adequately developed for this upload zone. Confirm companion documents still cover any Part I\u2013IV topics not expected in this single file.</p><p><strong>Theme-by-theme findings (MoP basis):</strong></p><ul><li><strong>Physical / causal link to the territory</strong> (Part I \u2014 Justification) \u2014 well covered. Expectation: Show how Batangas geography (volcanic soils, slope, climate Type I/III, elevation, rainfall) causally shapes Liberica quality \u2014 not just naming the place. Evidence cues found: volcanic, soil, climate, elevation.</li></ul>",
-    "score_breakdown": {
-      "analysis_mode": "mop_reference_qualitative",
-      "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako",
-      "final_score": 100,
-      "formula": "Qualitative MoP theme coverage (no keyword percentage)",
-      "sections": [
-        {
-          "id": "physical_link",
-          "label": "Physical / causal link to the territory",
-          "found": true,
-          "coverage": "well_covered",
-          "part": "Part I \u2014 Justification",
-          "expectation": "Show how Batangas geography (volcanic soils, slope, climate Type I/III, elevation, rainfall) causally shapes Liberica quality \u2014 not just naming the place.",
-          "evidence": [
-            "volcanic",
-            "soil",
-            "climate",
-            "elevation",
-            "slope",
-            "taal",
-            "physiography",
-            "suitability"
-          ]
-        }
-      ],
-      "sections_found": 1,
-      "sections_total": 1,
-      "improvements": [
-        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
-      ],
-      "terms": [
-        {
-          "term": "Physical / causal link to the territory",
-          "found": true,
-          "coverage": "well_covered"
-        }
-      ]
-    },
-    "ip_pillar_assessment": {
-      "pillars": [
-        {
-          "id": "trademark",
-          "label": "Trademark",
-          "scope": "Geographical indications, signs, labels, product names, branding, filing with the Bureau of Trademarks, publication, opposition, and GI registration.",
-          "status": "addressed",
-          "met": [
-            "Physical / causal link to the territory",
-            "volcanic",
-            "soil"
-          ],
-          "gaps": [],
-          "signal_detected": true,
-          "evidence": [
-            "\u2026oy, Tuy Tingloy and Cities of Tanauan, Batangas and Lipa. Figure _. Slope Map Soil Physiography Batangas Province is endowed with rich, volcanic soil above par in quality and easy to cultivate. The geographical formation of soil consists mostly of water-laid volcanic tuff. The tuffac\u2026",
-            "\u2026Mataasnakahoy, San Jose, San Juan, San Luis, Taysan, Tingloy, Tuy Tingloy and Cities of Tanauan, Batangas and Lipa. Figure _. Slope Map Soil Physiography Batangas Province is endowed with rich, volcanic soil above par in quality and easy to cultivate. The geographical formation\u2026"
-          ],
-          "narrative": "Trademark \u2014 Addressed. This upload provides clear support for the Trademark pillar under the IPOPHL four-pillar Geographical Indication framework. The following requirements were identified in the submitted text: Physical / causal link to the territory, volcanic, soil. Relevant passages from the document include: \u2026oy, Tuy Tingloy and Cities of Tanauan, Batangas and Lipa. Figure _. Slope Map Soil Physiography Batangas Province is endowed with rich, volcanic soil above par in quality and easy to cultivate. The geographical formation of soil consists mostly of water-laid volcanic tuff. The tuffac\u2026 Further supporting language was found where the file states: \u2026Mataasnakahoy, San Jose, San Juan, San Luis, Taysan, Tingloy, Tuy Tingloy and Cities of Tanauan, Batangas and Lipa. Figure _. Slope Map Soil Physiography Batangas Province is endowed with rich, volcanic soil above par in quality and easy to cultivate. The geographical formation\u2026 For Kapeng Barako / Lipa Barako GI registration, this satisfies examiner expectations for geographical indications, signs, labels, product names, branding, filing with the bureau of trademarks, publication, opposition, and gi registration. No immediate revision is required for this pillar in this specific upload."
-        },
-        {
-          "id": "copyright",
-          "label": "Copyright",
-          "scope": "Original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation.",
-          "status": "partial",
-          "met": [],
-          "gaps": [],
-          "signal_detected": true,
-          "evidence": [],
-          "narrative": "Copyright \u2014 Partially addressed. The document references Copyright-related content, but the evidence is not yet complete enough for this filing stage. To strengthen the Copyright pillar, expand sections that document original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation using consistent Kapeng Barako terminology and task-specific IPOPHL language."
-        },
-        {
-          "id": "industrial_design",
-          "label": "Industrial Design",
-          "scope": "Ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers.",
-          "status": "not_addressed",
-          "met": [],
-          "gaps": [],
-          "signal_detected": false,
-          "evidence": [],
-          "narrative": "Industrial Design \u2014 Not addressed. This upload does not yet contain sufficient documented support for the Industrial Design pillar. IPOPHL GI examiners will look for explicit evidence of ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers. Without this, the document may receive deficiency notices during formality or substantive review. Revise the file to include pillar-specific content before proceeding to Complete Registration."
-        },
-        {
-          "id": "patent",
-          "label": "Patent",
-          "scope": "Technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing.",
-          "status": "not_addressed",
-          "met": [],
-          "gaps": [],
-          "signal_detected": false,
-          "evidence": [],
-          "narrative": "Patent \u2014 Not addressed. This upload does not yet contain sufficient documented support for the Patent pillar. IPOPHL GI examiners will look for explicit evidence of technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing. Without this, the document may receive deficiency notices during formality or substantive review. Revise the file to include pillar-specific content before proceeding to Complete Registration."
-        }
-      ],
-      "ready_pillars": 1,
-      "partial_pillars": 1,
-      "gap_pillars": 2,
-      "pillar_total": 4,
-      "executive_summary": "This review evaluates the uploaded  Phase1 Physical Link  document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About  2,321  words were extracted for review. Overall classification:  Ready  \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.",
-      "recommendations": [
-        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
-      ],
-      "document_insights": {
-        "document_type": "Phase1 Physical Link",
-        "word_count": 2321,
-        "checklist_met": 1,
-        "checklist_total": 1,
-        "detected_features": [
-          "Physical / causal link to the territory"
-        ],
-        "missing_requirements": [],
-        "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako"
-      }
-    },
-    "upload_timestamp": "",
-    "analysis_timestamp": "2026-07-24T16:41:36.562454Z",
-    "ipophl_phase": "phase1",
-    "task_id": "phase1-physical-link"
-  },
   "2e510c67-b7d2-4eff-bd34-9f590d5c291b": {
     "file_uuid": "2e510c67-b7d2-4eff-bd34-9f590d5c291b",
     "original_filename": "TECHNICAL_-_General_Description.docx",
@@ -2485,53 +2351,78 @@
     "ipophl_phase": "phase3",
     "task_id": "phase3-control"
   },
-  "2da67bdb-d1af-4e8e-a113-37520d3dffa8": {
-    "file_uuid": "2da67bdb-d1af-4e8e-a113-37520d3dffa8",
+  "d16650c4-d379-4f30-894e-5ca658e69318": {
+    "file_uuid": "d16650c4-d379-4f30-894e-5ca658e69318",
     "original_filename": "Introduction__Reputation.docx",
-    "file_path": "machinelearning/uploads/2da67bdb-d1af-4e8e-a113-37520d3dffa8.docx",
+    "file_path": "machinelearning/uploads/d16650c4-d379-4f30-894e-5ca658e69318.docx",
     "file_type": ".docx",
     "file_size": 16603,
-    "ai_score": 100,
-    "ai_status": "Ready",
+    "ai_score": 50,
+    "ai_status": "Not Ready",
     "detected_features": [
-      "Introduction, reputation & origin",
-      "reputation",
-      "geographical indication"
+      "blocked: wrong product (guimaras mango, guimaras mangoes, mango growers)",
+      "reputation"
     ],
-    "missing_requirements": [],
+    "missing_requirements": [
+      "Kapeng Barako product focus"
+    ],
     "analysis_method": "mop_reference_qualitative",
     "text_length": 5216,
-    "shap_analysis": "<p>This review evaluates the uploaded <strong>Phase1 Introduction</strong> document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About <strong>828</strong> words were extracted for review. Overall classification: <strong>Ready</strong> \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.</p><p><strong>What is already working:</strong> The document shows useful coverage of <strong>Introduction, reputation & origin</strong>. These sections align with how an approved GI specification presents product identity, territorial link, technical description, and/or control systems for Liberica Barako.</p><p><strong>Completeness:</strong> Critical themes appear adequately developed for this upload zone. Confirm companion documents still cover any Part I\u2013IV topics not expected in this single file.</p><p><strong>Theme-by-theme findings (MoP basis):</strong></p><ul><li><strong>Introduction, reputation & origin</strong> (Part I \u2014 Justification) \u2014 well covered. Expectation: Explain why Batangas / Lipa Kapeng Barako deserves GI protection: product identity (Coffea liberica / Barako), geographic origin, and reputation among producers and consumers. Evidence cues found: reputation, geographical indication, geographical origin.</li></ul>",
+    "shap_analysis": "<p>This review evaluates the uploaded <strong>Phase1 Introduction</strong> document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). <strong>Scope:</strong> Kapeng Barako / Coffea liberica only \u2014 other GI products (for example Guimaras mangoes or Tnalak) are out of scope even if their document structure looks similar. About <strong>828</strong> words were extracted for review. Overall classification: <strong>Not Ready</strong> \u2014 critical MoP themes are still missing, only thinly addressed, or the document is not about Kapeng Barako.</p><p><strong>Product focus check failed:</strong> This document appears to describe another product (guimaras mango, guimaras mangoes, mango growers, mango industry, mango-producing), not Kapeng Barako / Coffea liberica from Batangas. The AI analysis only evaluates Geographical Indication readiness for Kapeng Barako. A Guimaras mango, Tnalak, or other non-Barako filing cannot be graded Ready here. Identity cues found: none. Competing product cues: <strong>guimaras mango, guimaras mangoes, mango growers, mango industry, mango-producing, guimaras, mangoes, mango</strong>.</p><p><strong>What is already working:</strong> Little substantive MoP content was detected. The file may be a draft outline, an unrelated attachment, or text that could not be extracted cleanly. Expand with concrete Kapeng Barako specifications drawn from the Part I\u2013IV reference package.</p><p><strong>Why it is not yet complete:</strong> fully missing: <strong>Kapeng Barako product focus</strong>; only partially developed: <strong>Introduction, reputation & origin</strong>. For GI examination, examiners look for a clear causal link to Batangas territory, Liberica morphological and sensory identity, a reproducible production process, BaCoFFed/PTWG control and traceability, and rules for the distinctive seal \u2014 not just naming \u201cBarako\u201d or \u201cLipa\u201d, and not filings for unrelated GI goods.</p><p><strong>Theme-by-theme findings (MoP basis):</strong></p><ul><li><strong>Introduction, reputation & origin</strong> (Part I \u2014 Justification) \u2014 partial. Expectation: Explain why Batangas / Lipa Kapeng Barako deserves GI protection: product identity (Coffea liberica / Barako), geographic origin, and reputation among producers and consumers. Evidence cues found: blocked: wrong product (guimaras mango, guimaras mangoes, mango growers), reputation, geographical indication, geographical origin.</li></ul>",
     "score_breakdown": {
       "analysis_mode": "mop_reference_qualitative",
       "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako",
-      "final_score": 100,
+      "final_score": 0,
       "formula": "Qualitative MoP theme coverage (no keyword percentage)",
       "sections": [
         {
           "id": "reputation_origin",
           "label": "Introduction, reputation & origin",
-          "found": true,
-          "coverage": "well_covered",
+          "found": false,
+          "coverage": "partial",
           "part": "Part I \u2014 Justification",
           "expectation": "Explain why Batangas / Lipa Kapeng Barako deserves GI protection: product identity (Coffea liberica / Barako), geographic origin, and reputation among producers and consumers.",
           "evidence": [
+            "blocked: wrong product (guimaras mango, guimaras mangoes, mango growers)",
             "reputation",
             "geographical indication",
             "geographical origin"
           ]
         }
       ],
-      "sections_found": 1,
+      "sections_found": 0,
       "sections_total": 1,
       "improvements": [
-        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
+        "This document appears to describe another product (guimaras mango, guimaras mangoes, mango growers, mango industry, mango-producing), not Kapeng Barako / Coffea liberica from Batangas. The AI analysis only evaluates Geographical Indication readiness for Kapeng Barako. A Guimaras mango, Tnalak, or other non-Barako filing cannot be graded Ready here.",
+        "Replace or rewrite the document so it is specifically about Kapeng Barako (Coffea liberica / Batangas\u2013Lipa coffee), then re-run analysis.",
+        "Strengthen \u00abIntroduction, reputation & origin\u00bb: Explain why Batangas / Lipa Kapeng Barako deserves GI protection: product identity (Coffea liberica / Barako), geographic origin, and reputation among producers and consumers."
       ],
+      "product_focus": {
+        "ok": false,
+        "has_identity": false,
+        "has_primary": false,
+        "wrong_product": true,
+        "missing_identity": true,
+        "identity_hits": [],
+        "primary_hits": [],
+        "off_product_hits": [
+          "guimaras mango",
+          "guimaras mangoes",
+          "mango growers",
+          "mango industry",
+          "mango-producing",
+          "guimaras",
+          "mangoes",
+          "mango"
+        ],
+        "reason": "This document appears to describe another product (guimaras mango, guimaras mangoes, mango growers, mango industry, mango-producing), not Kapeng Barako / Coffea liberica from Batangas. The AI analysis only evaluates Geographical Indication readiness for Kapeng Barako. A Guimaras mango, Tnalak, or other non-Barako filing cannot be graded Ready here.",
+        "label": "Kapeng Barako product focus"
+      },
       "terms": [
         {
           "term": "Introduction, reputation & origin",
           "found": true,
-          "coverage": "well_covered"
+          "coverage": "partial"
         }
       ]
     },
@@ -2541,19 +2432,21 @@
           "id": "trademark",
           "label": "Trademark",
           "scope": "Geographical indications, signs, labels, product names, branding, filing with the Bureau of Trademarks, publication, opposition, and GI registration.",
-          "status": "addressed",
+          "status": "partial",
           "met": [
-            "Introduction, reputation & origin",
-            "reputation",
-            "geographical indication"
+            "blocked: wrong product (guimaras mango, guimaras mangoes, mango growers)",
+            "reputation"
           ],
-          "gaps": [],
+          "gaps": [
+            "Kapeng Barako product focus",
+            "Introduction, reputation & origin"
+          ],
           "signal_detected": true,
           "evidence": [
             "\u2026e Philippines (IPOPHL). A geographical indication is a sign used on products that have a specific geographical origin and hold qualities or reputation that are due to that origin. Moreover, the qualities, characteristics or reputation of the product should be essentially due to the place o\u2026",
             "\u2026t-smelling aroma, thin seeds as well as peel (Eligio, 2017). The GMGPDC (the collective group) intends to register the Guimaras Mango as a Geographical Indication (GI) with the Intellectual Property Office of the Philippines (IPOPHL). A geographical indication is a sign used on products that have a sp\u2026"
           ],
-          "narrative": "Trademark \u2014 Addressed. This upload provides clear support for the Trademark pillar under the IPOPHL four-pillar Geographical Indication framework. The following requirements were identified in the submitted text: Introduction, reputation & origin, reputation, geographical indication. Relevant passages from the document include: \u2026e Philippines (IPOPHL). A geographical indication is a sign used on products that have a specific geographical origin and hold qualities or reputation that are due to that origin. Moreover, the qualities, characteristics or reputation of the product should be essentially due to the place o\u2026 Further supporting language was found where the file states: \u2026t-smelling aroma, thin seeds as well as peel (Eligio, 2017). The GMGPDC (the collective group) intends to register the Guimaras Mango as a Geographical Indication (GI) with the Intellectual Property Office of the Philippines (IPOPHL). A geographical indication is a sign used on products that have a sp\u2026 For Kapeng Barako / Lipa Barako GI registration, this satisfies examiner expectations for geographical indications, signs, labels, product names, branding, filing with the bureau of trademarks, publication, opposition, and gi registration. No immediate revision is required for this pillar in this specific upload."
+          "narrative": "Trademark \u2014 Partially addressed. The document references Trademark-related content, but the evidence is not yet complete enough for this filing stage. Items already present: blocked: wrong product (guimaras mango, guimaras mangoes, mango growers), reputation. The submission includes related wording such as: \u2026e Philippines (IPOPHL). A geographical indication is a sign used on products that have a specific geographical origin and hold qualities or reputation that are due to that origin. Moreover, the qualities, characteristics or reputation of the product should be essentially due to the place o\u2026 However, the following checklist items still need explicit coverage: Kapeng Barako product focus, Introduction, reputation & origin. IPOPHL formality and substantive examination typically require these to be stated clearly, not merely implied. To strengthen the Trademark pillar, expand sections that document geographical indications, signs, labels, product names, branding, filing with the bureau of trademarks, publication, opposition, and gi registration using consistent Kapeng Barako terminology and task-specific IPOPHL language."
         },
         {
           "id": "copyright",
@@ -2589,29 +2482,191 @@
           "narrative": "Patent \u2014 Partially addressed. The document references Patent-related content, but the evidence is not yet complete enough for this filing stage. To strengthen the Patent pillar, expand sections that document technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing using consistent Kapeng Barako terminology and task-specific IPOPHL language."
         }
       ],
-      "ready_pillars": 1,
-      "partial_pillars": 2,
+      "ready_pillars": 0,
+      "partial_pillars": 3,
       "gap_pillars": 1,
       "pillar_total": 4,
-      "executive_summary": "This review evaluates the uploaded  Phase1 Introduction  document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About  828  words were extracted for review. Overall classification:  Ready  \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.",
+      "executive_summary": "This review evaluates the uploaded  Phase1 Introduction  document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling).  Scope:  Kapeng Barako / Coffea liberica only \u2014 other GI products (for example Guimaras mangoes or Tnalak) are out of scope even if their document structure looks similar. About  828  words were extracted for review. Overall classification:  Not Ready  \u2014 critical MoP themes are still missing, only thinly addressed, or the document is not about Kapeng Barako.",
       "recommendations": [
-        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
+        "This document appears to describe another product (guimaras mango, guimaras mangoes, mango growers, mango industry, mango-producing), not Kapeng Barako / Coffea liberica from Batangas. The AI analysis only evaluates Geographical Indication readiness for Kapeng Barako. A Guimaras mango, Tnalak, or other non-Barako filing cannot be graded Ready here.",
+        "Replace or rewrite the document so it is specifically about Kapeng Barako (Coffea liberica / Batangas\u2013Lipa coffee), then re-run analysis.",
+        "Strengthen \u00abIntroduction, reputation & origin\u00bb: Explain why Batangas / Lipa Kapeng Barako deserves GI protection: product identity (Coffea liberica / Barako), geographic origin, and reputation among producers and consumers."
       ],
       "document_insights": {
         "document_type": "Phase1 Introduction",
         "word_count": 828,
-        "checklist_met": 1,
+        "checklist_met": 0,
         "checklist_total": 1,
-        "detected_features": [
-          "Introduction, reputation & origin"
+        "detected_features": [],
+        "missing_requirements": [
+          "Kapeng Barako product focus"
         ],
-        "missing_requirements": [],
         "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako"
       }
     },
     "upload_timestamp": "",
-    "analysis_timestamp": "2026-07-24T16:46:39.049931",
+    "analysis_timestamp": "2026-07-24T19:52:06.444631",
     "ipophl_phase": "phase1",
     "task_id": "phase1-introduction"
+  },
+  "b21dd9b5-d757-4d0d-affd-84670b32be79": {
+    "file_uuid": "b21dd9b5-d757-4d0d-affd-84670b32be79",
+    "original_filename": "Physical_Link.docx",
+    "file_path": "machinelearning/uploads/b21dd9b5-d757-4d0d-affd-84670b32be79.docx",
+    "file_type": ".docx",
+    "file_size": 397703,
+    "ai_score": 50,
+    "ai_status": "Not Ready",
+    "detected_features": [
+      "blocked: wrong product (guimaras mango, mango growers, mango production)",
+      "soil"
+    ],
+    "missing_requirements": [
+      "Kapeng Barako product focus"
+    ],
+    "analysis_method": "mop_reference_qualitative",
+    "text_length": 6272,
+    "shap_analysis": "<p>This review evaluates the uploaded <strong>Phase1 Physical Link</strong> document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). <strong>Scope:</strong> Kapeng Barako / Coffea liberica only \u2014 other GI products (for example Guimaras mangoes or Tnalak) are out of scope even if their document structure looks similar. About <strong>1,029</strong> words were extracted for review. Overall classification: <strong>Not Ready</strong> \u2014 critical MoP themes are still missing, only thinly addressed, or the document is not about Kapeng Barako.</p><p><strong>Product focus check failed:</strong> This document appears to describe another product (guimaras mango, mango growers, mango production, guimaras, mangoes), not Kapeng Barako / Coffea liberica from Batangas. The AI analysis only evaluates Geographical Indication readiness for Kapeng Barako. A Guimaras mango, Tnalak, or other non-Barako filing cannot be graded Ready here. Identity cues found: none. Competing product cues: <strong>guimaras mango, mango growers, mango production, guimaras, mangoes, mango</strong>.</p><p><strong>What is already working:</strong> Little substantive MoP content was detected. The file may be a draft outline, an unrelated attachment, or text that could not be extracted cleanly. Expand with concrete Kapeng Barako specifications drawn from the Part I\u2013IV reference package.</p><p><strong>Why it is not yet complete:</strong> fully missing: <strong>Kapeng Barako product focus</strong>; only partially developed: <strong>Physical / causal link to the territory</strong>. For GI examination, examiners look for a clear causal link to Batangas territory, Liberica morphological and sensory identity, a reproducible production process, BaCoFFed/PTWG control and traceability, and rules for the distinctive seal \u2014 not just naming \u201cBarako\u201d or \u201cLipa\u201d, and not filings for unrelated GI goods.</p><p><strong>Theme-by-theme findings (MoP basis):</strong></p><ul><li><strong>Physical / causal link to the territory</strong> (Part I \u2014 Justification) \u2014 partial. Expectation: Show how Batangas geography (volcanic soils, slope, climate Type I/III, elevation, rainfall) causally shapes Liberica quality \u2014 not just naming the place. Evidence cues found: blocked: wrong product (guimaras mango, mango growers, mango production), soil, climate, elevation.</li></ul>",
+    "score_breakdown": {
+      "analysis_mode": "mop_reference_qualitative",
+      "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako",
+      "final_score": 0,
+      "formula": "Qualitative MoP theme coverage (no keyword percentage)",
+      "sections": [
+        {
+          "id": "physical_link",
+          "label": "Physical / causal link to the territory",
+          "found": false,
+          "coverage": "partial",
+          "part": "Part I \u2014 Justification",
+          "expectation": "Show how Batangas geography (volcanic soils, slope, climate Type I/III, elevation, rainfall) causally shapes Liberica quality \u2014 not just naming the place.",
+          "evidence": [
+            "blocked: wrong product (guimaras mango, mango growers, mango production)",
+            "soil",
+            "climate",
+            "elevation",
+            "rainfall",
+            "slope",
+            "suitability"
+          ]
+        }
+      ],
+      "sections_found": 0,
+      "sections_total": 1,
+      "improvements": [
+        "This document appears to describe another product (guimaras mango, mango growers, mango production, guimaras, mangoes), not Kapeng Barako / Coffea liberica from Batangas. The AI analysis only evaluates Geographical Indication readiness for Kapeng Barako. A Guimaras mango, Tnalak, or other non-Barako filing cannot be graded Ready here.",
+        "Replace or rewrite the document so it is specifically about Kapeng Barako (Coffea liberica / Batangas\u2013Lipa coffee), then re-run analysis.",
+        "Strengthen \u00abPhysical / causal link to the territory\u00bb: Show how Batangas geography (volcanic soils, slope, climate Type I/III, elevation, rainfall) causally shapes Liberica quality \u2014 not just naming the place."
+      ],
+      "product_focus": {
+        "ok": false,
+        "has_identity": false,
+        "has_primary": false,
+        "wrong_product": true,
+        "missing_identity": true,
+        "identity_hits": [],
+        "primary_hits": [],
+        "off_product_hits": [
+          "guimaras mango",
+          "mango growers",
+          "mango production",
+          "guimaras",
+          "mangoes",
+          "mango"
+        ],
+        "reason": "This document appears to describe another product (guimaras mango, mango growers, mango production, guimaras, mangoes), not Kapeng Barako / Coffea liberica from Batangas. The AI analysis only evaluates Geographical Indication readiness for Kapeng Barako. A Guimaras mango, Tnalak, or other non-Barako filing cannot be graded Ready here.",
+        "label": "Kapeng Barako product focus"
+      },
+      "terms": [
+        {
+          "term": "Physical / causal link to the territory",
+          "found": true,
+          "coverage": "partial"
+        }
+      ]
+    },
+    "ip_pillar_assessment": {
+      "pillars": [
+        {
+          "id": "trademark",
+          "label": "Trademark",
+          "scope": "Geographical indications, signs, labels, product names, branding, filing with the Bureau of Trademarks, publication, opposition, and GI registration.",
+          "status": "partial",
+          "met": [
+            "soil"
+          ],
+          "gaps": [
+            "Kapeng Barako product focus",
+            "Physical / causal link to the territory"
+          ],
+          "signal_detected": true,
+          "evidence": [
+            "\u2026o trees. Mango trees in low lying areas with poor drainage and subjected to floods is prone to disease infection generally die quickly. B. Soil The combination of calcareous and loamy soils contributes to the good quality of the Guimaras mango. Gravelly loam is the major soil type,\u2026",
+            "\u2026ink to the territory A. Topography and Slope The topography of Guimaras Island varies from flat to steeply sloping, with land elevation ranging from 0 to nearly 300 meters above sea level. The moderately undulating and rolling to steeply sloping topography and elevation of the isl\u2026"
+          ],
+          "narrative": "Trademark \u2014 Partially addressed. The document references Trademark-related content, but the evidence is not yet complete enough for this filing stage. Items already present: soil. The submission includes related wording such as: \u2026o trees. Mango trees in low lying areas with poor drainage and subjected to floods is prone to disease infection generally die quickly. B. Soil The combination of calcareous and loamy soils contributes to the good quality of the Guimaras mango. Gravelly loam is the major soil type,\u2026 However, the following checklist items still need explicit coverage: Kapeng Barako product focus, Physical / causal link to the territory. IPOPHL formality and substantive examination typically require these to be stated clearly, not merely implied. To strengthen the Trademark pillar, expand sections that document geographical indications, signs, labels, product names, branding, filing with the bureau of trademarks, publication, opposition, and gi registration using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        },
+        {
+          "id": "copyright",
+          "label": "Copyright",
+          "scope": "Original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation.",
+          "status": "not_addressed",
+          "met": [],
+          "gaps": [],
+          "signal_detected": false,
+          "evidence": [],
+          "narrative": "Copyright \u2014 Not addressed. This upload does not yet contain sufficient documented support for the Copyright pillar. IPOPHL GI examiners will look for explicit evidence of original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation. Without this, the document may receive deficiency notices during formality or substantive review. Revise the file to include pillar-specific content before proceeding to Complete Registration."
+        },
+        {
+          "id": "industrial_design",
+          "label": "Industrial Design",
+          "scope": "Ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers.",
+          "status": "not_addressed",
+          "met": [],
+          "gaps": [],
+          "signal_detected": false,
+          "evidence": [],
+          "narrative": "Industrial Design \u2014 Not addressed. This upload does not yet contain sufficient documented support for the Industrial Design pillar. IPOPHL GI examiners will look for explicit evidence of ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers. Without this, the document may receive deficiency notices during formality or substantive review. Revise the file to include pillar-specific content before proceeding to Complete Registration."
+        },
+        {
+          "id": "patent",
+          "label": "Patent",
+          "scope": "Technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing.",
+          "status": "addressed",
+          "met": [
+            "blocked: wrong product (guimaras mango, mango growers, mango production)"
+          ],
+          "gaps": [],
+          "signal_detected": false,
+          "evidence": [],
+          "narrative": "Patent \u2014 Addressed. This upload provides clear support for the Patent pillar under the IPOPHL four-pillar Geographical Indication framework. The following requirements were identified in the submitted text: blocked: wrong product (guimaras mango, mango growers, mango production). For Kapeng Barako / Lipa Barako GI registration, this satisfies examiner expectations for technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing. No immediate revision is required for this pillar in this specific upload."
+        }
+      ],
+      "ready_pillars": 1,
+      "partial_pillars": 1,
+      "gap_pillars": 2,
+      "pillar_total": 4,
+      "executive_summary": "This review evaluates the uploaded  Phase1 Physical Link  document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling).  Scope:  Kapeng Barako / Coffea liberica only \u2014 other GI products (for example Guimaras mangoes or Tnalak) are out of scope even if their document structure looks similar. About  1,029  words were extracted for review. Overall classification:  Not Ready  \u2014 critical MoP themes are still missing, only thinly addressed, or the document is not about Kapeng Barako.",
+      "recommendations": [
+        "This document appears to describe another product (guimaras mango, mango growers, mango production, guimaras, mangoes), not Kapeng Barako / Coffea liberica from Batangas. The AI analysis only evaluates Geographical Indication readiness for Kapeng Barako. A Guimaras mango, Tnalak, or other non-Barako filing cannot be graded Ready here.",
+        "Replace or rewrite the document so it is specifically about Kapeng Barako (Coffea liberica / Batangas\u2013Lipa coffee), then re-run analysis.",
+        "Strengthen \u00abPhysical / causal link to the territory\u00bb: Show how Batangas geography (volcanic soils, slope, climate Type I/III, elevation, rainfall) causally shapes Liberica quality \u2014 not just naming the place."
+      ],
+      "document_insights": {
+        "document_type": "Phase1 Physical Link",
+        "word_count": 1029,
+        "checklist_met": 0,
+        "checklist_total": 1,
+        "detected_features": [],
+        "missing_requirements": [
+          "Kapeng Barako product focus"
+        ],
+        "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako"
+      }
+    },
+    "upload_timestamp": "",
+    "analysis_timestamp": "2026-07-24T19:53:53.727392",
+    "ipophl_phase": "phase1",
+    "task_id": "phase1-physical-link"
   }
 }

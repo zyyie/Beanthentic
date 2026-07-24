@@ -94,9 +94,10 @@ class IPOPHLAnalyzer {
 
         const zoneTaskId = (container && container.id) ? container.id.replace(/-files$/, '') : (doc.task_id || '');
         const fileItem = document.createElement('div');
-        fileItem.className = 'file-item success ai-enhanced';
+        fileItem.className = this.fileItemClassForStatus(doc.ai_status);
         fileItem.dataset.fileUuid = doc.file_uuid;
         fileItem.dataset.taskId = zoneTaskId || doc.task_id || '';
+        fileItem.dataset.aiStatus = String(doc.ai_status || '').trim();
         const meta = doc.ai_status
             ? `AI review · ${doc.ai_status}`
             : this.formatFileSize(doc.file_size || 0);
@@ -122,8 +123,39 @@ class IPOPHLAnalyzer {
         container.appendChild(fileItem);
     }
 
-    updateCardWithAI(card, doc) {
+    isAiReadyStatus(status) {
+        return String(status || '').trim().toLowerCase() === 'ready';
+    }
+
+    fileItemClassForStatus(status) {
+        if (this.isAiReadyStatus(status)) {
+            return 'file-item success ai-enhanced';
+        }
+        if (String(status || '').trim()) {
+            return 'file-item not-ready ai-not-ready ai-enhanced';
+        }
+        return 'file-item ai-enhanced';
+    }
+
+    applyAiStatusToCard(card, status) {
+        if (!card) return;
+        const ready = this.isAiReadyStatus(status);
+        card.classList.remove('success', 'not-ready', 'ai-not-ready', 'error', 'uploading', 'pending');
         card.classList.add('ai-enhanced');
+        if (ready) {
+            card.classList.add('success');
+        } else if (String(status || '').trim()) {
+            card.classList.add('not-ready', 'ai-not-ready');
+        }
+        card.dataset.aiStatus = String(status || '').trim();
+        const meta = card.querySelector('.file-meta');
+        if (meta && String(status || '').trim()) {
+            meta.textContent = `AI review · ${status}`;
+        }
+    }
+
+    updateCardWithAI(card, doc) {
+        this.applyAiStatusToCard(card, doc.ai_status);
         if (doc.file_uuid) {
             card.dataset.fileUuid = doc.file_uuid;
         }
@@ -1153,6 +1185,25 @@ class IPOPHLAnalyzer {
                 
                 // Refresh display
                 this.displayAnalysisResults(result.analysis);
+
+                // Keep the file list card accent in sync with Ready / Not Ready
+                const uuid = this.currentFile?.file_uuid;
+                if (uuid) {
+                    const card = document.querySelector(
+                        `#ipophl-module .file-item[data-file-uuid="${uuid}"]`
+                    );
+                    this.applyAiStatusToCard(card, result.analysis?.status);
+                    if (window.dashboardApp?.ipophlFiles) {
+                        Object.keys(window.dashboardApp.ipophlFiles).forEach((taskId) => {
+                            (window.dashboardApp.ipophlFiles[taskId] || []).forEach((f) => {
+                                if (String(f.id || f.file_uuid || '') === String(uuid)) {
+                                    f.ai_status = result.analysis?.status;
+                                }
+                            });
+                        });
+                    }
+                    this.refreshDashboardIndicator();
+                }
                 
                 // Show success message
                 this.showToast('Analysis refreshed successfully', 'success');

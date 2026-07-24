@@ -105,6 +105,7 @@ window.beanthenticParseJsonResponse = beanthenticParseJsonResponse;
 class DashboardApp {
   constructor() {
     this.data = [];
+    this.farmersData = [];
     this.filteredData = [];
     // Database is now the source of truth; keep a very high cap
     // so admin-added rows are visible in the dashboard.
@@ -2285,8 +2286,25 @@ class DashboardApp {
     }
 
     const addBtn = document.getElementById('coffeePricelistAddBtn');
-    if (addBtn) {
-      addBtn.addEventListener('click', () => this.promptAddPricelistRow());
+    if (addBtn) addBtn.remove();
+
+    const farmerSelect = document.getElementById('coffeePricingSelfSaleFarmerSelect');
+    const selfSaleToggle = document.getElementById('coffeePricingSelfSaleToggle');
+    if (farmerSelect) {
+      farmerSelect.addEventListener('change', () => {
+        this.syncCoffeePricingSelfSaleControls(Number(farmerSelect.value || 0));
+      });
+    }
+    if (selfSaleToggle) {
+      selfSaleToggle.addEventListener('change', async () => {
+        const fid = Number((farmerSelect && farmerSelect.value) || 0);
+        if (fid < 1) {
+          selfSaleToggle.checked = false;
+          return;
+        }
+        const farmerRow = (this.data || []).find((f) => this.farmerIdFromRow(f) === fid) || { farmer_id: fid };
+        await this.setFarmerSelfSale(fid, selfSaleToggle.checked, farmerRow);
+      });
     }
 
     const prevBtn = document.getElementById('coffeePricelistPrevBtn');
@@ -2321,15 +2339,15 @@ class DashboardApp {
     const pricelistBody = document.getElementById('coffeePricelistBody');
     if (pricelistBody) {
       pricelistBody.addEventListener('click', (e) => {
+        const editBtn = e.target.closest('[data-pricelist-edit]');
         const saveBtn = e.target.closest('[data-pricelist-save]');
-        const deleteBtn = e.target.closest('[data-pricelist-delete]');
+        if (editBtn) {
+          const row = editBtn.closest('tr');
+          if (row) this.setPricelistRowEditing(row, true);
+        }
         if (saveBtn) {
           const row = saveBtn.closest('tr');
           if (row) this.savePricelistRow(row);
-        }
-        if (deleteBtn) {
-          const priceId = Number(deleteBtn.dataset.pricelistDelete || 0);
-          if (priceId > 0) this.deactivatePricelistRow(priceId);
         }
       });
     }
@@ -2347,6 +2365,7 @@ class DashboardApp {
         }
       });
     }
+    this.syncCoffeePricingSelfSaleControls();
   }
 
   formatPhpAmount(value) {
@@ -2363,6 +2382,63 @@ class DashboardApp {
 
   async loadCoffeePricingData() {
     await Promise.all([this.loadCoffeePricelist(), this.loadCoffeePricingApplications()]);
+    this.syncCoffeePricingSelfSaleControls();
+  }
+
+  syncCoffeePricingSelfSaleControls(selectedFarmerId = null) {
+    const farmerSelect = document.getElementById('coffeePricingSelfSaleFarmerSelect');
+    const selfSaleToggle = document.getElementById('coffeePricingSelfSaleToggle');
+    const statusEl = document.getElementById('coffeePricingSelfSaleStatus');
+    if (!farmerSelect || !selfSaleToggle || !statusEl) return;
+
+    const rows = Array.isArray(this.data) ? this.data : [];
+    const previous = Number(selectedFarmerId || farmerSelect.value || 0);
+    const options = rows
+      .map((row) => ({
+        id: this.farmerIdFromRow(row),
+        name:
+          this.getValue(row, ['NAME OF FARMER', 'name']) ||
+          [this.getValue(row, ['FIRST NAME', 'first_name']), this.getValue(row, ['LAST NAME', 'last_name'])]
+            .filter(Boolean)
+            .join(' ')
+            .trim(),
+      }))
+      .filter((item) => item.id > 0);
+
+    const seen = new Set();
+    const uniqueOptions = options.filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+
+    farmerSelect.innerHTML = `<option value="">Select farmer</option>${uniqueOptions
+      .map((item) => `<option value="${item.id}">${this.escapeHtml(item.name || `Farmer #${item.id}`)}</option>`)
+      .join('')}`;
+
+    const targetId = uniqueOptions.some((o) => o.id === previous)
+      ? previous
+      : uniqueOptions.length
+        ? uniqueOptions[0].id
+        : 0;
+    farmerSelect.value = targetId ? String(targetId) : '';
+
+    const row = rows.find((f) => this.farmerIdFromRow(f) === Number(targetId));
+    const enabled = row
+      ? row.self_sale_enabled === true || row.self_sale_enabled === 'true' || row.self_sale_enabled === 1
+      : false;
+    selfSaleToggle.disabled = !targetId;
+    selfSaleToggle.checked = enabled;
+
+    if (!targetId) {
+      statusEl.textContent = 'No farmer records loaded yet.';
+      statusEl.classList.remove('is-enabled');
+      return;
+    }
+    statusEl.textContent = enabled
+      ? 'Self-sale enabled for selected farmer.'
+      : 'Self-sale disabled for selected farmer.';
+    statusEl.classList.toggle('is-enabled', enabled);
   }
 
   async loadCoffeePricelist() {
@@ -2370,8 +2446,8 @@ class DashboardApp {
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="6" class="transactions-loading-cell">Loading pricelist...</td></tr>';
     try {
-      const res = await fetch('/api/coffee-pricelist?include_inactive=1', { credentials: 'same-origin' });
-      const data = await res.json();
+      const res = await fetch('/api/coffee-pricelist', { credentials: 'same-origin' });
+      const data = await beanthenticParseJsonResponse(res);
       if (!res.ok || !data.ok) throw new Error(data.error || 'Could not load pricelist.');
       this.coffeePricelistOptions = data.options || {};
       this.coffeePricelistItems = Array.isArray(data.items) ? data.items : [];
@@ -2408,22 +2484,32 @@ class DashboardApp {
     const tbody = document.getElementById('coffeePricelistBody');
     if (!tbody) return;
     const allItems = Array.isArray(items) ? items : [];
-    this.coffeePricelistItems = allItems;
-    const varieties = (this.coffeePricelistOptions && this.coffeePricelistOptions.varieties) || ['liberica', 'excelsa', 'robusta'];
+    // Official list: one active row per variety only (Liberica / Excelsa / Robusta).
+    const byVariety = new Map();
+    allItems.forEach((item) => {
+      if (item && item.is_active === false) return;
+      const v = String(item.variety || '').toLowerCase();
+      if (!v || byVariety.has(v)) return;
+      byVariety.set(v, item);
+    });
+    const preferred = ['liberica', 'excelsa', 'robusta']
+      .map((v) => byVariety.get(v))
+      .filter(Boolean);
+    this.coffeePricelistItems = preferred.length ? preferred : allItems.filter((i) => i.is_active !== false);
     const beanTypes = (this.coffeePricelistOptions && this.coffeePricelistOptions.bean_types) || ['gcb', 'roasted'];
     const gcbClasses = (this.coffeePricelistOptions && this.coffeePricelistOptions.gcb) || [];
     const roastedClasses = (this.coffeePricelistOptions && this.coffeePricelistOptions.roasted) || [];
 
-    this.updateCoffeePricelistPagination(allItems.length);
+    this.updateCoffeePricelistPagination(this.coffeePricelistItems.length);
 
-    if (!allItems.length) {
-      tbody.innerHTML = '<tr><td colspan="6">No pricelist rows yet. Click “Add price row”.</td></tr>';
+    if (!this.coffeePricelistItems.length) {
+      tbody.innerHTML = '<tr><td colspan="6">No official pricelist rows yet. Refresh after server seed.</td></tr>';
       return;
     }
 
     const pageSize = this.coffeePricelistPageSize || 5;
     const start = (this.coffeePricelistCurrentPage - 1) * pageSize;
-    const pageItems = allItems.slice(start, start + pageSize);
+    const pageItems = this.coffeePricelistItems.slice(start, start + pageSize);
 
     tbody.innerHTML = pageItems.map((item) => {
       const priceId = Number(item.price_id || 0);
@@ -2432,48 +2518,39 @@ class DashboardApp {
         '<option value="">Default</option>',
         ...clsOptions.map((c) => `<option value="${this.escapeHtml(c)}"${c === item.classification ? ' selected' : ''}>${this.escapeHtml(this.formatPricingLabel(c))}</option>`),
       ].join('');
-      return `<tr data-price-id="${priceId}">
+      return `<tr data-price-id="${priceId}" data-editing="0">
         <td>
-          <select class="pricelist-inline-input" data-field="variety">
-            ${varieties.map((v) => `<option value="${v}"${v === item.variety ? ' selected' : ''}>${this.escapeHtml(this.formatPricingLabel(v))}</option>`).join('')}
-          </select>
+          <span class="pricelist-locked-value">${this.escapeHtml(this.formatPricingLabel(item.variety))}</span>
+          <input type="hidden" data-field="variety" value="${this.escapeHtml(item.variety || '')}" />
         </td>
         <td>
-          <select class="pricelist-inline-input" data-field="bean_type">
+          <select class="pricelist-inline-input" data-field="bean_type" disabled>
             ${beanTypes.map((t) => `<option value="${t}"${t === item.bean_type ? ' selected' : ''}>${this.escapeHtml(t.toUpperCase())}</option>`).join('')}
           </select>
         </td>
-        <td><select class="pricelist-inline-input" data-field="classification">${clsSelect}</select></td>
-        <td><input type="number" step="0.01" min="0" class="pricelist-inline-input" data-field="price_per_kg" value="${Number(item.price_per_kg || 0)}" /></td>
-        <td><input type="text" class="pricelist-inline-input" data-field="notes" value="${this.escapeHtml(item.notes || '')}" /></td>
+        <td><select class="pricelist-inline-input" data-field="classification" disabled>${clsSelect}</select></td>
+        <td><input type="number" step="0.01" min="0" class="pricelist-inline-input" data-field="price_per_kg" value="${Number(item.price_per_kg || 0)}" disabled /></td>
+        <td><input type="text" class="pricelist-inline-input" data-field="notes" value="${this.escapeHtml(item.notes || '')}" disabled /></td>
         <td>
           <div class="pricing-action-group">
-            <button type="button" class="btn btn-primary btn-sm" data-pricelist-save>Save</button>
-            ${item.is_active === false ? '' : `<button type="button" class="btn btn-primary btn-sm" data-pricelist-delete="${priceId}">Deactivate</button>`}
+            <button type="button" class="btn btn-secondary btn-sm" data-pricelist-edit>Edit</button>
+            <button type="button" class="btn btn-primary btn-sm" data-pricelist-save hidden>Save</button>
           </div>
         </td>
       </tr>`;
     }).join('');
   }
 
-  promptAddPricelistRow() {
-    const tbody = document.getElementById('coffeePricelistBody');
-    if (!tbody) return;
-    this.coffeePricelistCurrentPage = 1;
-    this.renderCoffeePricelistTable(this.coffeePricelistItems || []);
-    const varieties = (this.coffeePricelistOptions && this.coffeePricelistOptions.varieties) || ['liberica', 'excelsa', 'robusta'];
-    const beanTypes = (this.coffeePricelistOptions && this.coffeePricelistOptions.bean_types) || ['gcb', 'roasted'];
-    const row = document.createElement('tr');
-    row.dataset.priceId = '0';
-    row.innerHTML = `
-      <td><select class="pricelist-inline-input" data-field="variety">${varieties.map((v) => `<option value="${v}">${this.escapeHtml(this.formatPricingLabel(v))}</option>`).join('')}</select></td>
-      <td><select class="pricelist-inline-input" data-field="bean_type">${beanTypes.map((t) => `<option value="${t}">${t.toUpperCase()}</option>`).join('')}</select></td>
-      <td><select class="pricelist-inline-input" data-field="classification"><option value="">Default</option></select></td>
-      <td><input type="number" step="0.01" min="0" class="pricelist-inline-input" data-field="price_per_kg" value="150" /></td>
-      <td><input type="text" class="pricelist-inline-input" data-field="notes" value="" /></td>
-      <td><div class="pricing-action-group"><button type="button" class="btn btn-primary btn-sm" data-pricelist-save>Save</button></div></td>`;
-    if (tbody.querySelector('.transactions-loading-cell')) tbody.innerHTML = '';
-    tbody.prepend(row);
+  setPricelistRowEditing(row, editing) {
+    if (!row) return;
+    row.dataset.editing = editing ? '1' : '0';
+    row.querySelectorAll('.pricelist-inline-input').forEach((el) => {
+      el.disabled = !editing;
+    });
+    const editBtn = row.querySelector('[data-pricelist-edit]');
+    const saveBtn = row.querySelector('[data-pricelist-save]');
+    if (editBtn) editBtn.hidden = !!editing;
+    if (saveBtn) saveBtn.hidden = !editing;
   }
 
   readPricelistRow(row) {
@@ -2501,28 +2578,13 @@ class DashboardApp {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const data = await beanthenticParseJsonResponse(res);
       if (!res.ok || !data.ok) throw new Error(data.error || 'Save failed.');
       this.showNotification('Pricelist row saved.', 'success');
+      this.setPricelistRowEditing(row, false);
       await this.loadCoffeePricelist();
     } catch (err) {
       this.showNotification(err.message || 'Could not save pricelist row.', 'error');
-    }
-  }
-
-  async deactivatePricelistRow(priceId) {
-    if (!window.confirm('Deactivate this price row?')) return;
-    try {
-      const res = await fetch(`/api/coffee-pricelist/${priceId}`, {
-        method: 'DELETE',
-        credentials: 'same-origin',
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || 'Deactivate failed.');
-      this.showNotification('Price row deactivated.', 'success');
-      await this.loadCoffeePricelist();
-    } catch (err) {
-      this.showNotification(err.message || 'Could not deactivate price row.', 'error');
     }
   }
 
@@ -2535,7 +2597,7 @@ class DashboardApp {
     const qs = status ? `?status=${encodeURIComponent(status)}` : '';
     try {
       const res = await fetch(`/api/farmer-price-applications${qs}`, { credentials: 'same-origin' });
-      const data = await res.json();
+      const data = await beanthenticParseJsonResponse(res);
       if (!res.ok || !data.ok) throw new Error(data.error || 'Could not load applications.');
       this.renderCoffeePricingApplications(data.items || []);
     } catch (err) {
@@ -2545,7 +2607,10 @@ class DashboardApp {
 
   farmerNameById(farmerId) {
     const fid = Number(farmerId || 0);
-    const row = (this.farmersData || []).find((f) => this.farmerIdFromRow(f) === fid);
+    const sourceRows = Array.isArray(this.farmersData) && this.farmersData.length
+      ? this.farmersData
+      : (this.data || []);
+    const row = sourceRows.find((f) => this.farmerIdFromRow(f) === fid);
     if (!row) return `Farmer #${fid}`;
     return this.getValue(row, ['NAME OF FARMER', 'name']) || `Farmer #${fid}`;
   }
@@ -2637,6 +2702,7 @@ class DashboardApp {
       const body = document.getElementById('farmerSelfSaleAppsBody');
       if (body) body.innerHTML = '<tr><td colspan="7">No applications yet.</td></tr>';
     }
+    this.syncCoffeePricingSelfSaleControls(farmerId);
   }
 
   async setFarmerSelfSale(farmerId, enabled, farmerRow) {
@@ -2650,9 +2716,10 @@ class DashboardApp {
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || 'Update failed.');
       if (farmerRow) farmerRow.self_sale_enabled = !!enabled;
-      const cached = (this.farmersData || []).find((f) => this.farmerIdFromRow(f) === Number(farmerId));
+      const cached = (this.data || []).find((f) => this.farmerIdFromRow(f) === Number(farmerId));
       if (cached) cached.self_sale_enabled = !!enabled;
       this.initFarmerSelfSalePanel(farmerRow || { farmer_id: farmerId, self_sale_enabled: enabled });
+      this.syncCoffeePricingSelfSaleControls(farmerId);
       this.showNotification(enabled ? 'Self-sale enabled for farmer.' : 'Self-sale disabled for farmer.', 'success');
     } catch (err) {
       this.showNotification(err.message || 'Could not update self-sale status.', 'error');
@@ -4221,6 +4288,7 @@ class DashboardApp {
             .slice(0, this.maxFarmers)
             .map((row) => this.applyOwnershipFlags(row))
         : [];
+      this.farmersData = this.data;
 
       if (this.data.length === 0) {
         this.showNotification(
@@ -4241,6 +4309,7 @@ class DashboardApp {
       } catch (_) {
         /* ignore quota errors */
       }
+      this.syncCoffeePricingSelfSaleControls();
 
       this.updateStats();
       this.createCharts();
@@ -4257,6 +4326,7 @@ class DashboardApp {
         this.data = saved
           .filter((row) => this.isFarmerRegistrationComplete(row))
           .slice(0, this.maxFarmers);
+        this.farmersData = this.data;
         this.filteredData = [...this.data];
         this.totalRecords = this.data.length;
         this.updateStats();
@@ -4367,6 +4437,7 @@ class DashboardApp {
         'PHONE': '+63 934 567 8901'
       }
     ];
+    this.farmersData = this.data;
     
     this.filteredData = [...this.data];
     this.totalRecords = this.data.length;
@@ -4677,46 +4748,69 @@ class DashboardApp {
     setText('farmerProfileMunicipalityText', this.getValue(farmer, ['MUNICIPALITY', 'municipality', 'CITY']) || 'Lipa City');
     setText('farmerProfileBarangayText', this.getValue(farmer, ['BARANGAY', 'ADDRESS (BARANGAY)', 'barangay']) || '');
     setText('farmerProfileFederationText', this.getValue(farmer, ['FA OFFICER / MEMBER', 'FEDERATION', 'Federation Association']) || '');
-    setText('farmerProfileRsbsaText', this.getValue(farmer, ['REGISTERED (YES/NO)', 'RSBSA Registered']) || '');
-    setText('farmerProfileRsbsaNumberText', this.getValue(farmer, ['NCFRS', 'RSBSA Registered Number']) || '');
+    setText(
+      'farmerProfileRsbsaText',
+      this.getValue(farmer, ['RSBSA Registered (Yes/No)', 'RSBSA Registered', 'REGISTERED (YES/NO)']) || ''
+    );
+    setText(
+      'farmerProfileRsbsaNumberText',
+      this.getValue(farmer, ['RSBSA NUMBER', 'RSBSA Registered Number', 'rsbsa_number']) || ''
+    );
+    setText(
+      'farmerProfileRsbsaStatusText',
+      this.getValue(farmer, ['RSBSA Status', 'RSBSA STATUS', 'rsbsa_status']) || ''
+    );
+    setText('farmerProfileNcfrsText', this.getValue(farmer, ['NCFRS', 'ncfrs']) || '');
     setText('farmerProfileOwnershipText', this.getValue(farmer, ['STATUS OF OWNERSHIP', 'Status Ownership']) || '');
     setText(
       'farmerProfileTotalAreaText',
-      this.formatValue(this.getValue(farmer, ['TOTAL AREA PLANTED (HA.)', 'Total Plant Area', 'TOTAL AREA']) || '')
+      this.formatAreaHa(this.getValue(farmer, ['TOTAL AREA PLANTED (HA.)', 'Total Plant Area', 'TOTAL AREA', 'farm_size_ha']) || '')
     );
+    setText(
+      'farmerProfileCoffeeVarietiesText',
+      this.getValue(farmer, ['COFFEE VARIETIES', 'coffee_varieties', 'coffee_variety']) || ''
+    );
+    const deliveryPref = this.getValue(farmer, ['COFFEE DISTRIBUTION', 'coffee_distribution', 'distribution_option']) || '';
+    const flowSummary = this.getDeliveryFlowSummary(farmer);
+    setText('farmerProfileDistributionText', flowSummary ? `${deliveryPref || 'Mixed'} (${flowSummary})` : deliveryPref);
+    setText('farmerProfileFlowPreferenceText', deliveryPref || '—');
+    setText('farmerProfileFlowSummaryText', flowSummary || 'No split quantity');
+    setText('farmerProfileFlowLibText', this.formatVarietyFlowLine(farmer, 'liberica'));
+    setText('farmerProfileFlowExcText', this.formatVarietyFlowLine(farmer, 'excelsa'));
+    setText('farmerProfileFlowRobText', this.formatVarietyFlowLine(farmer, 'robusta'));
 
     // Populate Detailed Registration Fields
-    setText('farmerProfileLibBearingText', this.getValue(farmer, ['LIBERICA BEARING', 'Liberica_Bearing']) || '0');
-    setText('farmerProfileLibNonBearingText', this.getValue(farmer, ['LIBERICA NON-BEARING', 'Liberica_Non-bearing']) || '0');
-    setText('farmerProfileRobBearingText', this.getValue(farmer, ['ROBUSTA BEARING', 'Robusta_Bearing']) || '0');
-    setText('farmerProfileRobNonBearingText', this.getValue(farmer, ['ROBUSTA NON-BEARING', 'Robusta_Non-bearing']) || '0');
-    setText('farmerProfileExcBearingText', this.getValue(farmer, ['EXCELSA BEARING', 'Excelsa_Bearing']) || '0');
-    setText('farmerProfileExcNonBearingText', this.getValue(farmer, ['EXCELSA NON-BEARING', 'Excelsa_Non-bearing']) || '0');
+    setText('farmerProfileLibBearingText', this.varietyValueOrBlank(farmer, 'liberica', this.getValue(farmer, ['LIBERICA BEARING', 'Liberica_Bearing']) || '0', '—'));
+    setText('farmerProfileLibNonBearingText', this.varietyValueOrBlank(farmer, 'liberica', this.getValue(farmer, ['LIBERICA NON-BEARING', 'Liberica_Non-bearing']) || '0', '—'));
+    setText('farmerProfileRobBearingText', this.varietyValueOrBlank(farmer, 'robusta', this.getValue(farmer, ['ROBUSTA BEARING', 'Robusta_Bearing']) || '0', '—'));
+    setText('farmerProfileRobNonBearingText', this.varietyValueOrBlank(farmer, 'robusta', this.getValue(farmer, ['ROBUSTA NON-BEARING', 'Robusta_Non-bearing']) || '0', '—'));
+    setText('farmerProfileExcBearingText', this.varietyValueOrBlank(farmer, 'excelsa', this.getValue(farmer, ['EXCELSA BEARING', 'Excelsa_Bearing']) || '0', '—'));
+    setText('farmerProfileExcNonBearingText', this.varietyValueOrBlank(farmer, 'excelsa', this.getValue(farmer, ['EXCELSA NON-BEARING', 'Excelsa_Non-bearing']) || '0', '—'));
 
     // Harvest quantities
     const libHarvest = this.getVarietyHarvestProduction(farmer, 'liberica');
     const excHarvest = this.getVarietyHarvestProduction(farmer, 'excelsa');
     const robHarvest = this.getVarietyHarvestProduction(farmer, 'robusta');
     const fmtProd = (value) => this.formatKg(value);
-    setText('farmerProfileHarvestLibQtyText', fmtProd(libHarvest));
-    setText('farmerProfileHarvestExcQtyText', fmtProd(excHarvest));
-    setText('farmerProfileHarvestRobQtyText', fmtProd(robHarvest));
+    setText('farmerProfileHarvestLibQtyText', this.varietyValueOrBlank(farmer, 'liberica', this.formatQtyWithUnit(libHarvest, this.getVarietyHarvestUnit(farmer, 'liberica')), '—'));
+    setText('farmerProfileHarvestExcQtyText', this.varietyValueOrBlank(farmer, 'excelsa', this.formatQtyWithUnit(excHarvest, this.getVarietyHarvestUnit(farmer, 'excelsa')), '—'));
+    setText('farmerProfileHarvestRobQtyText', this.varietyValueOrBlank(farmer, 'robusta', this.formatQtyWithUnit(robHarvest, this.getVarietyHarvestUnit(farmer, 'robusta')), '—'));
 
     // GCB details
-    setText('farmerProfileGcbLibClassText', this.formatGcbClassification(farmer, 'liberica') || '—');
-    setText('farmerProfileGcbLibQtyText', fmtProd(this.getVarietyProduction(farmer, 'liberica')));
-    setText('farmerProfileGcbExcClassText', this.formatGcbClassification(farmer, 'excelsa') || '—');
-    setText('farmerProfileGcbExcQtyText', fmtProd(this.getVarietyProduction(farmer, 'excelsa')));
-    setText('farmerProfileGcbRobClassText', this.formatGcbClassification(farmer, 'robusta') || '—');
-    setText('farmerProfileGcbRobQtyText', fmtProd(this.getVarietyProduction(farmer, 'robusta')));
+    setText('farmerProfileGcbLibClassText', this.varietyValueOrBlank(farmer, 'liberica', this.formatGcbClassification(farmer, 'liberica') || '—', '—'));
+    setText('farmerProfileGcbLibQtyText', this.varietyValueOrBlank(farmer, 'liberica', fmtProd(this.getVarietyProduction(farmer, 'liberica')), '—'));
+    setText('farmerProfileGcbExcClassText', this.varietyValueOrBlank(farmer, 'excelsa', this.formatGcbClassification(farmer, 'excelsa') || '—', '—'));
+    setText('farmerProfileGcbExcQtyText', this.varietyValueOrBlank(farmer, 'excelsa', fmtProd(this.getVarietyProduction(farmer, 'excelsa')), '—'));
+    setText('farmerProfileGcbRobClassText', this.varietyValueOrBlank(farmer, 'robusta', this.formatGcbClassification(farmer, 'robusta') || '—', '—'));
+    setText('farmerProfileGcbRobQtyText', this.varietyValueOrBlank(farmer, 'robusta', fmtProd(this.getVarietyProduction(farmer, 'robusta')), '—'));
 
     // Roasted details
-    setText('farmerProfileRoastedLibClassText', this.formatRoastedClassification(farmer, 'liberica') || '—');
-    setText('farmerProfileRoastedLibQtyText', fmtProd(this.getVarietyRoastedProduction(farmer, 'liberica')));
-    setText('farmerProfileRoastedExcClassText', this.formatRoastedClassification(farmer, 'excelsa') || '—');
-    setText('farmerProfileRoastedExcQtyText', fmtProd(this.getVarietyRoastedProduction(farmer, 'excelsa')));
-    setText('farmerProfileRoastedRobClassText', this.formatRoastedClassification(farmer, 'robusta') || '—');
-    setText('farmerProfileRoastedRobQtyText', fmtProd(this.getVarietyRoastedProduction(farmer, 'robusta')));
+    setText('farmerProfileRoastedLibClassText', this.varietyValueOrBlank(farmer, 'liberica', this.formatRoastedClassification(farmer, 'liberica') || '—', '—'));
+    setText('farmerProfileRoastedLibQtyText', this.varietyValueOrBlank(farmer, 'liberica', fmtProd(this.getVarietyRoastedProduction(farmer, 'liberica')), '—'));
+    setText('farmerProfileRoastedExcClassText', this.varietyValueOrBlank(farmer, 'excelsa', this.formatRoastedClassification(farmer, 'excelsa') || '—', '—'));
+    setText('farmerProfileRoastedExcQtyText', this.varietyValueOrBlank(farmer, 'excelsa', fmtProd(this.getVarietyRoastedProduction(farmer, 'excelsa')), '—'));
+    setText('farmerProfileRoastedRobClassText', this.varietyValueOrBlank(farmer, 'robusta', this.formatRoastedClassification(farmer, 'robusta') || '—', '—'));
+    setText('farmerProfileRoastedRobQtyText', this.varietyValueOrBlank(farmer, 'robusta', fmtProd(this.getVarietyRoastedProduction(farmer, 'robusta')), '—'));
 
     // Legacy fields for backward compatibility
     const libProd = this.getVarietyProduction(farmer, 'liberica');
@@ -4729,6 +4823,12 @@ class DashboardApp {
     setText('farmerProfileRoastedExcProdText', fmtProd(this.getRoastedFromGcb(excProd)));
     setText('farmerProfileRoastedRobProdText', fmtProd(this.getRoastedFromGcb(robProd)));
     setText('farmerProfileProdUnitText', this.getValue(farmer, ['PRODUCTION UNIT', 'Production_Unit']) || 'kg');
+    const harvestUnitBadge = document.querySelector('.farmer-profile-production-table--harvest')
+      ?.closest('.registration-detail-section')
+      ?.querySelector('.unit-badge');
+    if (harvestUnitBadge) {
+      harvestUnitBadge.textContent = this.getHarvestUnitBadge(farmer);
+    }
 
     // Populate Bean Summary
     this.initBeanVarietyFilters(farmer);
@@ -4793,11 +4893,8 @@ class DashboardApp {
       initialBeans = Number(this.getValue(farmer, [key, variety.toLowerCase() + '_production']) || 0);
     }
 
-    // Fallback to placeholder if no data
-    if (initialBeans === 0) initialBeans = variety === 'All' ? 50 : 15;
-
-    // Example calculation for remaining: 85% of initial or fixed offset
-    const beansRemaining = Math.max(0, Math.floor(initialBeans * 0.14)); // Roughly 7KG if 50KG
+    // Keep real values from registration/transactions; no demo fallback.
+    const beansRemaining = Math.max(0, Math.floor(initialBeans * 0.14));
 
     initialValueEl.textContent = initialBeans;
     remainingValueEl.textContent = beansRemaining;
@@ -5030,9 +5127,18 @@ class DashboardApp {
     setText('farmerProfileBarangayText', 'Barangay');
     setText('farmerProfileFederationText', 'Federation Association');
     setText('farmerProfileRsbsaText', 'Yes/No');
-    setText('farmerProfileRsbsaNumberText', 'NCFRS-0000');
+    setText('farmerProfileRsbsaNumberText', 'RSBSA-0000');
+    setText('farmerProfileRsbsaStatusText', 'Pending RSBSA');
+    setText('farmerProfileNcfrsText', 'NCFRS-0000');
     setText('farmerProfileOwnershipText', 'Landowner / Lease / Others');
     setText('farmerProfileTotalAreaText', '0.00');
+    setText('farmerProfileCoffeeVarietiesText', 'Liberica, Robusta');
+    setText('farmerProfileDistributionText', 'Drop Off At Consolidator');
+    setText('farmerProfileFlowPreferenceText', 'Drop Off At Consolidator');
+    setText('farmerProfileFlowSummaryText', 'No split quantity');
+    setText('farmerProfileFlowLibText', '—');
+    setText('farmerProfileFlowExcText', '—');
+    setText('farmerProfileFlowRobText', '—');
 
     this.initBeanVarietyFilters({});
     this.initSeeMoreDetails();
@@ -5131,12 +5237,12 @@ class DashboardApp {
               this.createInputCell(nameParts.last, 'text'),
               this.createInputCell(nameParts.first, 'text'),
 
-              this.createInputCell(this.getValue(row, ['LIBERICA BEARING', 'Liberica_Bearing']), 'number', 'highlight-yellow'),
-              this.createInputCell(this.getValue(row, ['LIBERICA NON-BEARING', 'Liberica_Non-bearing']), 'number', 'highlight-yellow'),
-              this.createInputCell(this.getValue(row, ['EXCELSA BEARING', 'Excelsa_Bearing']), 'number', 'highlight-yellow'),
-              this.createInputCell(this.getValue(row, ['EXCELSA NON-BEARING', 'Excelsa_Non-bearing']), 'number', 'highlight-yellow'),
-              this.createInputCell(this.getValue(row, ['ROBUSTA BEARING', 'Robusta_Bearing']), 'number', 'highlight-yellow'),
-              this.createInputCell(this.getValue(row, ['ROBUSTA NON-BEARING', 'Robusta_Non-bearing']), 'number', 'highlight-yellow'),
+              this.createInputCell(this.varietyValueOrBlank(row, 'liberica', this.getValue(row, ['LIBERICA BEARING', 'Liberica_Bearing']), ''), 'number', 'highlight-yellow'),
+              this.createInputCell(this.varietyValueOrBlank(row, 'liberica', this.getValue(row, ['LIBERICA NON-BEARING', 'Liberica_Non-bearing']), ''), 'number', 'highlight-yellow'),
+              this.createInputCell(this.varietyValueOrBlank(row, 'excelsa', this.getValue(row, ['EXCELSA BEARING', 'Excelsa_Bearing']), ''), 'number', 'highlight-yellow'),
+              this.createInputCell(this.varietyValueOrBlank(row, 'excelsa', this.getValue(row, ['EXCELSA NON-BEARING', 'Excelsa_Non-bearing']), ''), 'number', 'highlight-yellow'),
+              this.createInputCell(this.varietyValueOrBlank(row, 'robusta', this.getValue(row, ['ROBUSTA BEARING', 'Robusta_Bearing']), ''), 'number', 'highlight-yellow'),
+              this.createInputCell(this.varietyValueOrBlank(row, 'robusta', this.getValue(row, ['ROBUSTA NON-BEARING', 'Robusta_Non-bearing']), ''), 'number', 'highlight-yellow'),
 
               this.createInputCell(this.getValue(row, ['TOTAL BEARING', 'Total_Bearing']), 'number', 'highlight-green'),
               this.createInputCell(this.getValue(row, ['TOTAL NON-BEARING', 'Total_Non-bearing']), 'number', 'highlight-green'),
@@ -5148,23 +5254,23 @@ class DashboardApp {
                 this.createInputCell(nameParts.last, 'text'),
                 this.createInputCell(nameParts.first, 'text'),
                 // Harvest
-                this.createInputCell(this.getVarietyHarvestProduction(row, 'liberica'), 'number', 'highlight-yellow'),
-                this.createInputCell(this.getVarietyHarvestProduction(row, 'excelsa'), 'number', 'highlight-yellow'),
-                this.createInputCell(this.getVarietyHarvestProduction(row, 'robusta'), 'number', 'highlight-yellow'),
+                this.createInputCell(this.varietyValueOrBlank(row, 'liberica', this.getVarietyHarvestProduction(row, 'liberica'), ''), 'number', 'highlight-yellow'),
+                this.createInputCell(this.varietyValueOrBlank(row, 'excelsa', this.getVarietyHarvestProduction(row, 'excelsa'), ''), 'number', 'highlight-yellow'),
+                this.createInputCell(this.varietyValueOrBlank(row, 'robusta', this.getVarietyHarvestProduction(row, 'robusta'), ''), 'number', 'highlight-yellow'),
                 // GCB
-                this.createInputCell(this.formatGcbClassification(row, 'liberica'), 'text', 'highlight-blue'),
-                this.createInputCell(this.getVarietyProduction(row, 'liberica'), 'number', 'highlight-blue'),
-                this.createInputCell(this.formatGcbClassification(row, 'excelsa'), 'text', 'highlight-blue'),
-                this.createInputCell(this.getVarietyProduction(row, 'excelsa'), 'number', 'highlight-blue'),
-                this.createInputCell(this.formatGcbClassification(row, 'robusta'), 'text', 'highlight-blue'),
-                this.createInputCell(this.getVarietyProduction(row, 'robusta'), 'number', 'highlight-blue'),
+                this.createInputCell(this.varietyValueOrBlank(row, 'liberica', this.formatGcbClassification(row, 'liberica'), '—'), 'text', 'highlight-blue'),
+                this.createInputCell(this.varietyValueOrBlank(row, 'liberica', this.getVarietyProduction(row, 'liberica'), ''), 'number', 'highlight-blue'),
+                this.createInputCell(this.varietyValueOrBlank(row, 'excelsa', this.formatGcbClassification(row, 'excelsa'), '—'), 'text', 'highlight-blue'),
+                this.createInputCell(this.varietyValueOrBlank(row, 'excelsa', this.getVarietyProduction(row, 'excelsa'), ''), 'number', 'highlight-blue'),
+                this.createInputCell(this.varietyValueOrBlank(row, 'robusta', this.formatGcbClassification(row, 'robusta'), '—'), 'text', 'highlight-blue'),
+                this.createInputCell(this.varietyValueOrBlank(row, 'robusta', this.getVarietyProduction(row, 'robusta'), ''), 'number', 'highlight-blue'),
                 // Roasted
-                this.createInputCell(this.formatRoastedClassification(row, 'liberica'), 'text', 'highlight-green'),
-                this.createInputCell(this.getVarietyRoastedProduction(row, 'liberica'), 'number', 'highlight-green'),
-                this.createInputCell(this.formatRoastedClassification(row, 'excelsa'), 'text', 'highlight-green'),
-                this.createInputCell(this.getVarietyRoastedProduction(row, 'excelsa'), 'number', 'highlight-green'),
-                this.createInputCell(this.formatRoastedClassification(row, 'robusta'), 'text', 'highlight-green'),
-                this.createInputCell(this.getVarietyRoastedProduction(row, 'robusta'), 'number', 'highlight-green')
+                this.createInputCell(this.varietyValueOrBlank(row, 'liberica', this.formatRoastedClassification(row, 'liberica'), '—'), 'text', 'highlight-green'),
+                this.createInputCell(this.varietyValueOrBlank(row, 'liberica', this.getVarietyRoastedProduction(row, 'liberica'), ''), 'number', 'highlight-green'),
+                this.createInputCell(this.varietyValueOrBlank(row, 'excelsa', this.formatRoastedClassification(row, 'excelsa'), '—'), 'text', 'highlight-green'),
+                this.createInputCell(this.varietyValueOrBlank(row, 'excelsa', this.getVarietyRoastedProduction(row, 'excelsa'), ''), 'number', 'highlight-green'),
+                this.createInputCell(this.varietyValueOrBlank(row, 'robusta', this.formatRoastedClassification(row, 'robusta'), '—'), 'text', 'highlight-green'),
+                this.createInputCell(this.varietyValueOrBlank(row, 'robusta', this.getVarietyRoastedProduction(row, 'robusta'), ''), 'number', 'highlight-green')
               ]
             : this.farmerTableView === 'automated-yields'
               ? [
@@ -5199,7 +5305,10 @@ class DashboardApp {
                 this.createOwnershipCell(this.getValue(row, ['LEASE', 'LESSEE', 'Lessee', 'C'])),
                 this.createOwnershipCell(this.getValue(row, ['SEASONAL', 'SHAREHOLDER', 'Shareholder', 'D'])),
                 this.createOwnershipCell(this.getValue(row, ['OTHERS', 'Others', 'E'])),
-                this.createInputCell(this.getValue(row, ['Total Area Planted (HA.)', 'TOTAL AREA PLANTED (HA.)', 'area']), 'number')
+                this.createInputCell(
+                  this.formatAreaHa(this.getValue(row, ['Total Area Planted (HA.)', 'TOTAL AREA PLANTED (HA.)', 'area', 'farm_size_ha'])),
+                  'text'
+                )
               ]
           : [
               this.createInputCell(displayNo, 'number'),
@@ -5306,10 +5415,10 @@ class DashboardApp {
 
   createInputCell(value, type = 'text', highlightClass = '') {
     let display = value;
-    if (type === 'number' && (display === '' || display === null || display === undefined)) {
-      display = 0;
+    if (type === 'number' && (display === null || display === undefined)) {
+      display = '';
     }
-    if (type === 'text' && (display === '' || display === null || display === undefined)) {
+    if ((type === 'text' || type === 'number') && (display === '' || display === null || display === undefined)) {
       display = '—';
     }
     const formattedValue = this.formatValue(display);
@@ -5561,6 +5670,38 @@ class DashboardApp {
     whole_beans: 'Whole Beans',
   };
 
+  selectedVarietiesFromRow(row) {
+    const out = new Set();
+    const raw = this.getValue(row, ['COFFEE VARIETIES', 'coffee_varieties', 'coffee_variety']);
+    if (raw) {
+      String(raw)
+        .split(/[,\|;/]/)
+        .map((token) => token.trim().toLowerCase())
+        .forEach((token) => {
+          if (!token) return;
+          if (token.includes('liberica') || token.includes('barako')) out.add('liberica');
+          else if (token.includes('excelsa')) out.add('excelsa');
+          else if (token.includes('robusta')) out.add('robusta');
+        });
+    }
+    const detailVars = row?.production_detail?.varieties;
+    if (detailVars && typeof detailVars === 'object') {
+      Object.keys(detailVars).forEach((key) => {
+        const v = String(key || '').trim().toLowerCase();
+        if (v === 'liberica' || v === 'excelsa' || v === 'robusta') out.add(v);
+      });
+    }
+    return out;
+  }
+
+  hasVarietySelected(row, variety) {
+    const v = String(variety || '').trim().toLowerCase();
+    if (!v) return false;
+    const selected = this.selectedVarietiesFromRow(row);
+    if (!selected.size) return true;
+    return selected.has(v);
+  }
+
   normalizeClassificationKey(value, labels) {
     if (value === 0 || value === 1 || value === 2) {
       const intMap = labels === this.gcbClassificationLabels
@@ -5719,6 +5860,86 @@ class DashboardApp {
     return 0;
   }
 
+  getVarietyHarvestUnit(row, variety) {
+    const v = String(variety || '').trim().toLowerCase();
+    const cap = v.toUpperCase();
+    const direct = this.getValue(row, [`${v}_harvest_unit`, `${cap} HARVEST UNIT`]);
+    if (direct) return String(direct).trim();
+    const nested = row?.production_detail?.varieties?.[v]?.harvest_unit
+      || row?.production_detail?.varieties?.[v]?.harvest?.unit
+      || row?.production_detail?.varieties?.[v]?.harvest?.unit_label;
+    return nested ? String(nested).trim() : 'kg';
+  }
+
+  varietyValueOrBlank(row, variety, value, blankValue = '') {
+    return this.hasVarietySelected(row, variety) ? value : blankValue;
+  }
+
+  formatAreaHa(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '';
+    if (Math.abs(n) >= 100) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  }
+
+  formatQtyWithUnit(value, unit) {
+    const qty = this.formatKg(value);
+    const cleanUnit = String(unit || '').trim();
+    return cleanUnit ? `${qty} ${cleanUnit}` : qty;
+  }
+
+  getVarietyFlowQty(row, variety, flowKey) {
+    const v = String(variety || '').trim().toLowerCase();
+    const flow = String(flowKey || '').trim().toLowerCase();
+    const nested = row?.production_detail?.varieties?.[v]?.allocation;
+    if (nested && typeof nested === 'object') {
+      const val = nested[`${flow}_qty_kg`] ?? nested[`${flow}_kg`] ?? nested[flow];
+      const n = Number(val);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    const flat = this.getValue(row, [`${v}_${flow}_qty_kg`, `${v}_${flow}_kg`, `${v.toUpperCase()} ${flow.toUpperCase()} QTY`]);
+    const n = Number(flat);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  getDeliveryFlowSummary(row) {
+    const selected = ['liberica', 'excelsa', 'robusta'].filter((v) => this.hasVarietySelected(row, v));
+    const chunks = [];
+    selected.forEach((v) => {
+      const sell = this.getVarietyFlowQty(row, v, 'sell');
+      const dropoff = this.getVarietyFlowQty(row, v, 'dropoff');
+      if (sell <= 0 && dropoff <= 0) return;
+      const label = v.charAt(0).toUpperCase() + v.slice(1);
+      const parts = [];
+      if (sell > 0) parts.push(`sell ${this.formatKg(sell)} kg`);
+      if (dropoff > 0) parts.push(`drop-off ${this.formatKg(dropoff)} kg`);
+      chunks.push(`${label}: ${parts.join(' / ')}`);
+    });
+    return chunks.join('; ');
+  }
+
+  formatVarietyFlowLine(row, variety) {
+    if (!this.hasVarietySelected(row, variety)) return '—';
+    const sell = this.getVarietyFlowQty(row, variety, 'sell');
+    const dropoff = this.getVarietyFlowQty(row, variety, 'dropoff');
+    if (sell <= 0 && dropoff <= 0) return 'No split quantity';
+    const parts = [];
+    if (sell > 0) parts.push(`Sell ${this.formatKg(sell)} kg`);
+    if (dropoff > 0) parts.push(`Drop-off ${this.formatKg(dropoff)} kg`);
+    return parts.join(' / ');
+  }
+
+  getHarvestUnitBadge(row) {
+    const units = ['liberica', 'excelsa', 'robusta']
+      .map((v) => this.getVarietyHarvestUnit(row, v))
+      .map((u) => String(u || '').trim())
+      .filter(Boolean);
+    if (!units.length) return 'kg';
+    const uniq = [...new Set(units.map((u) => u.toLowerCase()))];
+    if (uniq.length === 1) return units[0];
+    return 'mixed';
+  }
+
   gcbFiMatchesTreeComputation(gcbFi, gcbAc) {
     const fi = Number(gcbFi) || 0;
     const ac = Number(gcbAc) || 0;
@@ -5756,6 +5977,15 @@ class DashboardApp {
   }
 
   buildAutomatedYieldVarietyCells(row, variety) {
+    if (!this.hasVarietySelected(row, variety)) {
+      return [
+        this.createYieldCell('—'),
+        this.createYieldCell('—'),
+        this.createYieldCell('—'),
+        this.createYieldCell('—'),
+        this.createYieldCell('—'),
+      ];
+    }
     const y = this.computeAutomatedVarietyYield(row, variety);
     const cmp = y.matchesTreeComputation ? 'ay-match' : 'ay-mismatch';
     const cmpTitle = this.buildYieldComparisonTooltip(y, variety);
@@ -5770,7 +6000,10 @@ class DashboardApp {
 
   createYieldCell(value, highlightClass = '', comparisonClass = '', title = '', options = {}) {
     const withUnit = options.withUnit !== false;
-    const formattedValue = withUnit ? this.formatKgWithUnit(value) : this.formatKg(value);
+    const isPlaceholder = typeof value === 'string' && value.trim() === '—';
+    const formattedValue = isPlaceholder
+      ? '—'
+      : (withUnit ? this.formatKgWithUnit(value) : this.formatKg(value));
     const classes = [highlightClass, comparisonClass].filter(Boolean);
     const classAttr = classes.length ? ` class="${classes.join(' ')}"` : '';
     const titleAttr = title ? ` title="${title.replace(/"/g, '&quot;')}"` : '';
@@ -8237,6 +8470,8 @@ class DashboardApp {
     const trackEl = document.getElementById('giProcessTrack');
     const aiStatusEl = document.getElementById('giAiStatus');
 
+    this.syncIpophlUploadZoneCompactState();
+
     if (!percentEl || !metaEl || !fillEl || !trackEl || !aiStatusEl) return;
 
     const snapshot = this.getIpophlCompletionSnapshot();
@@ -8256,6 +8491,36 @@ class DashboardApp {
     aiStatusEl.classList.add(aiStatus.className);
 
     this.updateProgress(this.currentPhase || 1);
+  }
+
+  syncIpophlUploadZoneCompactState() {
+    const zones = document.querySelectorAll('#ipophl-module .file-upload-zone[data-service]');
+    zones.forEach((zone) => {
+      const service = zone.dataset.service;
+      if (!service) return;
+      const listEl = document.getElementById(`${service}-files`);
+      const listedCount = listEl
+        ? listEl.querySelectorAll('.file-item:not(.error)').length
+        : 0;
+      const storedCount = (this.ipophlFiles?.[service] || []).length;
+      const hasFiles = listedCount > 0 || storedCount > 0;
+      zone.classList.toggle('has-files', hasFiles);
+      zone.setAttribute('aria-label', hasFiles ? 'Add more files' : 'Upload document');
+      const icon = zone.querySelector(':scope > i');
+      if (icon) {
+        icon.className = hasFiles ? 'fa-solid fa-plus' : 'fa-solid fa-cloud-upload-alt';
+      }
+      const label = zone.querySelector(':scope > p');
+      if (label) {
+        label.hidden = false;
+        if (hasFiles) {
+          label.dataset.defaultUploadText = label.dataset.defaultUploadText || label.textContent;
+          label.textContent = 'Add more files';
+        } else if (label.dataset.defaultUploadText) {
+          label.textContent = label.dataset.defaultUploadText;
+        }
+      }
+    });
   }
 
   getServiceFromCard(card) {

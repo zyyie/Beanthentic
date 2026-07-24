@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -30,6 +31,15 @@ def _normalize_variety(value: str | None) -> str:
 
 def _normalize_bean_type(value: str | None) -> str:
     v = (value or "gcb").strip().lower()
+    aliases = {
+        "green_coffee_beans": "gcb",
+        "green coffee beans": "gcb",
+        "green": "gcb",
+        "roast": "roasted",
+        "roasted_beans": "roasted",
+        "roasted coffee beans": "roasted",
+    }
+    v = aliases.get(v, v)
     if v not in VALID_BEAN_TYPES:
         raise ValueError(f"Invalid bean_type: {value!r}")
     return v
@@ -37,6 +47,13 @@ def _normalize_bean_type(value: str | None) -> str:
 
 def _normalize_classification(value: str | None) -> str:
     return (value or "").strip().lower()
+
+
+def _pick(payload: dict, *keys: str) -> Any:
+    for key in keys:
+        if key in payload and payload.get(key) not in (None, ""):
+            return payload.get(key)
+    return None
 
 
 def _row_to_pricelist(row: dict) -> dict:
@@ -205,27 +222,144 @@ def ensure_pricing_schema(conn) -> None:
 
 
 def seed_default_pricelist(conn) -> None:
+    """Ensure exactly one active official price row per coffee variety."""
     with conn.cursor() as cur:
-        cur.execute("SELECT COUNT(*) AS c FROM coffee_pricelist")
-        row = cur.fetchone() or {}
-        count = int(row.get("c") if isinstance(row, dict) else row[0] or 0)
-        if count > 0:
-            return
         for variety in VARIETIES:
-            for bean_type, prices in (("gcb", _DEFAULT_GCB_PRICES), ("roasted", _DEFAULT_ROASTED_PRICES)):
+            cur.execute(
+                """
+                SELECT price_id FROM coffee_pricelist
+                WHERE variety = %s AND is_active = TRUE
+                ORDER BY
+                  CASE WHEN COALESCE(classification, '') = '' THEN 0 ELSE 1 END,
+                  CASE WHEN bean_type = 'gcb' THEN 0 ELSE 1 END,
+                  price_id ASC
+                """,
+                (variety,),
+            )
+            rows = cur.fetchall() or []
+            if not rows:
                 cur.execute(
                     """
                     INSERT INTO coffee_pricelist (variety, bean_type, classification, price_per_kg, notes)
-                    VALUES (%s, %s, '', %s, %s)
+                    VALUES (%s, 'gcb', '', %s, %s)
                     """,
                     (
                         variety,
-                        bean_type,
-                        prices[variety],
-                        "Default drop-off reference price",
+                        _DEFAULT_GCB_PRICES[variety],
+                        "Official drop-off reference price",
                     ),
                 )
+                continue
+            for r in rows[1:]:
+                pid = int(r["price_id"] if isinstance(r, dict) else r[0])
+                cur.execute(
+                    "UPDATE coffee_pricelist SET is_active = FALSE WHERE price_id = %s",
+                    (pid,),
+                )
     conn.commit()
+
+
+def _seed_default_pricelist_rest_if_empty() -> None:
+    """REST fallback: one active official row per variety only."""
+    if not is_configured():
+        return
+    try:
+        client = get_client()
+        existing = (
+            client.table("coffee_pricelist")
+            .select("price_id,variety,bean_type,classification,is_active")
+            .execute()
+        )
+        rows = [r for r in (existing.data or []) if isinstance(r, dict)]
+        by_variety: dict[str, list[dict]] = {v: [] for v in VARIETIES}
+        for r in rows:
+            v = str(r.get("variety") or "").strip().lower()
+            if v in by_variety and bool(r.get("is_active", True)):
+                by_variety[v].append(r)
+
+        # Already canonical (exactly one active row per variety) — skip writes.
+        if all(len(by_variety[v]) == 1 for v in VARIETIES):
+            return
+
+        to_insert: list[dict[str, Any]] = []
+        for variety in VARIETIES:
+            active = by_variety.get(variety) or []
+            if not active:
+                to_insert.append(
+                    {
+                        "variety": variety,
+                        "bean_type": "gcb",
+                        "classification": "",
+                        "price_per_kg": _DEFAULT_GCB_PRICES[variety],
+                        "currency": "PHP",
+                        "notes": "Official drop-off reference price",
+                        "is_active": True,
+                        "updated_at": _utc_now_iso(),
+                        "created_at": _utc_now_iso(),
+                    }
+                )
+                continue
+            active_sorted = sorted(
+                active,
+                key=lambda r: (
+                    0 if not str(r.get("classification") or "").strip() else 1,
+                    0 if str(r.get("bean_type") or "") == "gcb" else 1,
+                    int(r.get("price_id") or 0),
+                ),
+            )
+            for extra in active_sorted[1:]:
+                pid = int(extra.get("price_id") or 0)
+                if pid > 0:
+                    client.table("coffee_pricelist").update(
+                        {"is_active": False, "updated_at": _utc_now_iso()}
+                    ).eq("price_id", pid).execute()
+
+        if to_insert:
+            client.table("coffee_pricelist").insert(to_insert).execute()
+    except Exception as exc:
+        print(f"[Beanthentic] pricelist seed skipped: {exc}")
+        return
+
+
+def list_pricelist(*, active_only: bool = True) -> list[dict]:
+    if not is_configured():
+        return []
+    try:
+        _seed_default_pricelist_rest_if_empty()
+    except Exception:
+        pass
+    client = get_client()
+    last_exc: Exception | None = None
+    resp = None
+    for attempt in range(3):
+        try:
+            q = client.table("coffee_pricelist").select("*").order("variety").order("bean_type")
+            if active_only:
+                q = q.eq("is_active", True)
+            resp = q.execute()
+            last_exc = None
+            break
+        except Exception as exc:
+            last_exc = exc
+            # Transient httpx / socket errors (e.g. errno 35 on macOS).
+            if attempt < 2:
+                time.sleep(0.25 * (attempt + 1))
+                continue
+            raise
+    if last_exc is not None:
+        raise last_exc
+    rows = [_row_to_pricelist(r) for r in (resp.data or []) if isinstance(r, dict)]
+    # Official admin list should expose one row per variety.
+    if active_only:
+        by_variety: dict[str, dict] = {}
+        for row in sorted(rows, key=lambda r: (r["variety"], r["bean_type"], r["classification"])):
+            v = row["variety"]
+            if v not in by_variety:
+                by_variety[v] = row
+        rows = [by_variety[v] for v in VARIETIES if v in by_variety]
+    else:
+        rows.sort(key=lambda r: (r["variety"], r["bean_type"], r["classification"]))
+    return rows
 
 
 def _lookup_reference_price(
@@ -255,20 +389,10 @@ def _lookup_reference_price(
         ),
         None,
     )
-    return fallback["price_per_kg"] if fallback else None
-
-
-def list_pricelist(*, active_only: bool = True) -> list[dict]:
-    if not is_configured():
-        return []
-    client = get_client()
-    q = client.table("coffee_pricelist").select("*").order("variety").order("bean_type")
-    if active_only:
-        q = q.eq("is_active", True)
-    resp = q.execute()
-    rows = [_row_to_pricelist(r) for r in (resp.data or []) if isinstance(r, dict)]
-    rows.sort(key=lambda r: (r["variety"], r["bean_type"], r["classification"]))
-    return rows
+    if fallback:
+        return fallback["price_per_kg"]
+    any_variety = next((i for i in items if i["variety"] == variety), None)
+    return any_variety["price_per_kg"] if any_variety else None
 
 
 def upsert_pricelist(data: dict) -> dict:
@@ -291,30 +415,43 @@ def upsert_pricelist(data: dict) -> dict:
     }
     client = get_client()
     price_id = int(data.get("price_id") or 0)
-    if price_id > 0:
-        resp = client.table("coffee_pricelist").update(payload).eq("price_id", price_id).execute()
-        row = (resp.data or [{}])[0] if resp.data else {**payload, "price_id": price_id}
-        return _row_to_pricelist(row if isinstance(row, dict) else payload)
+    if price_id < 1:
+        raise ValueError("Official pricelist rows cannot be added. Edit an existing variety row.")
 
-    existing = (
+    # Keep variety locked to the existing row (no swapping varieties / duplicates).
+    current = (
         client.table("coffee_pricelist")
-        .select("price_id")
-        .eq("variety", variety)
-        .eq("bean_type", bean_type)
-        .eq("classification", classification)
+        .select("price_id,variety")
+        .eq("price_id", price_id)
         .limit(1)
         .execute()
     )
-    rows = existing.data or []
-    if rows and isinstance(rows[0], dict):
-        pid = int(rows[0].get("price_id") or 0)
-        resp = client.table("coffee_pricelist").update(payload).eq("price_id", pid).execute()
-        row = (resp.data or [{}])[0] if resp.data else {**payload, "price_id": pid}
-        return _row_to_pricelist(row if isinstance(row, dict) else payload)
+    current_rows = current.data or []
+    if not current_rows:
+        raise ValueError("Pricelist row not found.")
+    locked_variety = str(current_rows[0].get("variety") or "").strip().lower()
+    if locked_variety and locked_variety != variety:
+        raise ValueError("Variety cannot be changed. Edit classification/price on this row only.")
+    payload["variety"] = locked_variety or variety
 
-    payload["created_at"] = _utc_now_iso()
-    resp = client.table("coffee_pricelist").insert(payload).execute()
-    row = (resp.data or [{}])[0]
+    clash = (
+        client.table("coffee_pricelist")
+        .select("price_id")
+        .eq("variety", payload["variety"])
+        .eq("classification", classification)
+        .eq("is_active", True)
+        .neq("price_id", price_id)
+        .limit(1)
+        .execute()
+    )
+    if clash.data:
+        raise ValueError(
+            f"A pricelist row for {payload['variety']} with this classification already exists. "
+            "Edit that row instead of duplicating."
+        )
+
+    resp = client.table("coffee_pricelist").update(payload).eq("price_id", price_id).execute()
+    row = (resp.data or [{}])[0] if resp.data else {**payload, "price_id": price_id}
     return _row_to_pricelist(row if isinstance(row, dict) else payload)
 
 
@@ -379,36 +516,38 @@ def list_price_applications(
 
 
 def submit_price_application(data: dict) -> dict:
-    farmer_id = int(data.get("farmer_id") or 0)
+    farmer_id = int(_pick(data, "farmer_id", "farmer_no", "id") or 0)
     if farmer_id < 1:
         raise ValueError("farmer_id is required.")
     if not get_farmer_self_sale(farmer_id):
         raise ValueError("Self-sale is not enabled for this farmer. Contact the admin.")
 
-    variety = _normalize_variety(data.get("variety"))
-    bean_type = _normalize_bean_type(data.get("bean_type"))
-    classification = _normalize_classification(data.get("classification"))
-    qty = float(data.get("quantity_kg") or 0)
+    variety = _normalize_variety(_pick(data, "variety", "coffee_variety"))
+    bean_type = _normalize_bean_type(_pick(data, "bean_type", "type", "coffee_type"))
+    classification = _normalize_classification(_pick(data, "classification", "bean_classification", "class"))
+    qty = float(_pick(data, "quantity_kg", "qty_kg", "quantity", "amount_kg") or 0)
     if qty <= 0:
         raise ValueError("quantity_kg must be greater than zero.")
 
-    requested = data.get("requested_price_per_kg")
+    requested = _pick(data, "requested_price_per_kg", "requested_price", "price_per_kg", "ask_price_per_kg")
     requested_price = float(requested) if requested is not None and str(requested).strip() != "" else None
     if requested_price is not None and requested_price <= 0:
         raise ValueError("requested_price_per_kg must be greater than zero when provided.")
 
     reference = _lookup_reference_price(variety, bean_type, classification)
+    sale_channel = str(_pick(data, "sale_channel", "channel") or "self_sale").strip().lower() or "self_sale"
+    farmer_notes = str(_pick(data, "farmer_notes", "notes", "message") or "").strip()
     payload = {
         "farmer_id": farmer_id,
         "variety": variety,
         "bean_type": bean_type,
         "classification": classification,
         "quantity_kg": qty,
-        "sale_channel": "self_sale",
+        "sale_channel": sale_channel,
         "requested_price_per_kg": requested_price,
         "reference_price_per_kg": reference,
         "status": "pending",
-        "farmer_notes": str(data.get("farmer_notes") or "").strip(),
+        "farmer_notes": farmer_notes,
         "submitted_at": _utc_now_iso(),
     }
     client = get_client()

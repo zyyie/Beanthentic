@@ -2046,6 +2046,39 @@ body.beanthentic-dialog-open {
     font-size: 0.92rem;
 }
 
+#coffee-pricing-module .coffee-pricing-self-sale-bar {
+    margin-top: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+}
+
+#coffee-pricing-module .coffee-pricing-self-sale-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+#coffee-pricing-module .coffee-pricing-self-sale-select {
+    min-width: 220px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid #dbeafe;
+    background: #ffffff;
+    padding: 0 0.65rem;
+}
+
+#coffee-pricing-module .coffee-pricing-self-sale-status {
+    font-size: 0.82rem;
+    color: #475569;
+}
+
+#coffee-pricing-module .coffee-pricing-self-sale-status.is-enabled {
+    color: #166534;
+    font-weight: 700;
+}
+
 #coffee-pricing-module .coffee-pricing-grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -2156,6 +2189,21 @@ body.beanthentic-dialog-open {
     border-radius: 8px;
     padding: 0 0.5rem;
     font-size: 0.88rem;
+}
+
+#coffee-pricing-module .pricelist-inline-input:disabled {
+    background: #f8fafc;
+    color: #334155;
+    opacity: 1;
+    cursor: default;
+}
+
+#coffee-pricing-module .pricelist-locked-value {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    font-weight: 700;
+    color: #1f3d2a;
 }
 
 #coffee-pricing-module #coffeePricelistTable th:last-child,

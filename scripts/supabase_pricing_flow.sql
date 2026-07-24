@@ -41,13 +41,27 @@ CREATE INDEX IF NOT EXISTS idx_farmer_price_application_farmer
 CREATE INDEX IF NOT EXISTS idx_farmer_price_application_status
   ON farmer_price_application (status, submitted_at DESC);
 
--- Optional seed rows (base GCB prices per variety).
+-- Optional seed rows (one official price per variety only).
 INSERT INTO coffee_pricelist (variety, bean_type, classification, price_per_kg, notes)
 VALUES
-  ('liberica', 'gcb', '', 180.00, 'Default drop-off reference price'),
-  ('excelsa', 'gcb', '', 170.00, 'Default drop-off reference price'),
-  ('robusta', 'gcb', '', 150.00, 'Default drop-off reference price'),
-  ('liberica', 'roasted', '', 220.00, 'Default drop-off reference price'),
-  ('excelsa', 'roasted', '', 210.00, 'Default drop-off reference price'),
-  ('robusta', 'roasted', '', 190.00, 'Default drop-off reference price')
+  ('liberica', 'gcb', '', 180.00, 'Official drop-off reference price'),
+  ('excelsa', 'gcb', '', 170.00, 'Official drop-off reference price'),
+  ('robusta', 'gcb', '', 150.00, 'Official drop-off reference price')
 ON CONFLICT (variety, bean_type, classification) DO NOTHING;
+
+-- Keep only one active official row per variety.
+UPDATE coffee_pricelist p
+SET is_active = FALSE
+WHERE p.is_active = TRUE
+  AND p.price_id NOT IN (
+    SELECT keep_id FROM (
+      SELECT DISTINCT ON (variety) price_id AS keep_id
+      FROM coffee_pricelist
+      WHERE is_active = TRUE
+      ORDER BY
+        variety,
+        CASE WHEN COALESCE(classification, '') = '' THEN 0 ELSE 1 END,
+        CASE WHEN bean_type = 'gcb' THEN 0 ELSE 1 END,
+        price_id ASC
+    ) kept
+  );

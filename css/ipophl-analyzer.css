@@ -824,6 +824,18 @@ body.modal-open {
     margin-bottom: 20px;
 }
 
+.file-upload-zone.has-files {
+    padding: 0.5rem 0.85rem;
+    gap: 0.5rem;
+    margin-bottom: 8px;
+    min-height: 2.5rem;
+    width: 100%;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    line-height: 1;
+}
+
 .file-upload-zone:hover, .file-upload-zone.drag-over {
     border-color: #2c7a3e;
     background: #f0fdf4;
@@ -835,9 +847,27 @@ body.modal-open {
     transition: all 0.3s ease;
 }
 
+.file-upload-zone.has-files i {
+    font-size: 0.9rem;
+    width: 1em;
+    height: 1em;
+    margin: 0;
+    padding: 0;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transform: none;
+}
+
 .file-upload-zone:hover i, .file-upload-zone.drag-over i {
     color: #2c7a3e;
     transform: translateY(-5px);
+}
+
+.file-upload-zone.has-files:hover i,
+.file-upload-zone.has-files.drag-over i {
+    transform: none;
 }
 
 .file-upload-zone p {
@@ -845,6 +875,17 @@ body.modal-open {
     font-weight: 600;
     color: #475569;
     font-size: 0.95rem;
+}
+
+.file-upload-zone.has-files p {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    font-size: 0.86rem;
+    font-weight: 700;
+    line-height: 1;
+    color: #2c7a3e;
 }
 
 .file-upload-zone .file-input {
@@ -898,12 +939,18 @@ body.modal-open {
 }
 
 .file-item.success {
-    border-color: #dcfce7;
+    border-color: #bbf7d0;
     background: #f0fdf4;
 }
 
 .file-item.error {
-    border-color: #fee2e2;
+    border-color: #fecaca;
+    background: #fef2f2;
+}
+
+.file-item.not-ready,
+.file-item.ai-not-ready {
+    border-color: #fecaca;
     background: #fef2f2;
 }
 
@@ -955,6 +1002,19 @@ body.modal-open {
 .file-item.ai-enhanced {
     border-color: #bbf7d0;
     background: #f0fdf4;
+}
+
+.file-item.ai-enhanced.not-ready,
+.file-item.ai-enhanced.ai-not-ready,
+.file-item.success.not-ready,
+.file-item.success.ai-not-ready {
+    border-color: #fecaca;
+    background: #fef2f2;
+}
+
+.file-item.not-ready .file-meta,
+.file-item.ai-not-ready .file-meta {
+    color: #b91c1c;
 }
 
 .ai-score-badge {

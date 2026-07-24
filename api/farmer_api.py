@@ -900,6 +900,18 @@ def _map_app_row_to_dashboard(
     federation = str(row.get("federation_assoc") or "").strip() or "—"
     rsbsa_number = str(row.get("rsbsa_number") or "").strip() or "—"
     ncfrs = _ncfrs_label(row.get("ncfrs"))
+    coffee_varieties = _normalize_coffee_varieties(
+        row.get("coffee_varieties")
+        or row.get("coffee_variety")
+        or row.get("varieties_produced")
+        or row.get("coffee_varieties_produced")
+    )
+    coffee_distribution = _normalize_distribution_choice(
+        row.get("coffee_distribution")
+        or row.get("distribution_option")
+        or row.get("distribution_method")
+        or row.get("delivery_method")
+    )
 
     is_susp = int(row.get("is_suspended") or 0) == 1
     until_raw = row.get("suspended_until")
@@ -1001,6 +1013,19 @@ def _map_app_row_to_dashboard(
         "LIBERICA ROASTED QTY": roasted_qty_for_variety(row, "liberica"),
         "EXCELSA ROASTED QTY": roasted_qty_for_variety(row, "excelsa"),
         "ROBUSTA ROASTED QTY": roasted_qty_for_variety(row, "robusta"),
+        "LIBERICA HARVEST UNIT": str(row.get("liberica_harvest_unit") or "").strip(),
+        "EXCELSA HARVEST UNIT": str(row.get("excelsa_harvest_unit") or "").strip(),
+        "ROBUSTA HARVEST UNIT": str(row.get("robusta_harvest_unit") or "").strip(),
+        "LIBERICA GCB UNIT": str(row.get("liberica_gcb_unit") or "kg").strip(),
+        "EXCELSA GCB UNIT": str(row.get("excelsa_gcb_unit") or "kg").strip(),
+        "ROBUSTA GCB UNIT": str(row.get("robusta_gcb_unit") or "kg").strip(),
+        "LIBERICA ROASTED UNIT": str(row.get("liberica_roasted_unit") or "kg").strip(),
+        "EXCELSA ROASTED UNIT": str(row.get("excelsa_roasted_unit") or "kg").strip(),
+        "ROBUSTA ROASTED UNIT": str(row.get("robusta_roasted_unit") or "kg").strip(),
+        "COFFEE VARIETIES": coffee_varieties,
+        "coffee_varieties": coffee_varieties,
+        "COFFEE DISTRIBUTION": coffee_distribution,
+        "coffee_distribution": coffee_distribution,
         "production_detail": production_detail_payload(row),
         **prod_ext,
         "STATUS": row.get("status") or "",
@@ -1429,6 +1454,124 @@ def _get_farmer_pk(conn):
     mode = _detect_schema_mode(conn)
     return 'farmer_id' if mode == 'app' else 'id'
 
+
+def _db_column_exists(conn, table: str, column: str) -> bool:
+    """Check if a table column exists in current schema/database."""
+    if not table or not column:
+        return False
+    try:
+        with conn.cursor() as cur:
+            if _is_postgresql_db(conn):
+                cur.execute(
+                    """
+                    SELECT 1
+                      FROM information_schema.columns
+                     WHERE table_schema = CURRENT_SCHEMA()
+                       AND table_name = %s
+                       AND column_name = %s
+                     LIMIT 1
+                    """,
+                    (table, column),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT 1
+                      FROM information_schema.columns
+                     WHERE table_schema = DATABASE()
+                       AND table_name = %s
+                       AND column_name = %s
+                     LIMIT 1
+                    """,
+                    (table, column),
+                )
+            return bool(cur.fetchone())
+    except Exception:
+        return False
+
+
+def _optional_select_expr(
+    conn,
+    *,
+    table_name: str,
+    table_alias: str,
+    alias: str,
+    candidates: tuple[str, ...],
+) -> str:
+    """Build SELECT expression for first existing optional column."""
+    for col in candidates:
+        if _db_column_exists(conn, table_name, col):
+            return f"{table_alias}.{col} AS {alias}"
+    return f"NULL AS {alias}"
+
+
+def _normalize_coffee_varieties(raw_value) -> str:
+    """Normalize DB value into display string (Liberica, Robusta, ...)."""
+    label_map = {
+        "liberica": "Liberica",
+        "robusta": "Robusta",
+        "excelsa": "Excelsa",
+        "kapeng barako": "Liberica",
+    }
+
+    def _label(val) -> str:
+        token = str(val or "").strip()
+        if not token:
+            return ""
+        key = token.lower()
+        return label_map.get(key, token.replace("_", " ").title())
+
+    parsed = raw_value
+    if isinstance(raw_value, str):
+        text = raw_value.strip()
+        if not text:
+            return ""
+        if text.startswith("[") or text.startswith("{"):
+            try:
+                parsed = json.loads(text)
+            except Exception:
+                parsed = text
+        else:
+            parsed = [p.strip() for p in re.split(r"[;,|/]", text) if p.strip()]
+
+    items: list[str] = []
+    if isinstance(parsed, dict):
+        for key, val in parsed.items():
+            if isinstance(val, bool) and not val:
+                continue
+            if val in (None, "", 0, "0", "false", "False"):
+                continue
+            lbl = _label(key)
+            if lbl:
+                items.append(lbl)
+    elif isinstance(parsed, (list, tuple, set)):
+        for val in parsed:
+            lbl = _label(val)
+            if lbl:
+                items.append(lbl)
+    else:
+        lbl = _label(parsed)
+        if lbl:
+            items.append(lbl)
+
+    uniq: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        low = item.lower()
+        if low in seen:
+            continue
+        seen.add(low)
+        uniq.append(item)
+    return ", ".join(uniq)
+
+
+def _normalize_distribution_choice(raw_value) -> str:
+    token = str(raw_value or "").strip()
+    if not token:
+        return ""
+    normalized = token.replace("_", " ").replace("-", " ").strip()
+    return re.sub(r"\s+", " ", normalized).title()
+
 def _app_fetch_farmer_rows(limit: int = 2000) -> list[dict]:
     """
     Fetch farmer dataset from XAMPP MySQL/Supabase PostgreSQL schema used by Beanthentic-App.
@@ -1450,6 +1593,59 @@ def _app_fetch_farmer_rows(limit: int = 2000) -> list[dict]:
     from config.farmer_profile_photo import farmer_photo_select_sql
 
     photo_select = farmer_photo_select_sql(conn) or ", f.profile_photo AS profile_photo_data"
+    optional_selects = [
+        _optional_select_expr(
+            conn,
+            table_name="farm_information",
+            table_alias="fi",
+            alias="coffee_varieties",
+            candidates=(
+                "coffee_varieties",
+                "coffee_variety",
+                "varieties_produced",
+                "coffee_varieties_produced",
+            ),
+        ),
+        _optional_select_expr(
+            conn,
+            table_name="farm_information",
+            table_alias="fi",
+            alias="coffee_distribution",
+            candidates=(
+                "coffee_distribution",
+                "distribution_option",
+                "distribution_method",
+                "delivery_method",
+            ),
+        ),
+    ]
+    for variety in ("liberica", "excelsa", "robusta"):
+        optional_selects.extend(
+            [
+                _optional_select_expr(
+                    conn,
+                    table_name="production_information",
+                    table_alias="prod",
+                    alias=f"{variety}_harvest_unit",
+                    candidates=(f"{variety}_harvest_unit", f"{variety}_harvest_qty_unit", f"{variety}_harvest_uom"),
+                ),
+                _optional_select_expr(
+                    conn,
+                    table_name="production_information",
+                    table_alias="prod",
+                    alias=f"{variety}_gcb_unit",
+                    candidates=(f"{variety}_gcb_unit", f"{variety}_gcb_qty_unit", f"{variety}_gcb_uom"),
+                ),
+                _optional_select_expr(
+                    conn,
+                    table_name="production_information",
+                    table_alias="prod",
+                    alias=f"{variety}_roasted_unit",
+                    candidates=(f"{variety}_roasted_unit", f"{variety}_roasted_qty_unit", f"{variety}_roasted_uom"),
+                ),
+            ]
+        )
+    optional_select_sql = ",\n        ".join(optional_selects)
     sql = f"""
       SELECT
         f.{farmer_pk} AS farmer_id,
@@ -1480,6 +1676,7 @@ def _app_fetch_farmer_rows(limit: int = 2000) -> list[dict]:
         prod.robusta_qty_kg,
         prod.liberica_qty_kg,
         prod.excelsa_qty_kg,
+        {optional_select_sql},
         {PRODUCTION_DETAIL_SELECT_SQL},
         f.is_suspended,
         f.suspended_until,

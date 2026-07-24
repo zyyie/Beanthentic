@@ -832,6 +832,14 @@
                                 <label>RSBSA Registered Number</label>
                                 <span id="farmerProfileRsbsaNumberText" class="bold-value">—</span>
                               </div>
+                              <div class="detail-field">
+                                <label>RSBSA Status</label>
+                                <span id="farmerProfileRsbsaStatusText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>NCFRS</label>
+                                <span id="farmerProfileNcfrsText" class="bold-value">—</span>
+                              </div>
                             </div>
                           </section>
 
@@ -846,6 +854,40 @@
                               <div class="detail-field">
                                 <label>Total Plant Area</label>
                                 <span id="farmerProfileTotalAreaText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Coffee Varieties</label>
+                                <span id="farmerProfileCoffeeVarietiesText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Coffee Distribution</label>
+                                <span id="farmerProfileDistributionText" class="bold-value">—</span>
+                              </div>
+                            </div>
+                          </section>
+
+                          <section class="registration-detail-section">
+                            <h3>Delivery Split (Sell vs Drop-off)</h3>
+                            <div class="registration-detail-grid">
+                              <div class="detail-field">
+                                <label>Selected Flow</label>
+                                <span id="farmerProfileFlowPreferenceText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Summary</label>
+                                <span id="farmerProfileFlowSummaryText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Liberica</label>
+                                <span id="farmerProfileFlowLibText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Excelsa</label>
+                                <span id="farmerProfileFlowExcText" class="bold-value">—</span>
+                              </div>
+                              <div class="detail-field">
+                                <label>Robusta</label>
+                                <span id="farmerProfileFlowRobText" class="bold-value">—</span>
                               </div>
                             </div>
                           </section>
@@ -1366,6 +1408,17 @@
                 <div>
                   <h2 style="margin: 0;">Coffee Bean Pricing</h2>
                   <p class="coffee-pricing-subtitle">Manage drop-off reference prices and review farmer self-sale price applications.</p>
+                  <div class="coffee-pricing-self-sale-bar" id="coffeePricingSelfSaleBar">
+                    <label for="coffeePricingSelfSaleFarmerSelect" class="coffee-pricing-self-sale-label">Self-sale control</label>
+                    <select id="coffeePricingSelfSaleFarmerSelect" class="coffee-pricing-self-sale-select">
+                      <option value="">Select farmer</option>
+                    </select>
+                    <label class="self-sale-toggle coffee-pricing-self-sale-toggle" title="Enable farmer self-sale">
+                      <input type="checkbox" id="coffeePricingSelfSaleToggle" />
+                      <span class="self-sale-toggle-slider"></span>
+                    </label>
+                    <span id="coffeePricingSelfSaleStatus" class="coffee-pricing-self-sale-status">Select a farmer to manage self-sale.</span>
+                  </div>
                 </div>
                 <button type="button" class="action-btn" id="coffeePricingRefreshBtn">
                   <i class="fa-solid fa-rotate" aria-hidden="true"></i>
@@ -1377,9 +1430,6 @@
                 <div class="coffee-pricing-card">
                   <div class="coffee-pricing-card-head">
                     <h3>Official Pricelist</h3>
-                    <button type="button" class="btn btn-secondary btn-sm" id="coffeePricelistAddBtn">
-                      <i class="fa-solid fa-plus"></i> Add price row
-                    </button>
                   </div>
                   <div class="table-wrapper">
                     <table class="data-table" id="coffeePricelistTable">

@@ -1569,5 +1569,29 @@
     "source": "generated_pad_not_ready",
     "task_id": "phase2-details",
     "notes": "Padded sample 1 for phase2-details"
+  },
+  {
+    "text": "Guimaras Mango Geographical Indication — Introduction & Reputation\nCarabao mangoes from Guimaras are renowned among producers and consumers.\nThis geographical indication filing documents distinctive quality, heritage,\nand reputation of Guimaras mangoes. Tradition and origin justify GI protection.\nNo Kapeng Barako or Coffea liberica content.",
+    "label": "Not Ready",
+    "score": 0,
+    "source": "wrong_product_guimaras_mango",
+    "task_id": "phase1-introduction",
+    "notes": "Wrong product: Guimaras mango GI structure must not pass Kapeng Barako analysis"
+  },
+  {
+    "text": "History of Tnalak weaving among the T'boli people of South Cotabato.\nHeritage textile tradition and cultural continuity of handwoven abaca patterns\nspan centuries. Colonial and tribal history shaped the craft; weavers continue\nthe practice today. Geographical indication narrative for Tnalak cloth.\nNot a Kapeng Barako coffee filing.",
+    "label": "Not Ready",
+    "score": 0,
+    "source": "wrong_product_tnalak",
+    "task_id": "phase1-history",
+    "notes": "Wrong product: Tnalak GI-style history must not pass Kapeng Barako analysis"
+  },
+  {
+    "text": "Physical / causal link to the territory for a generic GI product.\nVolcanic soil, climate, elevation and rainfall create a microclimate that forms\na causal link between the territory and product quality. Physiography, slope and\ntemperature Type I conditions explain suitability of the production area.\nDocument never names Kapeng Barako, Liberica, Lipa, or Batangas coffee.",
+    "label": "Not Ready",
+    "score": 0,
+    "source": "wrong_product_generic_gi_structure",
+    "task_id": "phase1-physical-link",
+    "notes": "Generic GI structure without Kapeng Barako identity must be Not Ready"
   }
 ]

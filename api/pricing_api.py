@@ -47,10 +47,18 @@ def register_pricing_routes(app):
             return jsonify({"error": "Unauthorized"}), 401
         if not is_configured():
             return _pricing_unavailable()
-        _ensure_schema_once()
-        active_only = request.args.get("include_inactive") != "1"
-        items = list_pricelist(active_only=active_only)
-        return jsonify({"ok": True, "items": items, "options": classification_options()})
+        try:
+            _ensure_schema_once()
+            # Official pricelist is one active row per variety.
+            items = list_pricelist(active_only=True)
+            return jsonify({"ok": True, "items": items, "options": classification_options()})
+        except Exception as exc:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": safe_error_message(exc, public="Could not load coffee pricelist."),
+                }
+            ), 500
 
     @app.route("/api/coffee-pricelist", methods=["POST"])
     def api_coffee_pricelist_upsert():
@@ -107,17 +115,26 @@ def register_pricing_routes(app):
             return jsonify({"error": "Unauthorized"}), 401
         if not is_configured():
             return _pricing_unavailable()
-        _ensure_schema_once()
-        farmer_id = None
-        if request.args.get("farmer_id"):
-            ok_fid, fid_err, farmer_id = validate_positive_int(
-                request.args.get("farmer_id"), field="farmer_id", minimum=1
-            )
-            if not ok_fid:
-                return jsonify({"ok": False, "error": fid_err}), 400
-        status = (request.args.get("status") or "").strip() or None
-        items = list_price_applications(farmer_id=farmer_id, status=status)
-        return jsonify({"ok": True, "items": items})
+        try:
+            _ensure_schema_once()
+            farmer_id = None
+            if request.args.get("farmer_id"):
+                ok_fid, fid_err, farmer_id = validate_positive_int(
+                    request.args.get("farmer_id"), field="farmer_id", minimum=1
+                )
+                if not ok_fid:
+                    return jsonify({"ok": False, "error": fid_err}), 400
+            status = (request.args.get("status") or "").strip() or None
+            items = list_price_applications(farmer_id=farmer_id, status=status)
+            return jsonify({"ok": True, "items": items})
+        except Exception as exc:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": safe_error_message(exc, public="Could not load price applications."),
+                    "items": [],
+                }
+            ), 500
 
     @app.route("/api/farmer-price-applications/<int:application_id>/review", methods=["POST"])
     def api_review_price_application(application_id: int):
@@ -159,7 +176,9 @@ def register_pricing_routes(app):
             return _pricing_unavailable()
         _ensure_schema_once()
         ok_fid, fid_err, farmer_id = validate_positive_int(
-            request.args.get("farmer_id"), field="farmer_id", minimum=1
+            request.args.get("farmer_id") or request.args.get("farmer_no"),
+            field="farmer_id",
+            minimum=1,
         )
         if not ok_fid:
             return jsonify({"ok": False, "error": fid_err}), 400
@@ -190,7 +209,9 @@ def register_pricing_routes(app):
             return _pricing_unavailable()
         _ensure_schema_once()
         ok_fid, fid_err, farmer_id = validate_positive_int(
-            request.args.get("farmer_id"), field="farmer_id", minimum=1
+            request.args.get("farmer_id") or request.args.get("farmer_no"),
+            field="farmer_id",
+            minimum=1,
         )
         if not ok_fid:
             return jsonify({"ok": False, "error": fid_err}), 400

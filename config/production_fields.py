@@ -248,8 +248,43 @@ def expand_production_detail_into_row(row: dict) -> dict:
                 if v not in VARIETIES or not isinstance(block, dict):
                     continue
                 harvest_qty = block.get("harvest_qty_kg")
+                harvest_unit = block.get("harvest_unit")
+                harvest_block = block.get("harvest")
+                if isinstance(harvest_block, dict):
+                    if harvest_qty in (None, ""):
+                        harvest_qty = harvest_block.get("qty_kg")
+                    if harvest_qty in (None, ""):
+                        harvest_qty = harvest_block.get("quantity_kg")
+                    if harvest_qty in (None, ""):
+                        harvest_qty = harvest_block.get("quantity")
+                    if harvest_unit in (None, ""):
+                        harvest_unit = (
+                            harvest_block.get("unit")
+                            or harvest_block.get("unit_label")
+                            or harvest_block.get("uom")
+                        )
                 if harvest_qty is not None and harvest_qty != "":
                     out[f"{v}_harvest_qty_kg"] = harvest_qty
+                if harvest_unit is not None and str(harvest_unit).strip():
+                    out[f"{v}_harvest_unit"] = str(harvest_unit).strip()
+                allocation = block.get("allocation")
+                if isinstance(allocation, dict):
+                    sell_qty = allocation.get("sell_qty_kg")
+                    if sell_qty in (None, ""):
+                        sell_qty = allocation.get("sell_kg")
+                    if sell_qty in (None, ""):
+                        sell_qty = allocation.get("sell")
+                    dropoff_qty = allocation.get("dropoff_qty_kg")
+                    if dropoff_qty in (None, ""):
+                        dropoff_qty = allocation.get("dropoff_kg")
+                    if dropoff_qty in (None, ""):
+                        dropoff_qty = allocation.get("dropoff")
+                    if dropoff_qty in (None, ""):
+                        dropoff_qty = allocation.get("drop_off")
+                    if sell_qty not in (None, ""):
+                        out[f"{v}_sell_qty_kg"] = sell_qty
+                    if dropoff_qty not in (None, ""):
+                        out[f"{v}_dropoff_qty_kg"] = dropoff_qty
                 for section, keys in (("gcb", ("qty_kg", "classification", "classification_label")), ("roasted", ("qty_kg", "classification", "classification_label"))):
                     part = block.get(section)
                     if not isinstance(part, dict):
@@ -262,6 +297,9 @@ def expand_production_detail_into_row(row: dict) -> dict:
                             out[f"{v}_{section}_qty_kg"] = val
                         elif key in ("classification", "classification_label"):
                             out[f"{v}_{section}_classification"] = _coerce_classification_value(val, kind=section)
+                    unit_val = part.get("unit") or part.get("unit_label") or part.get("uom")
+                    if unit_val is not None and str(unit_val).strip():
+                        out[f"{v}_{section}_unit"] = str(unit_val).strip()
     return out
 
 
@@ -414,23 +452,44 @@ def production_row_extensions(row: dict) -> dict[str, Any]:
         roasted_class_raw = roasted_classification_raw(row, v)
         gcb_class_label = gcb_classification_label(gcb_class_raw)
         roasted_class_label = roasted_classification_label(roasted_class_raw)
+        harvest_unit = str(
+            row.get(f"{v}_harvest_unit")
+            or row.get(f"{cap} HARVEST UNIT")
+            or ""
+        ).strip()
+        gcb_unit = str(
+            row.get(f"{v}_gcb_unit")
+            or row.get(f"{cap} GCB UNIT")
+            or "kg"
+        ).strip()
+        roasted_unit = str(
+            row.get(f"{v}_roasted_unit")
+            or row.get(f"{cap} ROASTED UNIT")
+            or "kg"
+        ).strip()
 
         out[f"{v}_harvest_qty_kg"] = harvest_qty
+        out[f"{v}_harvest_unit"] = harvest_unit
         out[f"{v}_gcb_qty_kg"] = gcb_qty
+        out[f"{v}_gcb_unit"] = gcb_unit
         out[f"{v}_gcb_classification"] = gcb_class_label
         out[f"{v}_gcb_classification_code"] = _normalize_classification_key(
             gcb_class_raw, GCB_CLASSIFICATION_LABELS
         )
         out[f"{v}_roasted_qty_kg"] = roasted_qty
+        out[f"{v}_roasted_unit"] = roasted_unit
         out[f"{v}_roasted_classification"] = roasted_class_label
         out[f"{v}_roasted_classification_code"] = _normalize_classification_key(
             roasted_class_raw, ROASTED_CLASSIFICATION_LABELS
         )
 
         out[f"{cap} HARVEST QTY"] = harvest_qty
+        out[f"{cap} HARVEST UNIT"] = harvest_unit
         out[f"{cap} GCB QTY"] = gcb_qty
+        out[f"{cap} GCB UNIT"] = gcb_unit
         out[f"{cap} GCB CLASSIFICATION"] = gcb_class_label
         out[f"{cap} ROASTED QTY"] = roasted_qty
+        out[f"{cap} ROASTED UNIT"] = roasted_unit
         out[f"{cap} ROASTED CLASSIFICATION"] = roasted_class_label
 
         # Legacy production columns (FI totals for yields tab)
@@ -442,21 +501,72 @@ def production_row_extensions(row: dict) -> dict[str, Any]:
 
 def production_detail_payload(row: dict) -> dict:
     """Structured JSON for farmer profile / client consumers."""
+    existing_detail = parse_production_detail_value(
+        row.get(PRODUCTION_DETAIL_JSON_COLUMN) or row.get("production_detail")
+    )
+    existing_varieties = (
+        existing_detail.get("varieties")
+        if isinstance(existing_detail, dict) and isinstance(existing_detail.get("varieties"), dict)
+        else {}
+    )
     varieties: dict[str, dict] = {}
     for v in VARIETIES:
+        existing_block = existing_varieties.get(v) if isinstance(existing_varieties, dict) else {}
+        existing_alloc = (
+            existing_block.get("allocation")
+            if isinstance(existing_block, dict) and isinstance(existing_block.get("allocation"), dict)
+            else {}
+        )
         gcb_class_raw = gcb_classification_raw(row, v)
         roasted_class_raw = roasted_classification_raw(row, v)
+        sell_qty = _num(
+            row.get(f"{v}_sell_qty_kg")
+            or row.get(f"{v}_sell_kg")
+            or row.get(f"{v.upper()} SELL QTY")
+            or existing_alloc.get("sell_qty_kg")
+            or existing_alloc.get("sell_kg")
+            or existing_alloc.get("sell")
+        )
+        dropoff_qty = _num(
+            row.get(f"{v}_dropoff_qty_kg")
+            or row.get(f"{v}_dropoff_kg")
+            or row.get(f"{v.upper()} DROPOFF QTY")
+            or existing_alloc.get("dropoff_qty_kg")
+            or existing_alloc.get("dropoff_kg")
+            or existing_alloc.get("dropoff")
+            or existing_alloc.get("drop_off")
+        )
+        allocation = {
+            "sell_qty_kg": sell_qty,
+            "dropoff_qty_kg": dropoff_qty,
+        }
         varieties[v] = {
             "harvest_qty_kg": harvest_qty_for_variety(row, v),
+            "harvest_unit": str(
+                row.get(f"{v}_harvest_unit")
+                or row.get(f"{v.upper()} HARVEST UNIT")
+                or ""
+            ).strip(),
             "gcb": {
                 "qty_kg": gcb_qty_for_variety(row, v),
+                "unit": str(
+                    row.get(f"{v}_gcb_unit")
+                    or row.get(f"{v.upper()} GCB UNIT")
+                    or "kg"
+                ).strip(),
                 "classification": _normalize_classification_key(gcb_class_raw, GCB_CLASSIFICATION_LABELS),
                 "classification_label": gcb_classification_label(gcb_class_raw),
             },
             "roasted": {
                 "qty_kg": roasted_qty_for_variety(row, v),
+                "unit": str(
+                    row.get(f"{v}_roasted_unit")
+                    or row.get(f"{v.upper()} ROASTED UNIT")
+                    or "kg"
+                ).strip(),
                 "classification": _normalize_classification_key(roasted_class_raw, ROASTED_CLASSIFICATION_LABELS),
                 "classification_label": roasted_classification_label(roasted_class_raw),
             },
+            "allocation": allocation,
         }
     return {"varieties": varieties}

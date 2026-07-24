@@ -1054,6 +1054,7 @@ class GIAnalyzer:
             "sections_found": sum(1 for s in sections if s.get("found")),
             "sections_total": len(sections),
             "improvements": improvements,
+            "product_focus": review.get("product_focus"),
             "terms": [
                 {
                     "term": t.get("label"),
@@ -1071,7 +1072,7 @@ class GIAnalyzer:
             rubric_sections=sections,
             term_matches=self._term_matches,
             task_id=task_id,
-            document_ready=(status == "Ready"),
+            document_ready=(status == "Ready" and bool((review.get("product_focus") or {}).get("ok", True))),
             source_text=text,
             text_length=len(text or ""),
             mandatory_met=sum(1 for t in themes if t.get("critical") and t.get("coverage") != "missing"),
@@ -1108,6 +1109,7 @@ class GIAnalyzer:
             "section_score": None,
             "ip_pillar_assessment": ip_pillar_assessment,
             "improvements": improvements,
+            "product_focus": review.get("product_focus"),
         }
 
     def _task_keyword_ml_score(self, text: str, checklist: Dict) -> int:

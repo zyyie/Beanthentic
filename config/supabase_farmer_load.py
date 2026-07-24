@@ -97,6 +97,18 @@ def _merge_farmer_row(
         "barangay": pi.get("barangay") or fi.get("barangay") or farmer.get("address_barangay"),
         "ownership_status": fi.get("ownership_status"),
         "farm_size_ha": fi.get("farm_size_ha") or fi.get("total_area_planted_ha"),
+        "coffee_varieties": (
+            fi.get("coffee_varieties")
+            or fi.get("coffee_variety")
+            or fi.get("varieties_produced")
+            or fi.get("coffee_varieties_produced")
+        ),
+        "coffee_distribution": (
+            fi.get("coffee_distribution")
+            or fi.get("distribution_option")
+            or fi.get("distribution_method")
+            or fi.get("delivery_method")
+        ),
         "federation_assoc": ai.get("federation_assoc") or ai.get("fa_officer_member"),
         "ncfrs": ai.get("ncfrs"),
         "rsbsa_registered": ai.get("rsbsa_registered"),
@@ -115,20 +127,29 @@ def _merge_farmer_row(
             key: prod.get(key)
             for key in (
                 "liberica_harvest_qty_kg",
+                "liberica_harvest_unit",
                 "robusta_harvest_qty_kg",
+                "robusta_harvest_unit",
                 "excelsa_harvest_qty_kg",
+                "excelsa_harvest_unit",
                 "liberica_gcb_classification",
                 "liberica_gcb_qty_kg",
+                "liberica_gcb_unit",
                 "robusta_gcb_classification",
                 "robusta_gcb_qty_kg",
+                "robusta_gcb_unit",
                 "excelsa_gcb_classification",
                 "excelsa_gcb_qty_kg",
+                "excelsa_gcb_unit",
                 "liberica_roasted_classification",
                 "liberica_roasted_qty_kg",
+                "liberica_roasted_unit",
                 "robusta_roasted_classification",
                 "robusta_roasted_qty_kg",
+                "robusta_roasted_unit",
                 "excelsa_roasted_classification",
                 "excelsa_roasted_qty_kg",
+                "excelsa_roasted_unit",
                 PRODUCTION_DETAIL_JSON_COLUMN,
             )
         },

@@ -37,6 +37,36 @@ tests = [
         LGU certificate of locality and batch/lot records are maintained.
         """,
     ),
+    (
+        "guimaras mango wrong product",
+        "phase1-introduction",
+        """
+        Guimaras mangoes are renowned for their reputation as a geographical
+        indication product. Carabao mango from Guimaras has a distinctive sweet
+        flavor and strong tradition among producers and consumers. The origin
+        and heritage of mango cultivation justify GI protection.
+        """,
+    ),
+    (
+        "tnalak wrong product",
+        "phase1-history",
+        """
+        History of Tnalak weaving among the T'boli people of South Cotabato.
+        This heritage textile tradition and cultural continuity of handwoven
+        abaca patterns span centuries. Colonial and tribal history shaped the
+        craft and farmers and weavers continue the practice today.
+        """,
+    ),
+    (
+        "generic gi structure no barako",
+        "phase1-physical-link",
+        """
+        Volcanic soil, climate, elevation and rainfall create a microclimate
+        that forms a causal link between the territory and product quality.
+        Physiography, slope and temperature Type I conditions explain
+        suitability of the production area for this geographical indication.
+        """,
+    ),
 ]
 
 tmp = Path("machinelearning/uploads/_verify_ml.txt")

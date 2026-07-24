@@ -4482,7 +4482,7 @@ body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.ac
 #farmerTableBasic { min-width: 700px; }
 /* Tree / Production min-widths: see css/farmer-trees-production-tables.css */
 #farmerTableAffiliation { min-width: 700px; }
-#farmerTableFarm { min-width: 800px; }
+#farmerTableFarm { min-width: 940px; }
 
 /* Affiliation specific column widths */
 #farmerTableAffiliation.data-table th:nth-child(4) { width: 140px; } /* FA Officer/Member */
@@ -4497,7 +4497,13 @@ body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.ac
 #farmerTableFarm.data-table thead tr:nth-child(2) th:nth-child(3) { width: 90px; min-width: 90px; }
 #farmerTableFarm.data-table thead tr:nth-child(2) th:nth-child(4) { width: 100px; min-width: 100px; }
 #farmerTableFarm.data-table thead tr:nth-child(2) th:nth-child(5) { width: 80px; min-width: 80px; }
-#farmerTableFarm.data-table thead tr:first-child > th:nth-child(5) { width: 120px; min-width: 120px; } /* Total Area */
+#farmerTableFarm.data-table thead tr:first-child > th:nth-child(5) {
+  width: 220px;
+  min-width: 220px;
+  white-space: normal;
+  line-height: 1.2;
+  text-shadow: none;
+} /* Total Area */
 
 /* Farm Info: no white seam between “STATUS OF OWNERSHIP” and sub-headers */
 #farmerTableFarm.data-table thead tr:first-child > th[colspan="5"] {
@@ -7255,10 +7261,22 @@ body.dashboard-page #ipophl-module .phase-tasks {
   margin-top: 0.25rem;
 }
 
-body.dashboard-page #ipophl-module #phase-3 .phase-tasks,
+/* Phase 3: single card matches the width of Phase 1/2 cards */
+body.dashboard-page #ipophl-module #phase-3 .phase-tasks {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: none;
+}
+
+/* Phase 4: full width aligned with the stepper */
 body.dashboard-page #ipophl-module #phase-4 .phase-tasks {
   grid-template-columns: minmax(0, 1fr);
-  max-width: 42rem;
+  max-width: none;
+  width: 100%;
+}
+
+body.dashboard-page #ipophl-module #phase-4 .ipophl-compile-card {
+  width: 100%;
+  max-width: none;
 }
 
 body.dashboard-page #ipophl-module .ipophl-compile-panel {
@@ -7345,7 +7363,10 @@ body.dashboard-page #ipophl-module .ipophl-format-option:has(input:checked) {
 body.dashboard-page #ipophl-module .ipophl-compile-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.65rem;
+  width: 100%;
 }
 
 body.dashboard-page #ipophl-module .ipophl-compile-download-btn {
@@ -7421,10 +7442,68 @@ body.dashboard-page #ipophl-module .file-upload-zone {
   min-height: 78px;
   display: grid;
   place-items: center;
+  transition: min-height 0.2s ease, width 0.2s ease, padding 0.2s ease, border-radius 0.2s ease;
 }
 
 body.dashboard-page #ipophl-module .file-upload-zone i {
   color: #2c7a3e;
+}
+
+/* After a file is uploaded, collapse the large dropzone into a compact full-width add row */
+body.dashboard-page #ipophl-module .file-upload-zone.has-files {
+  min-height: 2.5rem;
+  width: 100%;
+  height: auto;
+  padding: 0.5rem 0.85rem;
+  margin: 0.35rem 0 0.15rem;
+  border-radius: 10px;
+  border-style: dashed;
+  border-width: 1.5px;
+  border-color: rgba(44, 122, 62, 0.45);
+  background: rgba(62, 166, 66, 0.08);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  align-self: stretch;
+  line-height: 1;
+}
+
+body.dashboard-page #ipophl-module .file-upload-zone.has-files:hover,
+body.dashboard-page #ipophl-module .file-upload-zone.has-files.drag-over {
+  background: rgba(62, 166, 66, 0.16);
+  border-color: #2c7a3e;
+  transform: none;
+}
+
+body.dashboard-page #ipophl-module .file-upload-zone.has-files i {
+  margin: 0;
+  padding: 0;
+  font-size: 0.9rem;
+  line-height: 1;
+  width: 1em;
+  height: 1em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+body.dashboard-page #ipophl-module .file-upload-zone.has-files p {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #2c7a3e;
+  white-space: nowrap;
+}
+
+body.dashboard-page #ipophl-module .attachment-area:has(.file-upload-zone.has-files) .attached-files {
+  margin-top: 0.45rem;
 }
 
 body.dashboard-page #ipophl-module .attached-files .file-item {
@@ -7434,6 +7513,23 @@ body.dashboard-page #ipophl-module .attached-files .file-item {
   gap: 0.75rem;
   padding: 0.65rem 0.75rem;
   margin-bottom: 0.5rem;
+}
+
+body.dashboard-page #ipophl-module .attached-files .file-item.success,
+body.dashboard-page #ipophl-module .attached-files .file-item.ai-enhanced:not(.not-ready):not(.ai-not-ready) {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+body.dashboard-page #ipophl-module .attached-files .file-item.not-ready,
+body.dashboard-page #ipophl-module .attached-files .file-item.ai-not-ready {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+body.dashboard-page #ipophl-module .attached-files .file-item.not-ready .file-meta,
+body.dashboard-page #ipophl-module .attached-files .file-item.ai-not-ready .file-meta {
+  color: #b91c1c;
 }
 
 body.dashboard-page #ipophl-module .attached-files .file-status-actions {
@@ -7484,8 +7580,19 @@ body.dashboard-page #ipophl-module .attached-files .file-status-actions {
 body.dashboard-page #ipophl-module .phase-actions {
   background: transparent;
   border: none;
-  padding: 0;
-  justify-content: flex-start;
+  padding: 0.35rem 0 0;
+  margin-top: 1rem;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* Keep "next / complete" on the far right even when there is no Back button */
+body.dashboard-page #ipophl-module .phase-actions .next-phase,
+body.dashboard-page #ipophl-module .phase-actions .complete-btn {
+  margin-left: auto;
 }
 
 body.dashboard-page #ipophl-module .phase-btn {
@@ -7505,7 +7612,8 @@ body.dashboard-page #ipophl-module .phase-btn.complete-btn:hover {
 }
 
 @media (max-width: 980px) {
-  body.dashboard-page #ipophl-module .phase-tasks {
+  body.dashboard-page #ipophl-module .phase-tasks,
+  body.dashboard-page #ipophl-module #phase-3 .phase-tasks {
     grid-template-columns: 1fr;
   }
 }
