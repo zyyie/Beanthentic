@@ -23,6 +23,10 @@ android-app/.idea/shelf/
 *.swo
 *~
 
+# macOS / OneDrive AppleDouble junk
+._*
+.DS_Store
+
 # Runtime data (avoid git pull conflicts)
 activity_log.json
 data/password_reset_tokens.json
