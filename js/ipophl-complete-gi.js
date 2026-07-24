@@ -1,5 +1,5 @@
 /**
- * IPOPHL Complete Registration — visible loading + upload to XAMPP gi_updates (GI Updates).
+ * IPOPHL Complete Registration — publish to GI Updates, then open Gmail to IPOPHL.
  */
 (function () {
   'use strict';
@@ -13,24 +13,144 @@
     return res.json();
   }
 
-  function statusEl() {
-    return document.getElementById('ipophl-complete-status');
+  function completeBtn() {
+    return document.querySelector('#ipophl-module .complete-btn');
   }
 
-  function setStatus(html, kind) {
-    const el = statusEl();
-    if (!el) return;
-    el.hidden = false;
-    el.className = 'ipophl-complete-status' + (kind ? ' is-' + kind : '');
-    el.innerHTML = html;
+  function setButtonCompleted() {
+    const btn = completeBtn();
+    if (!btn) return;
+    if (!btn.dataset.defaultLabel) {
+      btn.dataset.defaultLabel = (btn.textContent || 'Complete Registration').trim();
+    }
+    btn.disabled = true;
+    btn.classList.add('is-completed');
+    btn.classList.remove('is-loading');
+    btn.removeAttribute('aria-busy');
+    btn.textContent = btn.dataset.defaultLabel;
   }
 
-  function clearStatus() {
-    const el = statusEl();
-    if (!el) return;
-    el.hidden = true;
-    el.className = 'ipophl-complete-status';
-    el.innerHTML = '';
+  function setButtonEnabled() {
+    const btn = completeBtn();
+    if (!btn) return;
+    if (!btn.dataset.defaultLabel) {
+      btn.dataset.defaultLabel = (btn.textContent || 'Complete Registration').trim();
+    }
+    btn.disabled = false;
+    btn.classList.remove('is-completed', 'is-loading');
+    btn.removeAttribute('aria-busy');
+    btn.textContent = btn.dataset.defaultLabel;
+  }
+
+  function openPendingGmailTab() {
+    const tab = window.open('about:blank', '_blank');
+    if (!tab) return null;
+    try {
+      tab.document.title = 'Gmail — IPOPHL';
+      tab.document.body.innerHTML =
+        '<div style="font-family:system-ui,sans-serif;padding:2rem;color:#374151">' +
+        '<p style="font-size:1.1rem;margin:0 0 .5rem">Preparing Gmail for IPOPHL…</p>' +
+        '<p style="margin:0;color:#6b7280">Keep this tab open while registration finishes.</p>' +
+        '</div>';
+    } catch (_) {
+      /* cross-origin guard */
+    }
+    return tab;
+  }
+
+  function closeGmailTab(tab) {
+    if (!tab || tab.closed) return;
+    try {
+      tab.close();
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  function navigateGmailTab(tab, url) {
+    if (!url) return false;
+    if (tab && !tab.closed) {
+      try {
+        tab.location.href = url;
+        tab.focus();
+        return true;
+      } catch (_) {
+        /* fall through */
+      }
+    }
+    const opened = window.open(url, '_blank');
+    return !!(opened && !opened.closed);
+  }
+
+  async function downloadRegistrationZip() {
+    const res = await fetch(API('/api/ipophl/registration-zip'), { credentials: 'same-origin' });
+    if (!res.ok) {
+      const err = await parseJson(res).catch(() => ({}));
+      throw new Error(err.error || `Could not download registration zip (HTTP ${res.status})`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'beanthentic-ipophl-registration.zip';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  async function resolveGmailInfo(gmailInfo) {
+    if (gmailInfo && gmailInfo.gmail_url) return gmailInfo;
+    const res = await fetch(API('/api/ipophl/gmail-compose'), { credentials: 'same-origin' });
+    const data = await parseJson(res).catch(() => ({}));
+    if (!res.ok || !data.gmail_url) {
+      throw new Error(data.error || 'Could not prepare Gmail compose link.');
+    }
+    return data;
+  }
+
+  function notifyGmailFallback(url, to) {
+    const recipient = to || 'info@ipophl.gov.ph';
+    const el = document.createElement('div');
+    el.className = 'ipophl-notification ipophl-notification--gmail-fallback';
+    el.style.cssText =
+      'position:fixed;top:20px;right:20px;background:#92400e;color:#fff;padding:14px 18px;border-radius:8px;z-index:99999;max-width:400px;line-height:1.45;';
+    const text = document.createElement('p');
+    text.style.margin = '0 0 8px';
+    text.textContent = 'Popup blocked. Open Gmail manually for ' + recipient + ':';
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = 'Open Gmail compose';
+    link.style.cssText = 'color:#fff;text-decoration:underline';
+    el.appendChild(text);
+    el.appendChild(link);
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 30000);
+  }
+
+  async function openGmailToIpophl(gmailInfo, gmailTab) {
+    const info = await resolveGmailInfo(gmailInfo);
+    const opened = navigateGmailTab(gmailTab, info.gmail_url);
+    if (!opened) {
+      notifyGmailFallback(info.gmail_url, info.to);
+    } else {
+      notify(
+        'Gmail opened for IPOPHL (' +
+          (info.to || 'info@ipophl.gov.ph') +
+          '). Attach the downloaded zip, then send.'
+      );
+    }
+    try {
+      await downloadRegistrationZip();
+    } catch (zipErr) {
+      console.warn('Registration zip download failed:', zipErr);
+      notify(
+        (zipErr.message || 'Zip download failed') +
+          ' — attach files manually from the IPOPHL module if needed.'
+      );
+    }
   }
 
   function notify(msg) {
@@ -42,46 +162,9 @@
     el.className = 'ipophl-notification';
     el.textContent = msg;
     el.style.cssText =
-      'position:fixed;top:20px;right:20px;background:#145e1e;color:#fff;padding:14px 18px;border-radius:8px;z-index:99999;max-width:400px;line-height:1.45;';
+      'position:fixed;top:20px;right:20px;background:#047857;color:#fff;padding:14px 18px;border-radius:8px;z-index:99999;max-width:400px;line-height:1.45;';
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 12000);
-  }
-
-  function setLoading(isLoading, label) {
-    const btn = document.querySelector('#ipophl-module .complete-btn');
-    if (!btn) return;
-    if (!btn.dataset.defaultLabel) {
-      btn.dataset.defaultLabel = (btn.textContent || 'Complete Registration').trim();
-    }
-    if (isLoading) {
-      btn.disabled = true;
-      btn.classList.add('is-loading');
-      btn.setAttribute('aria-busy', 'true');
-      btn.innerHTML =
-        '<span class="complete-btn-spinner" aria-hidden="true"></span>' +
-        '<span class="complete-btn-label">' +
-        (label || 'Sending to XAMPP / GI Updates…') +
-        '</span>';
-    } else {
-      btn.disabled = false;
-      btn.classList.remove('is-loading');
-      btn.removeAttribute('aria-busy');
-      btn.textContent = btn.dataset.defaultLabel;
-    }
-  }
-
-  function busyStatus(title, steps) {
-    const stepHtml = (steps || [])
-      .map(
-        (s) =>
-          '<div class="status-step"><i class="fa-solid ' +
-          (s.done ? 'fa-check' : s.active ? 'fa-spinner fa-spin' : 'fa-circle') +
-          '"></i><span>' +
-          s.text +
-          '</span></div>'
-      )
-      .join('');
-    setStatus('<strong>' + title + '</strong>' + stepHtml, 'busy');
   }
 
   function collectExistingUuids() {
@@ -164,19 +247,8 @@
     }
   }
 
-  async function fetchServerUuids() {
-    const entries = await fetchServerFileEntries();
-    return entries.map((e) => e.file_uuid).filter(Boolean);
-  }
-
-  async function publishIpophlToGiUpdates() {
-    setLoading(true, 'Starting…');
-    busyStatus('Sending to GI Updates', [
-      { text: 'Collecting files from Phase 5…', active: true },
-      { text: 'Upload to admin server', active: false },
-      { text: 'Save to XAMPP MySQL (gi_updates)', active: false },
-      { text: 'Sync for mobile app', active: false },
-    ]);
+  async function publishIpophlToGiUpdates(gmailTab) {
+    setButtonCompleted();
 
     const pending =
       window.ipophlAnalyzer && typeof window.ipophlAnalyzer.collectPendingUploads === 'function'
@@ -186,7 +258,6 @@
     let existingUuids = fileEntries.map((e) => e.file_uuid).filter(Boolean);
 
     if (!pending.length && !existingUuids.length) {
-      setLoading(true, 'Checking saved documents…');
       fileEntries = await fetchServerFileEntries();
       existingUuids = fileEntries.map((e) => e.file_uuid).filter(Boolean);
     }
@@ -194,33 +265,11 @@
     const fileCount = pending.length + existingUuids.length;
 
     if (!fileCount) {
-      setLoading(false);
-      busyStatus('Walang file na ipapadala', [
-        {
-          text: 'Pumili muna ng file sa Phase 5 (berdeng dashed card), tapos click ulit ang Complete Registration.',
-          active: false,
-        },
-      ]);
-      setStatus(
-        '<strong>Walang file</strong><p>Pumili ng file sa Phase 5, hintayin ang berdeng card na “Ready”, tapos click Complete Registration.</p>',
-        'err'
-      );
+      closeGmailTab(gmailTab);
+      setButtonEnabled();
       notify('Pumili muna ng file sa Phase 5, tapos Complete Registration.');
       return;
     }
-
-    setLoading(
-      true,
-      pending.length
-        ? `Uploading ${pending.length} file(s)…`
-        : `Saving ${existingUuids.length} file(s) to XAMPP…`
-    );
-    busyStatus('Sending to GI Updates', [
-      { text: `Publishing ${fileCount} file(s) from IPOPHL zones…`, done: true },
-      { text: 'Sync files to app server (one batch)', active: true },
-      { text: 'Save to gi_updates', active: false },
-      { text: 'Ready on mobile', active: false },
-    ]);
 
     const form = new FormData();
     pending.forEach(({ file, task_id }) => {
@@ -236,7 +285,6 @@
     form.append('publish_all_categories', 'false');
     form.append('force_publish', 'true');
 
-    setLoading(true, 'Checking MySQL + app server…');
     try {
       const pre = await fetch(API('/api/ipophl/publish-preflight'), {
         credentials: 'same-origin',
@@ -245,9 +293,9 @@
       if (preData.ok === false) {
         const parts = [];
         if (preData.mysql_reachable === false && preData.mysql_error) {
-          parts.push('MySQL: ' + preData.mysql_error);
+          parts.push('Database: ' + preData.mysql_error);
         }
-        if (preData.xampp_reachable === false) {
+        if (preData.xampp_reachable === false && preData.source !== 'supabase') {
           parts.push(
             preData.error ||
               'App server (port 8080) hindi maabot. I-start ang python app.py sa XAMPP PC.'
@@ -255,33 +303,12 @@
         }
         throw new Error(parts.join(' ') || preData.error || 'Connection check failed.');
       }
-      busyStatus('Sending to GI Updates', [
-        { text: `Found ${pending.length} new + ${existingUuids.length} saved file(s)`, done: true },
-        {
-          text:
-            'MySQL ' +
-            (preData.mysql_reachable ? 'OK' : '—') +
-            ' · App :8080 ' +
-            (preData.xampp_reachable ? 'OK' : '—'),
-          done: true,
-        },
-        { text: 'Uploading and saving…', active: true },
-        { text: 'Sync for mobile app', active: false },
-      ]);
     } catch (preErr) {
-      setLoading(false);
-      setStatus('<strong>Connection failed</strong><p>' + (preErr.message || preErr) + '</p>', 'err');
+      closeGmailTab(gmailTab);
+      setButtonEnabled();
       notify(preErr.message || String(preErr));
       return;
     }
-
-    setLoading(true, 'Saving to XAMPP MySQL…');
-    busyStatus('Sending to GI Updates', [
-      { text: `Found ${pending.length} new + ${existingUuids.length} saved file(s)`, done: true },
-      { text: 'Upload to admin server', done: true },
-      { text: 'Writing to gi_updates (XAMPP)…', active: true },
-      { text: 'Sync for mobile app', active: false },
-    ]);
 
     try {
       const res = await fetch(API('/api/ipophl/complete-registration'), {
@@ -296,37 +323,8 @@
       }
       if (!res.ok || data.ok === false) {
         const detail = data.detail || data.error || data.message;
-        throw new Error(
-          detail || 'Save failed (HTTP ' + res.status + ')'
-        );
+        throw new Error(detail || 'Save failed (HTTP ' + res.status + ')');
       }
-
-      setLoading(true, 'Done — opening GI inbox…');
-      busyStatus('Success', [
-        { text: 'Upload to admin server', done: true },
-        { text: 'XAMPP MySQL saved', done: true },
-        { text: 'Ready on mobile — refresh GI Updates', done: true },
-      ]);
-
-      const cards = data.cards_published != null ? data.cards_published : '?';
-      const dbRows = data.db_rows != null ? data.db_rows : '?';
-      const withFiles = data.categories_with_files != null ? data.categories_with_files : '?';
-
-      setStatus(
-        '<strong>Na-save sa database</strong>' +
-          '<p>' +
-          (data.message || 'Published to GI Updates.') +
-          '</p>' +
-          '<p><small>Cards: <strong>' +
-          cards +
-          '</strong> · Files with attachment: <strong>' +
-          withFiles +
-          '</strong> · Admin rows in DB: <strong>' +
-          dbRows +
-          '</strong></small></p>' +
-          '<p><small>Sa phone: GI Updates → refresh. Farmer messages (green envelope) → Farmer\'s Contribution sa admin.</small></p>',
-        'ok'
-      );
 
       if (window.ipophlAnalyzer?.clearPendingAfterPublish) {
         window.ipophlAnalyzer.clearPendingAfterPublish();
@@ -335,12 +333,19 @@
         await window.ipophlAnalyzer.loadExistingDocuments();
       }
 
+      const cards = data.cards_published != null ? data.cards_published : '?';
       notify(
         data.message ||
-          'Saved to XAMPP! GI Updates: ' + cards + ' card(s). I-refresh ang app.'
+          'Published to GI Updates: ' + cards + ' card(s). Farmers can refresh the app.'
       );
 
-      /* IPOPHL → mobile GI Updates only; farmer compose messages → Farmer's Contribution inbox */
+      try {
+        await openGmailToIpophl(data.gmail, gmailTab);
+      } catch (gmailErr) {
+        console.warn('Gmail redirect failed:', gmailErr);
+        closeGmailTab(gmailTab);
+        notify(gmailErr.message || 'GI Updates saved, but Gmail could not be opened.');
+      }
     } catch (err) {
       console.error('GI publish failed:', err);
       let msg = err.message || 'Could not save to GI Updates.';
@@ -348,10 +353,9 @@
         msg =
           'Hindi maabot ang web.py. I-restart ang python web.py sa PC na ito, tapos Ctrl+Shift+R.';
       }
-      setStatus('<strong>Hindi na-save</strong><p>' + msg + '</p>', 'err');
+      closeGmailTab(gmailTab);
+      setButtonEnabled();
       notify(msg);
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -367,8 +371,9 @@
       e.preventDefault();
       e.stopImmediatePropagation();
       e.stopPropagation();
-      if (btn.disabled || btn.classList.contains('is-loading')) return;
-      publishIpophlToGiUpdates();
+      if (btn.disabled || btn.classList.contains('is-completed')) return;
+      const gmailTab = openPendingGmailTab();
+      publishIpophlToGiUpdates(gmailTab);
     },
     true
   );
@@ -377,7 +382,10 @@
     if (!window.dashboardApp) return;
     window.dashboardApp.completeRegistration = publishIpophlToGiUpdates;
     window.dashboardApp.sendRegistrationEmail = publishIpophlToGiUpdates;
-    window.dashboardApp.setCompleteRegistrationLoading = setLoading;
+    window.dashboardApp.setCompleteRegistrationLoading = function (isLoading) {
+      if (isLoading) setButtonCompleted();
+      else setButtonEnabled();
+    };
   }
 
   if (document.readyState === 'loading') {

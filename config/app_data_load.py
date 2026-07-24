@@ -11,6 +11,7 @@ from collections.abc import Callable
 from typing import TypeVar
 
 from config.app_connection import friendly_load_failure, prefer_app_http_bridge
+import beanthentic_env
 
 T = TypeVar("T")
 
@@ -24,6 +25,14 @@ def load_with_app_bridge(
     """
     Returns (data, source) where source is 'app_mysql' or 'app_server_http'.
     """
+    # Supabase anon — try SQL first; callers can use REST loaders before this helper.
+    if beanthentic_env.uses_supabase_anon() or beanthentic_env.is_postgresql():
+        try:
+            return mysql_loader(), "supabase_sql"
+        except Exception as exc:
+            raise RuntimeError(friendly_load_failure(module_label=module_label, mysql_error=exc)) from exc
+
+    # Otherwise use the normal bridge logic
     mysql_err: Exception | None = None
     http_err: Exception | None = None
 

@@ -13,6 +13,63 @@ function beanthenticApiUrl(path) {
 }
 window.beanthenticApiUrl = beanthenticApiUrl;
 
+/** Resolve GI contribution attachment paths to a browser-openable URL on this admin host. */
+function resolveGiAttachmentUrl(attachment) {
+  if (!attachment || typeof attachment !== 'object') return '';
+  const raw = String(
+    attachment.url || attachment.path || attachment.filename || attachment.name || ''
+  ).trim();
+  if (!raw) return '';
+
+  let path = raw.replace(/\\/g, '/');
+  if (/^https?:\/\//i.test(path)) {
+    try {
+      const parsed = new URL(path);
+      if (parsed.pathname.includes('/uploads/gi_contributions/')) {
+        path = parsed.pathname;
+      } else {
+        return path;
+      }
+    } catch (_err) {
+      return raw;
+    }
+  }
+
+  if (!path.startsWith('/')) {
+    if (path.includes('uploads/gi_contributions/')) {
+      path = `/${path.replace(/^\/+/, '')}`;
+    } else {
+      path = `/uploads/gi_contributions/${path.replace(/^\/+/, '')}`;
+    }
+  }
+  return beanthenticApiUrl(path);
+}
+
+/** Ask the admin server to mirror a farmer GI file locally, then return its URL. */
+async function ensureGiAttachmentUrl(attachment) {
+  const direct = resolveGiAttachmentUrl(attachment);
+  const rawName = String(
+    attachment?.filename || attachment?.name || attachment?.path || attachment?.url || ''
+  ).trim();
+  const basename = rawName.split(/[/\\]/).pop()?.split('?')[0] || '';
+  if (!basename) return direct;
+  try {
+    const res = await fetch(
+      beanthenticApiUrl(`/api/gi-contributions/ensure-attachment?filename=${encodeURIComponent(basename)}`),
+      { credentials: 'same-origin' }
+    );
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok && data.url) {
+      return beanthenticApiUrl(String(data.url));
+    }
+  } catch (_err) {
+    /* fall back to direct URL */
+  }
+  return direct;
+}
+window.resolveGiAttachmentUrl = resolveGiAttachmentUrl;
+window.ensureGiAttachmentUrl = ensureGiAttachmentUrl;
+
 /** Parse fetch responses; avoid opaque JSON errors when the server returns HTML. */
 async function beanthenticParseJsonResponse(res) {
   const text = await res.text();
@@ -63,6 +120,9 @@ class DashboardApp {
     this.googleInfoWindow = null;
     this.lipaBoundaryOverlay = null;
     this.googleHeatmap = null;
+    this.leafletMap = null;
+    this.leafletMarkers = [];
+    this.leafletBoundary = null;
     this.mapLayers = {
       farmerLocations: true,
       farmBoundaries: true,
@@ -94,6 +154,12 @@ class DashboardApp {
     this.clientReportPageSize = 10;
     this.clientReportTotalPages = 1;
     this.misconductReportRows = [];
+
+    // Coffee pricelist pagination (5 rows per page)
+    this.coffeePricelistItems = [];
+    this.coffeePricelistCurrentPage = 1;
+    this.coffeePricelistPageSize = 5;
+    this.coffeePricelistTotalPages = 1;
     
     // Explicitly hide the receipt modal on startup
     this.closeReceipt();
@@ -102,62 +168,7 @@ class DashboardApp {
   }
 
   getDefaultNotifications() {
-    return [
-      {
-        id: 'feed-sync-1',
-        icon: 'fa-user-plus',
-        title: 'New farmer record synced',
-        meta: 'Today · 9:41 AM',
-        detail:
-          'A new farmer record was merged into your dashboard from the latest data sync. You can open Farmer Records to check the new row, verify names and barangay, and fix any typos. If counts look wrong, use the header Refresh button to reload from your saved or imported file.',
-        targetModule: 'farmers',
-      },
-      {
-        id: 'feed-reminder-1',
-        icon: 'fa-triangle-exclamation',
-        title: 'Reminder: Complete profile details',
-        meta: 'Mar 26 · 11:00 AM',
-        detail:
-          'Some rows still have empty or incomplete information in the Farmer Records (Basic Info tab). Review and add clear notes for follow-up—for example planting status, visits, or data issues. Saving the table stores updates in your browser for next session.',
-        targetModule: 'farmers',
-      },
-      {
-        id: 'feed-misconduct-1',
-        icon: 'fa-gavel',
-        title: 'New Misconduct Report',
-        meta: 'May 23 · 2:15 PM',
-        detail:
-          'A new report regarding farmer misconduct has been submitted. Please review the details in the Client Report module and take appropriate action if necessary.',
-        targetModule: 'client-report',
-      },
-      {
-        id: 'feed-message-1',
-        icon: 'fa-message',
-        title: 'New message from Romeo Montoya',
-        meta: 'Today · 1:30 PM',
-        detail: 'Good afternoon, I would like to inquire about the upcoming GI registration process for my farm.',
-        targetModule: 'messaging',
-        targetPayload: { phone: '+63 912 345 6789' },
-      },
-      {
-        id: 'feed-profile-1',
-        icon: 'fa-user-check',
-        title: 'Profile Verified: Maria Santos',
-        meta: 'Yesterday · 10:00 AM',
-        detail: 'The profile for farmer Maria Santos (No. #5) has been successfully verified and added to the registry.',
-        targetModule: 'farmers-list',
-        targetPayload: { farmerNo: 5 },
-      },
-      {
-        id: 'feed-system-1',
-        icon: 'fa-server',
-        title: 'System Maintenance Completed',
-        meta: 'May 22 · 11:30 PM',
-        detail:
-          'The scheduled system maintenance and database optimization have been completed successfully. All services are fully operational.',
-        targetModule: 'overview',
-      },
-    ];
+    return [];
   }
 
   applyReadStateToItems(items) {
@@ -221,11 +232,11 @@ class DashboardApp {
       const tb = Date.parse(b.meta || '') || 0;
       return tb - ta;
     });
-    return merged.length > 0 ? merged : this.getDefaultNotifications();
+    return merged;
   }
 
   hydrateNotificationsFeed() {
-    return this.applyReadStateToItems(this.getDefaultNotifications());
+    return this.applyReadStateToItems([]);
   }
 
   iconForActivityAction(action) {
@@ -321,8 +332,9 @@ class DashboardApp {
     } catch (e) {
       console.warn('Admin notifications fetch failed:', e);
       if (!silent) {
-        this.notificationsFeed = this.hydrateNotificationsFeed();
+        this.notificationsFeed = this.applyReadStateToItems(this.notificationsFeed || []);
         this.renderNotificationsList();
+        this.updateNotificationBadges();
         this.showNotification('Could not load latest notifications.', 'error');
       }
       return false;
@@ -350,6 +362,38 @@ class DashboardApp {
 
   farmerIdFromRow(row) {
     return Number(row?.farmer_id ?? row?.['NO.'] ?? row?.['no'] ?? 0) || 0;
+  }
+
+  /** 1-based row number in the current farmer list (not the database id). */
+  farmerDisplaySeqNo(row, list = this.data) {
+    const rows = Array.isArray(list) ? list : [];
+    const idx = rows.indexOf(row);
+    return idx >= 0 ? idx + 1 : 0;
+  }
+
+  farmerRowByDisplaySeq(seq, list = this.data) {
+    const n = Number(seq);
+    const rows = Array.isArray(list) ? list : [];
+    if (!Number.isFinite(n) || n < 1 || n > rows.length) return null;
+    return rows[n - 1] ?? null;
+  }
+
+  farmerRowById(farmerId) {
+    const id = Number(farmerId);
+    if (!id) return null;
+    return (this.data || []).find((r) => this.farmerIdFromRow(r) === id) ?? null;
+  }
+
+  farmerIndexById(farmerId) {
+    const id = Number(farmerId);
+    if (!id) return -1;
+    return (this.data || []).findIndex((r) => this.farmerIdFromRow(r) === id);
+  }
+
+  resolveFarmerFromRef(ref) {
+    const n = Number(ref);
+    if (!n) return null;
+    return this.farmerRowById(n) || this.farmerRowByDisplaySeq(n);
   }
 
   loadKnownFarmerIds() {
@@ -419,22 +463,140 @@ class DashboardApp {
     const explicit = this.getValue(row, [
       'profile_photo_url',
       'profile_photo_data',
+      'profile_photo',
       'PHOTO',
       'photo',
       'photo_url',
       'image',
     ]);
-    if (explicit) {
-      const s = String(explicit).trim();
-      if (s && s !== 'undefined') {
-        if (/^data:image\//i.test(s)) return s;
-        if (/^https?:\/\//i.test(s)) return s;
-        return beanthenticApiUrl(s.startsWith('/') ? s : `/${s}`);
-      }
+    const s = String(explicit || '').trim();
+    if (s && s !== 'undefined') {
+      if (/^data:image\//i.test(s)) return s;
+      if (/^https?:\/\//i.test(s)) return s;
     }
     const fid = Number(row?.farmer_id ?? row?.['NO.'] ?? 0);
-    if (fid > 0) return beanthenticApiUrl(`/api/farmer-profile-photo/${fid}`);
+    if (fid > 0) {
+      return beanthenticApiUrl(`/api/farmer-profile-photo/${fid}?t=${Date.now()}`);
+    }
     return '';
+  }
+
+  hydrateFarmerCardPhotos() {
+    const grid = document.getElementById('farmersCardGrid');
+    if (!grid) return;
+    grid.querySelectorAll('.farmer-card__avatar-circle[data-farmer-id]').forEach((circle) => {
+      this._hydrateAvatarElement(circle, {
+        imgSelector: 'img.farmer-card__image',
+        fallbackSelector: '.farmer-card__avatar-fallback',
+      });
+    });
+  }
+
+  findFarmerByPhone(phone) {
+    const target = this.messagingPhoneTail(phone);
+    if (!target || !Array.isArray(this.data)) return null;
+    return (
+      this.data.find((f) => {
+        const fPhone = this.getValue(f, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']);
+        return this.messagingPhoneTail(fPhone) === target;
+      }) || null
+    );
+  }
+
+  farmerIdFromPhone(phone) {
+    const farmer = this.findFarmerByPhone(phone);
+    if (!farmer) return null;
+    const fid = this.farmerIdFromRow(farmer);
+    return fid > 0 ? fid : null;
+  }
+
+  _hydrateAvatarElement(container, { imgSelector, fallbackSelector }) {
+    const fid = String(container.dataset.farmerId || '').trim();
+    if (!fid || fid === '0') return;
+    const img = container.querySelector(imgSelector || 'img.messaging-avatar__img');
+    const fallback = container.querySelector(fallbackSelector || '.messaging-avatar__fallback');
+    if (!img) return;
+    const directUrl = String(container.dataset.photoUrl || '').trim();
+    const apiUrl = beanthenticApiUrl(`/api/farmer-profile-photo/${fid}?t=${Date.now()}`);
+    const showFallback = () => {
+      container.classList.remove('has-photo');
+      img.hidden = true;
+      img.removeAttribute('src');
+      if (fallback) fallback.style.display = '';
+    };
+    const showPhoto = (src) => {
+      img.onload = () => {
+        img.hidden = false;
+        container.classList.add('has-photo');
+        if (fallback) fallback.style.display = 'none';
+      };
+      img.onerror = showFallback;
+      img.src = src;
+      if (img.complete && img.naturalWidth > 0) {
+        img.hidden = false;
+        container.classList.add('has-photo');
+        if (fallback) fallback.style.display = 'none';
+      }
+    };
+    if (directUrl && (/^https?:\/\//i.test(directUrl) || /^data:image\//i.test(directUrl))) {
+      showPhoto(directUrl);
+      return;
+    }
+    void fetch(apiUrl, { credentials: 'same-origin' })
+      .then((res) => {
+        if (!res.ok) throw new Error('photo');
+        return res.blob();
+      })
+      .then((blob) => {
+        if (!blob || !blob.size || !String(blob.type || '').startsWith('image/')) {
+          throw new Error('empty');
+        }
+        if (img._blobUrl) URL.revokeObjectURL(img._blobUrl);
+        img._blobUrl = URL.createObjectURL(blob);
+        showPhoto(img._blobUrl);
+      })
+      .catch(() => showPhoto(apiUrl));
+  }
+
+  buildMessagingAvatarHtml({ phone, name, className = 'messaging-item__avatar', farmerId = null, admin = false } = {}) {
+    const esc = (s) => this.escapeHtml(s);
+    const initials = admin ? 'AD' : esc(this.getInitials(name || 'Farmer'));
+    const farmer = !admin && phone ? this.findFarmerByPhone(phone) : null;
+    const resolvedFid = farmerId || (farmer ? this.farmerIdFromRow(farmer) : this.farmerIdFromPhone(phone));
+    const photoUrl = farmer ? this.farmerProfilePhotoUrl(farmer) : '';
+    const attrs = [
+      resolvedFid ? ` data-farmer-id="${esc(String(resolvedFid))}"` : '',
+      photoUrl && /^https?:\/\//i.test(photoUrl) ? ` data-photo-url="${esc(photoUrl)}"` : '',
+      phone ? ` data-phone="${esc(phone)}"` : '',
+    ].join('');
+    const adminClass = admin ? ' messaging-avatar--admin' : '';
+    return `<div class="${className}${adminClass}"${attrs} aria-hidden="true"><img class="messaging-avatar__img" alt="" hidden /><span class="messaging-avatar__fallback">${initials}</span></div>`;
+  }
+
+  hydrateMessagingAvatars(root) {
+    let nodes = [];
+    if (!root) {
+      const mod = document.getElementById('messaging-module');
+      if (mod) nodes = [...mod.querySelectorAll('[data-farmer-id]')];
+    } else if (root.matches && root.matches('[data-farmer-id]')) {
+      nodes = [root];
+    } else if (root.querySelectorAll) {
+      nodes = [...root.querySelectorAll('[data-farmer-id]')];
+    }
+    nodes.forEach((el) => {
+      if (!el.querySelector('.messaging-avatar__img')) return;
+      this._hydrateAvatarElement(el, {
+        imgSelector: 'img.messaging-avatar__img',
+        fallbackSelector: '.messaging-avatar__fallback',
+      });
+    });
+  }
+
+  _revokeFarmerProfileAvatarBlob() {
+    if (this._farmerProfileAvatarBlobUrl) {
+      URL.revokeObjectURL(this._farmerProfileAvatarBlobUrl);
+      this._farmerProfileAvatarBlobUrl = null;
+    }
   }
 
   applyFarmerProfileAvatar(row) {
@@ -449,25 +611,49 @@ class DashboardApp {
       img.alt = '';
       wrap.insertBefore(img, wrap.firstChild);
     }
-    if (!url) {
+    const showPlaceholder = () => {
+      this._revokeFarmerProfileAvatarBlob();
       img.hidden = true;
       img.removeAttribute('src');
       if (icon) icon.style.display = '';
+    };
+    const showPhoto = (src) => {
+      img.onerror = () => {
+        wrap.classList.remove('has-photo');
+        showPlaceholder();
+      };
+      img.onload = () => {
+        img.hidden = false;
+        wrap.classList.add('has-photo');
+        if (icon) icon.style.display = 'none';
+      };
+      img.src = src;
+      if (img.complete && img.naturalWidth > 0) {
+        img.hidden = false;
+        wrap.classList.add('has-photo');
+        if (icon) icon.style.display = 'none';
+      }
+    };
+    if (!url) {
+      showPlaceholder();
       return;
     }
-    img.onerror = () => {
-      img.hidden = true;
-      if (icon) icon.style.display = '';
-    };
-    img.onload = () => {
-      img.hidden = false;
-      if (icon) icon.style.display = 'none';
-    };
-    img.src = url;
-    if (img.complete && img.naturalWidth > 0) {
-      img.hidden = false;
-      if (icon) icon.style.display = 'none';
+    if (/\/api\/farmer-profile-photo\/\d+/i.test(url)) {
+      void fetch(url, { credentials: 'same-origin' })
+        .then((res) => {
+          if (!res.ok) throw new Error('photo');
+          return res.blob();
+        })
+        .then((blob) => {
+          if (!blob || !blob.size) throw new Error('empty');
+          this._revokeFarmerProfileAvatarBlob();
+          this._farmerProfileAvatarBlobUrl = URL.createObjectURL(blob);
+          showPhoto(this._farmerProfileAvatarBlobUrl);
+        })
+        .catch(() => showPhoto(url));
+      return;
     }
+    showPhoto(url);
   }
 
   isFarmerRegistrationComplete(row) {
@@ -794,6 +980,7 @@ class DashboardApp {
   }
 
   async listProfilePhotoCameras() {
+    if (!navigator.mediaDevices?.enumerateDevices) return [];
     const devices = await navigator.mediaDevices.enumerateDevices();
     return devices.filter((d) => d.kind === 'videoinput');
   }
@@ -837,14 +1024,96 @@ class DashboardApp {
     }
   }
 
+  profilePhotoCameraBlockedMessage() {
+    const port = window.location.port || '5000';
+    return (
+      `On this computer, open http://127.0.0.1:${port}/dashboard for the camera, ` +
+      'or use Upload photo here.'
+    );
+  }
+
+  profilePhotoLocalhostUrl() {
+    try {
+      const u = new URL(window.location.href);
+      const host = (u.hostname || '').toLowerCase();
+      if (host === '127.0.0.1' || host === 'localhost' || host === '[::1]') return '';
+      const port = u.port || '5000';
+      return `http://127.0.0.1:${port}${u.pathname}${u.search}${u.hash}`;
+    } catch (_e) {
+      return '';
+    }
+  }
+
+  profilePhotoNeedsLocalhostForCamera() {
+    if (window.isSecureContext && window.location.protocol === 'https:') return false;
+    const host = (window.location.hostname || '').toLowerCase();
+    return host !== '127.0.0.1' && host !== 'localhost' && host !== '[::1]';
+  }
+
+  redirectProfilePhotoToLocalhost() {
+    const localUrl = this.profilePhotoLocalhostUrl();
+    if (!localUrl) {
+      this.showNotification(this.profilePhotoCameraBlockedMessage(), 'error');
+      return false;
+    }
+    const u = new URL(localUrl);
+    u.searchParams.set('openCamera', '1');
+    window.location.assign(u.toString());
+    return true;
+  }
+
+  ensureProfilePhotoMediaDevices() {
+    if (typeof navigator === 'undefined') return false;
+    if (!navigator.mediaDevices) {
+      navigator.mediaDevices = {};
+    }
+    if (typeof navigator.mediaDevices.getUserMedia === 'function') {
+      return true;
+    }
+    const legacy =
+      navigator.getUserMedia ||
+      navigator.webkitGetUserMedia ||
+      navigator.mozGetUserMedia ||
+      navigator.msGetUserMedia;
+    if (!legacy) return false;
+    navigator.mediaDevices.getUserMedia = (constraints) =>
+      new Promise((resolve, reject) => {
+        legacy.call(navigator, constraints, resolve, reject);
+      });
+    return true;
+  }
+
+  async _requestProfilePhotoStream(videoConstraints) {
+    this.ensureProfilePhotoMediaDevices();
+    const gum = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
+    if (!gum) throw new Error('Camera API unavailable');
+    try {
+      return await gum({ video: videoConstraints, audio: false });
+    } catch (err) {
+      if (err?.name === 'OverconstrainedError' || err?.name === 'NotFoundError') {
+        return gum({ video: true, audio: false });
+      }
+      throw err;
+    }
+  }
+
   async startProfilePhotoCamera(deviceId) {
     const panel = document.getElementById('profilePhotoCameraPanel');
     const video = document.getElementById('profilePhotoVideo');
     const select = document.getElementById('profilePhotoCameraSelect');
     if (!panel || !video) return;
 
-    if (!navigator.mediaDevices?.getUserMedia) {
-      this.showNotification('Camera is not supported in this browser.', 'error');
+    if (this.profilePhotoNeedsLocalhostForCamera()) {
+      this.redirectProfilePhotoToLocalhost();
+      return;
+    }
+
+    this.ensureProfilePhotoMediaDevices();
+    if (typeof navigator.mediaDevices?.getUserMedia !== 'function') {
+      this.showNotification(
+        'Camera is not supported in this browser. Use Upload photo or try Chrome/Edge.',
+        'error'
+      );
       return;
     }
 
@@ -856,7 +1125,7 @@ class DashboardApp {
       let cameras = await this.listProfilePhotoCameras();
       const needsPermission = cameras.every((d) => !(d.label || '').trim());
       if (needsPermission) {
-        const bootstrap = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        const bootstrap = await this._requestProfilePhotoStream(true);
         bootstrap.getTracks().forEach((track) => track.stop());
         cameras = await this.listProfilePhotoCameras();
       }
@@ -870,13 +1139,10 @@ class DashboardApp {
       await this.populateProfilePhotoCameraSelect(cameras, chosenId);
 
       const videoConstraints = chosenId
-        ? { deviceId: { exact: chosenId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        ? { deviceId: { ideal: chosenId }, width: { ideal: 1280 }, height: { ideal: 720 } }
         : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: videoConstraints,
-        audio: false,
-      });
+      const stream = await this._requestProfilePhotoStream(videoConstraints);
       this._profilePhotoStream = stream;
       video.srcObject = stream;
       await video.play();
@@ -884,7 +1150,19 @@ class DashboardApp {
       const active = cameras.find((d) => d.deviceId === chosenId);
       this.updateProfilePhotoCameraHint(active?.label || stream.getVideoTracks()[0]?.label || '');
     } catch (err) {
-      this.showNotification('Could not access the camera. Check permissions and try again.', 'error');
+      const name = err?.name || '';
+      let message = this.profilePhotoCameraBlockedMessage();
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        message =
+          'Camera permission was denied. Click the lock/camera icon in the address bar, allow camera access, then try again.';
+      } else if (name === 'NotFoundError') {
+        message = 'No camera was found on this device. Use Upload photo instead.';
+      } else if (name === 'NotReadableError') {
+        message = 'The camera is in use by another app. Close it and try again.';
+      }
+      this.showNotification(message, 'error');
+      panel.setAttribute('hidden', '');
+      document.querySelector('.profile-photo-actions')?.removeAttribute('hidden');
       console.error(err);
     }
   }
@@ -969,7 +1247,7 @@ class DashboardApp {
     const root = document.getElementById('profilePhotoModal');
 
     if (editBtn) {
-      editBtn.addEventListener('click', () => this.openProfilePhotoModal({ startCamera: true }));
+      editBtn.addEventListener('click', () => this.openProfilePhotoModal());
     }
     if (closeBtn) closeBtn.addEventListener('click', () => this.closeProfilePhotoModal());
     if (backdrop) backdrop.addEventListener('click', () => this.closeProfilePhotoModal());
@@ -1011,6 +1289,17 @@ class DashboardApp {
       e.preventDefault();
       this.closeProfilePhotoModal();
     });
+
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('openCamera') === '1') {
+        params.delete('openCamera');
+        const qs = params.toString();
+        const clean = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash || ''}`;
+        window.history.replaceState({}, '', clean);
+        setTimeout(() => this.openProfilePhotoModal({ startCamera: true }), 0);
+      }
+    } catch (_e) {}
   }
 
   openDeactivateAccountModal() {
@@ -1350,15 +1639,29 @@ class DashboardApp {
     if (low.startsWith('mysql:') || low.includes('pymysql.err')) {
       return fallback || 'Could not connect to the app database. Check settings.json.';
     }
+    if (low.includes('10035') || low.includes('non-blocking socket')) {
+      return (
+        'Temporary network glitch while loading data. Refresh the page or wait a few seconds and try again.'
+      );
+    }
+    if (low.includes('supabase') || low.includes('beanthentic_supabase')) {
+      return msg;
+    }
     return msg;
   }
 
   varietyLabel(variety) {
-    const v = String(variety || '').toLowerCase();
+    const raw = String(variety || '').trim();
+    if (!raw) return '—';
+    const v = raw.toLowerCase();
     if (v === 'liberica') return 'Liberica';
     if (v === 'excelsa') return 'Excelsa';
     if (v === 'robusta') return 'Robusta';
-    return variety || '—';
+    // Compound product labels (e.g. "robusta · roasted beans · 250g")
+    return raw
+      .replace(/_/g, ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
   deltaCellClass(delta) {
@@ -1686,8 +1989,7 @@ class DashboardApp {
         ? Number(row.change)
         : Math.max(0, paymentAmtNum - totalNum);
     const paymentText = (row.payment_method || row.payment || 'Cash').toString().trim() || 'Cash';
-    const productText =
-      (row.product || this.varietyLabel(row.variety) || row.variety || '-').toString();
+    const productText = this.varietyLabel(row.product || row.variety || '-');
     const qtyVal = row.qty != null ? row.qty : row.delta_kg;
     const qtyStr =
       qtyVal != null && String(qtyVal) !== ''
@@ -1914,6 +2216,434 @@ class DashboardApp {
         this.clientReportCurrentPage = 1;
         this.applyClientReportFiltersAndRender();
       });
+    }
+  }
+
+  async renderCoffeePricingModule() {
+    this.initCoffeePricingModuleControls();
+    await this.loadCoffeePricingData();
+  }
+
+  initCoffeePricingModuleControls() {
+    if (this.__coffeePricingControlsInitialized) return;
+    this.__coffeePricingControlsInitialized = true;
+
+    const refreshBtn = document.getElementById('coffeePricingRefreshBtn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => this.loadCoffeePricingData());
+    }
+
+    const filter = document.getElementById('coffeePricingAppFilter');
+    if (filter) {
+      filter.addEventListener('change', () => this.loadCoffeePricingApplications());
+    }
+
+    const addBtn = document.getElementById('coffeePricelistAddBtn');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => this.promptAddPricelistRow());
+    }
+
+    const prevBtn = document.getElementById('coffeePricelistPrevBtn');
+    const nextBtn = document.getElementById('coffeePricelistNextBtn');
+    const pageInput = document.getElementById('coffeePricelistPageInput');
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => {
+        if (this.coffeePricelistCurrentPage > 1) {
+          this.coffeePricelistCurrentPage -= 1;
+          this.renderCoffeePricelistTable(this.coffeePricelistItems || []);
+        }
+      });
+    }
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        if (this.coffeePricelistCurrentPage < (this.coffeePricelistTotalPages || 1)) {
+          this.coffeePricelistCurrentPage += 1;
+          this.renderCoffeePricelistTable(this.coffeePricelistItems || []);
+        }
+      });
+    }
+    if (pageInput) {
+      pageInput.addEventListener('change', () => {
+        let val = parseInt(pageInput.value, 10);
+        if (!Number.isFinite(val) || val < 1) val = 1;
+        if (val > (this.coffeePricelistTotalPages || 1)) val = this.coffeePricelistTotalPages || 1;
+        this.coffeePricelistCurrentPage = val;
+        this.renderCoffeePricelistTable(this.coffeePricelistItems || []);
+      });
+    }
+
+    const pricelistBody = document.getElementById('coffeePricelistBody');
+    if (pricelistBody) {
+      pricelistBody.addEventListener('click', (e) => {
+        const saveBtn = e.target.closest('[data-pricelist-save]');
+        const deleteBtn = e.target.closest('[data-pricelist-delete]');
+        if (saveBtn) {
+          const row = saveBtn.closest('tr');
+          if (row) this.savePricelistRow(row);
+        }
+        if (deleteBtn) {
+          const priceId = Number(deleteBtn.dataset.pricelistDelete || 0);
+          if (priceId > 0) this.deactivatePricelistRow(priceId);
+        }
+      });
+    }
+
+    const appsBody = document.getElementById('coffeePricingAppsBody');
+    if (appsBody) {
+      appsBody.addEventListener('click', (e) => {
+        const approveBtn = e.target.closest('[data-app-approve]');
+        const rejectBtn = e.target.closest('[data-app-reject]');
+        if (approveBtn) {
+          this.reviewPriceApplication(Number(approveBtn.dataset.appApprove || 0), 'approved');
+        }
+        if (rejectBtn) {
+          this.reviewPriceApplication(Number(rejectBtn.dataset.appReject || 0), 'rejected');
+        }
+      });
+    }
+  }
+
+  formatPhpAmount(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '—';
+    return `₱${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  formatPricingLabel(value) {
+    const v = String(value || '').trim();
+    if (!v) return 'Default';
+    return v.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  async loadCoffeePricingData() {
+    await Promise.all([this.loadCoffeePricelist(), this.loadCoffeePricingApplications()]);
+  }
+
+  async loadCoffeePricelist() {
+    const tbody = document.getElementById('coffeePricelistBody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" class="transactions-loading-cell">Loading pricelist...</td></tr>';
+    try {
+      const res = await fetch('/api/coffee-pricelist?include_inactive=1', { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Could not load pricelist.');
+      this.coffeePricelistOptions = data.options || {};
+      this.coffeePricelistItems = Array.isArray(data.items) ? data.items : [];
+      this.renderCoffeePricelistTable(this.coffeePricelistItems);
+    } catch (err) {
+      this.coffeePricelistItems = [];
+      this.updateCoffeePricelistPagination(0);
+      tbody.innerHTML = `<tr><td colspan="6" class="transactions-loading-cell">${this.escapeHtml(err.message || 'Load failed.')}</td></tr>`;
+    }
+  }
+
+  updateCoffeePricelistPagination(totalItems) {
+    const pageSize = this.coffeePricelistPageSize || 5;
+    this.coffeePricelistTotalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    if (this.coffeePricelistCurrentPage > this.coffeePricelistTotalPages) {
+      this.coffeePricelistCurrentPage = this.coffeePricelistTotalPages;
+    }
+    if (this.coffeePricelistCurrentPage < 1) this.coffeePricelistCurrentPage = 1;
+
+    const pageInput = document.getElementById('coffeePricelistPageInput');
+    const pageOf = document.getElementById('coffeePricelistPageOf');
+    const prevBtn = document.getElementById('coffeePricelistPrevBtn');
+    const nextBtn = document.getElementById('coffeePricelistNextBtn');
+    if (pageInput) {
+      pageInput.value = String(this.coffeePricelistCurrentPage);
+      pageInput.max = String(this.coffeePricelistTotalPages);
+    }
+    if (pageOf) pageOf.textContent = `of ${this.coffeePricelistTotalPages}`;
+    if (prevBtn) prevBtn.disabled = this.coffeePricelistCurrentPage <= 1;
+    if (nextBtn) nextBtn.disabled = this.coffeePricelistCurrentPage >= this.coffeePricelistTotalPages;
+  }
+
+  renderCoffeePricelistTable(items) {
+    const tbody = document.getElementById('coffeePricelistBody');
+    if (!tbody) return;
+    const allItems = Array.isArray(items) ? items : [];
+    this.coffeePricelistItems = allItems;
+    const varieties = (this.coffeePricelistOptions && this.coffeePricelistOptions.varieties) || ['liberica', 'excelsa', 'robusta'];
+    const beanTypes = (this.coffeePricelistOptions && this.coffeePricelistOptions.bean_types) || ['gcb', 'roasted'];
+    const gcbClasses = (this.coffeePricelistOptions && this.coffeePricelistOptions.gcb) || [];
+    const roastedClasses = (this.coffeePricelistOptions && this.coffeePricelistOptions.roasted) || [];
+
+    this.updateCoffeePricelistPagination(allItems.length);
+
+    if (!allItems.length) {
+      tbody.innerHTML = '<tr><td colspan="6">No pricelist rows yet. Click “Add price row”.</td></tr>';
+      return;
+    }
+
+    const pageSize = this.coffeePricelistPageSize || 5;
+    const start = (this.coffeePricelistCurrentPage - 1) * pageSize;
+    const pageItems = allItems.slice(start, start + pageSize);
+
+    tbody.innerHTML = pageItems.map((item) => {
+      const priceId = Number(item.price_id || 0);
+      const clsOptions = item.bean_type === 'roasted' ? roastedClasses : gcbClasses;
+      const clsSelect = [
+        '<option value="">Default</option>',
+        ...clsOptions.map((c) => `<option value="${this.escapeHtml(c)}"${c === item.classification ? ' selected' : ''}>${this.escapeHtml(this.formatPricingLabel(c))}</option>`),
+      ].join('');
+      return `<tr data-price-id="${priceId}">
+        <td>
+          <select class="pricelist-inline-input" data-field="variety">
+            ${varieties.map((v) => `<option value="${v}"${v === item.variety ? ' selected' : ''}>${this.escapeHtml(this.formatPricingLabel(v))}</option>`).join('')}
+          </select>
+        </td>
+        <td>
+          <select class="pricelist-inline-input" data-field="bean_type">
+            ${beanTypes.map((t) => `<option value="${t}"${t === item.bean_type ? ' selected' : ''}>${this.escapeHtml(t.toUpperCase())}</option>`).join('')}
+          </select>
+        </td>
+        <td><select class="pricelist-inline-input" data-field="classification">${clsSelect}</select></td>
+        <td><input type="number" step="0.01" min="0" class="pricelist-inline-input" data-field="price_per_kg" value="${Number(item.price_per_kg || 0)}" /></td>
+        <td><input type="text" class="pricelist-inline-input" data-field="notes" value="${this.escapeHtml(item.notes || '')}" /></td>
+        <td>
+          <div class="pricing-action-group">
+            <button type="button" class="btn btn-primary btn-sm" data-pricelist-save>Save</button>
+            ${item.is_active === false ? '' : `<button type="button" class="btn btn-primary btn-sm" data-pricelist-delete="${priceId}">Deactivate</button>`}
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  promptAddPricelistRow() {
+    const tbody = document.getElementById('coffeePricelistBody');
+    if (!tbody) return;
+    this.coffeePricelistCurrentPage = 1;
+    this.renderCoffeePricelistTable(this.coffeePricelistItems || []);
+    const varieties = (this.coffeePricelistOptions && this.coffeePricelistOptions.varieties) || ['liberica', 'excelsa', 'robusta'];
+    const beanTypes = (this.coffeePricelistOptions && this.coffeePricelistOptions.bean_types) || ['gcb', 'roasted'];
+    const row = document.createElement('tr');
+    row.dataset.priceId = '0';
+    row.innerHTML = `
+      <td><select class="pricelist-inline-input" data-field="variety">${varieties.map((v) => `<option value="${v}">${this.escapeHtml(this.formatPricingLabel(v))}</option>`).join('')}</select></td>
+      <td><select class="pricelist-inline-input" data-field="bean_type">${beanTypes.map((t) => `<option value="${t}">${t.toUpperCase()}</option>`).join('')}</select></td>
+      <td><select class="pricelist-inline-input" data-field="classification"><option value="">Default</option></select></td>
+      <td><input type="number" step="0.01" min="0" class="pricelist-inline-input" data-field="price_per_kg" value="150" /></td>
+      <td><input type="text" class="pricelist-inline-input" data-field="notes" value="" /></td>
+      <td><div class="pricing-action-group"><button type="button" class="btn btn-primary btn-sm" data-pricelist-save>Save</button></div></td>`;
+    if (tbody.querySelector('.transactions-loading-cell')) tbody.innerHTML = '';
+    tbody.prepend(row);
+  }
+
+  readPricelistRow(row) {
+    const read = (field) => {
+      const el = row.querySelector(`[data-field="${field}"]`);
+      return el ? el.value : '';
+    };
+    return {
+      price_id: Number(row.dataset.priceId || 0) || undefined,
+      variety: read('variety'),
+      bean_type: read('bean_type'),
+      classification: read('classification'),
+      price_per_kg: read('price_per_kg'),
+      notes: read('notes'),
+      is_active: true,
+    };
+  }
+
+  async savePricelistRow(row) {
+    const payload = this.readPricelistRow(row);
+    try {
+      const res = await fetch('/api/coffee-pricelist', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Save failed.');
+      this.showNotification('Pricelist row saved.', 'success');
+      await this.loadCoffeePricelist();
+    } catch (err) {
+      this.showNotification(err.message || 'Could not save pricelist row.', 'error');
+    }
+  }
+
+  async deactivatePricelistRow(priceId) {
+    if (!window.confirm('Deactivate this price row?')) return;
+    try {
+      const res = await fetch(`/api/coffee-pricelist/${priceId}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Deactivate failed.');
+      this.showNotification('Price row deactivated.', 'success');
+      await this.loadCoffeePricelist();
+    } catch (err) {
+      this.showNotification(err.message || 'Could not deactivate price row.', 'error');
+    }
+  }
+
+  async loadCoffeePricingApplications() {
+    const tbody = document.getElementById('coffeePricingAppsBody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="8" class="transactions-loading-cell">Loading applications...</td></tr>';
+    const filter = document.getElementById('coffeePricingAppFilter');
+    const status = filter ? String(filter.value || '') : 'pending';
+    const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+    try {
+      const res = await fetch(`/api/farmer-price-applications${qs}`, { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Could not load applications.');
+      this.renderCoffeePricingApplications(data.items || []);
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="8" class="transactions-loading-cell">${this.escapeHtml(err.message || 'Load failed.')}</td></tr>`;
+    }
+  }
+
+  farmerNameById(farmerId) {
+    const fid = Number(farmerId || 0);
+    const row = (this.farmersData || []).find((f) => this.farmerIdFromRow(f) === fid);
+    if (!row) return `Farmer #${fid}`;
+    return this.getValue(row, ['NAME OF FARMER', 'name']) || `Farmer #${fid}`;
+  }
+
+  renderCoffeePricingApplications(items) {
+    const tbody = document.getElementById('coffeePricingAppsBody');
+    if (!tbody) return;
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="8">No price applications found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = items.map((item) => {
+      const appId = Number(item.application_id || 0);
+      const status = String(item.status || 'pending').toLowerCase();
+      const actions = status === 'pending'
+        ? `<div class="pricing-action-group">
+            <button type="button" class="btn btn-secondary btn-sm" data-app-approve="${appId}">Approve</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-app-reject="${appId}">Reject</button>
+          </div>`
+        : '—';
+      return `<tr>
+        <td>${this.escapeHtml(this.farmerNameById(item.farmer_id))}</td>
+        <td>${this.escapeHtml(this.formatPricingLabel(item.variety))}</td>
+        <td>${this.escapeHtml(String(item.bean_type || '').toUpperCase())}</td>
+        <td>${Number(item.quantity_kg || 0).toLocaleString()}</td>
+        <td>${item.requested_price_per_kg != null ? this.formatPhpAmount(item.requested_price_per_kg) : '—'}</td>
+        <td>${item.reference_price_per_kg != null ? this.formatPhpAmount(item.reference_price_per_kg) : '—'}</td>
+        <td><span class="pricing-status-badge ${this.escapeHtml(status)}">${this.escapeHtml(status)}</span></td>
+        <td>${actions}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  async reviewPriceApplication(applicationId, status) {
+    if (applicationId < 1) return;
+    const note = status === 'rejected'
+      ? window.prompt('Optional note for the farmer (reason for rejection):', '') || ''
+      : '';
+    try {
+      const res = await fetch(`/api/farmer-price-applications/${applicationId}/review`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, admin_notes: note }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Review failed.');
+      this.showNotification(`Application ${status}.`, 'success');
+      await this.loadCoffeePricingApplications();
+      if (this.currentFarmerNo) {
+        await this.loadFarmerSelfSaleApplications(this.currentFarmerNo);
+      }
+    } catch (err) {
+      this.showNotification(err.message || 'Could not review application.', 'error');
+    }
+  }
+
+  initFarmerSelfSalePanel(farmer) {
+    const toggle = document.getElementById('farmerSelfSaleToggle');
+    const statusEl = document.getElementById('farmerSelfSaleStatus');
+    const appsWrap = document.getElementById('farmerSelfSaleApplicationsWrap');
+    const farmerId = this.farmerIdFromRow(farmer);
+    const enabled = farmer.self_sale_enabled === true || farmer.self_sale_enabled === 'true' || farmer.self_sale_enabled === 1;
+
+    if (toggle) {
+      toggle.checked = enabled;
+      const clone = toggle.cloneNode(true);
+      toggle.parentNode.replaceChild(clone, toggle);
+      clone.checked = enabled;
+      clone.addEventListener('change', async () => {
+        await this.setFarmerSelfSale(farmerId, clone.checked, farmer);
+      });
+    }
+
+    if (statusEl) {
+      statusEl.textContent = enabled
+        ? 'Self-sale enabled — farmer can submit price applications for beans they sell directly.'
+        : 'Self-sale is disabled for this farmer.';
+      statusEl.classList.toggle('is-enabled', enabled);
+    }
+
+    if (appsWrap) {
+      appsWrap.hidden = !enabled;
+    }
+
+    if (enabled && farmerId) {
+      this.loadFarmerSelfSaleApplications(farmerId);
+    } else if (appsWrap) {
+      const body = document.getElementById('farmerSelfSaleAppsBody');
+      if (body) body.innerHTML = '<tr><td colspan="7">No applications yet.</td></tr>';
+    }
+  }
+
+  async setFarmerSelfSale(farmerId, enabled, farmerRow) {
+    try {
+      const res = await fetch('/api/farmer-self-sale', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ farmer_id: farmerId, enabled: !!enabled }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Update failed.');
+      if (farmerRow) farmerRow.self_sale_enabled = !!enabled;
+      const cached = (this.farmersData || []).find((f) => this.farmerIdFromRow(f) === Number(farmerId));
+      if (cached) cached.self_sale_enabled = !!enabled;
+      this.initFarmerSelfSalePanel(farmerRow || { farmer_id: farmerId, self_sale_enabled: enabled });
+      this.showNotification(enabled ? 'Self-sale enabled for farmer.' : 'Self-sale disabled for farmer.', 'success');
+    } catch (err) {
+      this.showNotification(err.message || 'Could not update self-sale status.', 'error');
+      this.initFarmerSelfSalePanel(farmerRow || { farmer_id: farmerId, self_sale_enabled: !enabled });
+    }
+  }
+
+  async loadFarmerSelfSaleApplications(farmerId) {
+    const body = document.getElementById('farmerSelfSaleAppsBody');
+    if (!body) return;
+    body.innerHTML = '<tr><td colspan="7">Loading...</td></tr>';
+    try {
+      const res = await fetch(`/api/farmer-price-applications?farmer_id=${encodeURIComponent(farmerId)}`, {
+        credentials: 'same-origin',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Could not load applications.');
+      const items = data.items || [];
+      if (!items.length) {
+        body.innerHTML = '<tr><td colspan="7">No applications yet.</td></tr>';
+        return;
+      }
+      body.innerHTML = items.map((item) => {
+        const status = String(item.status || 'pending').toLowerCase();
+        const submitted = item.submitted_at ? new Date(item.submitted_at).toLocaleDateString() : '—';
+        return `<tr>
+          <td>${this.escapeHtml(submitted)}</td>
+          <td>${this.escapeHtml(this.formatPricingLabel(item.variety))}</td>
+          <td>${this.escapeHtml(String(item.bean_type || '').toUpperCase())}</td>
+          <td>${Number(item.quantity_kg || 0).toLocaleString()}</td>
+          <td>${item.requested_price_per_kg != null ? this.formatPhpAmount(item.requested_price_per_kg) : '—'}</td>
+          <td>${item.reference_price_per_kg != null ? this.formatPhpAmount(item.reference_price_per_kg) : '—'}</td>
+          <td><span class="pricing-status-badge ${this.escapeHtml(status)}">${this.escapeHtml(status)}</span></td>
+        </tr>`;
+      }).join('');
+    } catch (err) {
+      body.innerHTML = `<tr><td colspan="7">${this.escapeHtml(err.message || 'Load failed.')}</td></tr>`;
     }
   }
 
@@ -2445,8 +3175,8 @@ class DashboardApp {
           e.preventDefault();
           e.stopPropagation();
           const action = actionBtn.getAttribute('data-card-action');
-          const n = Number(actionBtn.getAttribute('data-farmer-no'));
-          const idx = this.data.findIndex(f => Number(f['NO.']) === n);
+          const farmerId = Number(actionBtn.getAttribute('data-farmer-id'));
+          const idx = this.farmerIndexById(farmerId);
           
           if (idx !== -1) {
             if (action === 'warning') {
@@ -2467,9 +3197,9 @@ class DashboardApp {
 
         const btn = e.target.closest('[data-action="open-farmer-profile"]');
         if (btn) {
-          const nRaw = btn.getAttribute('data-farmer-no') || '';
-          const n = Number.parseInt(nRaw, 10);
-          if (Number.isFinite(n)) this.openFarmerProfile(n);
+          const idRaw = btn.getAttribute('data-farmer-id') || btn.getAttribute('data-farmer-no') || '';
+          const farmerId = Number.parseInt(idRaw, 10);
+          if (Number.isFinite(farmerId)) this.openFarmerProfile(farmerId);
           return;
         }
 
@@ -2491,7 +3221,7 @@ class DashboardApp {
     if (farmerProfileMessageBtn) {
       farmerProfileMessageBtn.addEventListener('click', () => {
         if (!this.currentFarmerNo) return;
-        const farmer = (this.data || []).find(f => Number(f['NO.']) === Number(this.currentFarmerNo));
+        const farmer = this.farmerRowById(this.currentFarmerNo);
         if (farmer) {
           const phone = this.getValue(farmer, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']);
           if (phone) {
@@ -2503,6 +3233,19 @@ class DashboardApp {
       });
     }
 
+    const btnViewFarmerProduction = document.getElementById('btnViewFarmerProduction');
+    if (btnViewFarmerProduction) {
+      btnViewFarmerProduction.addEventListener('click', () => this.openFarmerProductionModal());
+    }
+    const closeFarmerProductionModalBtn = document.getElementById('closeFarmerProductionModalBtn');
+    if (closeFarmerProductionModalBtn) {
+      closeFarmerProductionModalBtn.addEventListener('click', () => this.closeFarmerProductionModal());
+    }
+    const farmerProductionModalBackdrop = document.getElementById('farmerProductionModalBackdrop');
+    if (farmerProductionModalBackdrop) {
+      farmerProductionModalBackdrop.addEventListener('click', () => this.closeFarmerProductionModal());
+    }
+
     // Farmer Profile Admin Actions
     const profileWarningBtn = document.getElementById('profileWarningBtn');
     if (profileWarningBtn) {
@@ -2512,7 +3255,7 @@ class DashboardApp {
         if (profileActionsContent) profileActionsContent.classList.remove('active');
 
         if (this.currentFarmerNo) {
-          const idx = this.data.findIndex(f => Number(f['NO.']) === this.currentFarmerNo);
+          const idx = this.farmerIndexById(this.currentFarmerNo);
           if (idx !== -1) {
             this.openFarmerActionModal('warning', idx);
           }
@@ -2528,7 +3271,7 @@ class DashboardApp {
         if (profileActionsContent) profileActionsContent.classList.remove('active');
 
         if (this.currentFarmerNo) {
-          const idx = this.data.findIndex(f => Number(f['NO.']) === this.currentFarmerNo);
+          const idx = this.farmerIndexById(this.currentFarmerNo);
           if (idx !== -1) {
             const isBlocked = this.data[idx].is_blocked === true || this.data[idx].is_blocked === 'true';
             if (isBlocked) {
@@ -2827,6 +3570,7 @@ class DashboardApp {
       'maps': 'Maps',
       'transactions': 'Client Transaction',
       'client-report': 'Client Report',
+      'coffee-pricing': 'Coffee Pricing',
       'register': 'IPOPHL Register',
       'security': 'Account Security',
       'activity': 'Activity Log',
@@ -2857,10 +3601,13 @@ class DashboardApp {
       targetModule.classList.remove('hidden');
     }
 
-    // Scroll behavior: only lock page scroll for the Farmers module
+    // Scroll behavior: lock page scroll for Farmers and Messaging (inner panes scroll)
     const moduleContent = document.querySelector('.module-content');
     if (moduleContent) {
-      moduleContent.classList.toggle('lock-scroll', resolvedModuleName === 'farmers');
+      moduleContent.classList.toggle(
+        'lock-scroll',
+        resolvedModuleName === 'farmers' || resolvedModuleName === 'messaging'
+      );
     }
 
     if (resolvedModuleName === 'settings') {
@@ -2894,6 +3641,9 @@ class DashboardApp {
     }
     if (resolvedModuleName === 'client-report') {
       this.renderClientReportModule();
+    }
+    if (resolvedModuleName === 'coffee-pricing') {
+      this.renderCoffeePricingModule();
     }
     if (resolvedModuleName === 'ipophl') {
       this.renderIpophlModule();
@@ -3439,7 +4189,13 @@ class DashboardApp {
       console.log('Successfully loaded farmer data:', this.data.length, 'records');
       console.log('First farmer:', this.data[0]);
       console.log('Sample of farmers:', this.data.slice(0, 3));
-      
+
+      try {
+        localStorage.setItem('beanthentic_farmers', JSON.stringify(this.data));
+      } catch (_) {
+        /* ignore quota errors */
+      }
+
       this.updateStats();
       this.createCharts();
       this.updateTable();
@@ -3460,10 +4216,11 @@ class DashboardApp {
         this.updateStats();
         this.createCharts();
         this.updateTable();
-        this.showNotification(
-          'Could not reach the app server. Loaded browser backup data. Check settings.json app_server_base (port 8080).',
-          'error'
-        );
+        const backupMsg =
+          error && error.message
+            ? `Could not load farmer data (${error.message}). Showing saved browser backup.`
+            : 'Could not load farmer data from Supabase. Showing saved browser backup.';
+        this.showNotification(backupMsg, 'error');
         return;
       }
 
@@ -3618,8 +4375,8 @@ class DashboardApp {
           
           if (diff <= 0) {
             // Auto-unsuspend if time is up
-            const n = Number(el.dataset.farmerNo);
-            const idx = this.data.findIndex(f => Number(f['NO.']) === n);
+            const farmerId = Number(el.dataset.farmerId);
+            const idx = this.farmerIndexById(farmerId);
             if (idx !== -1 && this.data[idx].is_blocked) {
               this.data[idx].is_blocked = false;
               delete this.data[idx].suspended_until;
@@ -3655,7 +4412,7 @@ class DashboardApp {
         this.renderFarmersListCards();
         this.renderTableBody();
         if (this.currentFarmerNo) {
-          const idx = this.data.findIndex(f => Number(f['NO.']) === this.currentFarmerNo);
+          const idx = this.farmerIndexById(this.currentFarmerNo);
           if (idx !== -1) this.updateProfileStatusButtons(this.data[idx].is_blocked);
         }
       }
@@ -3722,7 +4479,6 @@ class DashboardApp {
     </div>
   </div>
   <div class="farmer-card__footer">
-    <span class="farmer-card__joined">Joined at 2024</span>
     <button type="button" class="view-details-btn" data-action="open-farmer-placeholder-profile" data-farmer-no="${n}">
       View details <i class="fa-solid fa-chevron-right"></i>
     </button>
@@ -3732,39 +4488,41 @@ class DashboardApp {
       return;
     }
 
-    const formatNo = (row) => Number(row?.['NO.'] ?? row?.no ?? 0) || 0;
+    const formatNo = (row) => this.farmerDisplaySeqNo(row, this.data);
     const buildName = (row) => this.farmerDisplayNameFromRow(row);
 
     grid.innerHTML = pageData
       .map((row) => {
-        const n = formatNo(row);
-        const fullName = buildName(row) || `Farmer #${n || ''}`.trim();
+        const displaySeq = formatNo(row);
+        const farmerId = this.farmerIdFromRow(row);
+        const fullName = buildName(row) || `Farmer #${displaySeq || ''}`.trim();
         const dob = this.getValue(row, ['BIRTHDAY', 'birthday', 'Date of Birth']);
         const phone = this.getValue(row, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']);
         const address = this.getValue(row, ['ADDRESS (BARANGAY)', 'barangay', 'BARANGAY', 'address']) || 'Address not set';
-        const photoUrl = this.farmerProfilePhotoUrl(row);
         const isBlocked = row.is_blocked === true || row.is_blocked === 'true';
+        const photoUrl = this.farmerProfilePhotoUrl(row);
+        const photoAttr = photoUrl ? ` data-photo-url="${esc(photoUrl)}"` : '';
         
         return `<article class="farmer-card" aria-label="${esc(fullName)}">
   <div class="farmer-card__header">
     <div class="farmer-card__status-badge ${isBlocked ? 'is-blocked' : ''}">
       ${isBlocked ? 'Suspended' : 'Active'}
-      ${isBlocked && row.suspended_until ? `<span class="suspension-countdown" data-until="${row.suspended_until}" data-farmer-no="${esc(n)}">${this.getSuspensionCountdown(row.suspended_until)}</span>` : ''}
+      ${isBlocked && row.suspended_until ? `<span class="suspension-countdown" data-until="${row.suspended_until}" data-farmer-id="${esc(farmerId)}">${this.getSuspensionCountdown(row.suspended_until)}</span>` : ''}
     </div>
     <div class="profile-actions-dropdown">
       <button type="button" class="profile-actions-toggle card-menu-toggle" aria-label="More actions">
         <i class="fa-solid fa-ellipsis"></i>
       </button>
       <div class="profile-actions-content card-menu-content">
-        <button type="button" class="profile-action-item warning" data-card-action="warning" data-farmer-no="${esc(n)}">
+        <button type="button" class="profile-action-item warning" data-card-action="warning" data-farmer-id="${esc(farmerId)}">
           <i class="fa-solid fa-triangle-exclamation"></i> Warning
         </button>
         ${!isBlocked ? `
-          <button type="button" class="profile-action-item suspend" data-card-action="suspend" data-farmer-no="${esc(n)}">
+          <button type="button" class="profile-action-item suspend" data-card-action="suspend" data-farmer-id="${esc(farmerId)}">
             <i class="fa-solid fa-user-slash"></i> Suspend
           </button>
         ` : `
-          <button type="button" class="profile-action-item unsuspend" data-card-action="unsuspend" data-farmer-no="${esc(n)}">
+          <button type="button" class="profile-action-item unsuspend" data-card-action="unsuspend" data-farmer-id="${esc(farmerId)}">
             <i class="fa-solid fa-user-check"></i> Unsuspend
           </button>
         `}
@@ -3772,8 +4530,9 @@ class DashboardApp {
     </div>
   </div>
   <div class="farmer-card__media">
-    <div class="farmer-card__avatar-circle">
-      ${photoUrl ? `<img class="farmer-card__image" src="${esc(photoUrl)}" alt="${esc(fullName)}" loading="lazy" onerror="this.remove();" /><i class="fa-solid fa-user farmer-card__avatar-fallback" style="font-size: 2rem; color: #cbd5e1;"></i>` : `<i class="fa-solid fa-user farmer-card__avatar-fallback" style="font-size: 2rem; color: #cbd5e1;"></i>`}
+    <div class="farmer-card__avatar-circle" data-farmer-id="${esc(farmerId)}"${photoAttr}>
+      <img class="farmer-card__image" alt="${esc(fullName)}" hidden />
+      <i class="fa-solid fa-user farmer-card__avatar-fallback" style="font-size: 2rem; color: #cbd5e1;"></i>
     </div>
   </div>
   <div class="farmer-card__identity">
@@ -3782,7 +4541,7 @@ class DashboardApp {
   <div class="farmer-card__inner-box" style="background: #ffffff; border: 1px solid #f1f5f9;">
     <div class="farmer-card__detail-row">
       <i class="fa-solid fa-hashtag"></i>
-      <span>#${esc(n)}</span>
+      <span>#${esc(displaySeq)}</span>
     </div>
     <div class="farmer-card__detail-row">
       <i class="fa-solid fa-cake-candles"></i>
@@ -3798,17 +4557,17 @@ class DashboardApp {
     </div>
   </div>
   <div class="farmer-card__footer">
-    <span class="farmer-card__joined">Joined at 2024</span>
-    <button type="button" class="view-details-btn" data-action="open-farmer-profile" data-farmer-no="${esc(n)}">
+    <button type="button" class="view-details-btn" data-action="open-farmer-profile" data-farmer-id="${esc(farmerId)}">
       View details <i class="fa-solid fa-chevron-right"></i>
     </button>
   </div>
 </article>`;
       })
       .join('');
+    this.hydrateFarmerCardPhotos();
   }
 
-  openFarmerProfile(farmerNo, source = 'profiles') {
+  openFarmerProfile(farmerRef, source = 'profiles') {
     this.farmerProfileSource = source;
     const profileView = document.getElementById('farmerProfileView');
     const listView = document.getElementById('farmersListView');
@@ -3829,13 +4588,15 @@ class DashboardApp {
     if (detailsArea) detailsArea.classList.remove('expanded');
     if (seeMoreBtn) seeMoreBtn.textContent = 'See more';
 
-    const farmer = (this.data || []).find((r) => Number(r['NO.']) === Number(farmerNo));
+    const farmer = this.resolveFarmerFromRef(farmerRef);
     if (!farmer) {
       this.showNotification('Farmer not found.', 'error');
       return;
     }
 
-    this.currentFarmerNo = Number(farmerNo);
+    const farmerId = this.farmerIdFromRow(farmer);
+    const displaySeq = this.farmerDisplaySeqNo(farmer);
+    this.currentFarmerNo = farmerId;
     this.updateProfileStatusButtons(farmer.is_blocked === true || farmer.is_blocked === 'true');
 
     const fullName =
@@ -3844,7 +4605,7 @@ class DashboardApp {
         .filter(Boolean)
         .join(' ')
         .trim() ||
-      `Farmer #${farmerNo}`;
+      `Farmer #${displaySeq}`;
 
     const setText = (id, value) => {
       const el = document.getElementById(id);
@@ -3859,7 +4620,7 @@ class DashboardApp {
 
     setText('farmerProfileName', fullName);
     this.applyFarmerProfileAvatar(farmer);
-    setText('farmerProfileNo', `No. #${farmerNo}`);
+    setText('farmerProfileNo', `No. ${displaySeq}`);
     setText('farmerProfileDob', this.getValue(farmer, ['BIRTHDAY', 'birthday']) || '—');
     setText('farmerProfilePhone', this.getValue(farmer, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']) || '—');
     setText('farmerProfileAddress', this.getValue(farmer, ['ADDRESS (BARANGAY)', 'address', 'BARANGAY']) || '—');
@@ -3886,17 +4647,50 @@ class DashboardApp {
     setText('farmerProfileExcBearingText', this.getValue(farmer, ['EXCELSA BEARING', 'Excelsa_Bearing']) || '0');
     setText('farmerProfileExcNonBearingText', this.getValue(farmer, ['EXCELSA NON-BEARING', 'Excelsa_Non-bearing']) || '0');
 
-    setText('farmerProfileLibProdText', this.getValue(farmer, ['LIBERICA PRODUCTION', 'Liberica_Production']) || '0');
-    setText('farmerProfileRobProdText', this.getValue(farmer, ['ROBUSTA PRODUCTION', 'Robusta_Production']) || '0');
-    setText('farmerProfileExcProdText', this.getValue(farmer, ['EXCELSA PRODUCTION', 'Excelsa_Production']) || '0');
+    // Harvest quantities
+    const libHarvest = this.getVarietyHarvestProduction(farmer, 'liberica');
+    const excHarvest = this.getVarietyHarvestProduction(farmer, 'excelsa');
+    const robHarvest = this.getVarietyHarvestProduction(farmer, 'robusta');
+    const fmtProd = (value) => this.formatKg(value);
+    setText('farmerProfileHarvestLibQtyText', fmtProd(libHarvest));
+    setText('farmerProfileHarvestExcQtyText', fmtProd(excHarvest));
+    setText('farmerProfileHarvestRobQtyText', fmtProd(robHarvest));
+
+    // GCB details
+    setText('farmerProfileGcbLibClassText', this.formatGcbClassification(farmer, 'liberica') || '—');
+    setText('farmerProfileGcbLibQtyText', fmtProd(this.getVarietyProduction(farmer, 'liberica')));
+    setText('farmerProfileGcbExcClassText', this.formatGcbClassification(farmer, 'excelsa') || '—');
+    setText('farmerProfileGcbExcQtyText', fmtProd(this.getVarietyProduction(farmer, 'excelsa')));
+    setText('farmerProfileGcbRobClassText', this.formatGcbClassification(farmer, 'robusta') || '—');
+    setText('farmerProfileGcbRobQtyText', fmtProd(this.getVarietyProduction(farmer, 'robusta')));
+
+    // Roasted details
+    setText('farmerProfileRoastedLibClassText', this.formatRoastedClassification(farmer, 'liberica') || '—');
+    setText('farmerProfileRoastedLibQtyText', fmtProd(this.getVarietyRoastedProduction(farmer, 'liberica')));
+    setText('farmerProfileRoastedExcClassText', this.formatRoastedClassification(farmer, 'excelsa') || '—');
+    setText('farmerProfileRoastedExcQtyText', fmtProd(this.getVarietyRoastedProduction(farmer, 'excelsa')));
+    setText('farmerProfileRoastedRobClassText', this.formatRoastedClassification(farmer, 'robusta') || '—');
+    setText('farmerProfileRoastedRobQtyText', fmtProd(this.getVarietyRoastedProduction(farmer, 'robusta')));
+
+    // Legacy fields for backward compatibility
+    const libProd = this.getVarietyProduction(farmer, 'liberica');
+    const excProd = this.getVarietyProduction(farmer, 'excelsa');
+    const robProd = this.getVarietyProduction(farmer, 'robusta');
+    setText('farmerProfileGcbLibProdText', fmtProd(libProd));
+    setText('farmerProfileGcbExcProdText', fmtProd(excProd));
+    setText('farmerProfileGcbRobProdText', fmtProd(robProd));
+    setText('farmerProfileRoastedLibProdText', fmtProd(this.getRoastedFromGcb(libProd)));
+    setText('farmerProfileRoastedExcProdText', fmtProd(this.getRoastedFromGcb(excProd)));
+    setText('farmerProfileRoastedRobProdText', fmtProd(this.getRoastedFromGcb(robProd)));
     setText('farmerProfileProdUnitText', this.getValue(farmer, ['PRODUCTION UNIT', 'Production_Unit']) || 'kg');
 
     // Populate Bean Summary
     this.initBeanVarietyFilters(farmer);
 
     // Populate Transactions for this specific farmer
-    const farmerId = this.getValue(farmer, ['farmer_id', 'id', 'NO.', 'NO']);
     this.populateFarmerTransactions(farmerId, fullName);
+
+    this.initFarmerSelfSalePanel(farmer);
 
     // Init See More
     this.initSeeMoreDetails();
@@ -4015,7 +4809,7 @@ class DashboardApp {
           <tr>
             <td class="txn-date" style="background: #ffffff;">${date}</td>
             <td style="background: #ffffff;">${this.escapeHtml(t.buyer_name || 'Direct Sale')}</td>
-            <td style="background: #ffffff;">${this.escapeHtml(t.variety || 'Coffee Beans')}</td>
+            <td style="background: #ffffff;">${this.escapeHtml(this.varietyLabel(t.variety || t.product || 'Coffee Beans'))}</td>
             <td style="font-weight:700; background: #ffffff;">${qty} ${unit}</td>
           </tr>
         `;
@@ -4110,6 +4904,7 @@ class DashboardApp {
   }
 
   closeFarmerProfile() {
+    this.closeFarmerProductionModal();
     const profileView = document.getElementById('farmerProfileView');
     const listView = document.getElementById('farmersListView');
     if (!profileView || !listView) return;
@@ -4128,6 +4923,28 @@ class DashboardApp {
       profileView.hidden = true;
       listView.hidden = false;
     }
+  }
+
+  openFarmerProductionModal() {
+    const modal = document.getElementById('farmerProductionModal');
+    if (!modal) return;
+    const nameEl = document.getElementById('farmerProfileName');
+    const titleEl = document.getElementById('farmerProductionModalTitle');
+    if (titleEl) {
+      const name = nameEl?.textContent?.trim();
+      titleEl.innerHTML = name
+        ? `Production <span class="year-label">(2026)</span> · ${this.escapeHtml(name)}`
+        : 'Production <span class="year-label">(2026)</span>';
+    }
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+  }
+
+  closeFarmerProductionModal() {
+    const modal = document.getElementById('farmerProductionModal');
+    if (!modal) return;
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
   }
 
   openFarmerPlaceholderProfile(farmerNo = 1) {
@@ -4215,6 +5032,8 @@ class DashboardApp {
         ? document.getElementById('tableBodyTrees')
         : this.farmerTableView === 'production'
           ? document.getElementById('tableBodyProduction')
+          : this.farmerTableView === 'automated-yields'
+            ? document.getElementById('tableBodyAutomatedYields')
           : this.farmerTableView === 'affiliation'
             ? document.getElementById('tableBodyAffiliation')
             : this.farmerTableView === 'farm'
@@ -4238,12 +5057,14 @@ class DashboardApp {
         this.farmerTableView === 'trees'
           ? 12
           : this.farmerTableView === 'production'
-            ? 6
-            : this.farmerTableView === 'affiliation'
-              ? 8
-              : this.farmerTableView === 'farm'
-                ? 9
-              : 5;
+            ? 18
+            : this.farmerTableView === 'automated-yields'
+              ? 18
+              : this.farmerTableView === 'affiliation'
+                ? 8
+                : this.farmerTableView === 'farm'
+                  ? 9
+                  : 5;
       tableBody.innerHTML = `<tr><td colspan="${colSpan}" class="no-data">No data available.</td></tr>`;
       return;
     }
@@ -4251,12 +5072,8 @@ class DashboardApp {
     const bodyHTML = pageData.map((row, index) => {
       const actualIndex = startIndex + index + 1;
       const rowIndexInData = this.data.indexOf(row);
-      console.log('Rendering farmer', actualIndex, ':', row['NAME OF FARMER'] || 'Unknown');
-
-      // Always display the farmer's original NO., not the filtered/paginated row index.
-      // Falls back to actualIndex if the field is missing/invalid.
-      const rowNo = Number.parseInt(this.getValue(row, ['NO.', 'NO', 'no.']), 10);
-      const displayNo = Number.isFinite(rowNo) ? rowNo : actualIndex;
+      const displayNo = this.farmerDisplaySeqNo(row, this.data) || actualIndex;
+      console.log('Rendering farmer', displayNo, ':', row['NAME OF FARMER'] || 'Unknown');
 
       const fullName = this.getValue(row, ['NAME OF FARMER', 'Name of Farmer', 'name']);
       const nameParts = this.splitFarmerName(fullName);
@@ -4284,21 +5101,45 @@ class DashboardApp {
                 this.createInputCell(displayNo, 'number'),
                 this.createInputCell(nameParts.last, 'text'),
                 this.createInputCell(nameParts.first, 'text'),
-                this.createInputCell(this.getValue(row, ['LIBERICA PRODUCTION', 'Liberica_Production']), 'number', 'highlight-blue'),
-                this.createInputCell(this.getValue(row, ['EXCELSA PRODUCTION', 'Excelsa_Production']), 'number', 'highlight-blue'),
-                this.createInputCell(this.getValue(row, ['ROBUSTA PRODUCTION', 'Robusta_Production']), 'number', 'highlight-blue')
+                // Harvest
+                this.createInputCell(this.getVarietyHarvestProduction(row, 'liberica'), 'number', 'highlight-yellow'),
+                this.createInputCell(this.getVarietyHarvestProduction(row, 'excelsa'), 'number', 'highlight-yellow'),
+                this.createInputCell(this.getVarietyHarvestProduction(row, 'robusta'), 'number', 'highlight-yellow'),
+                // GCB
+                this.createInputCell(this.formatGcbClassification(row, 'liberica'), 'text', 'highlight-blue'),
+                this.createInputCell(this.getVarietyProduction(row, 'liberica'), 'number', 'highlight-blue'),
+                this.createInputCell(this.formatGcbClassification(row, 'excelsa'), 'text', 'highlight-blue'),
+                this.createInputCell(this.getVarietyProduction(row, 'excelsa'), 'number', 'highlight-blue'),
+                this.createInputCell(this.formatGcbClassification(row, 'robusta'), 'text', 'highlight-blue'),
+                this.createInputCell(this.getVarietyProduction(row, 'robusta'), 'number', 'highlight-blue'),
+                // Roasted
+                this.createInputCell(this.formatRoastedClassification(row, 'liberica'), 'text', 'highlight-green'),
+                this.createInputCell(this.getVarietyRoastedProduction(row, 'liberica'), 'number', 'highlight-green'),
+                this.createInputCell(this.formatRoastedClassification(row, 'excelsa'), 'text', 'highlight-green'),
+                this.createInputCell(this.getVarietyRoastedProduction(row, 'excelsa'), 'number', 'highlight-green'),
+                this.createInputCell(this.formatRoastedClassification(row, 'robusta'), 'text', 'highlight-green'),
+                this.createInputCell(this.getVarietyRoastedProduction(row, 'robusta'), 'number', 'highlight-green')
               ]
+            : this.farmerTableView === 'automated-yields'
+              ? [
+                  this.createInputCell(displayNo, 'number'),
+                  this.createInputCell(nameParts.last, 'text'),
+                  this.createInputCell(nameParts.first, 'text'),
+                  ...this.buildAutomatedYieldVarietyCells(row, 'liberica'),
+                  ...this.buildAutomatedYieldVarietyCells(row, 'robusta'),
+                  ...this.buildAutomatedYieldVarietyCells(row, 'excelsa')
+                ]
           : this.farmerTableView === 'affiliation'
             ? [
                 this.createInputCell(displayNo, 'number'),
                 this.createInputCell(nameParts.last, 'text'),
                 this.createInputCell(nameParts.first, 'text'),
-                this.createInputCell(this.getValue(row, ['FA OFFICER / MEMBER', 'FA Officer / member', 'officer']), 'text'),
-                this.createRSBSABadge(this.getValue(row, ['RSBSA Registered (Yes/No)', 'REGISTERED (YES/NO)', 'Registered (Yes/No)', 'registered'])),
-                this.createInputCell(this.getValue(row, ['RSBSA NUMBER', 'rsbsa_number']), 'text'),
+                this.createInputCell(this.getValue(row, ['FA OFFICER / MEMBER', 'FA OFFICER/MEMBER', 'federation_assoc', 'FA Officer / member', 'officer']), 'text'),
+                this.createRSBSABadge(this.getValue(row, ['RSBSA Registered (Yes/No)', 'RSBSA REGISTERED (YES/NO)', 'REGISTERED (YES/NO)', 'Registered (Yes/No)', 'registered', 'rsbsa_registered'])),
+                this.createInputCell(this.getValue(row, ['RSBSA NUMBER', 'RSBSA Registered Number', 'rsbsa_number']), 'text'),
                 this.createRSBSAStatusBadge(
-                  this.getValue(row, ['RSBSA Registered (Yes/No)', 'REGISTERED (YES/NO)', 'Registered (Yes/No)', 'registered']),
-                  this.getValue(row, ['RSBSA STATUS', 'RSBSA Status', 'rsbsa_status', 'status'])
+                  this.getValue(row, ['RSBSA Registered (Yes/No)', 'RSBSA REGISTERED (YES/NO)', 'REGISTERED (YES/NO)', 'Registered (Yes/No)', 'registered']),
+                  this.getValue(row, ['RSBSA Status', 'RSBSA STATUS', 'rsbsa_status'])
                 ),
                 this.createInputCell(this.getValue(row, ['NCFRS', 'ncfrs']), 'text')
               ]
@@ -4329,6 +5170,18 @@ class DashboardApp {
     console.log('Table rendered successfully with', pageData.length, 'farmer records');
   }
 
+  normalizeFarmerTableViewKey(view) {
+    const key = String(view || '').trim().toLowerCase();
+    if (key === 'trees') return 'trees';
+    if (key === 'production') return 'production';
+    if (key === 'automated-yields' || key === 'yields' || key === 'automated_yields') {
+      return 'automated-yields';
+    }
+    if (key === 'affiliation') return 'affiliation';
+    if (key === 'farm') return 'farm';
+    return 'basic';
+  }
+
   setFarmerTableView(view) {
     // Preserve scroll positions to avoid "jump to top" when sidebar is open.
     const farmersRoot = document.getElementById('farmers-module');
@@ -4342,25 +5195,14 @@ class DashboardApp {
     const prevTableScrollTop = tableWrapper ? tableWrapper.scrollTop : 0;
     const prevTableScrollLeft = tableWrapper ? tableWrapper.scrollLeft : 0;
 
-    const key = String(view || '')
-      .trim()
-      .toLowerCase();
-    this.farmerTableView =
-      key === 'trees'
-        ? 'trees'
-        : key === 'production'
-          ? 'production'
-          : key === 'affiliation'
-            ? 'affiliation'
-            : key === 'farm'
-              ? 'farm'
-              : 'basic';
+    const key = this.normalizeFarmerTableViewKey(view);
+    this.farmerTableView = key;
 
     const btns = farmersRoot
       ? farmersRoot.querySelectorAll('.view-toggle-btn[data-table-view]')
       : document.querySelectorAll('.view-toggle-btn[data-table-view]');
     btns.forEach((btn) => {
-      const btnKey = btn.getAttribute('data-table-view') || 'basic';
+      const btnKey = this.normalizeFarmerTableViewKey(btn.getAttribute('data-table-view') || 'basic');
       const active = btnKey === this.farmerTableView;
       btn.classList.toggle('active', active);
       btn.setAttribute('aria-pressed', active ? 'true' : 'false');
@@ -4369,6 +5211,7 @@ class DashboardApp {
     const basicTable = document.getElementById('farmerTableBasic');
     const treesTable = document.getElementById('farmerTableTrees');
     const productionTable = document.getElementById('farmerTableProduction');
+    const automatedYieldsTable = document.getElementById('farmerTableAutomatedYields');
     const affiliationTable = document.getElementById('farmerTableAffiliation');
     const farmTable = document.getElementById('farmerTableFarm');
 
@@ -4376,12 +5219,17 @@ class DashboardApp {
       const showBasic = this.farmerTableView === 'basic';
       const showTrees = this.farmerTableView === 'trees';
       const showProduction = this.farmerTableView === 'production';
+      const showAutomatedYields = this.farmerTableView === 'automated-yields';
       const showAffiliation = this.farmerTableView === 'affiliation';
       const showFarm = this.farmerTableView === 'farm';
 
       basicTable.classList.toggle('is-hidden', !showBasic);
       treesTable.classList.toggle('is-hidden', !showTrees);
       productionTable.classList.toggle('is-hidden', !showProduction);
+      if (automatedYieldsTable) {
+        automatedYieldsTable.classList.toggle('is-hidden', !showAutomatedYields);
+        automatedYieldsTable.setAttribute('aria-hidden', showAutomatedYields ? 'false' : 'true');
+      }
       affiliationTable.classList.toggle('is-hidden', !showAffiliation);
       farmTable.classList.toggle('is-hidden', !showFarm);
 
@@ -4411,9 +5259,16 @@ class DashboardApp {
   }
 
   createInputCell(value, type = 'text', highlightClass = '') {
-    const formattedValue = this.formatValue(value);
+    let display = value;
+    if (type === 'number' && (display === '' || display === null || display === undefined)) {
+      display = 0;
+    }
+    if (type === 'text' && (display === '' || display === null || display === undefined)) {
+      display = '—';
+    }
+    const formattedValue = this.formatValue(display);
     const className = highlightClass ? ` class="${highlightClass}"` : '';
-    
+
     return `<td${className}>${formattedValue}</td>`;
   }
 
@@ -4443,16 +5298,16 @@ class DashboardApp {
   }
 
   createRSBSABadge(value) {
-    const normalizedValue = String(value).toLowerCase().trim();
+    const normalizedValue = String(value || 'no').toLowerCase().trim();
     const isYes = normalizedValue === 'yes' || normalizedValue === 'y';
-    
+
     if (isYes) {
       return `<td><span class="rsbsa-badge rsbsa-yes">YES</span></td>`;
-    } else if (normalizedValue === 'no' || normalizedValue === 'n') {
-      return `<td><span class="rsbsa-badge rsbsa-no">NO</span></td>`;
-    } else {
-      return `<td></td>`;
     }
+    if (normalizedValue === 'pending' || normalizedValue === 'p') {
+      return `<td><span class="rsbsa-badge rsbsa-pending">PENDING</span></td>`;
+    }
+    return `<td><span class="rsbsa-badge rsbsa-no">NO</span></td>`;
   }
 
   getFarmerDbId(farmer) {
@@ -4494,7 +5349,7 @@ class DashboardApp {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.ok !== true) {
-      throw new Error(data.error || data.detail || `HTTP ${res.status}`);
+      throw new Error(data.detail || data.message || data.error || `HTTP ${res.status}`);
     }
     return data;
   }
@@ -4594,16 +5449,13 @@ class DashboardApp {
       if (label) label.textContent = 'Unsuspend';
       
       // Show countdown if we have a suspension end time
-      const farmer = (this.data || []).find(f => {
-        const no = f['NO.'] || f['no'] || f['No'] || f['id'] || f['ID'];
-        return Number(no) === Number(this.currentFarmerNo);
-      });
+      const farmer = this.farmerRowById(this.currentFarmerNo);
 
       if (farmer && farmer.suspended_until && countdownContainer && timerEl) {
         countdownContainer.hidden = false;
         countdownContainer.style.setProperty('display', 'flex', 'important');
         timerEl.dataset.until = farmer.suspended_until;
-        timerEl.dataset.farmerNo = this.currentFarmerNo;
+        timerEl.dataset.farmerId = String(this.currentFarmerNo);
       } else {
         if (countdownContainer) {
           countdownContainer.hidden = true;
@@ -4652,11 +5504,252 @@ class DashboardApp {
     }
   }
 
+  gcbClassificationLabels = {
+    small_beans: 'Small Beans',
+    medium_beans: 'Medium Beans',
+    large_beans: 'Large Beans',
+  };
+
+  roastedClassificationLabels = {
+    ground_beans: 'Ground Beans',
+    whole_beans: 'Whole Beans',
+  };
+
+  normalizeClassificationKey(value, labels) {
+    if (value === 0 || value === 1 || value === 2) {
+      const intMap = labels === this.gcbClassificationLabels
+        ? { 0: 'small_beans', 1: 'medium_beans', 2: 'large_beans' }
+        : { 0: 'ground_beans', 1: 'whole_beans' };
+      if (intMap[value]) return intMap[value];
+    }
+    const key = String(value || '').trim().toLowerCase().replace(/-/g, '_').replace(/\s+/g, '_');
+    if (!key) return '';
+    if (labels[key]) return key;
+    for (const [code, label] of Object.entries(labels)) {
+      if (key === String(label).toLowerCase().replace(/\s+/g, '_')) return code;
+    }
+    return key;
+  }
+
+  formatGcbClassification(row, variety) {
+    const v = String(variety || '').trim().toLowerCase();
+    const cap = v.toUpperCase();
+    const camel = v.charAt(0).toUpperCase() + v.slice(1);
+    const labeled = this.getValue(row, [
+      `${cap} GCB CLASSIFICATION`,
+      `${v}_gcb_classification`,
+      `${v}_gcb_classification_code`,
+      `${v}_gcb_class`,
+      `${v}_gcb_type`,
+      `${camel}GcbClassification`,
+      `${camel}GcbClass`,
+      `${camel}GcbType`,
+    ]);
+    if (labeled) {
+      const key = this.normalizeClassificationKey(labeled, this.gcbClassificationLabels);
+      return this.gcbClassificationLabels[key] || labeled;
+    }
+    const detail = row?.production_detail?.varieties?.[v]?.gcb?.classification_label
+      || row?.production_detail?.varieties?.[v]?.gcb?.classification;
+    if (detail) {
+      const key = this.normalizeClassificationKey(detail, this.gcbClassificationLabels);
+      return this.gcbClassificationLabels[key] || detail;
+    }
+    return '';
+  }
+
+  formatRoastedClassification(row, variety) {
+    const v = String(variety || '').trim().toLowerCase();
+    const cap = v.toUpperCase();
+    const camel = v.charAt(0).toUpperCase() + v.slice(1);
+    const labeled = this.getValue(row, [
+      `${cap} ROASTED CLASSIFICATION`,
+      `${v}_roasted_classification`,
+      `${v}_roasted_classification_code`,
+      `${v}_roasted_class`,
+      `${v}_roasted_type`,
+      `${camel}RoastedClassification`,
+      `${camel}RoastedClass`,
+      `${camel}RoastedType`,
+    ]);
+    if (labeled) {
+      const key = this.normalizeClassificationKey(labeled, this.roastedClassificationLabels);
+      return this.roastedClassificationLabels[key] || labeled;
+    }
+    const detail = row?.production_detail?.varieties?.[v]?.roasted?.classification_label
+      || row?.production_detail?.varieties?.[v]?.roasted?.classification;
+    if (detail) {
+      const key = this.normalizeClassificationKey(detail, this.roastedClassificationLabels);
+      return this.roastedClassificationLabels[key] || detail;
+    }
+    return '';
+  }
+
+  getVarietyProduction(row, variety) {
+    const v = String(variety || '').trim().toLowerCase();
+    const gcbDetail = this.getValue(row, [`${v}_gcb_qty_kg`, `${v.toUpperCase()} GCB QTY`]);
+    if (gcbDetail !== '' && gcbDetail != null && Number.isFinite(Number(gcbDetail))) {
+      return Number(gcbDetail);
+    }
+    const keysByVariety = {
+      liberica: [
+        'LIBERICA PRODUCTION',
+        'Liberica_Production',
+        'LIBERICA (KG)',
+        'LIBERICA',
+        'liberica_qty_kg',
+        'liberica_production',
+        'liberica_gcb_qty_kg',
+      ],
+      excelsa: [
+        'EXCELSA PRODUCTION',
+        'Excelsa_Production',
+        'EXCELSA (KG)',
+        'EXCELSA',
+        'excelsa_qty_kg',
+        'excelsa_production',
+        'excelsa_gcb_qty_kg',
+      ],
+      robusta: [
+        'ROBUSTA PRODUCTION',
+        'Robusta_Production',
+        'ROBUSTA (KG)',
+        'ROBUSTA',
+        'robusta_qty_kg',
+        'robusta_production',
+        'robusta_gcb_qty_kg',
+      ],
+    };
+    const keys = keysByVariety[v] || [`${v.toUpperCase()} PRODUCTION`, `${v} (KG)`];
+    const raw = this.getValue(row, keys);
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  getVarietyBearing(row, variety) {
+    const v = String(variety || '').trim().toLowerCase();
+    const keysByVariety = {
+      liberica: ['LIBERICA BEARING', 'Liberica_Bearing', 'liberica_bearing'],
+      excelsa: ['EXCELSA BEARING', 'Excelsa_Bearing', 'excelsa_bearing'],
+      robusta: ['ROBUSTA BEARING', 'Robusta_Bearing', 'robusta_bearing'],
+    };
+    const keys = keysByVariety[v] || [`${v.toUpperCase()} BEARING`];
+    const raw = this.getValue(row, keys);
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  getYieldGcbKgPerBearingTree(variety) {
+    const rates = { liberica: 0.3, robusta: 1, excelsa: 1 };
+    return rates[String(variety || '').trim().toLowerCase()] || 0;
+  }
+
+  getRoastedRecoveryFactor() {
+    return 0.78;
+  }
+
+  getRoastedFromGcb(gcbKg) {
+    return (Number(gcbKg) || 0) * this.getRoastedRecoveryFactor();
+  }
+
+  getVarietyRoastedProduction(row, variety) {
+    const v = String(variety || '').trim().toLowerCase();
+    const roastedDetail = this.getValue(row, [`${v}_roasted_qty_kg`, `${v.toUpperCase()} ROASTED QTY`]);
+    const n = Number(roastedDetail);
+    if (Number.isFinite(n) && n > 0) return n;
+    return this.getRoastedFromGcb(this.getVarietyProduction(row, variety));
+  }
+
+  getVarietyHarvestProduction(row, variety) {
+    const v = String(variety || '').trim().toLowerCase();
+    const harvestDetail = this.getValue(row, [`${v}_harvest_qty_kg`, `${v.toUpperCase()} HARVEST QTY`]);
+    const n = Number(harvestDetail);
+    if (Number.isFinite(n) && n > 0) return n;
+    const gcb = this.getVarietyProduction(row, variety);
+    if (gcb > 0) {
+      const factor = v === 'robusta' ? 5 : 10;
+      return gcb * factor;
+    }
+    return 0;
+  }
+
+  gcbFiMatchesTreeComputation(gcbFi, gcbAc) {
+    const fi = Number(gcbFi) || 0;
+    const ac = Number(gcbAc) || 0;
+    return Math.abs(fi - ac) <= 0.01;
+  }
+
+  computeAutomatedVarietyYield(row, variety) {
+    const bearingTrees = this.getVarietyBearing(row, variety);
+    const rate = this.getYieldGcbKgPerBearingTree(variety);
+    const gcbFi = this.getVarietyProduction(row, variety);
+    const gcbAc = bearingTrees * rate;
+    const roastedFi = this.getVarietyRoastedProduction(row, variety);
+    const roastedAc = gcbAc * this.getRoastedRecoveryFactor();
+    const matchesTreeComputation = this.gcbFiMatchesTreeComputation(gcbFi, gcbAc);
+    return { bearingTrees, gcbFi, gcbAc, roastedFi, roastedAc, matchesTreeComputation };
+  }
+
+  buildYieldComparisonTooltip(y, variety) {
+    const vLabel = String(variety || '').charAt(0).toUpperCase() + String(variety || '').slice(1);
+    const rateLabel = String(variety || '').toLowerCase() === 'liberica' ? '0.3 kg per tree' : '1 kg per tree';
+    const trees = Number(y.bearingTrees) || 0;
+    const fi = this.formatKgWithUnit(y.gcbFi);
+    const ac = this.formatKgWithUnit(y.gcbAc);
+    if (y.matchesTreeComputation) {
+      return (
+        `${vLabel} — Green highlight: Farmer input (FI, ${fi}) matches the system computation (AC, ${ac}). ` +
+        `AC is based on ${trees.toLocaleString()} bearing tree(s) × ${rateLabel}.`
+      );
+    }
+    return (
+      `${vLabel} — Red highlight: Farmer input (FI, ${fi}) does not match the system computation (AC, ${ac}). ` +
+      `AC uses ${trees.toLocaleString()} bearing tree(s) × ${rateLabel}. ` +
+      `Check tree counts or registration production if these should align.`
+    );
+  }
+
+  buildAutomatedYieldVarietyCells(row, variety) {
+    const y = this.computeAutomatedVarietyYield(row, variety);
+    const cmp = y.matchesTreeComputation ? 'ay-match' : 'ay-mismatch';
+    const cmpTitle = this.buildYieldComparisonTooltip(y, variety);
+    return [
+      this.createYieldCell(y.gcbAc, 'ay-bearing', cmp, cmpTitle, { withUnit: false }),
+      this.createYieldCell(y.gcbFi, 'ay-fi', cmp, cmpTitle),
+      this.createYieldCell(y.gcbAc, 'ay-ac', cmp, cmpTitle),
+      this.createYieldCell(y.roastedFi, 'ay-roasted-fi', cmp, cmpTitle),
+      this.createYieldCell(y.roastedAc, 'ay-roasted-ac', cmp, cmpTitle),
+    ];
+  }
+
+  createYieldCell(value, highlightClass = '', comparisonClass = '', title = '', options = {}) {
+    const withUnit = options.withUnit !== false;
+    const formattedValue = withUnit ? this.formatKgWithUnit(value) : this.formatKg(value);
+    const classes = [highlightClass, comparisonClass].filter(Boolean);
+    const classAttr = classes.length ? ` class="${classes.join(' ')}"` : '';
+    const titleAttr = title ? ` title="${title.replace(/"/g, '&quot;')}"` : '';
+    return `<td${classAttr}${titleAttr}>${formattedValue}</td>`;
+  }
+
+  formatKgWithUnit(value) {
+    return `${this.formatKg(value)} kg`;
+  }
+
+  formatKg(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '0';
+    if (Math.abs(n - Math.round(n)) < 0.001) {
+      return Math.round(n).toLocaleString();
+    }
+    return n.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+  }
+
   getTotalProduction(row) {
-    const lib = Number(this.getValue(row, ['LIBERICA PRODUCTION', 'Liberica_Production']) || 0) || 0;
-    const exc = Number(this.getValue(row, ['EXCELSA PRODUCTION', 'Excelsa_Production']) || 0) || 0;
-    const rob = Number(this.getValue(row, ['ROBUSTA PRODUCTION', 'Robusta_Production']) || 0) || 0;
-    return lib + exc + rob;
+    return (
+      this.getVarietyProduction(row, 'liberica') +
+      this.getVarietyProduction(row, 'excelsa') +
+      this.getVarietyProduction(row, 'robusta')
+    );
   }
 
   updateFarmerField(rowIndex, field, rawValue) {
@@ -5141,9 +6234,9 @@ class DashboardApp {
       const isLettersOnly = /^[a-z]+$/i.test(term);
 
       if (isWholeNumber) {
-        // Exact match for the "NO." column only (prevents matching dates/other fields).
         const n = Number.parseInt(numericCandidate, 10);
-        this.filteredData = this.data.filter(row => Number(row['NO.']) === n);
+        const row = this.farmerRowByDisplaySeq(n, this.data);
+        this.filteredData = row ? [row] : [];
       } else if (isLettersOnly) {
         // If the term matches farmer "LAST NAME" prefixes, show only those results.
         // Otherwise, fall back to a general "includes" search across all fields.
@@ -5306,8 +6399,9 @@ class DashboardApp {
       );
       return sum + (Number.isFinite(area) ? area : 0);
     }, 0);
-    const totalProduction = this.data.reduce((sum, farmer) => 
-      sum + (farmer['LIBERICA PRODUCTION'] || 0) + (farmer['EXCELSA PRODUCTION'] || 0) + (farmer['ROBUSTA PRODUCTION'] || 0), 0
+    const totalProduction = this.data.reduce(
+      (sum, farmer) => sum + this.getTotalProduction(farmer),
+      0
     );
 
     // Update stat cards
@@ -5324,6 +6418,173 @@ class DashboardApp {
     if (!window.Chart) return;
     this.createTreeDistributionChart();
     this.createProductionChart();
+    this.updateRegistrationChart();
+  }
+
+  buildRegistrationVolumeSeries(rows = []) {
+    const monthCount = 6;
+    const now = new Date();
+    const buckets = [];
+
+    for (let i = monthCount - 1; i >= 0; i -= 1) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      buckets.push({
+        key: `${d.getFullYear()}-${d.getMonth()}`,
+        label: d.toLocaleString(undefined, { month: 'short' }),
+        count: 0,
+      });
+    }
+
+    const bucketIndex = new Map(buckets.map((bucket, index) => [bucket.key, index]));
+
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      if (!this.isFarmerRegistrationComplete(row)) return;
+      const raw = row.registered_at || row.created_at;
+      if (!raw) return;
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) return;
+      const key = `${parsed.getFullYear()}-${parsed.getMonth()}`;
+      const index = bucketIndex.get(key);
+      if (index === undefined) return;
+      buckets[index].count += 1;
+    });
+
+    const values = buckets.map((bucket) => bucket.count);
+    const labels = buckets.map((bucket) => bucket.label);
+    const total = values.reduce((sum, value) => sum + value, 0);
+
+    let trendPct = null;
+    if (total > 0 && values.length >= 2) {
+      const current = values[values.length - 1];
+      const previous = values[values.length - 2];
+      if (previous > 0) {
+        trendPct = Math.round(((current - previous) / previous) * 100);
+      } else if (current > 0) {
+        trendPct = 100;
+      } else {
+        trendPct = 0;
+      }
+    }
+
+    return { labels, values, total, trendPct };
+  }
+
+  updateRegistrationTrendBadge({ total, trendPct }) {
+    const badge = document.getElementById('registrationTrendBadge');
+    const textEl = document.getElementById('registrationTrendBadgeText');
+    if (!badge || !textEl) return;
+
+    if (total <= 0 || trendPct === null) {
+      badge.hidden = true;
+      return;
+    }
+
+    badge.hidden = false;
+    badge.classList.remove('positive', 'negative', 'neutral');
+
+    if (trendPct > 0) {
+      badge.classList.add('positive');
+      textEl.textContent = `${trendPct}%`;
+      badge.querySelector('i')?.classList.replace('fa-arrow-down', 'fa-arrow-up');
+      badge.querySelector('i')?.classList.replace('fa-minus', 'fa-arrow-up');
+    } else if (trendPct < 0) {
+      badge.classList.add('negative');
+      textEl.textContent = `${Math.abs(trendPct)}%`;
+      const icon = badge.querySelector('i');
+      if (icon) {
+        icon.classList.remove('fa-arrow-up', 'fa-minus');
+        icon.classList.add('fa-arrow-down');
+      }
+    } else {
+      badge.classList.add('neutral');
+      textEl.textContent = '0%';
+      const icon = badge.querySelector('i');
+      if (icon) {
+        icon.classList.remove('fa-arrow-up', 'fa-arrow-down');
+        icon.classList.add('fa-minus');
+      }
+    }
+  }
+
+  updateRegistrationChart() {
+    const canvas = document.getElementById('registrationVolumeChart');
+    if (!canvas || !window.Chart) return;
+
+    const { labels, values, total, trendPct } = this.buildRegistrationVolumeSeries(this.data);
+    this.updateRegistrationTrendBadge({ total, trendPct });
+
+    const maxVal = Math.max(...values, 0);
+    const stepSize = maxVal <= 10 ? 1 : maxVal <= 50 ? 5 : 20;
+    const suggestedMax = maxVal === 0 ? 5 : Math.max(stepSize * 2, Math.ceil((maxVal * 1.15) / stepSize) * stepSize);
+
+    if (!this.charts.registrationChart) {
+      this.charts.registrationChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'New Registrations',
+            data: values,
+            backgroundColor: 'rgba(34, 197, 94, 0.2)',
+            borderColor: '#16a34a',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#16a34a',
+            pointRadius: 4,
+            pointHoverRadius: 6,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              backgroundColor: '#ffffff',
+              titleColor: '#0f172a',
+              bodyColor: '#475569',
+              borderColor: '#e2e8f0',
+              borderWidth: 1,
+              padding: 12,
+              displayColors: false,
+              callbacks: {
+                label: (context) => `Registrations: ${context.parsed.y}`,
+              },
+            },
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: {
+                font: { size: 11 },
+                color: '#94a3b8',
+              },
+            },
+            y: {
+              beginAtZero: true,
+              suggestedMax,
+              grid: { color: '#f1f5f9' },
+              ticks: {
+                stepSize,
+                font: { size: 11 },
+                color: '#94a3b8',
+              },
+            },
+          },
+        },
+      });
+      return;
+    }
+
+    const chart = this.charts.registrationChart;
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = values;
+    chart.options.scales.y.ticks.stepSize = stepSize;
+    chart.options.scales.y.suggestedMax = suggestedMax;
+    chart.update();
   }
 
   createTreeDistributionChart() {
@@ -5384,9 +6645,18 @@ class DashboardApp {
     const ctx = canvas.getContext('2d');
     
     // Calculate production by type
-    const libericaProduction = this.data.reduce((sum, farmer) => sum + (farmer['LIBERICA PRODUCTION'] || 0), 0);
-    const excelsaProduction = this.data.reduce((sum, farmer) => sum + (farmer['EXCELSA PRODUCTION'] || 0), 0);
-    const robustaProduction = this.data.reduce((sum, farmer) => sum + (farmer['ROBUSTA PRODUCTION'] || 0), 0);
+    const libericaProduction = this.data.reduce(
+      (sum, farmer) => sum + this.getVarietyProduction(farmer, 'liberica'),
+      0
+    );
+    const excelsaProduction = this.data.reduce(
+      (sum, farmer) => sum + this.getVarietyProduction(farmer, 'excelsa'),
+      0
+    );
+    const robustaProduction = this.data.reduce(
+      (sum, farmer) => sum + this.getVarietyProduction(farmer, 'robusta'),
+      0
+    );
 
     // Destroy existing chart if it exists
     if (this.charts.productionChart) {
@@ -5573,34 +6843,276 @@ class DashboardApp {
     if (el) el.textContent = text;
   }
 
+  async ensureIpophlFilesFromServer() {
+    this._ipophlDocumentItems = await this.fetchIpophlDocumentItems();
+  }
+
+  async fetchIpophlDocumentItems() {
+    try {
+      const res = await fetch(beanthenticApiUrl('/api/ipo-documents?limit=200'), {
+        credentials: 'same-origin',
+      });
+      const data = await beanthenticParseJsonResponse(res).catch(() => ({}));
+      const items = Array.isArray(data.items) ? data.items : [];
+      if (!this.ipophlFiles) this.ipophlFiles = {};
+      items.forEach((doc) => {
+        const taskId = String(doc.task_id || '').trim();
+        const id = String(doc.file_uuid || doc.id || '').trim();
+        if (!taskId || !id || taskId === 'ipophl-other' || taskId === 'unknown') return;
+        if (!this.getOfficialIpophlTaskIds().includes(taskId)) return;
+        if (!this.ipophlFiles[taskId]) this.ipophlFiles[taskId] = [];
+        if (!this.ipophlFiles[taskId].some((f) => f.id === id)) {
+          this.ipophlFiles[taskId].push({
+            id,
+            name: doc.filename || doc.original_filename || 'file',
+            ai_score: Number(doc.ai_score || 0),
+            ai_status: doc.ai_status || '',
+            upload_timestamp: doc.upload_timestamp || '',
+          });
+        }
+      });
+      return items;
+    } catch (err) {
+      console.warn('Could not load IPOPHL files for analytics:', err);
+      return this._ipophlDocumentItems || [];
+    }
+  }
+
+  getIpophlGroupLabel(taskId) {
+    const labels = {
+      'phase1-product': 'Qualifying Product',
+      'phase1-entity': 'Applicant Entity',
+      'phase1-stakeholders': 'Stakeholders',
+      'phase2-mop': 'Manual of Prod.',
+      'phase2-cert': 'Certification',
+      'phase2-details': 'Product Details',
+      'phase3-filing': 'Filing',
+      'phase3-payment': 'Payment',
+      'phase4-exam': 'Examination',
+      'phase4-response': 'Deficiency Resp.',
+      'phase4-pub': 'Publication',
+      'phase5-cert': 'GI Certificate',
+      'phase5-compliance': 'Compliance',
+    };
+    return labels[taskId] || taskId;
+  }
+
+  getIpophlPhaseMeta() {
+    return {
+      1: { short: 'Phase 1', title: 'Product & Entity', sub: 'Product & entity documents' },
+      2: { short: 'Phase 2', title: 'MoP & Specs', sub: 'Manual of production & specs' },
+      3: { short: 'Phase 3', title: 'Filing & Payment', sub: 'Application filing & fees' },
+      4: { short: 'Phase 4', title: 'Examination', sub: 'Formality & substantive exam' },
+      5: { short: 'Phase 5', title: 'Registration', sub: 'Certificate & compliance' },
+    };
+  }
+
+  isIpophlServiceComplete(service) {
+    const hasFiles = Boolean(this.ipophlFiles?.[service]?.length);
+    const hasLinks = Boolean(this.ipophlLinks?.[service]?.length);
+    return hasFiles || hasLinks;
+  }
+
+  computeIpophlDocumentAnalytics(docs) {
+    const items = Array.isArray(docs) ? docs : [];
+    const servicesByPhase = this.getIpophlServicesByPhase();
+    const allServices = Object.values(servicesByPhase).flat();
+    const scores = items.map((d) => Number(d.ai_score || 0)).filter((n) => !Number.isNaN(n));
+    const avgScore = scores.length
+      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+      : 0;
+    const passThreshold = 70;
+    const passedFiles = items.filter((d) => Number(d.ai_score || 0) >= passThreshold).length;
+    const pendingAi = items.filter((d) => {
+      const score = Number(d.ai_score || 0);
+      const status = String(d.ai_status || '').toLowerCase();
+      return score <= 15 || status === 'uploaded' || status === 'pending';
+    }).length;
+
+    const groupScores = allServices.map((service) => {
+      const groupDocs = items.filter((d) => String(d.task_id || '') === service);
+      const groupFileDocs = (this.ipophlFiles?.[service] || []).map((f) => ({
+        ai_score: Number(f.ai_score || 0),
+      }));
+      const source = groupDocs.length ? groupDocs : groupFileDocs;
+      const best = source.length
+        ? Math.max(...source.map((d) => Number(d.ai_score || 0)))
+        : this.isIpophlServiceComplete(service)
+          ? 50
+          : 0;
+      const phaseNum = Object.keys(servicesByPhase).find((p) =>
+        servicesByPhase[p].includes(service)
+      );
+      return {
+        service,
+        label: this.getIpophlGroupLabel(service),
+        score: best,
+        complete: this.isIpophlServiceComplete(service),
+        phase: Number(phaseNum || 0),
+        passed: best >= passThreshold,
+        failed: source.length > 0 && best < passThreshold,
+      };
+    });
+
+    const phaseStats = [1, 2, 3, 4, 5].map((phase) => {
+      const services = servicesByPhase[phase] || [];
+      const completed = services.filter((s) => this.isIpophlServiceComplete(s)).length;
+      const pending = services.length - completed;
+      const phaseDocs = items.filter((d) => String(d.ipophl_phase || '').includes(String(phase)) || services.includes(String(d.task_id || '')));
+      const pass = phaseDocs.filter((d) => Number(d.ai_score || 0) >= passThreshold).length;
+      const fail = phaseDocs.filter((d) => Number(d.ai_score || 0) > 0 && Number(d.ai_score || 0) < passThreshold).length;
+      return { phase, completed, pending, pass, fail, totalGroups: services.length };
+    });
+
+    let currentPhase = 5;
+    let currentMeta = this.getIpophlPhaseMeta()[5];
+    for (let p = 1; p <= 5; p += 1) {
+      const services = servicesByPhase[p] || [];
+      const allDone = services.every((s) => this.isIpophlServiceComplete(s));
+      if (!allDone) {
+        currentPhase = p;
+        currentMeta = this.getIpophlPhaseMeta()[p];
+        break;
+      }
+    }
+
+    const monthCounts = new Map();
+    items.forEach((doc) => {
+      const raw = doc.upload_timestamp || '';
+      const d = raw ? new Date(raw) : null;
+      if (!d || Number.isNaN(d.getTime())) return;
+      const key = d.toLocaleString(undefined, { month: 'short', year: '2-digit' });
+      monthCounts.set(key, (monthCounts.get(key) || 0) + 1);
+    });
+    const timelineLabels = [...monthCounts.keys()].slice(-8);
+    const timelineValues = timelineLabels.map((k) => monthCounts.get(k) || 0);
+
+    return {
+      avgScore,
+      passedFiles,
+      totalFiles: items.length,
+      pendingAi,
+      groupScores,
+      phaseStats,
+      currentPhase,
+      currentPhaseLabel: `${currentMeta.short} — ${currentMeta.title}`,
+      currentPhaseSub: currentMeta.sub,
+      timelineLabels,
+      timelineValues,
+    };
+  }
+
+  async fetchMlStatusForAnalytics() {
+    try {
+      const res = await fetch(beanthenticApiUrl('/api/ml/status'), { credentials: 'same-origin' });
+      const data = await beanthenticParseJsonResponse(res).catch(() => ({}));
+      if (!res.ok || !data.success) return null;
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  formatMlStatusLabel(status) {
+    if (!status) return 'Unavailable';
+    const farmer = !!status.farmer_model_loaded;
+    const doc = !!status.document_model_loaded;
+    if (farmer && doc) return 'Active · Farmer + Doc';
+    if (farmer) return 'Active · Farmer';
+    if (doc) return 'Active · Document';
+    return 'Not trained';
+  }
+
+  isFarmerGiEligibleByRules(farmer) {
+    const rsbsa = this.yesNo(farmer, [
+      'RSBSA Registered (Yes/No)',
+      'REGISTERED (YES/NO)',
+      'Registered (Yes/No)',
+      'registered',
+    ]);
+    const totalTrees =
+      this.num(farmer, ['TOTAL TREES', 'TOTAL_TREES']) ||
+      this.num(farmer, ['TOTAL BEARING', 'Total_Bearing']) +
+        this.num(farmer, ['TOTAL NON-BEARING', 'Total_Non-bearing']);
+    const ncfrs = (this.getValue(farmer, ['NCFRS', 'ncfrs']) || '').toString().trim();
+    return totalTrees >= 500 && rsbsa === true && !!ncfrs;
+  }
+
+  countFarmersNeedingGiSupport(rows, predictions) {
+    const farmers = Array.isArray(rows) ? rows : [];
+    const preds = Array.isArray(predictions) ? predictions : [];
+    let count = 0;
+    farmers.forEach((farmer, idx) => {
+      const ready = preds.length
+        ? !!preds[idx]?.gi_ready
+        : this.isFarmerGiEligibleByRules(farmer);
+      if (ready) return;
+      const trees =
+        this.num(farmer, ['TOTAL TREES', 'TOTAL_TREES']) ||
+        this.num(farmer, ['TOTAL BEARING', 'Total_Bearing']) +
+          this.num(farmer, ['TOTAL NON-BEARING', 'Total_Non-bearing']);
+      if (trees > 0) count += 1;
+    });
+    return count;
+  }
+
+  buildFarmerReadinessBuckets(predictions) {
+    const buckets = [0, 0, 0, 0];
+    (predictions || []).forEach((p) => {
+      const score = Number(p.readiness_score || 0);
+      if (score <= 25) buckets[0] += 1;
+      else if (score <= 50) buckets[1] += 1;
+      else if (score <= 75) buckets[2] += 1;
+      else buckets[3] += 1;
+    });
+    return buckets;
+  }
+
+  destroyAnalyticsChart(key) {
+    if (this.charts[key]) {
+      this.charts[key].destroy();
+      this.charts[key] = null;
+    }
+  }
+
   async renderAnalyticsModule() {
     const analyticsRoot = document.getElementById('analytics-module');
     if (!analyticsRoot || analyticsRoot.classList.contains('hidden')) return;
     if (!window.Chart) return;
 
+    const docs = await this.fetchIpophlDocumentItems();
     const metrics = await this.computeGiAnalyticsAsync();
-    const total = Math.max(metrics.total, 1);
-    const eligibleRate = (metrics.eligible / total) * 100;
-    const mlNote = metrics.mlEnabled ? ' · ML' : '';
-
-    this.setText('giEligibleCount', metrics.eligible.toLocaleString());
-    this.setText('giEligibleRate', `${eligibleRate.toFixed(1)}% of farmers${mlNote}`);
-    this.setText('cityGiReadinessRate', `${eligibleRate.toFixed(1)}%`);
-
+    const ipophl = this.computeIpophlDocumentAnalytics(docs);
     const ipophlSnapshot = this.getIpophlCompletionSnapshot();
+
+    this.setText('analyticsDocsPassed', String(ipophl.passedFiles));
+    this.setText(
+      'analyticsDocsPassedSub',
+      ipophl.totalFiles
+        ? `${ipophl.passedFiles} of ${ipophl.totalFiles} files · score ≥ 70%`
+        : 'Score ≥ 70%'
+    );
     this.setText('ipophlProgressRate', `${ipophlSnapshot.percentage}%`);
     this.setText('ipophlProgressSub', `${ipophlSnapshot.completed} of ${ipophlSnapshot.total} groups`);
 
+    this.renderIpophlPhaseCompletionChart(ipophl);
+    this.renderIpophlUploadTimelineChart(ipophl);
     this.renderTopBarangaysChart(metrics);
     this.renderGiGrowthTrendChart(metrics);
-    this.renderIpophlComplianceChart();
+    this.renderGiReadinessGaugeChart(metrics);
   }
 
   async computeGiAnalyticsAsync() {
     const base = this.computeGiAnalytics();
     const rows = Array.isArray(this.data) ? this.data : [];
     if (!rows.length) {
-      return { ...base, mlEnabled: false };
+      return {
+        ...base,
+        mlEnabled: false,
+        predictions: [],
+        readinessBuckets: [0, 0, 0, 0],
+        farmersNeedingSupport: 0,
+      };
     }
 
     try {
@@ -5612,7 +7124,13 @@ class DashboardApp {
       });
       const data = await beanthenticParseJsonResponse(res);
       if (!res.ok || !data.success || !Array.isArray(data.predictions)) {
-        return { ...base, mlEnabled: false };
+        return {
+          ...base,
+          mlEnabled: false,
+          predictions: [],
+          readinessBuckets: this.buildFarmerReadinessBuckets([]),
+          farmersNeedingSupport: this.countFarmersNeedingGiSupport(rows, []),
+        };
       }
 
       let eligible = 0;
@@ -5649,16 +7167,27 @@ class DashboardApp {
         trendValues,
         mlEnabled: true,
         analysisMethod: data.analysis_method || 'ml_farmer',
+        predictions: data.predictions,
+        readinessBuckets: this.buildFarmerReadinessBuckets(data.predictions),
+        farmersNeedingSupport: this.countFarmersNeedingGiSupport(rows, data.predictions),
       };
     } catch (err) {
       console.warn('ML analytics fallback to rules:', err);
-      return { ...base, mlEnabled: false };
+      return {
+        ...base,
+        mlEnabled: false,
+        predictions: [],
+        readinessBuckets: this.buildFarmerReadinessBuckets([]),
+        farmersNeedingSupport: this.countFarmersNeedingGiSupport(rows, []),
+      };
     }
   }
 
-  renderIpophlModule() {
+  async renderIpophlModule() {
     const ipophlRoot = document.getElementById('ipophl-module');
     if (!ipophlRoot || ipophlRoot.classList.contains('hidden')) return;
+
+    await this.ensureIpophlFilesFromServer();
     
     // Initialize IPOPHL module functionality
     this.initializePhaseNavigation();
@@ -5682,11 +7211,11 @@ class DashboardApp {
   }
 
   initializeProgressSteps() {
-    const progressSteps = document.querySelectorAll('.progress-step');
-    
-    progressSteps.forEach(step => {
+    const progressSteps = document.querySelectorAll('#giPhaseProgress .progress-step');
+
+    progressSteps.forEach((step) => {
       step.addEventListener('click', (e) => {
-        const phaseNum = parseInt(e.currentTarget.dataset.phase);
+        const phaseNum = parseInt(e.currentTarget.dataset.phase, 10);
         this.navigateToPhase(phaseNum);
       });
     });
@@ -5720,11 +7249,38 @@ class DashboardApp {
     this._ipophlCompleteDelegated = true;
   }
 
+  canNavigateToPhase(targetPhase) {
+    if (targetPhase < 1 || targetPhase > 5) return false;
+    const current = this.currentPhase || 1;
+    if (targetPhase <= current) return true;
+    for (let phase = current; phase < targetPhase; phase += 1) {
+      if (!this.isIpophlPhaseComplete(phase)) return false;
+    }
+    return true;
+  }
+
+  getBlockedPhaseForNavigation(targetPhase) {
+    const current = this.currentPhase || 1;
+    if (targetPhase <= current) return null;
+    for (let phase = current; phase < targetPhase; phase += 1) {
+      if (!this.isIpophlPhaseComplete(phase)) return phase;
+    }
+    return null;
+  }
+
   navigateToPhase(phaseNum) {
-    // Validate phase transition
     if (phaseNum < 1 || phaseNum > 5) return;
-    
-    // Allow free navigation between phases without validation
+
+    if (!this.canNavigateToPhase(phaseNum)) {
+      const blocked = this.getBlockedPhaseForNavigation(phaseNum);
+      this.showIpophlNotification(
+        blocked
+          ? `Upload all required documents in ${this.getPhaseTitle(blocked)} before continuing.`
+          : 'Complete all document uploads in the current phase before continuing.'
+      );
+      return;
+    }
+
     this.currentPhase = phaseNum;
     this.showPhase(phaseNum);
     this.updateProgress(phaseNum);
@@ -5752,7 +7308,7 @@ class DashboardApp {
 
     const container = document.getElementById(`${service}-files`);
     return Boolean(
-      container?.querySelector('.file-item[data-file-uuid], .file-item.pending, .file-item.success')
+      container?.querySelector('.file-item[data-file-uuid], .file-item.success:not(.pending):not(.uploading)')
     );
   }
 
@@ -5769,11 +7325,25 @@ class DashboardApp {
       const stepNum = parseInt(step.dataset.phase, 10);
       const isComplete = this.isIpophlPhaseComplete(stepNum);
       const isActive = stepNum === phaseNum;
-      const baseLabel = step.getAttribute('aria-label')?.replace(/, completed$/i, '') || `Phase ${stepNum}`;
+      const reachable = this.canNavigateToPhase(stepNum);
+      const baseLabel = step.getAttribute('aria-label')?.replace(/, completed$/i, '').replace(/, locked$/i, '') || `Phase ${stepNum}`;
 
       step.classList.toggle('active', isActive);
       step.classList.toggle('completed', isComplete);
-      step.setAttribute('aria-label', isComplete ? `${baseLabel}, completed` : baseLabel);
+      step.classList.toggle('locked', !reachable);
+      step.setAttribute('aria-disabled', reachable ? 'false' : 'true');
+      let label = baseLabel;
+      if (isComplete) label += ', completed';
+      else if (!reachable) label += ', locked';
+      step.setAttribute('aria-label', label);
+    });
+
+    document.querySelectorAll('#ipophl-module .next-phase').forEach((btn) => {
+      const next = parseInt(btn.dataset.next, 10);
+      const allowed = Number.isFinite(next) && this.canNavigateToPhase(next);
+      btn.disabled = !allowed;
+      btn.classList.toggle('is-locked', !allowed);
+      btn.setAttribute('aria-disabled', allowed ? 'false' : 'true');
     });
   }
 
@@ -5917,7 +7487,7 @@ class DashboardApp {
     return uuids;
   }
 
-  setCompleteRegistrationLoading(isLoading, label) {
+  setCompleteRegistrationLoading(isLoading) {
     const completeBtn = document.querySelector('#ipophl-module .complete-btn');
     if (!completeBtn) return;
     if (!completeBtn.dataset.defaultLabel) {
@@ -5925,14 +7495,13 @@ class DashboardApp {
     }
     if (isLoading) {
       completeBtn.disabled = true;
-      completeBtn.classList.add('is-loading');
-      completeBtn.setAttribute('aria-busy', 'true');
-      completeBtn.innerHTML =
-        '<span class="complete-btn-spinner" aria-hidden="true"></span>' +
-        `<span class="complete-btn-label">${label || 'Publishing to GI Updates…'}</span>`;
+      completeBtn.classList.add('is-completed');
+      completeBtn.classList.remove('is-loading');
+      completeBtn.removeAttribute('aria-busy');
+      completeBtn.textContent = completeBtn.dataset.defaultLabel;
     } else {
       completeBtn.disabled = false;
-      completeBtn.classList.remove('is-loading');
+      completeBtn.classList.remove('is-completed', 'is-loading');
       completeBtn.removeAttribute('aria-busy');
       completeBtn.textContent = completeBtn.dataset.defaultLabel;
     }
@@ -5943,7 +7512,7 @@ class DashboardApp {
       return window.publishIpophlToGiUpdates();
     }
     // Fallback if ipophl-complete-gi.js did not load.
-    this.setCompleteRegistrationLoading(true, 'Preparing IPOPHL documents…');
+    this.setCompleteRegistrationLoading(true);
 
     const merged = new Map();
     const serverEntries = await this.fetchAllIpophlFileEntriesFromServer();
@@ -5967,14 +7536,6 @@ class DashboardApp {
       fileUuids = phase5Ids;
       fileEntries = phase5Ids.map((id) => ({ file_uuid: id, task_id: 'ipophl-other' }));
     }
-
-    const publishCount = fileUuids.length;
-    this.setCompleteRegistrationLoading(
-      true,
-      publishCount
-        ? `Saving ${publishCount} file(s) to GI Updates (XAMPP)…`
-        : 'Saving to GI Updates (XAMPP)…'
-    );
 
     try {
       const res = await fetch(beanthenticApiUrl('/api/ipophl/complete-registration'), {
@@ -6028,7 +7589,6 @@ class DashboardApp {
           'Could not reach web.py. Restart python web.py, hard-refresh the page (Ctrl+F5), and set settings.json app_server_base to the app device (e.g. http://192.168.x.x:8080).';
       }
       this.showIpophlNotification(msg);
-    } finally {
       this.setCompleteRegistrationLoading(false);
     }
   }
@@ -6377,20 +7937,23 @@ class DashboardApp {
     };
   }
 
+  getOfficialIpophlTaskIds() {
+    return Object.values(this.getIpophlServicesByPhase()).flat();
+  }
+
   getIpophlCompletionSnapshot() {
-    const servicesByPhase = this.getIpophlServicesByPhase();
-    const allServices = Object.values(servicesByPhase).flat();
+    const allServices = this.getOfficialIpophlTaskIds();
     const completedServices = allServices.filter((service) => {
       const hasFiles = Boolean(this.ipophlFiles && this.ipophlFiles[service] && this.ipophlFiles[service].length > 0);
       const hasLinks = Boolean(this.ipophlLinks && this.ipophlLinks[service] && this.ipophlLinks[service].length > 0);
       return hasFiles || hasLinks;
     });
 
-    const total = 13; // Explicitly set to 13 document groups
+    const total = allServices.length;
     const completed = completedServices.length;
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-    return { total, completed, percentage };
+    return { total, completed, percentage, missing: allServices.filter((s) => !completedServices.includes(s)) };
   }
 
   getGiAiStatusDescriptor() {
@@ -6417,6 +7980,11 @@ class DashboardApp {
     const snapshot = this.getIpophlCompletionSnapshot();
     percentEl.textContent = `${snapshot.percentage}%`;
     metaEl.textContent = `${snapshot.completed} of ${snapshot.total} document groups completed`;
+    if (snapshot.completed < snapshot.total && snapshot.missing?.length) {
+      metaEl.title = `Missing upload: ${snapshot.missing.join(', ')}`;
+    } else {
+      metaEl.removeAttribute('title');
+    }
     fillEl.style.width = `${snapshot.percentage}%`;
     trackEl.setAttribute('aria-valuenow', String(snapshot.percentage));
 
@@ -6499,30 +8067,15 @@ class DashboardApp {
   }
 
   showIpophlNotification(message) {
-    // Create a simple notification for IPOPHL actions
     const notification = document.createElement('div');
     notification.className = 'ipophl-notification';
     notification.textContent = message;
-    notification.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: #8B4A2B;
-      color: white;
-      padding: 15px 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      z-index: 1000;
-      max-width: 300px;
-    `;
-    
     document.body.appendChild(notification);
-    
     setTimeout(() => {
       if (notification.parentNode) {
         notification.parentNode.removeChild(notification);
       }
-    }, 3000);
+    }, 5000);
   }
 
   renderTopBarangaysChart(metrics) {
@@ -6695,6 +8248,307 @@ class DashboardApp {
     });
   }
 
+  renderIpophlPhaseCompletionChart(ipophl) {
+    const canvas = document.getElementById('ipophlPhaseCompletionChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    this.destroyAnalyticsChart('ipophlPhaseCompletionChart');
+    const stats = ipophl?.phaseStats || [];
+    this.charts.ipophlPhaseCompletionChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: stats.map((s) => `Phase ${s.phase}`),
+        datasets: [
+          {
+            label: 'Completed groups',
+            data: stats.map((s) => s.completed),
+            backgroundColor: 'rgba(62, 166, 66, 0.82)',
+            stack: 'groups',
+          },
+          {
+            label: 'Pending groups',
+            data: stats.map((s) => s.pending),
+            backgroundColor: 'rgba(230, 233, 237, 1)',
+            stack: 'groups',
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: {
+          x: { stacked: true },
+          y: { stacked: true, beginAtZero: true, ticks: { precision: 0, max: 3 } },
+        },
+      },
+    });
+  }
+
+  renderIpophlGroupScoreChart(ipophl) {
+    const canvas = document.getElementById('ipophlGroupScoreChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    this.destroyAnalyticsChart('ipophlGroupScoreChart');
+    const groups = (ipophl?.groupScores || []).filter((g) => g.complete || g.score > 0);
+    const labels = groups.map((g) => g.label);
+    const values = groups.map((g) => g.score);
+    this.charts.ipophlGroupScoreChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'AI readiness %',
+            data: values,
+            backgroundColor: values.map((v) =>
+              v >= 70 ? 'rgba(62, 166, 66, 0.82)' : v >= 40 ? 'rgba(245, 158, 11, 0.82)' : 'rgba(239, 68, 68, 0.75)'
+            ),
+            borderWidth: 0,
+          },
+        ],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: true, max: 100, ticks: { callback: (v) => `${v}%` } },
+        },
+      },
+    });
+  }
+
+  renderIpophlUploadTimelineChart(ipophl) {
+    const canvas = document.getElementById('ipophlUploadTimelineChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    this.destroyAnalyticsChart('ipophlUploadTimelineChart');
+    const labels = ipophl?.timelineLabels?.length ? ipophl.timelineLabels : ['No uploads'];
+    const values = ipophl?.timelineValues?.length ? ipophl.timelineValues : [0];
+    this.charts.ipophlUploadTimelineChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Files uploaded',
+            data: values,
+            borderColor: 'rgba(59, 130, 246, 0.95)',
+            backgroundColor: 'rgba(59, 130, 246, 0.12)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 4,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+  }
+
+  renderIpophlPassFailPhaseChart(ipophl) {
+    const canvas = document.getElementById('ipophlPassFailPhaseChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    this.destroyAnalyticsChart('ipophlPassFailPhaseChart');
+    const stats = ipophl?.phaseStats || [];
+    this.charts.ipophlPassFailPhaseChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: stats.map((s) => `Phase ${s.phase}`),
+        datasets: [
+          {
+            label: 'AI pass (≥70%)',
+            data: stats.map((s) => s.pass),
+            backgroundColor: 'rgba(62, 166, 66, 0.82)',
+          },
+          {
+            label: 'AI fail (<70%)',
+            data: stats.map((s) => s.fail),
+            backgroundColor: 'rgba(239, 68, 68, 0.72)',
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+  }
+
+  renderIpophlDocScoreScatterChart(ipophl) {
+    const canvas = document.getElementById('ipophlDocScoreScatterChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    this.destroyAnalyticsChart('ipophlDocScoreScatterChart');
+    const groups = ipophl?.groupScores || [];
+    this.charts.ipophlDocScoreScatterChart = new Chart(ctx, {
+      type: 'scatter',
+      data: {
+        datasets: [
+          {
+            label: 'Document group score',
+            data: groups.map((g, idx) => ({ x: idx + 1, y: g.score })),
+            backgroundColor: groups.map((g) =>
+              g.score >= 70 ? 'rgba(62, 166, 66, 0.85)' : 'rgba(239, 68, 68, 0.75)'
+            ),
+            pointRadius: 6,
+            pointHoverRadius: 8,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctxItem) => {
+                const g = groups[ctxItem.dataIndex];
+                return g ? `${g.label}: ${g.score}%` : `${ctxItem.parsed.y}%`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'Document group (1–13)' },
+            min: 0,
+            max: 14,
+            ticks: { stepSize: 1 },
+          },
+          y: {
+            beginAtZero: true,
+            max: 100,
+            title: { display: true, text: 'AI score %' },
+          },
+        },
+      },
+    });
+  }
+
+  renderFarmerReadinessDistChart(metrics) {
+    const canvas = document.getElementById('farmerReadinessDistChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    this.destroyAnalyticsChart('farmerReadinessDistChart');
+    const buckets = [...(metrics.readinessBuckets || [0, 0, 0, 0])];
+    if (!metrics.mlEnabled && metrics.total) {
+      buckets[0] = metrics.notEligible || 0;
+      buckets[1] = 0;
+      buckets[2] = 0;
+      buckets[3] = metrics.eligible || 0;
+    }
+    this.charts.farmerReadinessDistChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['0–25%', '26–50%', '51–75%', '76–100%'],
+        datasets: [
+          {
+            label: 'Farmers',
+            data: buckets,
+            backgroundColor: [
+              'rgba(239, 68, 68, 0.72)',
+              'rgba(245, 158, 11, 0.78)',
+              'rgba(59, 130, 246, 0.72)',
+              'rgba(62, 166, 66, 0.82)',
+            ],
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+  }
+
+  renderFarmerMlBlockersChart(metrics) {
+    const canvas = document.getElementById('farmerMlBlockersChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    this.destroyAnalyticsChart('farmerMlBlockersChart');
+    const failCounts = metrics.failCounts || new Map();
+    const labels = [...failCounts.keys()];
+    const values = labels.map((k) => failCounts.get(k) || 0);
+    this.charts.farmerMlBlockersChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Farmers affected',
+            data: values,
+            backgroundColor: 'rgba(139, 74, 43, 0.82)',
+            borderColor: 'rgba(139, 74, 43, 1)',
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+  }
+
+  renderCityReadinessCompareChart(metrics, ipophlSnapshot) {
+    const canvas = document.getElementById('cityReadinessCompareChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    this.destroyAnalyticsChart('cityReadinessCompareChart');
+    const farmerRate = metrics.total ? (metrics.eligible / metrics.total) * 100 : 0;
+    const ipophlRate = ipophlSnapshot?.percentage || 0;
+    this.charts.cityReadinessCompareChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['IPOPHL documents', 'GI-ready farmers'],
+        datasets: [
+          {
+            label: 'Readiness %',
+            data: [ipophlRate, farmerRate],
+            backgroundColor: ['rgba(59, 130, 246, 0.82)', 'rgba(62, 166, 66, 0.82)'],
+            borderRadius: 8,
+            barThickness: 48,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctxItem) => `${ctxItem.parsed.y.toFixed(1)}%`,
+            },
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            max: 100,
+            ticks: { callback: (v) => `${v}%` },
+          },
+        },
+      },
+    });
+  }
+
   onGoogleMapsReady() {
     this.googleMapsReady = true;
     this.renderMapsModule();
@@ -6746,6 +8600,24 @@ class DashboardApp {
   }
 
   updateMapLayers() {
+    if (this.leafletMap && window.L) {
+      (this.leafletMarkers || []).forEach((marker) => {
+        if (this.mapLayers.farmerLocations) {
+          if (!this.leafletMap.hasLayer(marker)) marker.addTo(this.leafletMap);
+        } else if (this.leafletMap.hasLayer(marker)) {
+          this.leafletMap.removeLayer(marker);
+        }
+      });
+      if (this.leafletBoundary) {
+        if (this.mapLayers.farmBoundaries) {
+          if (!this.leafletMap.hasLayer(this.leafletBoundary)) this.leafletBoundary.addTo(this.leafletMap);
+        } else if (this.leafletMap.hasLayer(this.leafletBoundary)) {
+          this.leafletMap.removeLayer(this.leafletBoundary);
+        }
+      }
+      return;
+    }
+
     if (!this.googleMap || !window.google?.maps) return;
 
     // 1. Farmer Locations
@@ -6916,6 +8788,7 @@ class DashboardApp {
       'pag-olingin west': 'pag olingin west',
       'pag olingin west': 'pag olingin west',
       pagolingin: 'pag olingin west',
+      'pag olingin': 'pag olingin west',
       'pagolingin east': 'pag olingin west',
       'san jose': 'san jose',
       'san jose ': 'san jose',
@@ -6939,8 +8812,14 @@ class DashboardApp {
     const key = this.normalizeBarangayName(name);
     if (!key) return null;
     const aliases = this.getLipaPdfBarangayAliases();
-    const canonical = aliases[key] || key;
-    return this.getLipaPdfBarangayWhitelist().has(canonical) ? canonical : null;
+    const coords = this.getBarangayCoordinates();
+    const candidate = aliases[key] || key;
+    if (coords[candidate]) return candidate;
+    for (const barangayKey of Object.keys(coords)) {
+      if (barangayKey === candidate) return barangayKey;
+      if (barangayKey.includes(candidate) || candidate.includes(barangayKey)) return barangayKey;
+    }
+    return this.getLipaPdfBarangayWhitelist().has(candidate) ? candidate : null;
   }
 
   formatBarangayLabel(name) {
@@ -6978,21 +8857,38 @@ class DashboardApp {
     return 'Liberica';
   }
 
+  openPlaceInGoogleMaps(lat, lng, barangay) {
+    const latN = Number(lat);
+    const lngN = Number(lng);
+    const name = String(barangay || '').trim().replace(/^barangay\s+/i, '');
+    const query = name
+      ? `Barangay ${name}, Lipa City, Batangas, Philippines`
+      : `${latN},${lngN}`;
+    if (!name && (!Number.isFinite(latN) || !Number.isFinite(lngN))) return;
+    window.open(
+      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`,
+      '_blank',
+      'noopener,noreferrer'
+    );
+  }
+
   buildMapInfoWindowHtml(point) {
-    const variety = (this.mapVarietyFilter || 'liberica').toString().trim().toLowerCase();
+    const variety = (point.filteredVariety || this.mapVarietyFilter || 'all').toString().trim().toLowerCase();
     const varietyLabel = this.getMapVarietyLabel(variety);
     const title = this.escapeHtml(point.barangay || 'Unknown');
     const farmers = Number(point.count || 0);
     const coords = this.escapeHtml(this.formatCoordinatePill(point.lat, point.lng));
     const areaHa = Number(point.areaHa);
-    const productionKg = Number(point.productionKg);
-    const totalFarmers = Number(point.totalFarmers);
+    const productionKg = Number(
+      point.displayProductionKg != null ? point.displayProductionKg : this.getMapPointProductionKg(point, variety)
+    );
+    const totalFarmers = Number(point.totalFarmers || farmers);
 
     const stats = [
       {
-        icon: point.isFarmerPin ? 'fa-user' : 'fa-users',
-        value: point.isFarmerPin ? this.escapeHtml(point.farmerName || 'Farmer') : farmers.toLocaleString(),
-        label: point.isFarmerPin ? `Farmer #${point.farmerId || ''}` : farmers === 1 ? 'Farmer' : 'Farmers',
+        icon: 'fa-users',
+        value: farmers.toLocaleString(),
+        label: farmers === 1 ? 'Registered farmer' : 'Registered farmers',
       },
     ];
     if (Number.isFinite(areaHa) && areaHa > 0) {
@@ -7005,8 +8901,8 @@ class DashboardApp {
     if (Number.isFinite(productionKg) && productionKg > 0) {
       stats.push({
         icon: 'fa-seedling',
-        value: productionKg.toLocaleString(),
-        label: 'Production (kg)',
+        value: `${productionKg.toLocaleString()} kg`,
+        label: variety === 'all' ? 'Total production' : `${this.getMapVarietyLabel(variety)} production`,
       });
     } else if (Number.isFinite(totalFarmers) && totalFarmers > farmers) {
       stats.push({
@@ -7027,11 +8923,12 @@ class DashboardApp {
       .join('');
 
     return `<div class="map-info-popup map-info-popup--${this.escapeHtml(variety)}" role="dialog" aria-label="${title} barangay details">
+      <div class="map-info-popup__accent" aria-hidden="true"></div>
       <div class="map-info-popup__header">
         <span class="map-info-popup__pin" aria-hidden="true"><i class="fa-solid fa-location-dot"></i></span>
         <div class="map-info-popup__heading">
+          <p class="map-info-popup__eyebrow">Barangay · Lipa City, Batangas</p>
           <h3 class="map-info-popup__title">${title}</h3>
-          <p class="map-info-popup__subtitle">Barangay · Lipa City, Batangas</p>
         </div>
       </div>
       <div class="map-info-popup__stats">${statsHtml}</div>
@@ -7081,10 +8978,49 @@ class DashboardApp {
   }
 
   getPdfVarietyKey() {
-    const key = (this.mapVarietyFilter || 'liberica').toString().trim().toLowerCase();
+    const key = (this.mapVarietyFilter || 'all').toString().trim().toLowerCase();
     if (key === 'robusta') return 'robusta';
     if (key === 'excelsa') return 'excelsa';
+    if (key === 'all') return 'all';
     return 'liberica';
+  }
+
+  getMapVarietyFilterKey() {
+    return (this.mapVarietyFilter || 'all').toString().trim().toLowerCase();
+  }
+
+  getMapPointProductionKg(point, varietyKey) {
+    if (!point) return 0;
+    const key = (varietyKey || this.getMapVarietyFilterKey()).toLowerCase();
+    if (key === 'all') {
+      if (Number.isFinite(Number(point.totalProductionKg))) return Number(point.totalProductionKg);
+      if (typeof point.productionKg === 'number') return Number(point.productionKg);
+      const bucket = point.productionKg || {};
+      return Number(bucket.liberica || 0) + Number(bucket.robusta || 0) + Number(bucket.excelsa || 0);
+    }
+    if (typeof point.productionKg === 'number') return Number(point.productionKg);
+    return Number(point.productionKg?.[key] || 0);
+  }
+
+  applyMapVarietyFilter(points) {
+    const varietyKey = this.getMapVarietyFilterKey();
+    const list = Array.isArray(points) ? points : [];
+    if (varietyKey === 'all') {
+      return list
+        .filter((point) => Number(point.count || 0) > 0)
+        .map((point) => ({
+          ...point,
+          displayProductionKg: this.getMapPointProductionKg(point, 'all'),
+          filteredVariety: 'all',
+        }));
+    }
+    return list
+      .filter((point) => this.getMapPointProductionKg(point, varietyKey) > 0)
+      .map((point) => ({
+        ...point,
+        displayProductionKg: this.getMapPointProductionKg(point, varietyKey),
+        filteredVariety: varietyKey,
+      }));
   }
 
   buildMapBarangayPointsFromPdf() {
@@ -7104,25 +9040,42 @@ class DashboardApp {
       return { lat: Number.isFinite(lat) ? lat : center.lat, lng: Number.isFinite(lng) ? lng : center.lng };
     };
 
-    return visibleBarangays.map((canonical) => {
-      const coords = coordsByBarangay[canonical] || toFallbackCoordinate(canonical);
-      const s = summary[canonical] || {
-        farmers: 0,
-        areaHa: 0,
-        productionKg: { liberica: 0, excelsa: 0, robusta: 0 },
-        varietyFarmers: { liberica: 0, excelsa: 0, robusta: 0 },
-      };
-      return {
-        barangay: this.formatBarangayLabel(canonical),
-        canonical,
-        lat: coords.lat,
-        lng: coords.lng,
-        count: Number(s.varietyFarmers?.[varietyKey] || 0),
-        totalFarmers: Number(s.farmers || 0),
-        areaHa: Number(s.areaHa || 0),
-        productionKg: Number(s.productionKg?.[varietyKey] || 0),
-      };
-    }).filter((point) => point.count > 0);
+    return visibleBarangays
+      .map((canonical) => {
+        const coords = coordsByBarangay[canonical] || toFallbackCoordinate(canonical);
+        const s = summary[canonical] || {
+          farmers: 0,
+          areaHa: 0,
+          productionKg: { liberica: 0, excelsa: 0, robusta: 0 },
+          varietyFarmers: { liberica: 0, excelsa: 0, robusta: 0 },
+        };
+        const productionKg = {
+          liberica: Number(s.productionKg?.liberica || 0),
+          excelsa: Number(s.productionKg?.excelsa || 0),
+          robusta: Number(s.productionKg?.robusta || 0),
+        };
+        const totalProductionKg =
+          productionKg.liberica + productionKg.excelsa + productionKg.robusta;
+        const count =
+          varietyKey === 'all'
+            ? Number(s.farmers || 0)
+            : Number(s.varietyFarmers?.[varietyKey] || 0);
+        return {
+          barangay: this.formatBarangayLabel(canonical),
+          canonical,
+          lat: coords.lat,
+          lng: coords.lng,
+          count,
+          totalFarmers: Number(s.farmers || 0),
+          areaHa: Number(s.areaHa || 0),
+          productionKg,
+          totalProductionKg,
+        };
+      })
+      .filter((point) => {
+        if (varietyKey === 'all') return point.count > 0 || point.totalProductionKg > 0;
+        return this.getMapPointProductionKg(point, varietyKey) > 0;
+      });
   }
 
   drawLipaCityBoundary() {
@@ -7144,36 +9097,27 @@ class DashboardApp {
   }
 
   isVarietyMatch(row, variety) {
-    if (variety === 'all') return true;
-    const hasAnyTrees =
-      Number(this.getValue(row, ['LIBERICA BEARING']) || 0) +
-        Number(this.getValue(row, ['ROBUSTA BEARING']) || 0) +
-        Number(this.getValue(row, ['EXCELSA BEARING']) || 0) +
-        Number(this.getValue(row, ['LIBERICA NON-BEARING']) || 0) +
-        Number(this.getValue(row, ['ROBUSTA NON-BEARING']) || 0) +
-        Number(this.getValue(row, ['EXCELSA NON-BEARING']) || 0) >
-      0;
-    const barangay = this.getValue(row, ['ADDRESS (BARANGAY)', 'BARANGAY', 'barangay', 'address']);
-    if (!hasAnyTrees && barangay) return true;
-    if (variety === 'liberica') {
+    const key = (variety || 'all').toString().trim().toLowerCase();
+    if (key === 'all') return true;
+    if (key === 'liberica') {
       return (
-        Number(this.getValue(row, ['LIBERICA BEARING']) || 0) > 0 ||
-        Number(this.getValue(row, ['LIBERICA NON-BEARING']) || 0) > 0 ||
-        Number(this.getValue(row, ['LIBERICA PRODUCTION']) || 0) > 0
+        this.getVarietyProduction(row, 'liberica') > 0 ||
+        Number(this.getValue(row, ['LIBERICA BEARING', 'Liberica_Bearing']) || 0) > 0 ||
+        Number(this.getValue(row, ['LIBERICA NON-BEARING', 'Liberica_Non-bearing']) || 0) > 0
       );
     }
-    if (variety === 'robusta') {
+    if (key === 'robusta') {
       return (
-        Number(this.getValue(row, ['ROBUSTA BEARING']) || 0) > 0 ||
-        Number(this.getValue(row, ['ROBUSTA NON-BEARING']) || 0) > 0 ||
-        Number(this.getValue(row, ['ROBUSTA PRODUCTION']) || 0) > 0
+        this.getVarietyProduction(row, 'robusta') > 0 ||
+        Number(this.getValue(row, ['ROBUSTA BEARING', 'Robusta_Bearing']) || 0) > 0 ||
+        Number(this.getValue(row, ['ROBUSTA NON-BEARING', 'Robusta_Non-bearing']) || 0) > 0
       );
     }
-    if (variety === 'excelsa') {
+    if (key === 'excelsa') {
       return (
-        Number(this.getValue(row, ['EXCELSA BEARING']) || 0) > 0 ||
-        Number(this.getValue(row, ['EXCELSA NON-BEARING']) || 0) > 0 ||
-        Number(this.getValue(row, ['EXCELSA PRODUCTION']) || 0) > 0
+        this.getVarietyProduction(row, 'excelsa') > 0 ||
+        Number(this.getValue(row, ['EXCELSA BEARING', 'Excelsa_Bearing']) || 0) > 0 ||
+        Number(this.getValue(row, ['EXCELSA NON-BEARING', 'Excelsa_Non-bearing']) || 0) > 0
       );
     }
     return true;
@@ -7182,13 +9126,14 @@ class DashboardApp {
   getFilteredMapRows() {
     return (this.data || []).filter((row) => {
       const rawBarangay = this.getValue(row, ['ADDRESS (BARANGAY)', 'BARANGAY', 'barangay', 'address']);
-      const barangay = this.normalizeBarangayName(rawBarangay);
       const canonical = this.getCanonicalLipaBarangay(rawBarangay);
-      const searchableBarangay = canonical || barangay;
-      const lipaBarangayOk = !!canonical;
-      const searchOk = !this.mapSearchTerm || searchableBarangay.includes(this.mapSearchTerm);
-      const varietyOk = this.isVarietyMatch(row, this.mapVarietyFilter || 'liberica');
-      return lipaBarangayOk && searchOk && varietyOk;
+      if (!canonical) return false;
+      const searchableBarangay = canonical;
+      return (
+        !this.mapSearchTerm ||
+        searchableBarangay.includes(this.mapSearchTerm) ||
+        this.normalizeBarangayName(rawBarangay).includes(this.mapSearchTerm)
+      );
     });
   }
 
@@ -7223,6 +9168,10 @@ class DashboardApp {
         farmerId: fid,
         farmerName: this.farmerDisplayNameFromRow(row),
         isFarmerPin: true,
+        areaHa: Number(
+          this.getValue(row, ['TOTAL AREA PLANTED (HA.)', 'Total Area Planted (HA.)', 'farm_size_ha']) || 0
+        ),
+        productionKg: this.getTotalProduction(row),
       });
     });
     return points;
@@ -7257,15 +9206,39 @@ class DashboardApp {
         lat: coords.lat,
         lng: coords.lng,
         count: 0,
+        totalFarmers: 0,
+        areaHa: 0,
+        productionKg: { liberica: 0, excelsa: 0, robusta: 0 },
+        varietyFarmers: { liberica: 0, excelsa: 0, robusta: 0 },
       };
       current.count += 1;
+      current.totalFarmers = current.count;
+      current.areaHa += Number(
+        this.getValue(row, ['TOTAL AREA PLANTED (HA.)', 'Total Area Planted (HA.)', 'farm_size_ha']) || 0
+      );
+      const libKg = this.getVarietyProduction(row, 'liberica');
+      const robKg = this.getVarietyProduction(row, 'robusta');
+      const excKg = this.getVarietyProduction(row, 'excelsa');
+      current.productionKg.liberica += libKg;
+      current.productionKg.robusta += robKg;
+      current.productionKg.excelsa += excKg;
+      if (libKg > 0 || this.isVarietyMatch(row, 'liberica')) current.varietyFarmers.liberica += 1;
+      if (robKg > 0 || this.isVarietyMatch(row, 'robusta')) current.varietyFarmers.robusta += 1;
+      if (excKg > 0 || this.isVarietyMatch(row, 'excelsa')) current.varietyFarmers.excelsa += 1;
       pointsMap.set(canonical, current);
     });
 
-    return Array.from(pointsMap.values());
+    return Array.from(pointsMap.values()).map((point) => ({
+      ...point,
+      totalProductionKg:
+        Number(point.productionKg.liberica || 0) +
+        Number(point.productionKg.robusta || 0) +
+        Number(point.productionKg.excelsa || 0),
+    }));
   }
 
   updateMapInsights(points, rows) {
+    const varietyKey = this.getMapVarietyFilterKey();
     const covered = points.length;
     const usePdf = !Array.isArray(rows) || rows.length === 0;
     const totalArea = usePdf
@@ -7285,25 +9258,51 @@ class DashboardApp {
     if (statEls[2]) statEls[2].textContent = `${avgArea.toLocaleString(undefined, { maximumFractionDigits: 1 })}ha`;
 
     const topList = document.querySelector('#maps-module .top-barangays-list');
+    const topHeading = document.querySelector('#maps-module .maps-panel h2');
+    if (topHeading) {
+      topHeading.textContent =
+        varietyKey === 'all'
+          ? 'Barangay Indications'
+          : `Top ${this.getMapVarietyLabel(varietyKey)} Producers`;
+    }
     if (topList) {
+      const metricValue = (point) =>
+        varietyKey === 'all'
+          ? Number(point.displayProductionKg ?? point.totalProductionKg ?? 0) || Number(point.count || 0)
+          : Number(point.displayProductionKg ?? this.getMapPointProductionKg(point, varietyKey) ?? 0);
+
       const sorted = points
         .map((point) => ({
           canonical: point.canonical || this.normalizeBarangayName(point.barangay),
           label: point.barangay || this.formatBarangayLabel(point.canonical),
           count: Number(point.count || 0),
+          productionKg: metricValue(point),
           lat: Number(point.lat),
           lng: Number(point.lng),
         }))
-        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+        .sort(
+          (a, b) =>
+            b.productionKg - a.productionKg ||
+            b.count - a.count ||
+            a.label.localeCompare(b.label)
+        );
 
       topList.innerHTML = sorted
         .map((p) => {
-          const tier = this.densityTier(p.count);
+          const tier = this.densityTier(
+            varietyKey === 'all' ? p.count : Math.max(1, Math.round(p.productionKg / 100))
+          );
           const coords = this.formatCoordinatePill(p.lat, p.lng);
-          return `<li><span><em class="dot dot--${tier}"></em>${p.label}<small style="display:block; font-size:11px; color:#6b7280;">${coords}</small></span><strong>${p.count}</strong></li>`;
+          const valueLabel =
+            varietyKey === 'all'
+              ? `${p.count} farmer${p.count === 1 ? '' : 's'}`
+              : `${p.productionKg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`;
+          return `<li><span><em class="dot dot--${tier}"></em>${p.label}<small style="display:block; font-size:11px; color:#6b7280;">${coords}</small></span><strong>${valueLabel}</strong></li>`;
         })
         .join('');
-      if (!sorted.length) topList.innerHTML = '<li><span>No matching barangays</span><strong>0</strong></li>';
+      if (!sorted.length) {
+        topList.innerHTML = `<li><span>No barangays with ${varietyKey === 'all' ? 'registered farmers' : `${this.getMapVarietyLabel(varietyKey)} production`}</span><strong>0</strong></li>`;
+      }
     }
 
     const treesTotalEl = document.querySelector('#maps-module .trees-total-card strong');
@@ -7311,14 +9310,26 @@ class DashboardApp {
     const treesMini = document.querySelectorAll('#maps-module .trees-mini-grid strong');
     const treesMiniLabels = document.querySelectorAll('#maps-module .trees-mini-grid span');
     if (usePdf) {
+      const activeVarietyProduction = points.reduce(
+        (sum, point) => sum + (Number(point.displayProductionKg ?? this.getMapPointProductionKg(point, varietyKey)) || 0),
+        0
+      );
       const activeVarietyFarmers = points.reduce((sum, point) => sum + (Number(point.count) || 0), 0);
-      const activeVarietyProduction = points.reduce((sum, point) => sum + (Number(point.productionKg) || 0), 0);
       if (treesTotalEl) treesTotalEl.textContent = `${activeVarietyProduction.toLocaleString()} kg`;
-      if (treesTotalLabelEl) treesTotalLabelEl.textContent = `${this.getPdfVarietyKey().toUpperCase()} Production`;
-      if (treesMini[0]) treesMini[0].textContent = activeVarietyFarmers ? (activeVarietyProduction / activeVarietyFarmers).toFixed(1) : '0';
+      if (treesTotalLabelEl) {
+        treesTotalLabelEl.textContent =
+          varietyKey === 'all' ? 'Total Production' : `${this.getMapVarietyLabel(varietyKey)} Production`;
+      }
+      if (treesMini[0]) {
+        treesMini[0].textContent = activeVarietyFarmers
+          ? (activeVarietyProduction / activeVarietyFarmers).toFixed(1)
+          : '0';
+      }
       if (treesMini[1]) treesMini[1].textContent = activeVarietyFarmers.toLocaleString();
       if (treesMiniLabels[0]) treesMiniLabels[0].textContent = 'kg/farmer';
-      if (treesMiniLabels[1]) treesMiniLabels[1].textContent = 'Variety Farmers';
+      if (treesMiniLabels[1]) {
+        treesMiniLabels[1].textContent = varietyKey === 'all' ? 'Barangays' : 'Producing barangays';
+      }
     } else {
       if (treesTotalLabelEl) treesTotalLabelEl.textContent = 'Total Trees';
       if (treesMiniLabels[0]) treesMiniLabels[0].textContent = 'Trees/ha';
@@ -7342,7 +9353,7 @@ class DashboardApp {
 
   getBarangayPinIcon(point) {
     const opacity = point.count > 0 ? 1 : 0.72;
-    const label = point.isFarmerPin ? '' : String(point.count || '');
+    const label = String(point.count || '');
     const labelSvg = label
       ? `<text x="22" y="25" text-anchor="middle" font-size="11" font-weight="700" fill="#047857" font-family="Arial,sans-serif">${label}</text>`
       : '';
@@ -7388,6 +9399,107 @@ class DashboardApp {
     this.googleMapMarkers = [];
   }
 
+  ensureLeafletMap() {
+    if (this.leafletMap || !window.L) return;
+    const canvas = document.getElementById('mapsGoogleCanvas');
+    if (!canvas) return;
+    const center = this.getLipaCityCenter();
+    this.leafletMap = window.L.map(canvas, {
+      center: [center.lat, center.lng],
+      zoom: 12,
+      minZoom: 10,
+      maxZoom: 17,
+    });
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19,
+    }).addTo(this.leafletMap);
+    const bounds = this.getLipaCityBounds();
+    this.leafletBoundary = window.L.rectangle(
+      [
+        [bounds.south, bounds.west],
+        [bounds.north, bounds.east],
+      ],
+      {
+        color: '#047857',
+        weight: 2,
+        fillOpacity: 0,
+        interactive: false,
+      }
+    );
+    if (this.mapLayers.farmBoundaries) {
+      this.leafletBoundary.addTo(this.leafletMap);
+    }
+  }
+
+  clearLeafletMarkers() {
+    if (!this.leafletMap) return;
+    (this.leafletMarkers || []).forEach((marker) => {
+      try {
+        this.leafletMap.removeLayer(marker);
+      } catch (_) {
+        /* ignore */
+      }
+    });
+    this.leafletMarkers = [];
+  }
+
+  getLeafletPinIcon() {
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="46" viewBox="0 0 44 64">
+        <path d="M22 2C11.5 2 3 10.5 3 21c0 14 19 41 19 41s19-27 19-41C41 10.5 32.5 2 22 2z" fill="#047857" stroke="#065f46" stroke-width="2"/>
+        <circle cx="22" cy="21" r="9.5" fill="#ffffff"/>
+      </svg>
+    `.trim();
+    return window.L.divIcon({
+      className: 'farmer-leaflet-pin',
+      html: svg,
+      iconSize: [32, 46],
+      iconAnchor: [16, 45],
+      popupAnchor: [0, -40],
+    });
+  }
+
+  renderLeafletMarkers(points) {
+    if (!this.leafletMap || !window.L) return;
+    this.clearLeafletMarkers();
+    const pinIcon = this.getLeafletPinIcon();
+    const latLngs = [];
+
+    points.forEach((point) => {
+      const marker = window.L.marker([point.lat, point.lng], {
+        icon: pinIcon,
+        title: `${point.barangay} (${point.count} farmer${Number(point.count) === 1 ? '' : 's'})`,
+      });
+      marker.bindPopup(this.buildMapInfoWindowHtml(point), { maxWidth: 320 });
+      marker.on('click', () => {
+        this.updateMapCoordPill(point.lat, point.lng);
+        this.openPlaceInGoogleMaps(point.lat, point.lng, point.barangay);
+      });
+      if (this.mapLayers.farmerLocations) {
+        marker.addTo(this.leafletMap);
+      }
+      this.leafletMarkers.push(marker);
+      latLngs.push([point.lat, point.lng]);
+    });
+
+    if (latLngs.length > 1) {
+      this.leafletMap.fitBounds(latLngs, { padding: [50, 50], maxZoom: 14 });
+    } else if (latLngs.length === 1) {
+      this.leafletMap.setView(latLngs[0], 14);
+    } else {
+      const center = this.getLipaCityCenter();
+      this.leafletMap.setView([center.lat, center.lng], 12);
+    }
+    setTimeout(() => {
+      try {
+        this.leafletMap.invalidateSize();
+      } catch (_) {
+        /* ignore */
+      }
+    }, 120);
+  }
+
   renderGoogleMapMarkers(points) {
     if (!this.googleMap || !window.google?.maps) return;
     this.clearMapMarkers();
@@ -7398,9 +9510,7 @@ class DashboardApp {
       const marker = new window.google.maps.Marker({
         position: { lat: point.lat, lng: point.lng },
         map: this.mapLayers.farmerLocations ? this.googleMap : null,
-        title: point.isFarmerPin
-          ? `${point.farmerName || 'Farmer'} · ${point.barangay}`
-          : `${point.barangay} (${point.count})`,
+        title: `${point.barangay} (${point.count} farmer${Number(point.count) === 1 ? '' : 's'})`,
         icon: {
           url: pinIcon.url,
           scaledSize: pinIcon.scaledSize,
@@ -7411,10 +9521,12 @@ class DashboardApp {
         // No label (number) on pin
       });
       marker.addListener('click', () => {
-        if (!this.googleInfoWindow) return;
         this.updateMapCoordPill(point.lat, point.lng);
-        this.googleInfoWindow.setContent(this.buildMapInfoWindowHtml(point));
-        this.googleInfoWindow.open(this.googleMap, marker);
+        if (this.googleInfoWindow) {
+          this.googleInfoWindow.setContent(this.buildMapInfoWindowHtml(point));
+          this.googleInfoWindow.open(this.googleMap, marker);
+        }
+        this.openPlaceInGoogleMaps(point.lat, point.lng, point.barangay);
       });
       this.googleMapMarkers.push(marker);
       fitBounds.extend(marker.getPosition());
@@ -7438,37 +9550,53 @@ class DashboardApp {
     const hasKey = !!(window.__GOOGLE_MAPS_API_KEY__ || '').trim();
     const ready = this.googleMapsReady || !!window.__BEANTHENTIC_GOOGLE_MAPS_READY__;
     const rows = this.getFilteredMapRows();
-    const points = rows.length ? this.buildMapFarmerPoints(rows) : this.buildMapBarangayPoints(rows);
+    const aggregated = this.buildMapBarangayPoints(rows);
+    const points = this.applyMapVarietyFilter(aggregated);
 
     this.updateMapInsights(points, rows);
     this.updateMapCoordPill(this.getLipaCityCenter().lat, this.getLipaCityCenter().lng);
     if (!canvas) return;
 
-    // No API key: fall back to Google Maps embed centered on Lipa City.
-    if (!hasKey) {
-      if (fallback) fallback.hidden = true;
-      canvas.classList.add('is-hidden');
-      if (embed) embed.classList.remove('is-hidden');
-      return;
-    }
-
-    if (!ready || !window.google?.maps) {
-      if (fallback) fallback.hidden = false;
-      if (embed) embed.classList.add('is-hidden');
-      canvas.classList.add('is-hidden');
-      return;
-    }
-
-    if (fallback) fallback.hidden = true;
     if (embed) embed.classList.add('is-hidden');
     canvas.classList.remove('is-hidden');
-    this.ensureGoogleMap();
-    if (this.googleMap && window.google?.maps?.event) {
-      window.google.maps.event.trigger(this.googleMap, 'resize');
+
+    const useGoogle = hasKey && ready && !!window.google?.maps;
+    if (useGoogle) {
+      if (fallback) fallback.hidden = true;
+      this.ensureGoogleMap();
+      if (this.googleMap && window.google?.maps?.event) {
+        window.google.maps.event.trigger(this.googleMap, 'resize');
+      }
+      this.renderGoogleMapMarkers(points);
+      this.syncMapLayerToggleUi();
+      this.updateMapLayers();
+      return;
     }
-    this.renderGoogleMapMarkers(points);
-    this.syncMapLayerToggleUi();
-    this.updateMapLayers();
+
+    if (fallback) {
+      fallback.hidden = false;
+      fallback.textContent = hasKey
+        ? 'Loading Google Maps… Farmer pins will appear at each registered barangay.'
+        : `${points.length} farmer pin(s) on OpenStreetMap. Add maps.google_api_key in settings.json for Google Maps.`;
+    }
+
+    if (window.L) {
+      this.ensureLeafletMap();
+      this.renderLeafletMarkers(points);
+      if (fallback) {
+        fallback.hidden = points.length > 0;
+        if (!points.length) {
+          fallback.textContent =
+            'No farmer pins yet. Complete farmer registrations with a Lipa City barangay, then refresh.';
+        }
+      }
+      this.syncMapLayerToggleUi();
+      this.updateMapLayers();
+      return;
+    }
+
+    if (embed) embed.classList.remove('is-hidden');
+    canvas.classList.add('is-hidden');
   }
 
   getRegisterDocuments() {
@@ -7755,80 +9883,7 @@ class DashboardApp {
   }
 
   initRegistrationChart() {
-    const ctx = document.getElementById('registrationVolumeChart');
-    if (!ctx) return;
-
-    const data = {
-      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-      datasets: [{
-        label: 'New Registrations',
-        data: [65, 78, 92, 85, 110, 125],
-        backgroundColor: 'rgba(34, 197, 94, 0.2)',
-        borderColor: '#16a34a',
-        borderWidth: 2,
-        fill: true,
-        tension: 0.4,
-        pointBackgroundColor: '#16a34a',
-        pointRadius: 4,
-        pointHoverRadius: 6
-      }]
-    };
-
-    const config = {
-      type: 'line',
-      data: data,
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: false
-          },
-          tooltip: {
-            mode: 'index',
-            intersect: false,
-            backgroundColor: '#ffffff',
-            titleColor: '#0f172a',
-            bodyColor: '#475569',
-            borderColor: '#e2e8f0',
-            borderWidth: 1,
-            padding: 12,
-            displayColors: false,
-            callbacks: {
-              label: (context) => `Registrations: ${context.parsed.y}`
-            }
-          }
-        },
-        scales: {
-          x: {
-            grid: {
-              display: false
-            },
-            ticks: {
-              font: {
-                size: 11
-              },
-              color: '#94a3b8'
-            }
-          },
-          y: {
-            beginAtZero: true,
-            grid: {
-              color: '#f1f5f9'
-            },
-            ticks: {
-              stepSize: 20,
-              font: {
-                size: 11
-              },
-              color: '#94a3b8'
-            }
-          }
-        }
-      }
-    };
-
-    this.charts.registrationChart = new Chart(ctx, config);
+    this.updateRegistrationChart();
   }
 
   initCalendarWidget() {
@@ -8015,11 +10070,19 @@ class DashboardApp {
   updateNotificationBadges() {
     const headerBadge = document.getElementById('headerNotificationBadge');
     const navBadge = document.getElementById('navNotificationBadge');
-    
+
     const unreadCount = this.notificationsFeed.filter(n => !n.read).length;
-    
-    if (headerBadge) headerBadge.textContent = unreadCount;
-    if (navBadge) navBadge.textContent = unreadCount;
+
+    if (headerBadge) {
+      if (unreadCount > 0) {
+        headerBadge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+        headerBadge.classList.add('is-visible');
+      } else {
+        headerBadge.textContent = '';
+        headerBadge.classList.remove('is-visible');
+      }
+    }
+    if (navBadge) navBadge.textContent = unreadCount > 0 ? String(unreadCount) : '';
   }
 
   initLastUpdatedTime() {
@@ -8776,7 +10839,7 @@ class DashboardApp {
         );
 
       // Ensure detail view is hidden if no conversation is selected
-      if (!this.messagingSelectedId) {
+      if (!this.messagingSelectedId && !this.messagingSelectedPhone) {
         const detail = document.getElementById('messagingDetail');
         const placeholder = document.getElementById('messagingNoChatSelected');
         if (detail) detail.style.display = 'none';
@@ -8820,14 +10883,13 @@ class DashboardApp {
         selectedTail && currentConvPhone === selectedTail ? ' is-active' : '';
       
       const displayName = c.name;
-      const initials = this.getInitials(displayName);
       const timeStr = this.formatChatListTime(m.created_at);
       
       const prefix = this.isAdminMessage(m) ? 'You: ' : '';
       const preview = prefix + (m.body || '').substring(0, 60);
 
       return `<li class="messaging-item${unreadClass}${activeClass}" data-phone="${esc(c.phone)}" data-msg-id="${m.id}">
-        <div class="messaging-item__avatar">${esc(initials)}</div>
+        ${this.buildMessagingAvatarHtml({ phone: c.phone, name: displayName, className: 'messaging-item__avatar' })}
         <div class="messaging-item__content">
           <div class="messaging-item__top">
             <span class="messaging-item__sender">${esc(displayName)}</span>
@@ -8838,6 +10900,7 @@ class DashboardApp {
       </li>`;
     }).join('');
 
+    this.hydrateMessagingAvatars(listEl);
   }
 
   /** Open a chat from the sidebar list (by phone + optional message id). */
@@ -8889,10 +10952,15 @@ class DashboardApp {
       const fullName = this.getFarmerFullName(f);
       const phone = this.getValue(f, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']);
       const barangay = this.getValue(f, ['ADDRESS (BARANGAY)', 'barangay', 'BARANGAY', 'address']) || 'Address not set';
-      const initials = this.getInitials(fullName);
+      const farmerId = this.farmerIdFromRow(f);
       
       return `<li class="messaging-item messaging-contact-item" data-phone="${esc(phone)}">
-        <div class="messaging-item__avatar messaging-category-dot--farmer">${esc(initials)}</div>
+        ${this.buildMessagingAvatarHtml({
+          phone,
+          name: fullName,
+          className: 'messaging-item__avatar messaging-category-dot--farmer',
+          farmerId,
+        })}
         <div class="messaging-item__content">
           <div class="messaging-item__top">
             <span class="messaging-item__sender">${esc(fullName)}</span>
@@ -8908,6 +10976,8 @@ class DashboardApp {
         </div>
       </li>`;
     }).join('');
+
+    this.hydrateMessagingAvatars(listEl);
   }
 
   messagingNormalizePhone(p) {
@@ -9087,12 +11157,22 @@ class DashboardApp {
       const isSentByMe = this.isAdminMessage(msg);
       const direction = isSentByMe ? 'sent' : 'received';
       const senderName = isSentByMe ? 'Administrator' : (msg.sender_name || 'Farmer');
-      const avatarInitials = isSentByMe ? 'AD' : this.getInitials(senderName);
       const timeStr = this.bubbleTimestamp(msg.created_at);
+      const avatarHtml = isSentByMe
+        ? this.buildMessagingAvatarHtml({
+            name: 'Administrator',
+            className: 'messaging-message__avatar',
+            admin: true,
+          })
+        : this.buildMessagingAvatarHtml({
+            phone: this.messagingSelectedPhone || msg.sender_phone,
+            name: senderName,
+            className: 'messaging-message__avatar',
+          });
 
       return `
         <div class="messaging-message messaging-message--${direction}">
-          <div class="messaging-message__avatar">${esc(avatarInitials)}</div>
+          ${avatarHtml}
           <div class="messaging-message__content">
             <div class="messaging-message__bubble">${esc(msg.body)}</div>
             <div class="messaging-message__timestamp" aria-label="Message time">${esc(timeStr)}</div>
@@ -9100,6 +11180,19 @@ class DashboardApp {
         </div>
       `;
     }).join('');
+  }
+
+  scrollMessagingConversationToBottom(bodyEl) {
+    const el = bodyEl || document.getElementById('messagingDetailBody');
+    if (!el) return;
+    const scrollToEnd = () => {
+      el.scrollTop = el.scrollHeight;
+    };
+    scrollToEnd();
+    requestAnimationFrame(() => {
+      scrollToEnd();
+      requestAnimationFrame(scrollToEnd);
+    });
   }
 
   patchMessagingAfterSend(recipientPhone, replyData) {
@@ -9123,10 +11216,18 @@ class DashboardApp {
     this.messagingMessages.push(saved);
 
     if (Array.isArray(this.messagingConversations)) {
-      const conv = this.messagingConversations.find(
+      let conv = this.messagingConversations.find(
         (c) => this.messagingPhoneTail(c.phone) === tail
       );
-      if (conv) {
+      if (!conv) {
+        conv = {
+          phone: recipientPhone,
+          name: replyData.recipient_name || this.resolveFarmerName(recipientPhone, ''),
+          latest_message: saved,
+          unread_count: 0,
+        };
+        this.messagingConversations.unshift(conv);
+      } else {
         conv.latest_message = saved;
         conv.unread_count = 0;
       }
@@ -9140,7 +11241,8 @@ class DashboardApp {
   }
 
   async sendInlineReply() {
-    if (!this.messagingSelectedId) return;
+    // New conversations from search have messagingSelectedPhone but no message id yet
+    if (!this.messagingSelectedId && !this.messagingSelectedPhone) return;
 
     const inlineReplyInput = document.getElementById('msgInlineReplyInput');
     const message = (inlineReplyInput?.value || '').trim();
@@ -9167,9 +11269,11 @@ class DashboardApp {
         return normalize(m.sender_phone) === target || normalize(m.recipient_phone) === target;
       });
 
-      const subject = (originalMessage && originalMessage.subject && originalMessage.subject.toLowerCase().startsWith('re:'))
-        ? originalMessage.subject
-        : `Re: ${(originalMessage && originalMessage.subject) || 'Message'}`;
+      const subject = originalMessage
+        ? ((originalMessage.subject && originalMessage.subject.toLowerCase().startsWith('re:'))
+          ? originalMessage.subject
+          : `Re: ${originalMessage.subject || 'Message'}`)
+        : 'Message';
 
       // Get recipient name from header if originalMessage is missing (for new conversations)
       const headerName = document.getElementById('messagingDetailSenderName')?.textContent || '';
@@ -9183,7 +11287,7 @@ class DashboardApp {
           category: 'farmers',
           recipient_phone: recipientPhone,
           recipient_name: (originalMessage && (normalize(originalMessage.sender_phone) === target ? originalMessage.sender_name : originalMessage.recipient_name)) || headerName,
-          farmer_id: (originalMessage && originalMessage.farmer_id) ?? null,
+          farmer_id: (originalMessage && originalMessage.farmer_id) ?? this.lookupFarmerIdByPhone(recipientPhone),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -9212,19 +11316,11 @@ class DashboardApp {
           conversation: []
         };
         this.messagingMessages.push(currentMsg);
-        this.messagingSelectedId = currentMsg.id;
+        this.messagingSelectedId = saved.id || currentMsg.id;
       }
 
       if (!currentMsg.conversation) {
-        currentMsg.conversation = [
-          {
-            body: currentMsg.body,
-            sender_name: currentMsg.sender_name,
-            sender_phone: currentMsg.sender_phone,
-            sender_role: 'farmer', // Assume the root is from farmer for new chats
-            created_at: currentMsg.created_at
-          }
-        ];
+        currentMsg.conversation = [];
       }
       
       // Don't push if it's the very first message we just put in the thread above
@@ -9236,7 +11332,7 @@ class DashboardApp {
       const bodyEl = document.getElementById('messagingDetailBody');
       if (bodyEl) {
         bodyEl.innerHTML = this.renderConversation(currentMsg);
-        setTimeout(() => bodyEl.scrollTop = bodyEl.scrollHeight, 50);
+        this.scrollMessagingConversationToBottom(bodyEl);
       }
 
       if (inlineReplyInput) {
@@ -9566,6 +11662,9 @@ class DashboardApp {
 
     this.closeMessagingCompose(); // Close compose if open
     this.messagingSelectedId = id;
+    if (newContact?.phone) {
+      this.messagingSelectedPhone = newContact.phone;
+    }
 
     const main = document.getElementById('messagingMain');
     const detail = document.getElementById('messagingDetail');
@@ -9671,8 +11770,21 @@ class DashboardApp {
       const displayName = this.resolveFarmerName(displayPhone, rawName);
 
       if (avatarEl) {
-        avatarEl.textContent = this.getInitials(displayName);
         avatarEl.className = 'messaging-detail__sender-avatar messaging-detail__sender-avatar--farmer';
+        const fid = this.farmerIdFromPhone(displayPhone);
+        avatarEl.innerHTML =
+          '<img class="messaging-avatar__img" alt="" hidden /><span class="messaging-avatar__fallback"></span>';
+        avatarEl.querySelector('.messaging-avatar__fallback').textContent = this.getInitials(displayName);
+        if (fid) avatarEl.setAttribute('data-farmer-id', String(fid));
+        else avatarEl.removeAttribute('data-farmer-id');
+        const farmer = this.findFarmerByPhone(displayPhone);
+        const photoUrl = farmer ? this.farmerProfilePhotoUrl(farmer) : '';
+        if (photoUrl && /^https?:\/\//i.test(photoUrl)) {
+          avatarEl.setAttribute('data-photo-url', photoUrl);
+        } else {
+          avatarEl.removeAttribute('data-photo-url');
+        }
+        this.hydrateMessagingAvatars(avatarEl);
       }
       if (nameEl) nameEl.textContent = displayName;
       if (phoneEl) {
@@ -9707,7 +11819,8 @@ class DashboardApp {
           });
           msg.conversation = thread;
           bodyEl.innerHTML = this.renderConversation(msg);
-          setTimeout(() => bodyEl.scrollTop = bodyEl.scrollHeight, 50);
+          this.hydrateMessagingAvatars(bodyEl);
+          this.scrollMessagingConversationToBottom(bodyEl);
         }
       }
 
@@ -9736,7 +11849,8 @@ class DashboardApp {
         }
       }
 
-      if (this.messagingSelectedPhone && !newContact) {
+      const isNewEmptyChat = !!(newContact && !id);
+      if (this.messagingSelectedPhone && !isNewEmptyChat) {
         await this.markConversationRead(this.messagingSelectedPhone);
         if (openSeq !== this._messagingOpenSeq) return;
         this.renderMessagingList();
@@ -9972,17 +12086,24 @@ class DashboardApp {
     list.innerHTML = sortedFarmers.map(f => {
       const fullName = this.getFarmerFullName(f);
       const phone = this.getValue(f, ['PHONE', 'phone', 'PHONE NO.', 'Phone No.']);
-      const initials = this.getInitials(fullName);
+      const farmerId = this.farmerIdFromRow(f);
       
       return `
         <div class="messaging-contact-dropdown__item" data-phone="${esc(phone)}" data-name="${esc(fullName)}">
-          <div class="messaging-contact-dropdown__avatar">${esc(initials)}</div>
+          ${this.buildMessagingAvatarHtml({
+            phone,
+            name: fullName,
+            className: 'messaging-contact-dropdown__avatar',
+            farmerId,
+          })}
           <div class="messaging-contact-dropdown__name">
             ${esc(fullName)}
           </div>
         </div>
       `;
     }).join('');
+
+    this.hydrateMessagingAvatars(list);
   }
 
   filterContactDropdown(query) {
@@ -10010,7 +12131,8 @@ class DashboardApp {
 
   selectContact(name, phone) {
     this.closeMessagingCompose();
-    
+    this.messagingSelectedPhone = phone;
+
     // Find if we already have a conversation with this phone
     const normalize = (p) => String(p || '').replace(/\D/g, '').replace(/^(0|63)/, '');
     const target = normalize(phone);
@@ -10024,6 +12146,22 @@ class DashboardApp {
       // Open a "virtual" conversation for this new contact
       this.openMessagingDetail(null, { phone, name });
     }
+  }
+
+  lookupFarmerIdByPhone(phone) {
+    if (!phone || !Array.isArray(this.data)) return null;
+    const normalize = (p) => String(p || '').replace(/\D/g, '').replace(/^(0|63)/, '');
+    const target = normalize(phone);
+    const farmer = this.data.find((row) => {
+      const rowPhone = normalize(
+        this.getValue(row, ['PHONE', 'phone_number', 'CONTACT NUMBER', 'contact_number'])
+      );
+      return rowPhone && rowPhone === target;
+    });
+    if (!farmer) return null;
+    const fid = farmer.farmer_id ?? farmer['NO.'] ?? farmer.no ?? farmer.id;
+    const n = parseInt(fid, 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
   }
 
   resolveFarmerName(phone, fallbackName) {
@@ -10186,8 +12324,7 @@ class DashboardApp {
       const bodyEl = document.getElementById('messagingDetailBody');
       if (bodyEl) {
         bodyEl.innerHTML = this.renderConversation(originalMessage);
-        // Scroll to bottom to show the new message
-        bodyEl.scrollTop = bodyEl.scrollHeight;
+        this.scrollMessagingConversationToBottom(bodyEl);
       }
 
       // In a real implementation, this would send to the API
@@ -10235,7 +12372,13 @@ class DashboardApp {
 
       const inboxBadge = document.getElementById('messagingInboxBadge');
       if (inboxBadge) {
-        inboxBadge.textContent = count > 0 ? (count > 99 ? '99+' : String(count)) : '';
+        if (count > 0) {
+          inboxBadge.textContent = count > 99 ? '99+' : String(count);
+          inboxBadge.classList.add('is-visible');
+        } else {
+          inboxBadge.textContent = '';
+          inboxBadge.classList.remove('is-visible');
+        }
       }
     } catch {
       // Silently fail
@@ -10269,6 +12412,10 @@ class DashboardApp {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
+  isTruthyDbFlag(value) {
+    return value === true || value === 1 || value === '1';
+  }
+
   mapGiContributionItem(item) {
     const status = String(item.upload_status || item.status || 'pending').toLowerCase();
     const phase = String(item.current_phase || '').trim();
@@ -10276,6 +12423,15 @@ class DashboardApp {
       item.direction === 'outbound' ||
       phase === 'admin_submission' ||
       !!item.from_admin;
+    const readAdmin =
+      this.isTruthyDbFlag(item.is_read_admin) || this.isTruthyDbFlag(item.seen);
+    let unread;
+    if (item.unread != null && item.unread !== '') {
+      unread = this.isTruthyDbFlag(item.unread);
+    } else {
+      unread = !readAdmin;
+    }
+    if (fromAdmin) unread = false;
     return {
       id: Number(item.gi_update_id || item.id || 0),
       farmer_id: Number(item.farmer_id || 0),
@@ -10291,8 +12447,8 @@ class DashboardApp {
       status: status === 'archived' ? 'archived' : (status === 'approved' ? 'approved' : 'pending'),
       category: String(item.category || 'general'),
       starred: !!(item.is_starred || item.starred),
-      unread: item.unread != null ? !!item.unread : !item.is_read_admin,
-      seen: !!(item.is_read_admin || item.seen),
+      unread,
+      seen: readAdmin,
       attachments: Array.isArray(item.attachments) ? item.attachments : [],
     };
   }
@@ -10543,11 +12699,18 @@ class DashboardApp {
         const safeMsg = this.escapeHtml(
           this.formatAppLoadError(this.contributionsLoadError, 'Could not load contributions.')
         );
+        const low = String(this.contributionsLoadError || '').toLowerCase();
+        const supabaseHint =
+          low.includes('supabase') ||
+          low.includes('10035') ||
+          low.includes('non-blocking socket') ||
+          low.includes('beanthentic_supabase');
+        const hintText = supabaseHint
+          ? 'Check <code>BEANTHENTIC_SUPABASE_URL</code> and <code>BEANTHENTIC_SUPABASE_ANON_KEY</code> in <code>.env</code>, then restart <code>web.py</code>.'
+          : 'Check <code>app_db_host</code>, <code>app_db_pass</code>, and <code>app_server_base</code> in <code>settings.json</code> or open <a href="/connection-settings">Connection Settings</a>.';
         extra =
           `<p style="color:#b91c1c;line-height:1.5;">${safeMsg}</p>` +
-          '<p style="color:#64748b;font-size:0.9rem;margin-top:0.5rem;">' +
-          'Check <code>app_db_host</code>, <code>app_db_pass</code>, and <code>app_server_base</code> in ' +
-          '<code>settings.json</code> or open <a href="/connection-settings">Connection Settings</a>.</p>';
+          `<p style="color:#64748b;font-size:0.9rem;margin-top:0.5rem;">${hintText}</p>`;
       }
       container.innerHTML = `
         <div class="beanthentic-contribution-empty" role="status" aria-live="polite">
@@ -10559,7 +12722,7 @@ class DashboardApp {
     }
 
     container.innerHTML = filtered.map(contribution => `
-      <div class="beanthentic-contribution-item ${contribution.unread ? 'unread' : ''}" data-id="${contribution.id}">
+      <div class="beanthentic-contribution-item ${contribution.unread ? 'unread' : 'is-read'}" data-id="${contribution.id}">
         <div class="beanthentic-contribution-left">
           <div class="beanthentic-contribution-checkbox">
             <input type="checkbox" ${this.selectedContributions.has(contribution.id) ? 'checked' : ''}>
@@ -10748,69 +12911,121 @@ class DashboardApp {
   async openContribution(id) {
     const contribution = this.contributions.find(c => c.id === id);
     if (!contribution) return;
-    try {
-      await this.patchGiContribution(id, { is_read_admin: true });
-      contribution.unread = false;
-      contribution.seen = true;
-    } catch (_e) {
-      contribution.unread = false;
-      contribution.seen = true;
+    if (!contribution.fromAdmin) {
+      try {
+        await this.patchGiContribution(id, { is_read_admin: true });
+      } catch (err) {
+        console.warn('Could not mark contribution as read:', err);
+      }
     }
+    contribution.unread = false;
+    contribution.seen = true;
     this.renderContributions();
     this.openContributionDetailModal(contribution);
   }
 
-  openContributionDetailModal(contribution) {
+  async openContributionDetailModal(contribution) {
     const modal = document.getElementById('beanthenticContributionDetailModal');
     if (!modal || !contribution) return;
 
     // Store previous focus
     this.__previousFocus = document.activeElement;
 
-    // Gmail-style fields
     const avatarEl = document.getElementById('beanthenticContributionAvatar');
     const farmerEl = document.getElementById('beanthenticContributionDetailFarmer');
     const emailEl = document.getElementById('beanthenticContributionDetailEmail');
     const dateEl = document.getElementById('beanthenticContributionDetailDate');
     const subjectEl = document.getElementById('beanthenticContributionDetailSubject');
     const previewEl = document.getElementById('beanthenticContributionDetailPreview');
+    const attachSectionEl = document.getElementById('beanthenticAttachmentsSection');
     const attachCountEl = document.getElementById('beanthenticAttachmentCount');
     const attachGridEl = document.getElementById('beanthenticAttachmentGrid');
 
     const attachments = Array.isArray(contribution.attachments) ? contribution.attachments : [];
+    const farmerName = String(contribution.farmer || 'Farmer').trim();
+    const subjectRaw = String(contribution.subject || contribution.preview || 'Farmer contribution').trim();
+    const message = String(contribution.content || contribution.preview || 'No message provided.').trim();
 
-    if (avatarEl) avatarEl.textContent = (contribution.farmer || 'F').charAt(0);
-    if (farmerEl) farmerEl.textContent = contribution.farmer || '—';
-    if (emailEl) emailEl.textContent = contribution.farmer_email || '—';
+    if (avatarEl) avatarEl.textContent = farmerName.charAt(0).toUpperCase() || 'F';
+    if (farmerEl) farmerEl.textContent = farmerName || '—';
+    if (emailEl) {
+      const email = String(contribution.farmer_email || '').trim();
+      emailEl.textContent = email;
+      emailEl.hidden = !email;
+    }
     if (dateEl) dateEl.textContent = contribution.date || '—';
-    if (subjectEl) subjectEl.textContent = contribution.subject || 'Contribution Detail';
+    const duplicateSubject = subjectRaw.toLowerCase() === message.toLowerCase();
+    if (subjectEl) {
+      if (duplicateSubject) {
+        subjectEl.textContent = '';
+        subjectEl.hidden = true;
+      } else {
+        subjectEl.textContent = subjectRaw;
+        subjectEl.hidden = false;
+      }
+    }
+    if (previewEl) previewEl.textContent = message;
 
-    if (previewEl) previewEl.textContent = contribution.content || contribution.preview || 'No details available.';
-
+    if (attachSectionEl) attachSectionEl.hidden = false;
     if (attachCountEl) {
       attachCountEl.textContent = attachments.length
-        ? `${attachments.length} Attachment${attachments.length === 1 ? '' : 's'}`
-        : 'No attachments';
+        ? (attachments.length === 1 ? '1 attachment' : `${attachments.length} attachments`)
+        : 'Attachments';
     }
     if (attachGridEl) {
       if (!attachments.length) {
-        attachGridEl.innerHTML = '<p class="beanthentic-attachment-empty">No files attached.</p>';
+        attachGridEl.innerHTML =
+          '<p class="fc-detail-attachments-empty">No files were attached to this message.</p>';
       } else {
-        attachGridEl.innerHTML = attachments.map((a) => {
-          const name = String(a.name || 'file');
-          const url = String(a.url || a.path || '#');
-          const mime = String(a.mime || '').toLowerCase();
-          const isImg = mime.indexOf('image/') === 0 || /\.(jpe?g|png|gif|webp)$/i.test(name);
-          const preview = isImg
-            ? `<img src="${url}" alt="${name}" style="max-width:100%;max-height:120px;object-fit:cover;border-radius:8px;">`
-            : `<div class="beanthentic-attachment-doc-icon"><i class="fa-solid fa-file-lines"></i></div>`;
-          return `
-            <a class="beanthentic-attachment-thumb" href="${url}" target="_blank" rel="noopener">
+        const resolved = await Promise.all(
+          attachments.map(async (a) => {
+            const url = await ensureGiAttachmentUrl(a);
+            return { attachment: a, url };
+          })
+        );
+        attachGridEl.innerHTML = resolved
+          .map(({ attachment: a, url: resolvedUrl }) => {
+            const rawName = String(a.name || a.filename || 'file');
+            const name = this.escapeHtml(rawName);
+            const url = this.escapeHtml(resolvedUrl || '#');
+            const mime = String(a.mime || a.type || '').toLowerCase();
+            const isImg =
+              mime.indexOf('image/') === 0 || /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(rawName);
+            const preview = isImg
+              ? `<img class="fc-detail-attachment-img" src="${url}" alt="${name}" loading="lazy" decoding="async" data-fallback-name="${name}" />`
+              : `<div class="fc-detail-attachment-doc" aria-hidden="true"><i class="fa-solid fa-file-lines"></i></div>`;
+            return `
+            <a class="fc-detail-attachment-thumb${isImg ? ' fc-detail-attachment-thumb--image' : ''}" href="${url}" target="_blank" rel="noopener noreferrer" title="Open ${name} in a new tab">
               ${preview}
-              <div class="beanthentic-attachment-info">${name}</div>
-            </a>
-          `;
-        }).join('');
+              <span class="fc-detail-attachment-name">${name}</span>
+            </a>`;
+          })
+          .join('');
+        attachGridEl.querySelectorAll('img.fc-detail-attachment-img').forEach((img) => {
+          img.addEventListener('error', async () => {
+            const rawName = String(img.getAttribute('data-fallback-name') || img.alt || '').trim();
+            if (!rawName || img.dataset.retried === '1') {
+              img.replaceWith(
+                Object.assign(document.createElement('div'), {
+                  className: 'fc-detail-attachment-doc fc-detail-attachment-doc--broken',
+                  innerHTML: '<i class="fa-solid fa-image" aria-hidden="true"></i><span>Preview unavailable</span>',
+                })
+              );
+              return;
+            }
+            img.dataset.retried = '1';
+            const retryUrl = await ensureGiAttachmentUrl({ filename: rawName, name: rawName });
+            if (retryUrl) img.src = retryUrl;
+          });
+        });
+        attachGridEl.querySelectorAll('a.fc-detail-attachment-thumb').forEach((link) => {
+          link.addEventListener('click', (ev) => {
+            const openUrl = link.getAttribute('href');
+            if (!openUrl || openUrl === '#') return;
+            ev.preventDefault();
+            window.open(openUrl, '_blank', 'noopener,noreferrer');
+          });
+        });
       }
     }
 

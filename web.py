@@ -14,6 +14,8 @@ from pathlib import Path
 from flask import Flask, jsonify, redirect, request, make_response
 from sqlalchemy import text
 
+import beanthentic_env
+
 from config.app_connection import app_db_connect_timeout
 
 from config.auth import register_auth_routes
@@ -34,6 +36,7 @@ from api.misconduct_report_api import register_misconduct_report_routes
 from api.messaging_api import register_messaging_routes
 from api.platform_api import register_platform_routes
 from api.ml_api import register_ml_routes
+from api.pricing_api import register_pricing_routes
 from routes.dashboard import register_dashboard_routes
 from routes.farmer_portal import register_farmer_portal_routes
 
@@ -51,7 +54,7 @@ def _add_cors_for_lan_api(response):
         path = request.path or ""
     except RuntimeError:
         return response
-    if path.startswith("/api/") or path in ("/health", "/api/connection-status"):
+    if path.startswith("/api/") or path in ("/health", "/api/connection-status", "/api/supabase-config"):
         origin = (request.headers.get("Origin") or "").strip()
         if origin:
             response.headers["Access-Control-Allow-Origin"] = origin
@@ -63,50 +66,51 @@ def _add_cors_for_lan_api(response):
             "Content-Type, Authorization, Accept, X-HTTP-Method-Override, X-Beanthentic-Client-Host"
         )
         response.headers["Access-Control-Max-Age"] = "86400"
+    if not path.startswith("/api/"):
+        response.headers.setdefault("Permissions-Policy", "camera=(self), microphone=()")
+        # Undo browser HSTS from earlier dev HTTPS — admin is HTTP-only on port 5000.
+        try:
+            if request.scheme == "http":
+                response.headers["Strict-Transport-Security"] = "max-age=0"
+        except RuntimeError:
+            pass
     return response
+
+
+@app.route("/open-admin")
+def open_admin_redirect():
+    """Bookmark this path as http://127.0.0.1:5000/open-admin (never https)."""
+    port = request.environ.get("SERVER_PORT") or os.getenv("PORT", "5000")
+    target = f"http://127.0.0.1:{port}/dashboard"
+    return redirect(target, code=302)
 
 
 @app.route("/api/connection-status", methods=["GET", "OPTIONS"])
 def api_connection_status():
+    """Public Supabase connection diagnostic (no admin login required)."""
+    if request.method == "OPTIONS":
+        return make_response("", 204)
+
+    from config.supabase_app_config import shared_app_config
+
+    payload = shared_app_config()
+    code = 200 if payload.get("ok") else 503
+    return jsonify(payload), code
+
+
+@app.route("/api/supabase-config", methods=["GET", "OPTIONS"])
+def api_supabase_config():
     """
-    Public LAN diagnostic — no admin login required.
-    Use from browser on admin PC or phone: http://<admin-LAN-IP>:5000/api/connection-status
+    Shared Supabase URL + anon key for Beanthentic-App and Beanthentic-Client.
+    The anon key is public by design (RLS enforces access rules).
     """
     if request.method == "OPTIONS":
         return make_response("", 204)
 
-    from api.gi_contributions_api import probe_app_mysql, probe_gi_app_server
-    from config.app_connection import (
-        app_db_params,
-        app_server_base,
-        guess_lan_ip,
-        iter_app_server_bases,
-        read_connection_settings,
-    )
+    from config.supabase_app_config import shared_app_config
 
-    conn = read_connection_settings()
-    mysql_ok, mysql_err = probe_app_mysql(timeout=4.0)
-    http_ok, http_base, http_err = probe_gi_app_server(timeout=4.0)
-    admin_lan = guess_lan_ip()
-    bases = iter_app_server_bases()
-    payload = {
-        "ok": bool(http_ok or mysql_ok),
-        "admin_lan_ip": admin_lan or None,
-        "admin_port": int(os.getenv("PORT", "5000")),
-        "connection": conn,
-        "app_server_bases_tried": bases,
-        "mysql_reachable": mysql_ok,
-        "mysql_error": None if mysql_ok else mysql_err,
-        "http_reachable": http_ok,
-        "http_base": http_base or None,
-        "http_error": None if http_ok else http_err,
-        "app_server_base": app_server_base() or None,
-        "hint": (
-            "Beanthentic-App (phone) must use the SAME host as app_server_base on port 8080 — "
-            "not this admin port 5000. In the app: Server URL → http://<XAMPP-PC-IP>:8080"
-        ),
-    }
-    code = 200 if payload["ok"] else 503
+    payload = shared_app_config()
+    code = 200 if payload.get("ok") else 503
     return jsonify(payload), code
 
 SETTINGS_PATH = Path(__file__).resolve().parent / "settings.json"
@@ -163,9 +167,23 @@ def _write_sms_settings(payload: dict) -> None:
     SETTINGS_PATH.write_text(json.dumps(settings, indent=2), encoding="utf-8")
 
 
-def _mysql_url_from_connection(conn: dict) -> str:
-    """Build SQLAlchemy MySQL URL from settings.json connection block."""
+def _build_database_url_from_connection(conn: dict) -> str:
+    """
+    Build SQLAlchemy database URL from settings.json connection block.
+    Supports both MySQL and PostgreSQL (Supabase).
+    """
+    # First check if connection already provides a full URL
+    full_url = str(conn.get("app_db_url") or "").strip()
+    if full_url:
+        return full_url
+
+    # If no full URL, build from components - default to MySQL
     host = str(conn.get("app_db_host") or "").strip()
+    if not host:
+        return ""
+
+    # Determine which dialect to use
+    dialect = str(conn.get("app_db_dialect") or "mysql").strip().lower()
     user = str(conn.get("app_db_user") or "root").strip() or "root"
     password = str(conn.get("app_db_pass") if conn.get("app_db_pass") is not None else "")
     db_name = str(conn.get("app_db_name") or "beanthentic_app").strip() or "beanthentic_app"
@@ -174,35 +192,21 @@ def _mysql_url_from_connection(conn: dict) -> str:
         port = int(port_raw)
     except (TypeError, ValueError):
         port = 3306
-    if not host:
-        return ""
+
     port_part = f":{port}" if port else ""
-    return f"mysql+pymysql://{user}:{password}@{host}{port_part}/{db_name}"
+
+    if dialect in ("postgresql", "postgres"):
+        return f"postgresql://{user}:{password}@{host}{port_part}/{db_name}"
+    else:  # default to mysql
+        return f"mysql+pymysql://{user}:{password}@{host}{port_part}/{db_name}"
 
 
 # SQLAlchemy configuration
-# Priority:
-# 1) DATABASE_URL env var (full SQLAlchemy URL)
-# 2) MySQL from Beanthentic/settings.json (XAMPP — same as connection-settings UI)
-# 3) MySQL from env vars (MYSQL_USER/MYSQL_PASSWORD/MYSQL_HOST/MYSQL_DB)
-database_url = os.getenv("DATABASE_URL", "").strip()
-if not database_url:
-    database_url = _mysql_url_from_connection(_read_connection_settings())
-if not database_url:
-    mysql_user = os.getenv("MYSQL_USER", "").strip()
-    mysql_password = os.getenv("MYSQL_PASSWORD", "")
-    mysql_host = os.getenv("MYSQL_HOST", "").strip()
-    mysql_db = os.getenv("MYSQL_DB", "").strip()
-    mysql_port = os.getenv("MYSQL_PORT", "").strip()
-
-    if mysql_user and mysql_host and mysql_db:
-        port_part = f":{mysql_port}" if mysql_port else ""
-        database_url = f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}{port_part}/{mysql_db}"
-
-if not database_url:
+# Only use beanthentic_env for Supabase
+database_url = beanthentic_env.sqlalchemy_database_url()
+if not database_url or not database_url.strip():
     raise RuntimeError(
-        "No database configured. Set MySQL in Beanthentic/settings.json "
-        "(connection.app_db_host, app_db_user, app_db_name) or DATABASE_URL."
+        "No database configured. Set up .env with BEANTHENTIC_DB_TYPE=postgresql and other BEANTHENTIC_* variables."
     )
 
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
@@ -216,41 +220,95 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 db.init_app(app)
 
 
-def _uses_xampp_app_database() -> bool:
-    """True when connected to Beanthentic-App XAMPP schema (not legacy admin SQLite tables)."""
-    uri = str(app.config.get("SQLALCHEMY_DATABASE_URI") or "").lower()
-    if "beanthentic_app" in uri:
-        return True
-    return bool(str(_read_connection_settings().get("app_db_host") or "").strip())
-
-
 def _init_database_schema() -> None:
     """
-    XAMPP beanthentic_app already defines farmers, affiliation_information, etc.
-    db.create_all() would try to add legacy tables (affiliations → farmers.id) and fail.
-    Only create admin-web tables that are missing.
+    Create missing SQLAlchemy tables on local MySQL only.
+
+    Supabase/PostgreSQL uses the Beanthentic-App schema (farmers.farmer_id,
+    production_information, etc.). Running create_all() there tries to add
+    legacy admin models (production → farmers.id) and fails on every startup.
     """
-    from sqlalchemy import inspect
-
-    from config.models import ActivityLogEntry, AdminUser, DocumentAnalysis
-
-    if _uses_xampp_app_database():
-        inspector = inspect(db.engine)
-        existing = {t.lower() for t in inspector.get_table_names()}
-        for model in (AdminUser, ActivityLogEntry, DocumentAnalysis):
-            name = model.__tablename__.lower()
-            if name not in existing:
-                model.__table__.create(db.engine, checkfirst=True)
+    if beanthentic_env.is_postgresql():
+        _ensure_farmer_profile_photo_column()
+        _ensure_production_detail_columns()
+        _ensure_pricing_schema()
+        _ensure_admin_users_table()
         return
-
     db.create_all()
+    _ensure_admin_users_table()
+
+
+def _ensure_admin_users_table() -> None:
+    """Ensure admin_user exists and JSON accounts are synced to the database."""
+    from config.utils import ensure_admin_users_migrated
+
+    try:
+        ensure_admin_users_migrated()
+    except Exception as exc:
+        print(f"[Beanthentic] admin_user migration skipped: {exc}")
+
+
+def _ensure_production_detail_columns() -> None:
+    """Add harvest / GCB / roasted detail columns on production_information."""
+    try:
+        from config.mysql_app_bridge import connect_app_db
+        from config.production_fields import ensure_production_detail_columns
+        from config.supabase_production_sync import (
+            backfill_production_classifications_from_detail,
+            backfill_production_detail_from_legacy,
+            sync_production_bean_classifications,
+        )
+
+        conn = connect_app_db({})
+        try:
+            added = ensure_production_detail_columns(conn)
+            if added:
+                print(f"[Beanthentic] production_information: added {len(added)} column(s)")
+            updated = backfill_production_detail_from_legacy(conn)
+            if updated:
+                print(f"[Beanthentic] production_information: backfilled {updated} row(s) from legacy qty")
+            class_updated = backfill_production_classifications_from_detail(conn)
+            if class_updated:
+                print(
+                    f"[Beanthentic] production_information: synced classifications for {class_updated} row(s)"
+                )
+            bean_class_synced = sync_production_bean_classifications(conn)
+            if bean_class_synced:
+                print(
+                    f"[Beanthentic] production_information: synced {bean_class_synced} classification(s) from production_bean_classifications"
+                )
+        finally:
+            conn.close()
+    except Exception as exc:
+        print(f"[Beanthentic] production detail columns skipped: {exc}")
+
+
+def _ensure_pricing_schema() -> None:
+    """Create coffee pricelist tables and farmers.self_sale_enabled when missing."""
+    try:
+        from config.mysql_app_bridge import connect_app_db
+        from config.pricing_store import ensure_pricing_schema
+
+        conn = connect_app_db({})
+        try:
+            ensure_pricing_schema(conn)
+        finally:
+            conn.close()
+    except Exception as exc:
+        print(f"[Beanthentic] pricing schema migration skipped: {exc}")
+
+
+def _ensure_farmer_profile_photo_column() -> None:
+    """Allow Supabase URLs and data-URL fallbacks in farmers.profile_photo."""
+    try:
+        db.session.execute(text("ALTER TABLE farmers ALTER COLUMN profile_photo TYPE TEXT"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 with app.app_context():
-    try:
         _init_database_schema()
-    except Exception as e:
-        print(f"Warning: Could not create tables: {e}")
 
 # Register all route modules
 register_auth_routes(app)
@@ -362,10 +420,11 @@ def api_messages_list_backup():
     except Exception as e:
         msg = friendly_load_failure(module_label="messages", http_error=e)
         return jsonify(load_error_payload("MESSAGES_LOAD_FAILED", msg)), 503
-
+2
 
 register_platform_routes(app)
 register_ml_routes(app)
+register_pricing_routes(app)
 register_farmer_portal_routes(app)
 
 
@@ -410,342 +469,46 @@ for _gi_send_rule in (
     )
 
 
-@app.route("/connection-settings", methods=["GET", "POST"])
-@require_admin
-def connection_settings():
-    """Manual UI to set cross-device DB connection IP/port for admin web."""
-    form_error = ""
-    if request.method == "POST":
-        host = (request.form.get("app_db_host") or "").strip()
-        port_raw = (request.form.get("app_db_port") or "3306").strip()
-        user = (request.form.get("app_db_user") or "root").strip() or "root"
-        password_field = request.form.get("app_db_pass")
-        db_name = (request.form.get("app_db_name") or "beanthentic_app").strip() or "beanthentic_app"
+from routes.connection_settings import register_connection_settings_routes
 
-        ok_host, host_err = validate_db_host(host)
-        ok_port, port_err, port = validate_db_port(port_raw)
-        ok_db, db_err, db_name = validate_db_name(db_name)
-        if not ok_host:
-            form_error = host_err
-        elif not ok_port:
-            form_error = port_err
-        elif not ok_db:
-            form_error = db_err
-        elif not user or len(user) > 64 or not re.match(r"^[\w.\-]+$", user):
-            form_error = "Database user must be 1–64 characters (letters, numbers, underscore, dot, hyphen)."
-        else:
-            from config.app_connection import normalize_app_server_base_url
-
-            server_base = (request.form.get("app_server_base") or "").strip().rstrip("/")
-            if server_base and not server_base.startswith(("http://", "https://")):
-                form_error = "App server base URL must start with http:// or https://"
-            else:
-                server_base = normalize_app_server_base_url(server_base, db_host=host)
-
-        sms_enabled = request.form.get("sms_enabled") == "1"
-        sms_provider = (request.form.get("sms_provider") or "auto").strip().lower()
-        allowed_providers = (
-            "auto",
-            "sms_gateway",
-            "semaphore",
-            "twilio",
-            "log",
-        )
-        if sms_provider not in allowed_providers:
-            sms_provider = "auto"
-        sms_sender = (request.form.get("sms_sender_name") or "Beanthentic").strip()[:11]
-        public_base = (request.form.get("public_base_url") or "").strip().rstrip("/")
-        if public_base and not public_base.startswith(("http://", "https://")):
-            form_error = form_error or "Public base URL must start with http:// or https."
-
-        gw_mode = (request.form.get("gateway_mode") or "auto").strip().lower()
-        if gw_mode not in ("local", "cloud", "auto"):
-            gw_mode = "auto"
-        gw_local = (request.form.get("gateway_local_base_url") or "").strip().rstrip("/")
-        if gw_local and not gw_local.startswith(("http://", "https://")):
-            gw_local = f"http://{gw_local.lstrip('/')}"
-        if gw_local and "sms-gate.app" in gw_local.lower():
-            form_error = form_error or (
-                "Local base URL must be your phone IP (e.g. http://192.168.x.x:8080), not api.sms-gate.app."
-            )
-        gw_local_user = (request.form.get("gateway_local_username") or "").strip()
-        gw_local_pass = request.form.get("gateway_local_password")
-        gw_user = (request.form.get("gateway_username") or "").strip()
-        gw_pass = request.form.get("gateway_password")
-        try:
-            gw_sim = int(request.form.get("gateway_sim_number") or 1)
-        except ValueError:
-            gw_sim = 1
-
-        if not form_error:
-            conn_prev = _read_connection_settings()
-            password = (
-                conn_prev.get("app_db_pass")
-                if password_field is None or password_field == ""
-                else password_field
-            )
-            _write_connection_settings(
-                {
-                    "app_db_host": host,
-                    "app_db_port": port,
-                    "app_db_user": user,
-                    "app_db_pass": password if password is not None else "",
-                    "app_db_name": db_name,
-                    "app_server_base": server_base or str(conn_prev.get("app_server_base") or "").strip(),
-                }
-            )
-            sms_prev = _read_settings().get("sms")
-            sms_prev = sms_prev if isinstance(sms_prev, dict) else {}
-            gw_prev = sms_prev.get("sms_gateway")
-            gw_prev = gw_prev if isinstance(gw_prev, dict) else {}
-            gw_password = (
-                gw_prev.get("password")
-                if gw_pass is None or gw_pass == ""
-                else gw_pass
-            )
-            gw_local_password = (
-                gw_prev.get("local_password")
-                if gw_local_pass is None or gw_local_pass == ""
-                else gw_local_pass
-            )
-            _write_sms_settings(
-                {
-                    "enabled": sms_enabled,
-                    "provider": sms_provider,
-                    "sender_name": sms_sender or "Beanthentic",
-                    "public_base_url": public_base or str(sms_prev.get("public_base_url") or "").strip(),
-                    "sms_gateway": {
-                        "mode": gw_mode,
-                        "local_base_url": gw_local or str(gw_prev.get("local_base_url") or "").strip(),
-                        "local_path": str(gw_prev.get("local_path") or "/message"),
-                        "local_username": gw_local_user or str(gw_prev.get("local_username") or "sms").strip(),
-                        "local_password": gw_local_password if gw_local_password is not None else "",
-                        "cloud_url": (
-                            str(gw_prev.get("cloud_url") or "").strip()
-                            or "https://api.sms-gate.app/3rdparty/v1/messages"
-                        ),
-                        "cloud_device_id": str(gw_prev.get("cloud_device_id") or gw_prev.get("device_id") or "").strip(),
-                        "username": gw_user or str(gw_prev.get("username") or "").strip(),
-                        "password": gw_password if gw_password is not None else "",
-                        "sim_number": max(1, min(3, gw_sim)),
-                    },
-                }
-            )
-            return redirect("/connection-settings?saved=1")
-
-    from config.app_connection import guess_lan_ip, probe_app_server_http
-
-    conn = _read_connection_settings()
-    sms = _read_settings().get("sms")
-    sms = sms if isinstance(sms, dict) else {}
-    saved = (request.args.get("saved") or "").strip() == "1"
-    admin_lan = guess_lan_ip() or "(unknown — check Wi‑Fi)"
-    http_ok, http_used, http_err = probe_app_server_http(timeout=4.0)
-    probe_line = (
-        f"<p class='ok'>App server OK: <code>{http_used}</code></p>"
-        if http_ok
-        else f"<p style='color:#b91c1c;'>App server not reachable: {http_err}</p>"
-    )
-    host = str(conn.get("app_db_host") or "")
-    port = str(conn.get("app_db_port") or 3306)
-    user = str(conn.get("app_db_user") or "root")
-    db_name = str(conn.get("app_db_name") or "beanthentic_app")
-    server_base = str(conn.get("app_server_base") or "http://192.168.x.x:8080")
-    sms_enabled = "checked" if sms.get("enabled", True) else ""
-    sms_provider = str(sms.get("provider") or "auto")
-    sms_sender = str(sms.get("sender_name") or "Beanthentic")
-    public_base = str(sms.get("public_base_url") or "http://127.0.0.1:5000")
-    gw = sms.get("sms_gateway") if isinstance(sms.get("sms_gateway"), dict) else {}
-    gw_mode = str(gw.get("mode") or "auto")
-    gw_local = str(gw.get("local_base_url") or "")
-    gw_local_user = str(gw.get("local_username") or "sms")
-    gw_user = str(gw.get("username") or "")
-    return f"""<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Connection Settings</title>
-  <style>
-    body {{ font-family: Arial, sans-serif; margin: 24px; max-width: 820px; }}
-    h1 {{ margin-bottom: 8px; }}
-    p {{ color: #374151; }}
-    .ok {{ color: #166534; margin-bottom: 12px; }}
-    label {{ display:block; margin-top: 12px; font-weight: 600; }}
-    input {{ width: 100%; padding: 8px; box-sizing: border-box; margin-top: 6px; }}
-    button {{ margin-top: 16px; padding: 10px 14px; border: 0; background: #14532d; color: #fff; border-radius: 6px; }}
-    code {{ background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }}
-  </style>
-</head>
-<body>
-  <h1>Admin Web Connection Settings</h1>
-  <p>Ilagay dito ang IP ng device na may XAMPP + <code>python app.py</code> (port <strong>8080</strong>) — hindi ang admin port 5000.</p>
-  <p>Admin PC LAN IP (web.py): <code>{admin_lan}</code> — buksan <a href="/api/connection-status">/api/connection-status</a> para sa diagnostic.</p>
-  <p style="font-size:0.9rem;">Sa phone (Beanthentic-App): Server URL = <code>http://&lt;XAMPP-PC-IP&gt;:8080</code> (pareho sa <code>app_server_base</code> sa baba).</p>
-  {"<div class='ok'>Saved. Re-run or refresh dashboard.</div>" if saved else ""}
-  {probe_line}
-  {f"<div style='color:#b91c1c;margin-bottom:12px;'>{form_error}</div>" if form_error else ""}
-  <form method="post">
-    <label>App DB Host (IP)</label>
-    <input name="app_db_host" value="{host}" placeholder="192.168.x.x" />
-    <label>App DB Port</label>
-    <input name="app_db_port" value="{port}" placeholder="3306" />
-    <label>App DB User</label>
-    <input name="app_db_user" value="{user}" placeholder="root" />
-    <label>App DB Password</label>
-    <input name="app_db_pass" type="password" value="" placeholder="(leave blank if none)" />
-    <label>App DB Name</label>
-    <input name="app_db_name" value="{db_name}" placeholder="beanthentic_app" />
-    <label>App Server Base URL (HTTP fallback)</label>
-    <input name="app_server_base" value="{server_base}" placeholder="http://192.168.x.x:8080" />
-    <h2 style="margin-top:28px;">SMS (OTP &amp; password reset)</h2>
-    <p style="font-size:0.9rem;">Use <strong>SMS Gateway for Android</strong> on a phone on the same Wi‑Fi as this PC.</p>
-    <label><input type="checkbox" name="sms_enabled" value="1" {sms_enabled} /> Enable SMS</label>
-    <label>SMS provider</label>
-    <select name="sms_provider" style="width:100%;padding:8px;margin-top:6px;">
-      <option value="sms_gateway" {"selected" if sms_provider in ("sms_gateway", "sms_forwarder", "auto", "") else ""}>SMS Gateway for Android (recommended)</option>
-      <option value="auto" {"selected" if sms_provider == "auto" else ""}>auto (Gateway → cloud APIs → log)</option>
-      <option value="semaphore" {"selected" if sms_provider == "semaphore" else ""}>Semaphore (cloud API)</option>
-      <option value="twilio" {"selected" if sms_provider == "twilio" else ""}>Twilio</option>
-      <option value="log" {"selected" if sms_provider == "log" else ""}>log (dev only)</option>
-    </select>
-    <label>Public base URL (admin reset links in SMS)</label>
-    <input name="public_base_url" value="{public_base}" placeholder="http://192.168.x.x:5000" />
-    <h3 style="margin-top:20px;">SMS Gateway for Android</h3>
-    <p style="font-size:0.85rem;color:#4b5563;">App → Local Server ON. Copy username/password from the app. Default port 8080.</p>
-    <label>Gateway mode</label>
-    <select name="gateway_mode" style="width:100%;padding:8px;margin-top:6px;">
-      <option value="auto" {"selected" if gw_mode == "auto" else ""}>auto (cloud, then local — recommended)</option>
-      <option value="cloud" {"selected" if gw_mode == "cloud" else ""}>cloud only (api.sms-gate.app)</option>
-      <option value="local" {"selected" if gw_mode == "local" else ""}>local only (phone on Wi‑Fi)</option>
-    </select>
-    <label>Local base URL (from app → Local address)</label>
-    <input name="gateway_local_base_url" value="{gw_local}" placeholder="http://192.168.100.63:8080" />
-    <label>Local username (Local Server in app, usually sms)</label>
-    <input name="gateway_local_username" value="{gw_local_user}" placeholder="sms" />
-    <label>Local password</label>
-    <input name="gateway_local_password" type="password" value="" placeholder="(leave blank to keep current)" />
-    <label>Cloud username (Cloud Server in app)</label>
-    <input name="gateway_username" value="{gw_user}" placeholder="B4U_TR" />
-    <label>Cloud password</label>
-    <input name="gateway_password" type="password" value="" placeholder="(leave blank to keep current)" />
-    <label>SIM number (1–3)</label>
-    <input name="gateway_sim_number" value="{gw.get('sim_number', 1)}" placeholder="1" />
-    <button type="submit">Save Connection</button>
-  </form>
-  <p>Config file: <code>Beanthentic/settings.json</code></p>
-</body>
-</html>"""
+register_connection_settings_routes(
+    app,
+    settings_path=SETTINGS_PATH,
+    read_settings=_read_settings,
+    write_connection_settings=_write_connection_settings,
+)
 
 # Health check endpoint
 @app.route("/health")
 def health():
-    """
-    Health check for monitoring.
-
-    Remote app MySQL (settings.json app_db_host) may be unreachable from the admin PC
-    while the admin app, IPOPHL (local JSON), and app HTTP bridge (:8080) still work.
-    """
-    from config.app_connection import app_db_params, app_server_base, friendly_mysql_error
+    """Health check — Supabase anon connection."""
     from config.ipophl_store import STORE_PATH
-    from config.mysql_app_bridge import connect_app_mysql
+    from config.supabase_client import is_configured, verify_connection, public_config
+    from config.sms import SMS_BUILD_ID
 
-    from config.sms import SMS_BUILD_ID  # noqa: E402
-
+    sb_ok, sb_err = verify_connection() if is_configured() else (False, "Supabase not configured")
     payload: dict = {
-        "status": "healthy",
+        "status": "healthy" if sb_ok else "degraded",
         "admin_server": "up",
         "sms_build": SMS_BUILD_ID,
-        "database": "disconnected",
-        "app_mysql": "not_configured",
-        "app_server_http": "not_configured",
-        "ipophl_local": "unknown",
+        "mode": "supabase_anon",
+        "supabase": "connected" if sb_ok else "disconnected",
+        "supabase_url": public_config().get("supabase_url") if is_configured() else None,
+        "database": "supabase" if sb_ok else "disconnected",
+        "ipophl_local": "available" if STORE_PATH.exists() else "ready",
     }
-    hints: list[str] = []
+    if not sb_ok:
+        payload["supabase_error"] = sb_err
+        payload["hint"] = "Set BEANTHENTIC_SUPABASE_URL and BEANTHENTIC_SUPABASE_ANON_KEY in .env"
 
-    params = app_db_params()
-    if params:
-        payload["app_mysql"] = "disconnected"
-        conn = None
-        try:
-            conn = connect_app_mysql(params)
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1")
-                cur.fetchone()
-            payload["app_mysql"] = "connected"
-            payload["database"] = "connected"
-        except Exception as e:
-            payload["app_mysql_error"] = friendly_mysql_error(e, host=str(params.get("host") or ""))
-            hints.append(
-                "App MySQL unreachable from this PC. Use Connection Settings: set app_db_host to the "
-                "XAMPP PC LAN IP, start MySQL on that device, or use app_server_base HTTP only."
-            )
-        finally:
-            if conn:
-                conn.close()
-    else:
-        hints.append("Set app_db_host in settings.json or /connection-settings for farmer/app data.")
-
-    base = app_server_base()
-    if base:
-        from config.app_connection import probe_app_server_http
-
-        payload["app_server_http"] = "disconnected"
-        payload["app_server_base"] = base
-        http_ok, http_used, http_err = probe_app_server_http(timeout=4.0)
-        if http_ok:
-            payload["app_server_http"] = "connected"
-            payload["app_server_http_base"] = http_used
-            if payload["database"] != "connected":
-                payload["database"] = "http_only"
-            try:
-                from config.ipophl_app_bridge import _request_bridge
-
-                _request_bridge(action="list", query={"limit": 1}, timeout=4)
-                payload["ipophl_http_bridge"] = "connected"
-            except Exception as ipophl_exc:
-                payload["ipophl_http_bridge"] = "disconnected"
-                payload["ipophl_http_bridge_error"] = str(ipophl_exc)
-        else:
-            payload["app_server_http_error"] = http_err
-            hints.append(
-                f"Cannot reach app server at {base}. On the XAMPP PC: "
-                "pip install -r requirements.txt && python app.py (port 8080). "
-                "Allow Windows Firewall inbound TCP 8080 on that PC."
-            )
-
-    if STORE_PATH.exists():
-        payload["ipophl_local"] = "available"
-    else:
-        payload["ipophl_local"] = "ready"
-
-    sqlalchemy_ok = False
     try:
         db.session.execute(text("SELECT 1"))
-        sqlalchemy_ok = True
         payload["sqlalchemy"] = "connected"
     except Exception as e:
         payload["sqlalchemy"] = "disconnected"
         payload["sqlalchemy_error"] = safe_error_message(e, public="SQLAlchemy ping failed.")
 
-    if payload["app_mysql"] == "connected" or payload["app_server_http"] == "connected":
-        payload["status"] = "healthy"
-        code = 200
-    elif payload["ipophl_local"] in ("available", "ready"):
-        payload["status"] = "degraded"
-        payload["message"] = (
-            "Admin web is running. Remote app database is not reachable; "
-            "IPOPHL uploads and local features still work."
-        )
-        code = 200
-    else:
-        payload["status"] = "unhealthy"
-        payload["message"] = "Admin web is running but no app database path is available."
-        code = 503
-
-    if hints:
-        payload["hints"] = hints
-
+    code = 200 if sb_ok else 503
     return jsonify(payload), code
 
 
@@ -753,32 +516,21 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
     debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
     try:
-        from config.app_connection import (
-            app_server_base,
-            guess_lan_ip,
-            probe_app_server_http,
-            read_connection_settings,
-        )
+        from config.supabase_client import is_configured, verify_connection, public_config
 
-        lan = guess_lan_ip()
-        conn = read_connection_settings()
-        print("[Beanthentic] Cross-device setup:")
-        print(f"  Admin web (this PC): http://{lan or '127.0.0.1'}:{port}")
-        print(f"  app_db_host: {conn.get('app_db_host') or '(not set)'}")
-        print(f"  app_server_base: {app_server_base() or '(not set)'}")
-        http_ok, http_used, http_err = probe_app_server_http(timeout=5.0)
-        if http_ok:
-            print(f"  Beanthentic-App HTTP: OK @ {http_used}")
-        else:
-            print(f"  Beanthentic-App HTTP: FAIL — {http_err}")
-            print(
-                "  Fix: On the XAMPP PC run python app.py, then set app_server_base "
-                "in /connection-settings to http://<XAMPP-LAN-IP>:8080"
-            )
-        print(
-            f"  Phone Server URL must match app_server_base (port 8080), not admin :{port}."
-        )
-        print(f"  Diagnostic: http://{lan or '127.0.0.1'}:{port}/api/connection-status")
+        cfg = public_config() if is_configured() else {}
+        ok, err = verify_connection() if is_configured() else (False, "not configured")
+        print("[Beanthentic] Supabase setup:")
+        print(f"  URL: {cfg.get('supabase_url') or '(not set)'}")
+        print(f"  Anon key: {'(set)' if cfg.get('supabase_anon_key') else '(not set)'}")
+        print(f"  REST API: {'OK' if ok else f'FAIL — {err}'}")
+        print(f"  App/Client config: http://127.0.0.1:{port}/api/supabase-config")
+        print(f"  Diagnostic: http://127.0.0.1:{port}/api/connection-status")
+        print(f"  Admin (camera): http://127.0.0.1:{port}/dashboard")
+        print(f"  Quick open:     http://127.0.0.1:{port}/open-admin")
+        print("  Use http:// only — not https:// (no certificate warnings).")
+        print("  If Chrome still forces https, visit chrome://net-internals/#hsts")
+        print("  and delete domain: 192.168.18.126")
     except Exception as boot_exc:
         print(f"[Beanthentic] Startup diagnostic skipped: {boot_exc}")
     app.run(host="0.0.0.0", port=port, debug=debug, threaded=True)

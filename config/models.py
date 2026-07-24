@@ -23,15 +23,24 @@ class Farmer(db.Model):
     first_name = db.Column(db.String(100))
     address_barangay = db.Column(db.String(150))
     birthday = db.Column(db.Date)
+    profile_photo = db.Column(db.String(255))
+    account_id = db.Column(db.Integer, db.ForeignKey('admin_user.id', ondelete='SET NULL'))
+    client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='SET NULL'))
+    user_id = db.Column(db.BigInteger)
+    status = db.Column(db.String(20), default='pending')
+    is_suspended = db.Column(db.Boolean, default=False)
+    suspended_until = db.Column(db.DateTime)
+    suspension_reason = db.Column(db.String(500))
+    warning_count = db.Column(db.Integer, default=0)
+    last_warning_at = db.Column(db.DateTime)
+    last_warning_reason = db.Column(db.String(500))
+    last_warning_ack_at = db.Column(db.DateTime)
 
     # Relationships
     affiliation = db.relationship('Affiliation', backref='farmer', uselist=False, cascade='all, delete-orphan')
     farm_info = db.relationship('FarmInfo', backref='farmer', uselist=False, cascade='all, delete-orphan')
     tree_counts = db.relationship('TreeCounts', backref='farmer', uselist=False, cascade='all, delete-orphan')
     production = db.relationship('Production', backref='farmer', uselist=False, cascade='all, delete-orphan')
-    profile_photo = db.Column(db.String(255))
-    account_id = db.Column(db.Integer, db.ForeignKey('admin_user.id', ondelete='SET NULL'))
-    client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='SET NULL'))
 
     @property
     def fa_officer_member(self):
@@ -126,14 +135,22 @@ class Farmer(db.Model):
 # Affiliation table
 class Affiliation(db.Model):
     """Affiliation information for farmers."""
-    __tablename__ = 'affiliations'
+    __tablename__ = 'affiliation_information'
 
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    farmer_id = db.Column(db.Integer, db.ForeignKey('farmers.id', ondelete='CASCADE'))
-    fa_officer_member = db.Column(db.String(100))
-    rsbsa_registered = db.Column(db.Enum('YES', 'NO'))
+    affiliation_info_id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    farmer_id = db.Column(db.BigInteger, db.ForeignKey('farmers.id', ondelete='CASCADE'))
+    federation_assoc = db.Column(db.String(255))
+    coop_name = db.Column(db.String(255))
+    rsbsa_registered = db.Column(db.String(20))
     rsbsa_number = db.Column(db.String(100))
+    rsbsa_status = db.Column(db.String(50))
     ncfrs = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime)
+
+    @property
+    def fa_officer_member(self):
+        return self.federation_assoc or ""
 
     def __repr__(self):
         return f"Affiliation('{self.fa_officer_member}', '{self.rsbsa_registered}')"
@@ -141,16 +158,21 @@ class Affiliation(db.Model):
 # Farm Info table
 class FarmInfo(db.Model):
     """Farm information for farmers."""
-    __tablename__ = 'farm_info'
+    __tablename__ = 'farm_information'
 
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    farmer_id = db.Column(db.Integer, db.ForeignKey('farmers.id', ondelete='CASCADE'))
+    farm_info_id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    farmer_id = db.Column(db.BigInteger, db.ForeignKey('farmers.id', ondelete='CASCADE'))
+    farm_name = db.Column(db.String(255))
     is_landowner = db.Column(db.Boolean, default=False)
     is_cloa_holder = db.Column(db.Boolean, default=False)
     is_leaseholder = db.Column(db.Boolean, default=False)
     is_seasonal_farm_worker = db.Column(db.Boolean, default=False)
     is_others = db.Column(db.Boolean, default=False)
+    ownership_status = db.Column(db.String(40))
     total_area_planted_ha = db.Column(db.Numeric(10, 4))
+    barangay = db.Column(db.String(150))
+    created_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime)
 
     def __repr__(self):
         return f"FarmInfo('{self.total_area_planted_ha} HA')"

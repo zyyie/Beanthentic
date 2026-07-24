@@ -3,10 +3,20 @@
    ═══════════════════════════════════════════════════════ */
 
 /* ── Layout ─────────────────────────────────────────── */
+#messaging-module.module {
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+  padding-bottom: 0;
+}
+
 .messaging-layout {
-  display: block;
-  min-height: 600px;
-  height: calc(100vh - 100px);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  max-height: 100%;
   background: #fff;
   border-radius: 14px;
   overflow: hidden;
@@ -19,8 +29,9 @@
 .messaging-main {
   display: grid;
   grid-template-columns: 360px 1fr;
+  flex: 1;
+  min-height: 0;
   height: 100%;
-  min-height: 600px;
 }
 
 /* ── Chat List Side ────────────────────────────────── */
@@ -29,6 +40,8 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
   background: #fff;
   width: 360px;
   flex-shrink: 0;
@@ -40,6 +53,7 @@
 .messaging-list-header {
   padding: 24px 20px 16px;
   background: #fff;
+  flex-shrink: 0;
 }
 
 .messaging-list-header__top {
@@ -135,7 +149,27 @@
   margin: 0;
   padding: 8px;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.messaging-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.messaging-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.messaging-list::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 10px;
+}
+
+.messaging-list::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
 }
 
 .messaging-list-empty {
@@ -277,6 +311,47 @@
   color: #fff;
   background: linear-gradient(135deg, #2c7a3e, #38a169);
   box-shadow: 0 4px 10px rgba(44, 122, 62, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.messaging-avatar__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.messaging-avatar__fallback {
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+}
+
+.messaging-item__avatar.has-photo,
+.messaging-detail__sender-avatar.has-photo,
+.messaging-message__avatar.has-photo,
+.messaging-contact-dropdown__avatar.has-photo {
+  background: #e5e7eb;
+}
+
+.messaging-item__avatar.has-photo .messaging-avatar__fallback,
+.messaging-detail__sender-avatar.has-photo .messaging-avatar__fallback,
+.messaging-message__avatar.has-photo .messaging-avatar__fallback,
+.messaging-contact-dropdown__avatar.has-photo .messaging-avatar__fallback {
+  display: none;
+}
+
+.messaging-detail__sender-avatar {
+  position: relative;
+  overflow: hidden;
+}
+
+.messaging-message__avatar {
+  position: relative;
+  overflow: hidden;
 }
 
 .messaging-item__content {
@@ -296,8 +371,8 @@
 
 .messaging-item__sender {
   font-size: 15px;
-  font-weight: 700;
-  color: #111827;
+  font-weight: 500;
+  color: #6b7280;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -311,20 +386,34 @@
 
 .messaging-item__preview {
   font-size: 13.5px;
-  color: #6b7280;
+  color: #9ca3af;
+  font-weight: 400;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
 }
 
+.messaging-item:not(.is-unread) .messaging-item__avatar {
+  opacity: 0.78;
+  background: linear-gradient(135deg, #9ca3af, #cbd5e1);
+  box-shadow: none;
+}
+
 .is-unread .messaging-item__sender {
   color: #111827;
+  font-weight: 700;
 }
 
 .is-unread .messaging-item__preview {
-  color: #111827;
-  font-weight: 700;
+  color: #374151;
+  font-weight: 600;
+}
+
+.is-unread .messaging-item__avatar {
+  opacity: 1;
+  background: linear-gradient(135deg, #2c7a3e, #38a169);
+  box-shadow: 0 4px 10px rgba(44, 122, 62, 0.2);
 }
 
 .is-unread::after {
@@ -333,11 +422,12 @@
   right: 16px;
   top: 50%;
   transform: translateY(-50%);
-  width: 12px;
-  height: 12px;
-  background: #2c7a3e;
+  width: 10px;
+  height: 10px;
+  background: #e53e3e;
   border-radius: 50%;
-  box-shadow: 0 0 0 3px #fff;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
   pointer-events: none;
 }
 
@@ -347,17 +437,19 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   position: relative;
   overflow: hidden;
 }
 
 .messaging-detail {
-  display: flex;
+  display: none;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   height: 100%;
   width: 100%;
   overflow: hidden;
-  display: none;
 }
 
 .messaging-detail.is-visible {
@@ -416,6 +508,7 @@
   align-items: center;
   gap: 12px;
   min-height: 72px;
+  flex-shrink: 0;
 }
 
 .messaging-detail__back-btn {
@@ -472,6 +565,8 @@
   font-weight: 700;
   font-size: 15px;
   box-shadow: 0 4px 10px rgba(44, 122, 62, 0.15);
+  position: relative;
+  overflow: hidden;
 }
 
 .messaging-detail__sender-name {
@@ -522,13 +617,16 @@
 /* ── Conversation Messages ─────────────────────────── */
 .messaging-conversation {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   background: #fff;
   scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Custom scrollbar for conversation */
@@ -576,6 +674,8 @@
   font-weight: 700;
   color: #fff;
   background: #9ca3af; /* Default gray for farmers */
+  position: relative;
+  overflow: hidden;
 }
 
 .messaging-message--sent .messaging-message__avatar {
@@ -917,6 +1017,9 @@
   font-size: 11px;
   font-weight: 700;
   color: #4b5563;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
 }
 
 .messaging-contact-dropdown__name {

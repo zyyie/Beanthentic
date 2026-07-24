@@ -380,6 +380,24 @@ def analysis_payload_from_record(record: dict) -> dict:
             missing = json.loads(missing)
         except json.JSONDecodeError:
             missing = []
+    score_breakdown = record.get("score_breakdown")
+    if isinstance(score_breakdown, str):
+        try:
+            score_breakdown = json.loads(score_breakdown)
+        except json.JSONDecodeError:
+            score_breakdown = None
+    if not isinstance(score_breakdown, dict):
+        score_breakdown = None
+
+    ip_pillar_assessment = record.get("ip_pillar_assessment")
+    if isinstance(ip_pillar_assessment, str):
+        try:
+            ip_pillar_assessment = json.loads(ip_pillar_assessment)
+        except json.JSONDecodeError:
+            ip_pillar_assessment = None
+    if not isinstance(ip_pillar_assessment, dict):
+        ip_pillar_assessment = None
+
     payload = {
         "readiness_score": int(record.get("ai_score") or 0),
         "status": record.get("ai_status") or "Not Ready",
@@ -388,6 +406,8 @@ def analysis_payload_from_record(record: dict) -> dict:
         "analysis_method": record.get("analysis_method") or "rule_based",
         "text_length": int(record.get("text_length") or 0),
         "shap_analysis": record.get("shap_analysis") or "",
+        "score_breakdown": score_breakdown,
+        "ip_pillar_assessment": ip_pillar_assessment,
         "analysis_timestamp": record.get("analysis_timestamp"),
     }
     try:

@@ -11,7 +11,8 @@ from flask import jsonify, request
 from config.app_connection import app_db_params, clamp_limit, load_error_payload
 from config.app_data_load import load_with_app_bridge
 from config.app_http_bridge import app_http_get_json
-from config.mysql_app_bridge import connect_app_mysql
+from config.mysql_app_bridge import connect_app_db
+import beanthentic_env
 from config.utils import is_authenticated
 
 
@@ -131,19 +132,25 @@ _TXN_SQL = """
 
 
 def _load_from_mysql(limit: int, farmer_id: int | None) -> list[dict]:
-    params = app_db_params()
-    if not params:
-        raise RuntimeError("app_db_host not set in settings.json")
-    conn = connect_app_mysql(params)
+    # Check if we're using PostgreSQL/Supabase first
+    if beanthentic_env.is_postgresql():
+        conn = connect_app_db({})
+    else:
+        params = app_db_params()
+        if not params:
+            raise RuntimeError("app_db_host not set in settings.json")
+        conn = connect_app_db(params)
+
     try:
-        sql = _TXN_SQL
+        # PostgreSQL does not allow SELECT aliases inside ORDER BY COALESCE(...).
+        sql = f"SELECT * FROM ({_TXN_SQL.strip()}) AS txn WHERE 1=1"
         qparams: list = []
         if farmer_id and farmer_id > 0:
-            sql += " AND ct.farmer_id = %s"
+            sql += " AND txn.farmer_id = %s"
             qparams.append(int(farmer_id))
         sql += """
-            ORDER BY COALESCE(approved_at, ct.transaction_date) DESC,
-                     ct.customer_transaction_id DESC
+            ORDER BY COALESCE(txn.approved_at, txn.transaction_date) DESC,
+                     txn.customer_transaction_id DESC
             LIMIT %s
         """
         qparams.append(int(limit))
@@ -170,6 +177,13 @@ def load_admin_transactions(limit: int = 500, farmer_id: int | None = None) -> t
     limit = clamp_limit(limit or 500)
     if farmer_id is not None and farmer_id < 1:
         farmer_id = None
+
+    if beanthentic_env.uses_supabase_anon():
+        from config.supabase_transactions_load import fetch_transactions_via_rest
+
+        rows = fetch_transactions_via_rest(limit=limit, farmer_id=farmer_id)
+        return _rows_to_items(rows), "supabase_rest"
+
     return load_with_app_bridge(
         module_label="transactions",
         mysql_loader=lambda: _load_from_mysql(limit, farmer_id),

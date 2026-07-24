@@ -15,7 +15,13 @@ from flask import jsonify, request, session
 import pymysql
 from pymysql.cursors import DictCursor
 
-from config.app_connection import app_db_params, app_server_base, friendly_load_failure, load_error_payload
+from config.app_connection import (
+    app_db_params,
+    app_server_base,
+    friendly_load_failure,
+    is_app_db_configured,
+    load_error_payload,
+)
 from config.phone_utils import normalize_phone as _normalize_phone, phone_variants
 from config.messaging_load import (
     MessagesLoadError,
@@ -27,7 +33,8 @@ from config.messaging_load import (
     send_shared_message,
 )
 from config.models import Message, db
-from config.mysql_app_bridge import connect_app_mysql
+from config.mysql_app_bridge import connect_app_db
+import beanthentic_env
 from config.security import safe_error_message
 from pymysql.err import OperationalError
 from config.validation import (
@@ -53,7 +60,14 @@ def _shared_db_params() -> dict | None:
     return app_db_params()
 
 
+def _use_shared_messages() -> bool:
+    """True when messages live in shared_messages (Supabase / app DB), not admin SQLAlchemy only."""
+    return is_app_db_configured() or beanthentic_env.uses_supabase_anon()
+
+
 def _shared_connect():
+    if _use_shared_messages():
+        return connect_messaging_mysql()
     params = app_db_params()
     if not params:
         return None
@@ -120,6 +134,35 @@ def _shared_identity():
 
 def register_messaging_routes(app):
     """Register messaging API routes with the Flask app."""
+    
+    @app.route("/api/farmer-send-message", methods=["POST"])
+    def api_farmer_send_message():
+        """Allow farmers to send messages directly to admin via web.py."""
+        try:
+            data = request.get_json(silent=True) or request.form or {}
+            sender_phone = str(data.get("sender_phone") or "")
+            sender_name = str(data.get("sender_name") or sender_phone)
+            subject = str(data.get("subject") or "Message from Farmer")
+            body = str(data.get("body") or "")
+            category = str(data.get("category") or "general")[:30]
+            farmer_id = data.get("farmer_id")
+            farmer_id = int(farmer_id) if farmer_id and str(farmer_id).isdigit() else None
+            
+            saved = send_shared_message(
+                role="farmer",
+                phone=sender_phone,
+                sender_name=sender_name,
+                recipient_role="admin",
+                recipient_phone="",
+                recipient_name="Admin",
+                subject=subject,
+                body=body,
+                category=category,
+                farmer_id=farmer_id,
+            )
+            return jsonify({"success": True, "message": saved}), 201
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
     @app.route("/api/messages", methods=["GET"])
     def api_messages_list():
@@ -127,8 +170,8 @@ def register_messaging_routes(app):
         if not (is_authenticated() or is_farmer_authenticated()):
             return jsonify({"error": "Unauthorized"}), 401
 
-        # Shared XAMPP DB (same settings.json as farmers / GI) — MySQL direct or HTTP via app_server_base
-        if app_db_params() or app_server_base():
+        # Shared DB (Supabase shared_messages) — same store as Beanthentic-App
+        if _use_shared_messages():
             role, phone, _name = _shared_identity()
             folder = request.args.get("folder", "inbox")  # inbox | sent | starred | archived | all
             search = (request.args.get("search", "") or "").strip().lower()
@@ -251,7 +294,7 @@ def register_messaging_routes(app):
         if not variants:
             return jsonify({"error": "phone is required."}), 400
 
-        if app_db_params() or app_server_base():
+        if _use_shared_messages():
             try:
                 items = load_shared_messages_thread(farmer_phone)
                 return jsonify({"items": items, "ok": True})
@@ -294,7 +337,7 @@ def register_messaging_routes(app):
         if not (is_authenticated() or is_farmer_authenticated()):
             return jsonify({"error": "Unauthorized"}), 401
 
-        if _shared_db_params():
+        if _use_shared_messages():
             role, phone, name_hint = _shared_identity()
             users = load_users()
             sender = users.get(get_current_user_phone() or get_current_farmer_phone() or "", {})
@@ -409,7 +452,7 @@ def register_messaging_routes(app):
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
-        if _shared_db_params():
+        if _use_shared_messages():
             role, phone, _name = _shared_identity()
             conn = None
             try:
@@ -479,7 +522,7 @@ def register_messaging_routes(app):
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
-        if _shared_db_params():
+        if _use_shared_messages():
             role, phone, _name = _shared_identity()
             conn = None
             try:
@@ -527,7 +570,7 @@ def register_messaging_routes(app):
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
-        if _shared_db_params():
+        if _use_shared_messages():
             role, phone, _name = _shared_identity()
             conn = None
             try:
@@ -571,7 +614,7 @@ def register_messaging_routes(app):
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
-        if _shared_db_params():
+        if _use_shared_messages():
             role, phone, _name = _shared_identity()
             conn = None
             try:
@@ -619,7 +662,7 @@ def register_messaging_routes(app):
         if not variants:
             return jsonify({"error": "phone is required."}), 400
 
-        if _shared_db_params():
+        if _use_shared_messages():
             role, my_phone, _name = _shared_identity()
             conn = None
             try:
@@ -667,7 +710,7 @@ def register_messaging_routes(app):
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
-        if _shared_db_params():
+        if _use_shared_messages():
             role, phone, _name = _shared_identity()
             conn = None
             try:
@@ -719,7 +762,7 @@ def register_messaging_routes(app):
         if not is_authenticated():
             return jsonify({"error": "Unauthorized"}), 401
 
-        if _shared_db_params():
+        if _use_shared_messages():
             role, phone, _name = _shared_identity()
             conn = None
             try:

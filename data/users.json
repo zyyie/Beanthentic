@@ -13,9 +13,7 @@
   },
   "9493380766": {
     "full_name": "Eliaza Mae Malibiran",
-    "password_hash": "scrypt:32768:8:1$0ajTYNRA6eLy39Ym$95f87d40c3770a29a1dbd3b1937862fa6932fa8443fe0b3404705ce3cf4fbbd56147ebc3b9de3da6485b13516af2c5ad3533ba6ac527cac00312a559656bde31",
-    "first_name": "Eliaza",
-    "last_name": "Mae Malibiran"
+    "password_hash": "scrypt:32768:8:1$0ajTYNRA6eLy39Ym$95f87d40c3770a29a1dbd3b1937862fa6932fa8443fe0b3404705ce3cf4fbbd56147ebc3b9de3da6485b13516af2c5ad3533ba6ac527cac00312a559656bde31"
   },
   "9920993078": {
     "full_name": "Nyco Alec Balaogan",
@@ -27,7 +25,7 @@
   },
   "9930152544": {
     "full_name": "Eliaza Mae Malibiran",
-    "password_hash": "scrypt:32768:8:1$j1xKDmX5IM9xX64T$b27c999b4ee8d077811d549387c4e2971601f8b512f0df9fb45a310d8b9c9362e935581a6bf873457908b39eba816c9aee2fc8f23bb727a48611220a14a3f7f5"
+    "password_hash": "scrypt:32768:8:1$xrZOzR3Mm0QfJXKB$933284a4467f59f35bc1a0a724f27f8e4c0b7ed550aae355fde95075d1bdecbeddf710427e401be51e7b3318dccfe93366bd98d12d90d5a210b7302fba532f6c"
   },
   "9704953895": {
     "full_name": "Anne Hathaway",
@@ -36,5 +34,29 @@
   "9292929292": {
     "full_name": "Meryl Streep",
     "password_hash": "scrypt:32768:8:1$YTWAwDZy1fBTvLg5$a1418bdc5581984f894230da526cc2dee3829a35c49eb1269840aa06130c8a1003c8f29dd88968d244417aabddca6b021d64fc4a247359998f9afec2039c67fd"
+  },
+  "9911991199": {
+    "full_name": "Tung Tung Sahur",
+    "password_hash": "scrypt:32768:8:1$AdR4ZDcebbG6vnR5$604672084e8ecb591813af0e25c5112f1e2994f83f8127e780a4921996163df9aee5bcbc15c751abb124310ae506ff5dc8d2459f4d548c9a7024aa9e732a3599"
+  },
+  "9930992078": {
+    "full_name": "Tung Tung Sahur",
+    "password_hash": "scrypt:32768:8:1$zx8MxjrWdKAOp896$066c376481e230dd84d87a98cd5699188c33d110c3f78b94c26a937aa3b862c5e92774ce93eb6908878934a0488cdf02664b892e1a31d73fe8b20b465a874b9c"
+  },
+  "9682529459": {
+    "full_name": "Ericka Maynete",
+    "password_hash": "scrypt:32768:8:1$WBNnEItl627zeZUn$492a74c9e9601b7eb1eb258bdbb0b39afde920445a8a999586a92377259c7e936f88616d082b0ffe792636f5bd295cbe2cbb2f6c177a238cfda8668afa292fc7"
+  },
+  "9900229922": {
+    "full_name": "Boo Seungkwan",
+    "password_hash": "scrypt:32768:8:1$rXkGVYQlo2jAOsLI$0a104645a10257e045f3b67cf0950812cf9784ca672cfd64cb5edad9b711364d60bbd905ca3e3066ab1cef38ac33be8a21759a85e71861f2d7fb4c68adf67ba4"
+  },
+  "9214365879": {
+    "full_name": "Iron Man",
+    "password_hash": "scrypt:32768:8:1$UgXza0gDA5bO5Ost$5de4e2fcced4fec2b09f541285140cbde9974f81b19e39e235e51018eed826a2f89cd5ff6b6d540eab2f93e6d6b61cb35c119dfa1b89e1b602d9a41887e4d7d9"
+  },
+  "9234567819": {
+    "full_name": "Ericka Austria",
+    "password_hash": "scrypt:32768:8:1$0VfKExbDgXDcuBtw$27e679eab58254dbc08e42b81d96e62121472d5dee589bbd6863880bbf05f705e1b233fdf1debefa3fed0fb91a2d1d6155a9fde9ceaf23aac304994cde29ce8a"
   }
 }

@@ -87,11 +87,41 @@ def main() -> int:
     print(f"Admin web URL: http://{admin_lan or '127.0.0.1'}:5000")
     print(f"Diagnostic:    http://{admin_lan or '127.0.0.1'}:5000/api/connection-status")
 
+    sys.path.insert(0, str(ROOT))
+    import beanthentic_env
+    from config.supabase_client import verify_connection, is_configured
+
+    print(f"Supabase cfg:  http://{admin_lan or '127.0.0.1'}:5000/api/supabase-config")
+
+    if is_configured():
+        ok, err = verify_connection()
+        print(f"\n--- Supabase (primary) ---")
+        print(f"  URL: {beanthentic_env.supabase_url()}")
+        print(f"  REST: {'OK' if ok else f'FAIL — {err}'}")
+        if ok:
+            print("\n  Admin, Beanthentic-App, and Client Web should all use:")
+            print("    GET /api/supabase-config  (from admin :5000 or app :8080)")
+            print("  Set BEANTHENTIC_ADMIN_PUBLIC_BASE in .env so Client Web finds admin APIs.")
+
     conn = read_connection_settings()
     print("\n--- settings.json connection ---")
     print(json.dumps(conn, indent=2))
 
     app_base = app_server_base()
+    if beanthentic_env.uses_supabase_anon() and is_configured():
+        print("\n--- App server (:8080) optional with Supabase ---")
+        if app_base:
+            print(f"  app_server_base: {app_base} (bridges only — DB uses Supabase REST)")
+        else:
+            print("  app_server_base not set — OK when mobile/client read /api/supabase-config directly.")
+        if not verify_connection()[0]:
+            print("\n  WARN: Supabase REST probe failed — unpause project or check internet/DNS.")
+            print("        Dashboard: https://supabase.com/dashboard/project/jvxvxdyrfsgtesazqjqo")
+        print("\n" + "=" * 60)
+        print("Supabase mode configured. REST must be OK for all apps to sync.")
+        print("=" * 60)
+        return 0 if verify_connection()[0] else 1
+
     if not app_base:
         print("\nFAIL: app_server_base not set.")
         print("Fix: http://<XAMPP-PC-IP>:5000/connection-settings")

@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from config.app_connection import app_db_params
-from config.mysql_app_bridge import connect_app_mysql
+from config.mysql_app_bridge import connect_app_db
+import beanthentic_env
 
 
 def _count(cur, sql: str) -> int:
@@ -30,7 +31,7 @@ def _count(cur, sql: str) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Clear GI Updates in app MySQL")
+    parser = argparse.ArgumentParser(description="Clear GI Updates in app MySQL/PostgreSQL")
     parser.add_argument(
         "--all",
         action="store_true",
@@ -43,23 +44,21 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    params = app_db_params()
-    if not params:
-        print("ERROR: settings.json has no connection.app_db_host")
-        print(f"Edit: {ROOT / 'settings.json'}")
-        raise SystemExit(1)
-
-    host = params.get("host", "?")
-    db = params.get("database", "?")
-    print(f"Connecting to MySQL {host} / {db} ...")
-
-    try:
-        conn = connect_app_mysql(params)
-    except Exception as exc:
-        print(f"ERROR: Cannot connect to MySQL at {host}")
-        print(f"  {exc}")
-        print("Check: XAMPP/MySQL running on that PC, same Wi-Fi, settings.json app_db_host")
-        raise SystemExit(1) from exc
+    if beanthentic_env.is_postgresql():
+        conn = connect_app_db({})
+        host = "Supabase/PostgreSQL"
+        db = beanthentic_env.get_db_config().get("dbname", "?")
+        print(f"Connecting to PostgreSQL {host} / {db} ...")
+    else:
+        params = app_db_params()
+        if not params:
+            print("ERROR: settings.json has no connection.app_db_host")
+            print(f"Edit: {ROOT / 'settings.json'}")
+            raise SystemExit(1)
+        conn = connect_app_db(params)
+        host = params.get("host", "?")
+        db = params.get("database", "?")
+        print(f"Connecting to MySQL {host} / {db} ...")
 
     scope = "ALL gi_updates rows" if args.all else "admin_submission + admin_progress rows"
     if not args.yes:

@@ -73,7 +73,17 @@ class GIAnalyzer:
                 "Traditional Knowledge", "Processing Method", "Packaging", "Governing Board",
                 "Third-party Observation", "Foreign Protection", "Prior Use", "Distinctive Quality",
                 "Flavor Profile", "Aroma", "Roasting Process", "Farming Practices"
-            ]
+            ],
+            "term_weights": {
+                "Manual of Specifications": 1.5,
+                "Causal Link": 2.0,
+                "Geographical Indication": 1.5,
+                "Lipa City": 1.2,
+                "Batangas": 1.2,
+                "Barako": 1.2,
+                "Quality Control": 1.3,
+                "Production Process": 1.3
+            }
         }
 
         # Task-specific checklists based on IPOPHL requirements (Total 13 documents)
@@ -149,54 +159,213 @@ class GIAnalyzer:
 
         # Synonyms help match real IPOPHL uploads (authorization letters, receipts, etc.)
         self._term_synonyms = {
-            "manual of specifications": ["manual of specification", "mop", "specifications manual"],
-            "causal link": ["causal relationship", "link between", "geographical area and"],
-            "production process": ["production method", "processing method", "cultivation"],
-            "quality control": ["quality standards", "quality assurance", "qc "],
-            "labeling rules": ["labelling", "label requirements", "packaging rules"],
-            "applicant entity": ["applicant", "organization", "association", "cooperative"],
-            "producers organization": ["producers", "farmers association", "growers", "membership"],
-            "legal standing": ["authorization", "authorized", "hereby authorize", "legal capacity", "representative"],
-            "membership list": ["members", "member list", "roster", "directory"],
-            "stakeholder consultations": ["stakeholder", "consultation", "public hearing"],
-            "meeting minutes": ["minutes of meeting", "minutes of the", "meeting held"],
-            "consensus": ["agreed", "unanimous", "resolution"],
-            "governance board": ["board of directors", "governing board", "board resolution"],
-            "technical validation": ["technical certification", "validated by", "certified by"],
-            "government certification": ["department of agriculture", "bureau of", "da ", "certified"],
-            "independent verification": ["third party", "independent", "verified by"],
-            "application form": ["application for", "duly accomplished", "application to register"],
-            "applicant name": ["name of applicant", "applicant’s name", "applicant's name"],
-            "domicile": ["address", "residence", "located at", "domiciled"],
-            "industrial establishment": ["establishment", "place of business", "office at"],
-            "file application": ["filed application", "filing", "submit application", "submitted"],
-            "bureau of trademarks": ["ipophl", "intellectual property", "bureau of trademark"],
-            "application package": ["application documents", "complete application", "submission package"],
-            "cover letter": ["letter of transmittal", "transmittal letter"],
-            "official receipt": ["official receipt", "or number", "receipt no"],
-            "application fee": ["filing fee", "payment of fee", "registration fee"],
-            "proof of payment": ["proof of payment", "paid", "payment confirmation", "bank transfer"],
-            "formality examination": ["formality", "formal examination"],
-            "substantive examination": ["substantive", "substance examination"],
-            "ip code compliance": ["intellectual property code", "ip code", "republic act"],
-            "deficiency notice response": ["deficiency", "response to notice", "comply with"],
-            "timeframe compliance": ["within the period", "deadline", "days from"],
-            "corrective actions": ["corrective action", "remedy", "amended"],
-            "publication for opposition": ["publication", "opposition period", "published for opposition"],
-            "public notice period": ["public notice", "notice period"],
-            "opposition period": ["opposition", "third-party"],
-            "gi registration certificate": ["certificate of registration", "registration certificate", "gi certificate"],
-            "official notice of registration": ["notice of registration", "registered geographical indication"],
-            "registration number": ["reg. no", "registration no", "certificate no"],
-            "maintain quality standards": ["quality standards", "maintain quality", "compliance with standards"],
-            "regular compliance audits": ["audit", "compliance audit", "inspection"],
-            "monitoring records": ["monitoring", "records of", "documentation of"],
-            "lipa barako coffee": ["barako", "liberica", "lipa coffee", "batangas coffee"],
-            "flavor profile": ["flavor", "taste profile", "cup profile", "aroma"],
-            "geographical origin": ["geographical indication", "origin", "lipa city", "batangas", "grown in"],
-            "distinctive quality": ["distinctive", "unique quality", "reputation", "characteristic"],
-            "geographical indication": ["geographical indication", " gi ", "indication of origin"],
-            "gi": ["geographical indication", " gi registration", "protected gi"],
+            "manual of specifications": [
+                "manual of specification", "mop", "specifications manual", "code of practice",
+                "technical specifications", "product specifications", "standard operating procedures",
+                "sop", "spec manual"
+            ],
+            "causal link": [
+                "causal relationship", "link between", "geographical area and", "connection to origin",
+                "terroir", "link to locality", "specific to area", "origin-specific", "geographical link",
+                "quality due to", "characteristics from area"
+            ],
+            "production process": [
+                "production method", "processing method", "cultivation", "farming process",
+                "growing practices", "harvesting", "post-harvest", "processing steps",
+                "manufacturing process", "production flow"
+            ],
+            "quality control": [
+                "quality standards", "quality assurance", "qc ", "quality check",
+                "quality management", "qa", "quality inspection", "control measures",
+                "quality verification"
+            ],
+            "labeling rules": [
+                "labelling", "label requirements", "packaging rules", "labelling requirements",
+                "packaging specifications", "marking rules", "label guidelines"
+            ],
+            "applicant entity": [
+                "applicant", "organization", "association", "cooperative", "producers group",
+                "farmers cooperative", "growers association", "registered organization",
+                "legal entity", "applicant organization"
+            ],
+            "producers organization": [
+                "producers", "farmers association", "growers", "membership", "producer group",
+                "farmers group", "growers cooperative", "agricultural association"
+            ],
+            "legal standing": [
+                "authorization", "authorized", "hereby authorize", "legal capacity", "representative",
+                "legal authority", "authorized signatory", "power of attorney", "poa",
+                "legal status", "registered entity"
+            ],
+            "membership list": [
+                "members", "member list", "roster", "directory", "list of members",
+                "membership roster", "member directory", "registered members"
+            ],
+            "stakeholder consultations": [
+                "stakeholder", "consultation", "public hearing", "community consultation",
+                "stakeholder meeting", "public consultation", "consultative meeting"
+            ],
+            "meeting minutes": [
+                "minutes of meeting", "minutes of the", "meeting held", "minutes",
+                "meeting notes", "meeting record", "minutes of proceedings"
+            ],
+            "consensus": [
+                "agreed", "unanimous", "resolution", "agreement", "unanimous agreement",
+                "collective decision", "general agreement"
+            ],
+            "governance board": [
+                "board of directors", "governing board", "board resolution", "board members",
+                "executive board", "advisory board", "board decisions"
+            ],
+            "technical validation": [
+                "technical certification", "validated by", "certified by", "technical verification",
+                "technical assessment", "certification", "validation", "technical approval"
+            ],
+            "government certification": [
+                "department of agriculture", "bureau of", "da ", "certified", "government issued",
+                "philippine government", "da certification", "bpi", "bureau of plant industry",
+                "local government", "lgu certification", "city agriculturist", "municipal agriculturist"
+            ],
+            "independent verification": [
+                "third party", "independent", "verified by", "third-party verification",
+                "independent audit", "external verification", "independent assessment"
+            ],
+            "application form": [
+                "application for", "duly accomplished", "application to register", "application",
+                "form", "registration form", "application document", "filled-out form"
+            ],
+            "applicant name": [
+                "name of applicant", "applicant's name", "applicant name", "entity name",
+                "organization name", "applicant details"
+            ],
+            "domicile": [
+                "address", "residence", "located at", "domiciled", "principal address",
+                "registered address", "business address", "office address"
+            ],
+            "industrial establishment": [
+                "establishment", "place of business", "office at", "business location",
+                "facility", "plant", "production site", "processing plant"
+            ],
+            "file application": [
+                "filed application", "filing", "submit application", "submitted",
+                "application filed", "submission of application", "file registration"
+            ],
+            "bureau of trademarks": [
+                "ipophl", "intellectual property", "bureau of trademark", "intellectual property office of the philippines",
+                "trademark office", "ip office", "philippine ip office"
+            ],
+            "application package": [
+                "application documents", "complete application", "submission package",
+                "application dossier", "registration documents", "submission documents"
+            ],
+            "cover letter": [
+                "letter of transmittal", "transmittal letter", "cover note", "letter of introduction",
+                "accompanying letter"
+            ],
+            "official receipt": [
+                "official receipt", "or number", "receipt no", "o.r.", "official receipt number",
+                "payment receipt", "receipt"
+            ],
+            "application fee": [
+                "filing fee", "payment of fee", "registration fee", "application fee",
+                "processing fee", "fee payment"
+            ],
+            "proof of payment": [
+                "proof of payment", "paid", "payment confirmation", "bank transfer",
+                "payment slip", "deposit slip", "transaction receipt"
+            ],
+            "formality examination": [
+                "formality", "formal examination", "formality check", "formal review",
+                "examination of formalities"
+            ],
+            "substantive examination": [
+                "substantive", "substance examination", "substantive review", "merits examination"
+            ],
+            "ip code compliance": [
+                "intellectual property code", "ip code", "republic act", "ra 8293",
+                "philippine ip code", "compliance with ip code"
+            ],
+            "deficiency notice response": [
+                "deficiency", "response to notice", "comply with", "deficiency response",
+                "response to deficiency", "correct deficiency", "remedy deficiency"
+            ],
+            "timeframe compliance": [
+                "within the period", "deadline", "days from", "compliance with deadline",
+                "on time", "timely submission", "within timeframe"
+            ],
+            "corrective actions": [
+                "corrective action", "remedy", "amended", "correction", "corrective measures",
+                "remedial actions", "amendment"
+            ],
+            "publication for opposition": [
+                "publication", "opposition period", "published for opposition", "published",
+                "publication in gazette", "ipophl gazette", "public notice"
+            ],
+            "public notice period": [
+                "public notice", "notice period", "notice", "publication period"
+            ],
+            "opposition period": [
+                "opposition", "third-party", "opposition phase", "opposition filing"
+            ],
+            "gi registration certificate": [
+                "certificate of registration", "registration certificate", "gi certificate",
+                "certificate", "gi registration", "registered gi certificate"
+            ],
+            "official notice of registration": [
+                "notice of registration", "registered geographical indication", "registration notice",
+                "official notice", "registration approval"
+            ],
+            "registration number": [
+                "reg. no", "registration no", "certificate no", "registration number",
+                "certificate number", "reg number"
+            ],
+            "maintain quality standards": [
+                "quality standards", "maintain quality", "compliance with standards",
+                "adhere to standards", "quality maintenance", "uphold standards"
+            ],
+            "regular compliance audits": [
+                "audit", "compliance audit", "inspection", "regular audit", "compliance inspection",
+                "monitoring audit"
+            ],
+            "monitoring records": [
+                "monitoring", "records of", "documentation of", "monitoring logs",
+                "records", "documentation", "monitoring documents"
+            ],
+            "lipa barako coffee": [
+                "lipa coffee", "batangas coffee", "kapeng barako", "kape barako", "coffea liberica",
+                "lipa liberica", "batangas barako", "lipa barako", "barako coffee"
+            ],
+            "product photos": [
+                "photograph", "photographs", "product image", "product photo", "images",
+                "photos", "product pictures"
+            ],
+            "roasting process": [
+                "roasting process", "roasted coffee", "coffee roasting", "roast profile",
+                "roasting method"
+            ],
+            "farming practices": [
+                "farming practices", "farming practice", "traditional farming", "agricultural practices",
+                "cultivation practices", "farm practices"
+            ],
+            "flavor profile": [
+                "flavor profile", "taste profile", "cup profile", "taste notes", "flavor notes",
+                "aroma profile", "sensory profile"
+            ],
+            "geographical origin": [
+                "geographical origin", "geographical indication", "grown in lipa", "origin",
+                "place of origin", "geographical source", "area of origin"
+            ],
+            "distinctive quality": [
+                "distinctive quality", "unique quality", "characteristic quality", "unique characteristics",
+                "distinct characteristics", "special quality"
+            ],
+            "geographical indication": [
+                "geographical indication", " gi ", "indication of origin", "gi product",
+                "geographically indicated"
+            ],
+            "gi": [
+                "geographical indication", " gi registration", "protected gi", "geographical indication registration"
+            ],
         }
 
         if ML_AVAILABLE:
@@ -274,7 +443,7 @@ class GIAnalyzer:
             logging.warning("Could not auto-train document model: %s", e)
 
     def _term_matches(self, text_lower: str, term: str) -> bool:
-        """Match mandatory/optional GI terms with phrase and synonym support."""
+        """Match mandatory/optional GI terms with phrase, synonym, or multi-word co-occurrence."""
         term_lower = term.lower().strip()
         if not term_lower:
             return False
@@ -282,6 +451,11 @@ class GIAnalyzer:
             return True
         if " " not in term_lower:
             if re.search(r"\b" + re.escape(term_lower) + r"\b", text_lower):
+                return True
+        else:
+            # All significant words present (e.g. "geographical" + "origin") without loose single-word synonyms
+            parts = [p for p in re.split(r"\s+", term_lower) if len(p) > 3]
+            if len(parts) >= 2 and all(p in text_lower for p in parts):
                 return True
         for synonym in self._term_synonyms.get(term_lower, []):
             syn = synonym.lower().strip()
@@ -293,23 +467,85 @@ class GIAnalyzer:
                 return True
         return False
 
+    def _compute_readiness_score(
+        self,
+        detected_mandatory: List[str],
+        missing_mandatory: List[str],
+        detected_optional: List[str],
+        checklist: Dict,
+    ) -> int:
+        """
+        IPOPHL task score from explicit keyword coverage with term weighting:
+        up to 70% from mandatory terms, up to 30% from optional terms.
+        Terms with higher weights contribute more to the score.
+        """
+        mandatory_terms = checklist["mandatory_terms"]
+        term_weights = checklist.get("term_weights", {})
+        
+        total_mandatory_weight = 0.0
+        detected_mandatory_weight = 0.0
+        for term in mandatory_terms:
+            weight = term_weights.get(term, 1.0)
+            total_mandatory_weight += weight
+            if term in detected_mandatory:
+                detected_mandatory_weight += weight
+        
+        mandatory_total = max(1.0, total_mandatory_weight)
+        mandatory_score = (detected_mandatory_weight / mandatory_total) * 70
+        
+        optional_terms = checklist.get("optional_terms") or []
+        optional_total = max(1, len(optional_terms)) if optional_terms else 1
+        optional_score = (
+            (len(detected_optional) / optional_total) * 30 if optional_terms else 0
+        )
+        
+        return min(100, round(mandatory_score + optional_score))
+
+    def _resolve_task_id_from_text(self, text: str, task_id: str | None) -> str | None:
+        """Prefer upload-zone declared in document body (synthetic / test uploads)."""
+        if not text:
+            return task_id
+        match = re.search(r"upload\s*zone:\s*(phase[1-5]-[\w-]+)", text, re.I)
+        if not match:
+            return task_id
+        candidate = match.group(1).lower()
+        if candidate in self.task_checklists:
+            if task_id and task_id != candidate:
+                logging.info(
+                    "Resolved task_id from document content: %s (upload slot was %s)",
+                    candidate,
+                    task_id,
+                )
+            return candidate
+        return task_id
+
     def ml_status(self) -> Dict:
         """Return whether trained models are available."""
-        training_path = self.ml_dir / "training_results.json"
-        meta = {}
-        if training_path.exists():
+        farmer_meta = {}
+        document_meta = {}
+        farmer_path = self.ml_dir / "training_results.json"
+        document_path = self.ml_dir / "document_training_results.json"
+        if farmer_path.exists():
             try:
-                with open(training_path, encoding="utf-8") as f:
-                    meta = json.load(f)
+                with open(farmer_path, encoding="utf-8") as f:
+                    farmer_meta = json.load(f)
             except Exception:
-                meta = {}
+                farmer_meta = {}
+        if document_path.exists():
+            try:
+                with open(document_path, encoding="utf-8") as f:
+                    document_meta = json.load(f)
+            except Exception:
+                document_meta = {}
         return {
             "farmer_model_loaded": self.farmer_model is not None,
             "document_model_loaded": self.document_model is not None,
             "document_analysis_default": (
                 "ml_hybrid" if self.document_model else "rule_based"
             ),
-            "training": meta,
+            "farmer_training": farmer_meta,
+            "document_training": document_meta,
+            "training": document_meta or farmer_meta,
         }
 
     def _get_explainer(self):
@@ -325,57 +561,124 @@ class GIAnalyzer:
             self.explainer = None
         return self.explainer
 
-    def _generate_shap_explanation(self, features: List, readiness_score: int, task_id: str = None) -> str:
-        """Generate an in-depth SHAP analysis in paragraph form with 3 paragraphs"""
+    def _generate_shap_explanation(
+        self,
+        features: List,
+        readiness_score: int,
+        task_id: str = None,
+        *,
+        rule_result: Dict = None,
+        rf_score: int = None,
+        checklist: Dict = None,
+    ) -> str:
+        """SHAP narrative plus keyword checklist audit and ML/rule irregularities."""
+        doc_type = task_id.replace("-", " ").title() if task_id else "Document"
+        status = self._compliance_status_label(readiness_score)
+        rule_score = int((rule_result or {}).get("readiness_score") or readiness_score)
+        detected = (rule_result or {}).get("detected_features") or []
+        missing = (rule_result or {}).get("missing_requirements") or []
+        mandatory = (checklist or {}).get("mandatory_terms") or []
+        optional = (checklist or {}).get("optional_terms") or []
+
+        p1 = (
+            f"<p>The keyword checklist for <strong>{doc_type}</strong> produced a readiness score of "
+            f"<strong>{readiness_score}%</strong> ({status}). "
+        )
+        if mandatory:
+            found_m = [t for t in mandatory if t in detected]
+            p1 += (
+                f"Mandatory terms matched: <strong>{len(found_m)} of {len(mandatory)}</strong>"
+                f" ({', '.join(found_m) if found_m else 'none'}).</p>"
+            )
+        else:
+            p1 += "</p>"
+
+        irregularities: List[str] = []
+        if rf_score is not None and abs(int(rf_score) - rule_score) >= 15:
+            if int(rf_score) > rule_score:
+                irregularities.append(
+                    f"The Random Forest model rated this document at <strong>{rf_score}%</strong>, "
+                    f"which is <strong>{int(rf_score) - rule_score} points higher</strong> than the "
+                    f"task keyword score ({rule_score}%). This suggests general GI vocabulary in the "
+                    f"text may be inflating the statistical model even though required terms for this "
+                    f"upload zone are still missing."
+                )
+            else:
+                irregularities.append(
+                    f"The Random Forest model rated this document at <strong>{rf_score}%</strong>, "
+                    f"which is <strong>{rule_score - int(rf_score)} points lower</strong> than the "
+                    f"keyword score ({rule_score}%). The model may under-weight domain terms that "
+                    f"are present but phrased differently from training samples."
+                )
+
         feature_names = self.document_feature_names or self.farmer_feature_names
         explainer = self._get_explainer()
-        if not explainer or not feature_names:
-            return "Detailed AI analysis is currently unavailable. Please ensure all ML dependencies are installed."
+        shap_pos: List[str] = []
+        shap_neg: List[str] = []
+        if explainer and feature_names:
+            try:
+                shap_values = explainer.shap_values(np.array([features]))
+                if isinstance(shap_values, list):
+                    instance_shap = shap_values[1][0]
+                else:
+                    instance_shap = (
+                        shap_values[0, :, 1] if len(shap_values.shape) == 3 else shap_values[0]
+                    )
+                feature_impact = []
+                for i, val in enumerate(instance_shap):
+                    if i < len(feature_names):
+                        name = feature_names[i]
+                        if name in ("text_length", "word_count"):
+                            continue
+                        feature_impact.append({"name": name, "impact": float(val)})
+                feature_impact.sort(key=lambda x: abs(x["impact"]), reverse=True)
+                shap_pos = [f["name"] for f in feature_impact if f["impact"] > 0.05][:3]
+                shap_neg = [f["name"] for f in feature_impact if f["impact"] < -0.05][:3]
+                for term in shap_pos:
+                    if term not in detected and term in mandatory + optional:
+                        irregularities.append(
+                            f"SHAP flagged <strong>{term}</strong> as supportive, but that term was "
+                            f"not matched by the strict task checklist for this upload zone."
+                        )
+            except Exception as exc:
+                logging.warning("SHAP value extraction failed: %s", exc)
 
-        try:
-            # Get SHAP values for the features
-            shap_values = explainer.shap_values(np.array([features]))
-            
-            # Link SHAP values with feature names
-            if isinstance(shap_values, list):
-                instance_shap = shap_values[1][0]
-            else:
-                instance_shap = shap_values[0, :, 1] if len(shap_values.shape) == 3 else shap_values[0]
+        p2 = "<p><strong>Gap analysis:</strong> "
+        if missing:
+            p2 += (
+                f"Missing mandatory requirements: <strong>{', '.join(missing)}</strong>. "
+            )
+        else:
+            p2 += "All mandatory keywords for this upload zone were found. "
+        if optional:
+            missing_opt = [t for t in optional if t not in detected]
+            if missing_opt:
+                p2 += (
+                    f"Optional terms not detected: {', '.join(missing_opt[:4])}"
+                    f"{'…' if len(missing_opt) > 4 else ''}. "
+                )
+        p2 += "</p>"
 
-            feature_impact = []
-            for i, val in enumerate(instance_shap):
-                if i < len(feature_names):
-                    feature_impact.append({'name': feature_names[i], 'impact': val})
+        if irregularities:
+            p3 = (
+                "<p><strong>ML irregularities:</strong> "
+                + " ".join(irregularities)
+                + "</p>"
+            )
+        elif shap_pos or shap_neg:
+            p3 = "<p><strong>Model feature influence:</strong> "
+            if shap_pos:
+                p3 += f"Terms that increased ML confidence: {', '.join(shap_pos)}. "
+            if shap_neg:
+                p3 += f"Terms that decreased ML confidence: {', '.join(shap_neg)}. "
+            p3 += "The final score follows the task keyword checklist, not the ML model alone.</p>"
+        else:
+            p3 = (
+                "<p>The keyword score and ML signals are aligned for this document. "
+                "Re-upload after adding any missing mandatory terms to improve readiness.</p>"
+            )
 
-            feature_impact.sort(key=lambda x: abs(x['impact']), reverse=True)
-            doc_type = task_id.replace('-', ' ').title() if task_id else "Document"
-            status = "highly compliant" if readiness_score >= 85 else "conditionally sufficient" if readiness_score >= 70 else "insufficient"
-            
-            # Paragraph 1: Executive Summary and Model Reasoning
-            positives = [f['name'] for f in feature_impact if f['impact'] > 0.05][:3]
-            p1 = f"<p>The AI model's comprehensive evaluation of the {doc_type} has determined a status of <strong>{status}</strong>, supported by a calculated readiness score of <strong>{readiness_score}%</strong>. "
-            if positives:
-                p1 += f"The high confidence in this assessment was primarily driven by the explicit presence of {', '.join(positives[:-1])} and {positives[-1]}, which are identified as key statistical anchors for valid Geographical Indication submissions. These elements provide the foundational data required by the system to validate the document's authenticity and technical depth.</p>"
-            else:
-                p1 += "The current assessment reflects a lack of critical terminology and structural requirements that the Random Forest model uses to verify compliance with IPOPHL standards.</p>"
-
-            # Paragraph 2: Technical Gap Analysis
-            negatives = [f['name'] for f in feature_impact if f['impact'] < -0.05][:4]
-            p2 = "<p>A deeper technical analysis of the document's content structure reveals significant variances in expected metadata and descriptive terminology. "
-            if negatives:
-                p2 += f"Specifically, the absence or weak representation of <strong>{', '.join(negatives[:-1])} and {negatives[-1]}</strong> creates a negative impact on the SHAP interpretation values. In the context of GI registration, these missing components are vital for establishing a legally defensible link between the product's quality and its Batangas origin, and their omission suggests that the document may not yet meet the formality examination criteria.</p>"
-            else:
-                p2 += "While no major technical gaps were explicitly flagged, the overall density of domain-specific information could be further optimized to ensure a smoother transition through the substantive examination phase of the registration process.</p>"
-
-            # Paragraph 3: Strategic Recommendations
-            p3 = "<p>To bridge these identified gaps, it is highly recommended to perform a targeted revision focusing on the explicit documentation of technical specifications and the causal relationship between the Lipa Barako flavor profile and the local soil composition. "
-            p3 += "Providing more exhaustive details on the {0} and quality control measures will not only improve the AI readiness score but also significantly reduce the likelihood of receiving deficiency notices from IPOPHL. Once these improvements are integrated, the document should be re-analyzed to verify that all mandatory parameters have been successfully satisfied.</p>".format("production process" if "process" not in [n['name'].lower() for n in feature_impact[:5]] else "labeling rules")
-
-            return p1 + p2 + p3
-
-        except Exception as e:
-            logging.error(f"SHAP explanation generation failed: {e}")
-            return "<p>An error occurred while generating the detailed AI analysis. The basic score and feature detection are still available.</p>"
+        return p1 + p2 + p3
 
     @staticmethod
     def _compliance_status_label(score: int) -> str:
@@ -627,6 +930,7 @@ class GIAnalyzer:
         try:
             # Extract text
             text = self.extract_text_from_file(file_path)
+            task_id = self._resolve_task_id_from_text(text, task_id)
 
             # Determine which checklist to use
             checklist = self.gi_checklist
@@ -637,13 +941,19 @@ class GIAnalyzer:
                 }
                 logging.info(f"Using task-specific checklist for: {task_id}")
 
-            rule_result = self._rule_based_analysis(text, checklist)
+            rule_result = self._rule_based_analysis(text, checklist, task_id=task_id)
             if self.document_model is not None:
                 ml_result = self._ml_analysis(text, checklist, task_id)
-                return self._merge_analysis_results(
-                    rule_result, ml_result, text=text, task_id=task_id
+                merged = self._merge_analysis_results(
+                    rule_result, ml_result, text=text, task_id=task_id, checklist=checklist
                 )
-            return self.normalize_analysis_payload(rule_result)
+                if task_id:
+                    merged["task_id"] = task_id
+                return merged
+            payload = self.normalize_analysis_payload(rule_result)
+            if task_id:
+                payload["task_id"] = task_id
+            return payload
 
         except Exception as e:
             logging.error(f"Analysis error: {e}")
@@ -665,10 +975,19 @@ class GIAnalyzer:
                 "missing_requirements": checklist["mandatory_terms"]
             }
 
-    def _rule_based_analysis(self, text: str, checklist: Dict = None) -> Dict:
-        """Rule-based analysis using keyword matching"""
+    def _rule_based_analysis(self, text: str, checklist: Dict = None, task_id: str | None = None) -> Dict:
+        """Rule-based analysis using keyword matching + optional section rubric."""
         if checklist is None:
             checklist = self.gi_checklist
+
+        try:
+            from machinelearning.gi_rubrics import (
+                blend_scores,
+                build_term_breakdown,
+                evaluate_gi_rubric,
+            )
+        except ImportError:
+            from gi_rubrics import blend_scores, build_term_breakdown, evaluate_gi_rubric
             
         text_lower = text.lower()
 
@@ -688,16 +1007,43 @@ class GIAnalyzer:
             if self._term_matches(text_lower, term):
                 detected_optional.append(term)
 
-        # Calculate readiness score
-        mandatory_score = (len(detected_mandatory) / max(1, len(checklist["mandatory_terms"]))) * 70
-        optional_score = (len(detected_optional) / max(1, len(checklist["optional_terms"]))) * 30
-        readiness_score = min(100, round(mandatory_score + optional_score))
+        keyword_score = self._compute_readiness_score(
+            detected_mandatory, missing_mandatory, detected_optional, checklist
+        )
+        rubric = evaluate_gi_rubric(text_lower, task_id, self._term_matches)
+        all_mandatory_found = len(missing_mandatory) == 0
+        readiness_score = blend_scores(
+            keyword_score, rubric, all_mandatory_found=all_mandatory_found
+        )
 
         # Determine status
         status = "Ready" if readiness_score >= 75 else "Not Ready"
 
+        term_breakdown = build_term_breakdown(checklist, detected_mandatory, detected_optional)
+        score_breakdown = {
+            "keyword_score": keyword_score,
+            "final_score": readiness_score,
+            "formula": "70% mandatory keywords + 30% optional keywords"
+            + (
+                "; all mandatory found → keyword score final"
+                if all_mandatory_found
+                else "; otherwise 65% keyword + 35% section rubric"
+            ),
+            "terms": term_breakdown,
+        }
+        if rubric:
+            score_breakdown["section_score"] = rubric["section_score"]
+            score_breakdown["sections"] = rubric["sections"]
+            score_breakdown["sections_found"] = rubric["sections_found"]
+            score_breakdown["sections_total"] = rubric["sections_total"]
+
         # Generate structured 2-3 paragraph analysis
-        p1 = f"<p>The rule-based analysis has identified <strong>{len(detected_mandatory)}</strong> out of <strong>{len(checklist['mandatory_terms'])}</strong> mandatory requirements within this document. This results in an initial readiness score of <strong>{readiness_score}%</strong>. "
+        p1 = f"<p>The rule-based analysis has identified <strong>{len(detected_mandatory)}</strong> out of <strong>{len(checklist['mandatory_terms'])}</strong> mandatory requirements within this document. The keyword checklist score is <strong>{keyword_score}%</strong>"
+        if rubric and not all_mandatory_found and readiness_score != keyword_score:
+            p1 += f"; after section rubric blending the readiness score is <strong>{readiness_score}%</strong>"
+        else:
+            p1 += f", yielding a readiness score of <strong>{readiness_score}%</strong>"
+        p1 += ". "
         if readiness_score >= 75:
             p1 += "The document demonstrates strong compliance with IPOPHL standards, showing a consistent use of technical terminology required for this specific registration stage.</p>"
         else:
@@ -708,8 +1054,42 @@ class GIAnalyzer:
             p2 += f"<strong>{', '.join(missing_mandatory[:3])}</strong> and other related identifiers. "
         p2 += "The absence of these specific requirements may lead to formality examination deficiencies, as they are necessary to validate the document's relevance to the Lipa Barako coffee registration process.</p>"
 
+        if rubric:
+            missing_sections = [s["label"] for s in rubric["sections"] if not s["found"]]
+            p2b = (
+                f"<p><strong>Section rubric ({rubric['sections_found']}/{rubric['sections_total']} sections):</strong> "
+            )
+            if missing_sections:
+                p2b += f"Missing structural sections: <strong>{', '.join(missing_sections[:4])}</strong>"
+                if len(missing_sections) > 4:
+                    p2b += "…"
+                p2b += ". Align content with IPOPHL Rule 10 / Code of Practice structure (as in approved GI filings).</p>"
+            else:
+                p2b += "All expected document sections for this upload zone were detected.</p>"
+        else:
+            p2b = ""
+
         p3 = "<p>To improve this document's standing, it is recommended to explicitly integrate the missing mandatory requirements identified above. "
         p3 += "Ensuring that all task-specific details are fully addressed will help achieve a higher compliance score and facilitate a smoother approval workflow with IPOPHL. Once updated, the document should be re-analyzed to verify readiness.</p>"
+
+        try:
+            from machinelearning.ip_pillars import evaluate_ip_pillars
+        except ImportError:
+            from ip_pillars import evaluate_ip_pillars
+
+        ip_pillar_assessment = evaluate_ip_pillars(
+            text_lower,
+            detected_features=detected_mandatory + detected_optional,
+            missing_requirements=missing_mandatory,
+            rubric_sections=(rubric or {}).get("sections"),
+            term_matches=self._term_matches,
+            task_id=task_id,
+            document_ready=(status == "Ready"),
+            source_text=text,
+            text_length=len(text),
+            mandatory_met=len(detected_mandatory),
+            mandatory_total=len(checklist["mandatory_terms"]),
+        )
 
         return {
             "success": True,
@@ -719,8 +1099,36 @@ class GIAnalyzer:
             "missing_requirements": missing_mandatory,
             "text_length": len(text),
             "analysis_method": "rule_based",
-            "shap_analysis": p1 + p2 + p3
+            "shap_analysis": p1 + p2 + p2b + p3,
+            "score_breakdown": score_breakdown,
+            "keyword_score": keyword_score,
+            "section_score": rubric["section_score"] if rubric else None,
+            "ip_pillar_assessment": ip_pillar_assessment,
         }
+
+    def _task_keyword_ml_score(self, text: str, checklist: Dict) -> int:
+        """ML display score mirrors task keyword coverage (same formula as rules)."""
+        text_lower = text.lower()
+        detected_m = [
+            t for t in checklist["mandatory_terms"] if self._term_matches(text_lower, t)
+        ]
+        missing_m = [t for t in checklist["mandatory_terms"] if t not in detected_m]
+        detected_o = [
+            t for t in checklist.get("optional_terms", []) if self._term_matches(text_lower, t)
+        ]
+        return self._compute_readiness_score(detected_m, missing_m, detected_o, checklist)
+
+    def _random_forest_document_score(self, features: List) -> int | None:
+        if self.document_model is None:
+            return None
+        try:
+            if hasattr(self.document_model, "predict_proba"):
+                probability = self.document_model.predict_proba([features])[0]
+                ready_idx = 1 if len(probability) > 1 else 0
+                return int(round(float(probability[ready_idx]) * 100))
+            return int(self.document_model.predict([features])[0] * 100)
+        except Exception:
+            return None
 
     def _merge_analysis_results(
         self,
@@ -729,32 +1137,34 @@ class GIAnalyzer:
         *,
         text: str = None,
         task_id: str = None,
+        checklist: Dict = None,
     ) -> Dict:
-        """Combine rule-based term detection with ML readiness probability."""
+        """Keyword checklist is the final score; RF score is advisory (SHAP / ml_score)."""
         rule_score = int(rule_result.get("readiness_score") or 0)
         ml_score = int(ml_result.get("readiness_score") or 0)
-        merged_score = min(100, round(0.45 * ml_score + 0.55 * rule_score))
-        detected = list(
-            dict.fromkeys(
-                (rule_result.get("detected_features") or [])
-                + (ml_result.get("detected_features") or [])
-            )
-        )
-        missing = [t for t in (rule_result.get("missing_requirements") or []) if t not in detected]
+        rf_score = ml_result.get("rf_score")
+        merged_score = rule_score
+        detected = list(rule_result.get("detected_features") or [])
+        missing = list(rule_result.get("missing_requirements") or [])
         status = "Ready" if merged_score >= 75 else "Not Ready"
 
         shap = ""
         if text and self.document_model is not None:
             try:
                 features = self._extract_features(text)
-                shap = self._generate_shap_explanation(features, merged_score, task_id)
+                shap = self._generate_shap_explanation(
+                    features,
+                    merged_score,
+                    task_id,
+                    rule_result=rule_result,
+                    rf_score=rf_score if rf_score is not None else ml_score,
+                    checklist=checklist,
+                )
             except Exception as exc:
                 logging.warning("Merged SHAP regeneration failed: %s", exc)
-                shap = ml_result.get("shap_analysis") or rule_result.get("shap_analysis") or ""
-                shap = self._align_shap_readiness_text(shap, merged_score)
+                shap = self._keyword_shap_fallback(rule_result, merged_score, task_id)
         else:
-            raw_shap = ml_result.get("shap_analysis") or rule_result.get("shap_analysis") or ""
-            shap = self._align_shap_readiness_text(raw_shap, merged_score) if raw_shap else ""
+            shap = self._keyword_shap_fallback(rule_result, merged_score, task_id)
 
         return self.normalize_analysis_payload({
             "success": True,
@@ -767,36 +1177,60 @@ class GIAnalyzer:
             "shap_analysis": shap,
             "ml_score": ml_score,
             "rule_score": rule_score,
+            "rf_score": rf_score,
+            "score_breakdown": rule_result.get("score_breakdown"),
+            "keyword_score": rule_result.get("keyword_score"),
+            "section_score": rule_result.get("section_score"),
+            "ip_pillar_assessment": rule_result.get("ip_pillar_assessment"),
         })
 
+    def _keyword_shap_fallback(self, rule_result: Dict, score: int, task_id: str | None) -> str:
+        doc_type = task_id.replace("-", " ").title() if task_id else "Document"
+        detected = rule_result.get("detected_features") or []
+        missing = rule_result.get("missing_requirements") or []
+        p1 = (
+            f"<p>Keyword analysis for <strong>{doc_type}</strong>: readiness "
+            f"<strong>{score}%</strong>. Matched: {', '.join(detected) if detected else 'none'}.</p>"
+        )
+        p2 = (
+            f"<p>Missing mandatory terms: {', '.join(missing) if missing else 'none'}.</p>"
+        )
+        return p1 + p2
+
     def _ml_analysis(self, text: str, checklist: Dict = None, task_id: str = None) -> Dict:
-        """ML-based analysis using Random Forest"""
+        """ML layer: task keyword score + Random Forest advisory probability."""
         if checklist is None:
             checklist = self.gi_checklist
-            
+
         try:
             features = self._extract_features(text)
-
-            if hasattr(self.document_model, "predict_proba"):
-                probability = self.document_model.predict_proba([features])[0]
-                ready_idx = 1 if len(probability) > 1 else 0
-                readiness_score = int(round(float(probability[ready_idx]) * 100))
-            else:
-                readiness_score = int(self.document_model.predict([features])[0] * 100)
-
-            status = "Ready" if readiness_score >= 75 else "Not Ready"
+            rf_score = self._random_forest_document_score(features)
+            readiness_score = self._task_keyword_ml_score(text, checklist)
             detected_features, missing_requirements = self._analyze_terms(text, checklist)
-            shap_analysis = self._generate_shap_explanation(features, readiness_score, task_id)
+            shap_analysis = self._generate_shap_explanation(
+                features,
+                readiness_score,
+                task_id,
+                rule_result={
+                    "readiness_score": readiness_score,
+                    "detected_features": detected_features,
+                    "missing_requirements": missing_requirements,
+                },
+                rf_score=rf_score,
+                checklist=checklist,
+            )
 
             return self.normalize_analysis_payload({
                 "success": True,
                 "readiness_score": readiness_score,
-                "status": status,
+                "status": "Ready" if readiness_score >= 75 else "Not Ready",
                 "detected_features": detected_features,
                 "missing_requirements": missing_requirements,
                 "text_length": len(text),
                 "analysis_method": "ml_based",
                 "shap_analysis": shap_analysis,
+                "rf_score": rf_score,
+                "ml_score": readiness_score,
             })
 
         except Exception as e:
@@ -804,20 +1238,12 @@ class GIAnalyzer:
             return self.normalize_analysis_payload(self._rule_based_analysis(text, checklist))
 
     def _extract_features(self, text: str) -> List:
-        """Extract ML features from text based on standard checklist"""
-        features = []
-
-        # Text length features
-        features.append(len(text))
-        features.append(len(text.split()))
-
-        # Keyword presence features (always use global checklist for consistent ML features)
+        """Extract ML features from text (fixed global vector for trained RF model)."""
+        features = [len(text), len(text.split())]
         all_terms = self.gi_checklist["mandatory_terms"] + self.gi_checklist["optional_terms"]
         text_lower = text.lower()
-
         for term in all_terms:
             features.append(1 if self._term_matches(text_lower, term) else 0)
-
         return features
 
     def _analyze_terms(self, text: str, checklist: Dict = None) -> Tuple[List[str], List[str]]:

@@ -43,6 +43,8 @@ class IPOPHLAnalyzer {
 
     updateDashboardState(taskId, doc, action) {
         if (!window.dashboardApp) return;
+        const official = window.dashboardApp.getOfficialIpophlTaskIds?.() || [];
+        if (taskId && !official.includes(taskId)) return;
         
         if (!window.dashboardApp.ipophlFiles) {
             window.dashboardApp.ipophlFiles = {};
@@ -339,7 +341,18 @@ class IPOPHLAnalyzer {
                 file_uuid: result.file_uuid,
             };
             this.showFullAIAnalysis(fileData);
-            this.showToast('Document uploaded and analyzed.', 'success');
+
+            const gi = result.gi_publish;
+            if (gi && gi.ok) {
+                this.showToast('Uploaded — live on farmers\' GI Updates.', 'success');
+            } else if (gi && gi.error) {
+                this.showToast(
+                    `Uploaded, but GI Updates sync failed: ${gi.error}`,
+                    'error'
+                );
+            } else {
+                this.showToast('Document uploaded and analyzed.', 'success');
+            }
         } catch (error) {
             console.error('IPOPHL upload/analyze failed:', error);
             const msg = error.message || 'Upload or analysis failed';
@@ -402,7 +415,7 @@ class IPOPHLAnalyzer {
                 <i class="fa-solid ${iconClass}"></i>
                 <div class="file-details">
                     <span class="file-name">${file.name}</span>
-                    <span class="file-meta">Ready — publishes when you click Complete Registration</span>
+                    <span class="file-meta">Ready — publishes on Complete Registration</span>
                 </div>
             </div>
             <div class="file-status-actions">
@@ -583,7 +596,13 @@ class IPOPHLAnalyzer {
 
                 fileItem.style.opacity = '0';
                 setTimeout(() => fileItem.remove(), 300);
-                this.showToast('Document deleted', 'success');
+                const giOk = result.gi_sync && result.gi_sync.ok !== false;
+                this.showToast(
+                    giOk
+                        ? 'Document deleted and removed from farmer GI Updates.'
+                        : 'Document deleted.',
+                    'success'
+                );
             } else {
                 throw new Error(result.error);
             }
@@ -737,10 +756,6 @@ class IPOPHLAnalyzer {
         if (statusBadge) statusBadge.textContent = 'Analyzing...';
         if (resultsEl) resultsEl.classList.add('loading');
 
-        // Always reset progress bar to 0 before loading new analysis
-        this.updateProgressIndicator(0);
-
-        // Reset cards to placeholder state instead of clearing innerHTML
         this.resetAnalysisUI();
 
         // Use analysis results if already provided
@@ -772,148 +787,324 @@ class IPOPHLAnalyzer {
     }
 
     resetAnalysisUI() {
-        // Reset Information Found list
-        const foundList = document.getElementById('detectedFeaturesList');
-        if (foundList) foundList.innerHTML = '<li class="placeholder">Analyzing document for key information...</li>';
-        
-        // Reset Improvement paragraph
-        const improvedPara = document.getElementById('improvementAnalysisParagraph');
-        if (improvedPara) improvedPara.innerHTML = '<p class="placeholder">Generating in-depth analysis and improvement recommendations...</p>';
+        const container = document.getElementById('requirementAnalysisContent');
+        const typing = document.getElementById('aiChatTyping');
+        if (container) {
+            container.querySelectorAll('.ai-analysis-block, .ai-pillar-grid, .ai-doc-insights').forEach((el) => el.remove());
+        }
+        if (typing) typing.hidden = false;
     }
 
-    /** Keep SHAP narrative % in sync with Document Quality Score (fixes legacy mismatches). */
-    syncShapScoreInHtml(html, score) {
-        if (!html || score == null || score === '') return html || '';
-        const n = Math.max(0, Math.min(100, parseInt(score, 10) || 0));
-        const statusLabel =
-            n >= 85 ? 'highly compliant' : n >= 70 ? 'conditionally sufficient' : 'insufficient';
-        let out = String(html);
-        out = out.replace(
-            /(readiness score of\s*<strong>)\d+(%<\/strong>)/gi,
-            `$1${n}$2`
+    showChatTyping(show) {
+        const typing = document.getElementById('aiChatTyping');
+        if (typing) typing.hidden = !show;
+    }
+
+    formatPlainText(text) {
+        let raw = String(text ?? '');
+        raw = raw.replace(/<[^>]+>/g, ' ');
+        raw = raw.replace(/\*\*(.+?)\*\*/g, '$1');
+        raw = raw.replace(/\s{2,}/g, ' ').trim();
+        return this.escapeHtml(raw);
+    }
+
+    formatAssistantMarkdown(text) {
+        return this.formatPlainText(text);
+    }
+
+    pillarStatusLabel(status) {
+        const map = {
+            addressed: 'Addressed',
+            partial: 'Partial',
+            not_addressed: 'Gap',
+        };
+        return map[status] || 'Gap';
+    }
+
+    renderPillarTags(items, kind) {
+        if (!items?.length) return '';
+        const cls = kind === 'gap' ? 'ai-tag ai-tag--gap' : 'ai-tag';
+        return `<div class="ai-tag-list">${items.map((item) =>
+            `<span class="${cls}">${this.escapeHtml(item)}</span>`
+        ).join('')}</div>`;
+    }
+
+    renderPillarCards(pillars) {
+        if (!pillars.length) return '';
+        const cards = pillars.map((pillar) => {
+            const status = pillar.status || 'not_addressed';
+            const narrative = pillar.narrative || this.buildPillarParagraph(pillar);
+            const evidence = Array.isArray(pillar.evidence) ? pillar.evidence : [];
+            const evidenceHtml = evidence.length
+                ? `<blockquote class="ai-evidence">${evidence.map((e) =>
+                    this.escapeHtml(e)
+                ).join('</blockquote><blockquote class="ai-evidence">')}</blockquote>`
+                : '';
+            return `<article class="ai-pillar-card">
+                <div class="ai-pillar-card__head">
+                    <span class="ai-pillar-card__title">${this.escapeHtml(pillar.label || pillar.id || 'Pillar')}</span>
+                    <span class="ai-pillar-chip ai-pillar-chip--${status}">${this.pillarStatusLabel(status)}</span>
+                </div>
+                <p class="ai-pillar-card__body">${this.formatPlainText(narrative)}</p>
+                ${evidenceHtml}
+                ${this.renderPillarTags(pillar.met, 'met')}
+                ${this.renderPillarTags(pillar.gaps, 'gap')}
+            </article>`;
+        }).join('');
+        return `<div class="ai-pillar-grid">${cards}</div>`;
+    }
+
+    renderDocumentInsights(analysis, assessment) {
+        const insights = assessment?.document_insights;
+        if (!insights) return '';
+
+        const breakdown = analysis.score_breakdown || {};
+        const sections = breakdown.sections || [];
+        const sectionRows = sections.length
+            ? sections.map((s) =>
+                `<li class="${s.found ? 'ai-insight-ok' : 'ai-insight-gap'}">${this.escapeHtml(s.label || 'Section')} — ${s.found ? 'Found' : 'Missing'}</li>`
+            ).join('')
+            : '';
+
+        const detected = (insights.detected_features || []).slice(0, 8);
+        const missing = (insights.missing_requirements || []).slice(0, 8);
+
+        return `<div class="ai-doc-insights">
+            <h5 class="ai-doc-insights__title">Document profile</h5>
+            <dl class="ai-doc-insights__meta">
+                <div><dt>Type</dt><dd>${this.escapeHtml(insights.document_type || 'GI document')}</dd></div>
+                <div><dt>Content</dt><dd>${Number(insights.word_count || 0).toLocaleString()} words extracted</dd></div>
+                <div><dt>Checklist</dt><dd>${insights.checklist_met || 0} of ${insights.checklist_total || 0} items detected</dd></div>
+            </dl>
+            ${detected.length ? `<p class="ai-doc-insights__label">Detected in this file</p>${this.renderPillarTags(detected, 'met')}` : ''}
+            ${missing.length ? `<p class="ai-doc-insights__label">Not found in this file</p>${this.renderPillarTags(missing, 'gap')}` : ''}
+            ${sectionRows ? `<p class="ai-doc-insights__label">Structural sections</p><ul class="ai-section-list">${sectionRows}</ul>` : ''}
+        </div>`;
+    }
+
+    buildExecutiveSummary(analysis, assessment) {
+        if (assessment?.executive_summary) {
+            return assessment.executive_summary;
+        }
+        const ready = String(analysis.status || '').trim().toLowerCase() === 'ready';
+        const pillars = assessment?.pillars || [];
+        const partial = pillars.filter((p) => p.status === 'partial').map((p) => p.label);
+        const gaps = pillars.filter((p) => p.status === 'not_addressed').map((p) => p.label);
+        let focus = '';
+        if (partial.length || gaps.length) {
+            focus = ` Priority revision areas: ${[...partial, ...gaps].slice(0, 3).join(', ')}.`;
+        }
+        return (
+            `This review evaluates the submitted document against the IPOPHL four-pillar framework ` +
+            `(Trademark, Copyright, Industrial Design, and Patent) for Kapeng Barako GI registration. ` +
+            `Overall classification: ${ready ? 'Ready' : 'Not Ready'}.${focus} ` +
+            `The findings below are derived from text extracted from this specific upload.`
         );
-        out = out.replace(
-            /(initial readiness score of\s*<strong>)\d+(%<\/strong>)/gi,
-            `$1${n}$2`
-        );
-        out = out.replace(
-            /status of\s*<strong>[^<]*<\/strong>/i,
-            `status of <strong>${statusLabel}</strong>`
-        );
-        return out;
+    }
+
+    buildRecommendations(analysis, assessment, gaps) {
+        if (Array.isArray(assessment?.recommendations) && assessment.recommendations.length) {
+            return assessment.recommendations;
+        }
+        const recs = [];
+        (assessment?.pillars || []).forEach((pillar) => {
+            if (pillar.gaps?.length) {
+                recs.push(`Improve ${pillar.label}: ${pillar.gaps.slice(0, 5).join(', ')}.`);
+            }
+        });
+        if (!recs.length && gaps.length) {
+            recs.push(`Address missing requirements: ${gaps.slice(0, 4).join(', ')}.`);
+        }
+        if (!recs.length) {
+            recs.push('Confirm companion uploads cover any pillar not fully addressed in this file alone.');
+        } else {
+            recs.push('Run **Refresh Analysis** after revisions to verify readiness.');
+        }
+        return recs.slice(0, 5);
+    }
+
+    renderChatAnalysis(analysis) {
+        const container = document.getElementById('requirementAnalysisContent');
+        if (!container) return;
+
+        const assessment = analysis.ip_pillar_assessment || null;
+        const pillars = Array.isArray(assessment?.pillars) ? assessment.pillars : [];
+        const gaps = this.collectRequirementGaps(analysis);
+        const summary = this.buildExecutiveSummary(analysis, assessment);
+        const recommendations = this.buildRecommendations(analysis, assessment, gaps);
+        const docInsights = this.renderDocumentInsights(analysis, assessment);
+
+        this.showChatTyping(false);
+
+        const intro = `<section class="ai-analysis-block">
+            <h5 class="ai-analysis-block__title">Overview</h5>
+            <p class="ai-analysis-block__text">${this.formatPlainText(summary)}</p>
+        </section>`;
+
+        const pillarBlock = pillars.length ? this.renderPillarCards(pillars) : `<section class="ai-analysis-block">
+            <p class="ai-analysis-block__text">Re-run Refresh Analysis to generate four-pillar classification for this upload.</p>
+        </section>`;
+
+        const recBlock = `<section class="ai-analysis-block">
+            <h5 class="ai-analysis-block__title">Recommended next steps</h5>
+            <ul class="ai-rec-list">${recommendations.map((r) =>
+                `<li>${this.formatPlainText(r)}</li>`
+            ).join('')}</ul>
+        </section>`;
+
+        container.innerHTML = `${intro}${docInsights}${pillarBlock}${recBlock}`;
     }
 
     displayAnalysisResults(analysis) {
         this.currentAnalysis = analysis;
-        const score = analysis.readiness_score ?? 0;
-        
-        // Hide loading state immediately
+
         const resultsEl = document.getElementById('analysisResults');
         if (resultsEl) {
             resultsEl.classList.remove('loading');
-            // Remove the loading spinner text
             const spinner = resultsEl.querySelector('.loading-spinner');
             if (spinner) spinner.remove();
         }
 
-        // Update progress indicator (Document Quality Score)
-        this.updateProgressIndicator(score);
-        
-        // Update status badge
         this.updateStatusBadge(analysis.status || 'Analyzed');
-        
-        // Update detected features (Information Found)
-        this.updateDetectedFeatures(analysis.detected_features || []);
-        
-        // Update improvement analysis (What Needs to be Improved)
-        const improvementContainer = document.getElementById('improvementAnalysisParagraph');
-        if (improvementContainer) {
-            if (analysis.shap_analysis) {
-                improvementContainer.innerHTML = this.syncShapScoreInHtml(
-                    analysis.shap_analysis,
-                    score
-                );
-            } else {
-                improvementContainer.innerHTML = `<p class="placeholder">Detailed improvement analysis is currently unavailable for this document.</p>`;
-            }
-        }
-    }
-
-    updateProgressIndicator(score) {
-        const progressBar = document.getElementById('giProgressBar');
-        const percentage = document.getElementById('giProgressPercentage');
-        if (!progressBar || !percentage) return;
-        
-        // Animate progress bar
-        progressBar.style.width = '0%';
-        setTimeout(() => {
-            progressBar.style.width = `${score}%`;
-        }, 100);
-        
-        percentage.textContent = `${score}%`;
-        
-        // Update color based on score
-        progressBar.className = 'progress-bar';
-        if (score >= 75) {
-            progressBar.classList.add('success');
-        } else if (score >= 50) {
-            progressBar.classList.add('warning');
-        } else {
-            progressBar.classList.add('danger');
-        }
+        window.setTimeout(() => this.renderChatAnalysis(analysis), 450);
     }
 
     updateStatusBadge(status) {
         const badge = document.getElementById('analysisStatusBadge');
         if (!badge) return;
-        
-        // Ensure status is readable
-        const displayStatus = status.toLowerCase() === 'not ready' ? 'Not Ready' : 
-                             status.toLowerCase() === 'ready' ? 'Ready' : status;
-        
+
+        const normalized = String(status || '').trim().toLowerCase();
+        const displayStatus = normalized === 'ready' ? 'Ready' : 'Not Ready';
+
         badge.textContent = displayStatus;
         badge.className = 'status-badge';
-        
-        if (displayStatus === 'Ready' || displayStatus.toLowerCase().includes('compliant')) {
-            badge.classList.add('success');
-        } else {
-            badge.classList.add('warning');
-        }
+        badge.classList.add(displayStatus === 'Ready' ? 'success' : 'warning');
     }
 
-    updateDetectedFeatures(features) {
-        const list = document.getElementById('detectedFeaturesList');
-        if (!list) return;
-        
-        if (features.length === 0) {
-            list.innerHTML = '<li class="placeholder">No mandatory sections or information found in this document.</li>';
-            return;
+    collectRequirementGaps(analysis) {
+        const gaps = [...(analysis.missing_requirements || [])];
+        const breakdown = analysis.score_breakdown || {};
+        (breakdown.terms || []).forEach((row) => {
+            if (!row?.found && row?.term) gaps.push(row.term);
+        });
+        (breakdown.sections || []).forEach((row) => {
+            if (!row?.found && row?.label) gaps.push(row.label);
+        });
+        return [...new Set(gaps.map((item) => String(item).trim()).filter(Boolean))];
+    }
+
+    formatRequirementPhrase(items) {
+        const list = (items || []).map((item) => this.escapeHtml(String(item).trim())).filter(Boolean);
+        if (!list.length) return '';
+        if (list.length === 1) return list[0];
+        if (list.length === 2) return `${list[0]} and ${list[1]}`;
+        return `${list.slice(0, -1).join(', ')}, and ${list[list.length - 1]}`;
+    }
+
+    cleanShapNarrative(html) {
+        if (!html) return '';
+        let out = String(html);
+        out = out.replace(/readiness score of\s*<strong>\d+%<\/strong>/gi, 'readiness assessment');
+        out = out.replace(/keyword checklist score is\s*<strong>\d+%<\/strong>/gi, 'keyword coverage');
+        out = out.replace(/;\s*after section rubric blending the readiness score is\s*<strong>\d+%<\/strong>/gi, '');
+        out = out.replace(/yielding a readiness score of\s*<strong>\d+%<\/strong>/gi, '');
+        out = out.replace(/initial readiness score of\s*<strong>\d+%<\/strong>/gi, 'initial assessment');
+        out = out.replace(/\b\d+%\b/g, '');
+        out = out.replace(/\s{2,}/g, ' ');
+        return out.trim();
+    }
+
+    buildPillarParagraph(pillar) {
+        const label = pillar.label || pillar.id || 'Pillar';
+        const statusMap = {
+            addressed: 'Addressed',
+            partial: 'Partially addressed',
+            not_addressed: 'Not addressed',
+        };
+        const status = statusMap[pillar.status] || 'Not addressed';
+        const met = Array.isArray(pillar.met) ? pillar.met : [];
+        const gaps = Array.isArray(pillar.gaps) ? pillar.gaps : [];
+        const scope = pillar.scope || '';
+
+        let text = `${label} — ${status}. ${scope}`;
+
+        if (met.length) {
+            text += ` Requirements satisfied in the extracted text: ${this.formatRequirementPhrase(met)}.`;
+        } else if (pillar.signal_detected) {
+            text += ` The document contains related ${label.toLowerCase()} language, but mapped checklist items for this pillar are still incomplete.`;
+        } else {
+            text += ` No requirements for this pillar were clearly identified in the document text.`;
         }
-        
-        list.innerHTML = features
-            .map(feature => `
-                <li class="feature-item">
-                    <i class="fa-solid fa-check-circle text-success"></i>
-                    <span>${feature}</span>
-                </li>
-            `)
-            .join('');
+
+        if (gaps.length) {
+            text += ` Items to improve: ${this.formatRequirementPhrase(gaps)}.`;
+        } else if (pillar.status === 'addressed') {
+            text += ` This pillar is adequately covered for the current upload category.`;
+        }
+
+        return text;
+    }
+
+    buildRequirementNarrative(analysis, met, gaps) {
+        const ready = String(analysis.status || '').trim().toLowerCase() === 'ready';
+        const assessment = analysis.ip_pillar_assessment || null;
+        const pillars = Array.isArray(assessment?.pillars) ? assessment.pillars : [];
+        const parts = [];
+
+        parts.push(
+            `<p>This analysis applies the IPOPHL <strong>four-pillar standard</strong>: <strong>Trademark</strong>, <strong>Copyright</strong>, <strong>Industrial Design</strong>, and <strong>Patent</strong>. Requirements are identified by which IP right they belong to — not by loose keywords alone. Overall document classification: <strong>${ready ? 'Ready' : 'Not Ready'}</strong>.</p>`
+        );
+
+        if (pillars.length) {
+            pillars.forEach((pillar) => parts.push(this.buildPillarParagraph(pillar)));
+            parts.push(
+                `<p><strong>Pillar summary.</strong> ${assessment.ready_pillars || 0} of 4 pillars fully addressed, ${assessment.partial_pillars || 0} partially addressed, and ${assessment.gap_pillars || 0} require revision. A GI filing package should collectively satisfy all four pillars across its supporting documents.</p>`
+            );
+        } else if (met.length || gaps.length) {
+            parts.push(
+                `<p><strong>Legacy checklist view.</strong> Re-run Refresh Analysis to generate four-pillar classification. Detected items: ${met.length ? this.formatRequirementPhrase(met) : 'none'}. Gaps: ${gaps.length ? this.formatRequirementPhrase(gaps) : 'none'}.</p>`
+            );
+        }
+
+        if (!ready) {
+            parts.push(
+                '<p><strong>Next steps.</strong> Revise the document so each pillar — Trademark, Copyright, Industrial Design, and Patent — has explicit supporting content where applicable. Use consistent Kapeng Barako / Lipa Barako terminology, attach evidence (labels, photos, process descriptions), then run Refresh Analysis before Complete Registration.</p>'
+            );
+        } else {
+            parts.push(
+                '<p><strong>Next steps.</strong> Confirm that companion uploads cover any pillar not fully addressed in this file alone, then proceed with the next IPOPHL phase.</p>'
+            );
+        }
+
+        return parts.join('');
+    }
+
+    escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    updateRequirementAnalysis(analysis) {
+        this.renderChatAnalysis(analysis);
     }
 
     showAnalysisError(message) {
         const resultsEl = document.getElementById('analysisResults');
         const statusBadge = document.getElementById('analysisStatusBadge');
-        
+
         if (statusBadge) statusBadge.textContent = 'Error';
-        
+
         if (resultsEl) {
             resultsEl.classList.remove('loading');
-            // We don't overwrite the entire innerHTML anymore, just show a toast or a small error indicator
             this.showToast(`Analysis Error: ${message}`, 'error');
-            
-            // Set placeholders to indicate failure
-            const foundList = document.getElementById('detectedFeaturesList');
-            if (foundList) foundList.innerHTML = `<li class="placeholder text-danger">Failed to retrieve information: ${message}</li>`;
+
+            const container = document.getElementById('requirementAnalysisContent');
+            if (container) {
+                container.innerHTML = `<p class="placeholder text-danger">Failed to retrieve analysis: ${this.escapeHtml(message)}</p>`;
+            }
         }
     }
 

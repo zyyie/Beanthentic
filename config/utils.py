@@ -22,14 +22,169 @@ USER_DB = Path(__file__).resolve().parent.parent / "data" / "users.json"
 SETTINGS_DB = Path(__file__).resolve().parent.parent / "settings.json"
 
 
-def load_users() -> dict:
-    """Load users from JSON file."""
+def _load_users_json() -> dict:
+    """Load admin accounts from users.json (legacy / backup)."""
     if not USER_DB.exists():
         return {}
     try:
-        return json.loads(USER_DB.read_text(encoding="utf-8"))
+        raw = json.loads(USER_DB.read_text(encoding="utf-8"))
+        return raw if isinstance(raw, dict) else {}
     except json.JSONDecodeError:
         return {}
+
+
+def _normalize_users_dict(users: dict) -> dict:
+    """Normalize phone keys to 10-digit PH mobile format where possible."""
+    from config.validation import validate_phone
+
+    out: dict = {}
+    for key, data in (users or {}).items():
+        if not isinstance(data, dict):
+            continue
+        ok, _, normalized = validate_phone(str(key))
+        phone_key = normalized if ok else str(key).strip()
+        if not phone_key:
+            continue
+        merged = dict(out.get(phone_key) or {})
+        for field, value in data.items():
+            if value is None:
+                continue
+            if field == "password_hash":
+                if value and (not merged.get("password_hash") or len(str(value)) >= len(str(merged.get("password_hash", "")))):
+                    merged["password_hash"] = value
+            elif not merged.get(field):
+                merged[field] = value
+        out[phone_key] = merged
+    return out
+
+
+def _users_from_db() -> dict | None:
+    """Load admin accounts from admin_user table. Returns None if DB unavailable."""
+    try:
+        rows = AdminUser.query.all()
+    except Exception:
+        return None
+    users: dict = {}
+    for row in rows:
+        phone = str(row.phone_number or "").strip()
+        if not phone or not row.password_hash:
+            continue
+        users[phone] = {
+            "full_name": str(row.full_name or "").strip(),
+            "password_hash": str(row.password_hash or "").strip(),
+        }
+    return users
+
+
+def load_users() -> dict:
+    """Load admin accounts — database is source of truth when available."""
+    json_users = _normalize_users_dict(_load_users_json())
+    db_users = _users_from_db()
+    if db_users is None:
+        return json_users
+    if not db_users and json_users:
+        try:
+            _sync_users_to_db(json_users)
+            db_users = _users_from_db() or json_users
+        except Exception:
+            db_users = json_users
+    merged = dict(json_users)
+    merged.update(db_users)
+    for phone, db_data in db_users.items():
+        if phone not in merged:
+            merged[phone] = dict(db_data)
+            continue
+        for field, value in db_data.items():
+            if field == "password_hash" and value:
+                merged[phone]["password_hash"] = value
+            elif value and not merged[phone].get(field):
+                merged[phone][field] = value
+    return _normalize_users_dict(merged)
+
+
+def save_users(users: dict) -> None:
+    """Persist admin accounts to database and users.json backup."""
+    users = _normalize_users_dict(users)
+    USER_DB.parent.mkdir(parents=True, exist_ok=True)
+    USER_DB.write_text(json.dumps(users, indent=2), encoding="utf-8")
+    try:
+        _sync_users_to_db(users)
+    except Exception:
+        pass
+
+
+def _sync_users_to_db(users: dict | None = None) -> None:
+    """Upsert admin accounts into admin_user."""
+    users = _normalize_users_dict(users if users is not None else _load_users_json())
+    for phone, data in users.items():
+        phone = str(phone).strip()
+        full_name = str(data.get("full_name") or "").strip() or "Admin"
+        password_hash = str(data.get("password_hash") or "").strip()
+        if not phone or not password_hash:
+            continue
+        existing = AdminUser.query.filter_by(phone_number=phone).first()
+        if existing:
+            existing.full_name = full_name
+            existing.password_hash = password_hash
+        else:
+            db.session.add(
+                AdminUser(
+                    phone_number=phone,
+                    full_name=full_name,
+                    password_hash=password_hash,
+                )
+            )
+    db.session.commit()
+
+
+def sync_users_json_to_db() -> None:
+    """Backward-compatible alias — sync users.json into admin_user."""
+    _sync_users_to_db(_load_users_json())
+
+
+def ensure_admin_users_migrated() -> None:
+    """Create admin_user table if needed and migrate JSON accounts into the database."""
+    from sqlalchemy import inspect, text
+
+    try:
+        inspector = inspect(db.engine)
+        if "admin_user" not in inspector.get_table_names():
+            db.session.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS admin_user (
+                        id SERIAL PRIMARY KEY,
+                        phone_number VARCHAR(255) UNIQUE NOT NULL,
+                        full_name VARCHAR(255) NOT NULL,
+                        password_hash VARCHAR(512) NOT NULL,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+            )
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+        try:
+            db.create_all()
+        except Exception:
+            db.session.rollback()
+
+    json_users = _normalize_users_dict(_load_users_json())
+    if json_users:
+        try:
+            _sync_users_to_db(json_users)
+        except Exception:
+            db.session.rollback()
+
+    db_users = _users_from_db()
+    if db_users:
+        merged = _normalize_users_dict({**json_users, **db_users})
+        try:
+            USER_DB.parent.mkdir(parents=True, exist_ok=True)
+            USER_DB.write_text(json.dumps(merged, indent=2), encoding="utf-8")
+        except OSError:
+            pass
 
 
 def resolve_user_phone_key(users: dict, phone_digits: str) -> str | None:
@@ -49,43 +204,6 @@ def resolve_user_phone_key(users: dict, phone_digits: str) -> str | None:
         if ok and normalized == target:
             return str(key)
     return None
-
-
-def save_users(users: dict) -> None:
-    """Save users to JSON file."""
-    USER_DB.write_text(json.dumps(users, indent=2), encoding="utf-8")
-    # Keep sqlite in sync for Flask-Admin visibility.
-    try:
-        sync_users_json_to_db()
-    except Exception:
-        # Don't break app flow if DB sync fails.
-        pass
-
-
-def sync_users_json_to_db() -> None:
-    """Sync users from JSON file to database."""
-    users = load_users()
-    for phone, data in users.items():
-        phone = str(phone).strip()
-        full_name = data.get("full_name", "").strip()
-        password_hash = data.get("password_hash", "").strip()
-
-        if not phone or not password_hash:
-            continue
-
-        existing = AdminUser.query.get(phone)
-        if existing:
-            existing.full_name = full_name
-            existing.password_hash = password_hash
-        else:
-            db.session.add(
-                AdminUser(
-                    phone_number=phone,
-                    full_name=full_name,
-                    password_hash=password_hash
-                )
-            )
-    db.session.commit()
 
 
 def has_admin_account() -> bool:

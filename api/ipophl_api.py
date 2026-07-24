@@ -6,8 +6,12 @@ When connected to the app DB, uses SQLAlchemy first and HTTP bridge fallback
 (same pattern as farmer records and messages).
 """
 
+import io
+import json
 import os
 import threading
+import urllib.parse
+import zipfile
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -47,10 +51,12 @@ from config.validation import (
 from config.utils import get_current_user_phone, is_authenticated, log_activity
 from api.gi_contributions_api import (
     _count_admin_gi_rows,
+    _load_ipophl_disk_files,
     publish_gi_registration_fallback_to_gi_updates,
     publish_ipophl_registration_to_gi_updates,
+    publish_ipophl_task_to_gi_updates,
 )
-from config.ipophl_store import collect_registration_file_uuids
+from config.ipophl_store import collect_registration_file_uuids, filter_uuids_on_disk
 
 
 def _is_db_error(exc: BaseException) -> bool:
@@ -99,6 +105,14 @@ def _ingest_ipophl_upload(file, *, task_id: str, ipophl_phase: str | None = None
     except Exception:
         analysis_result = {"success": True, "readiness_score": 50, "status": "Uploaded"}
 
+    resolved_task = analysis_result.get("task_id")
+    if resolved_task:
+        task_id = normalize_ipophl_task_id(resolved_task)
+        phase = ipophl_phase or (
+            task_id.split("-", 1)[0] if task_id.startswith("phase") else "unknown"
+        )
+        phase = validate_enum(phase, IPOPHL_PHASES, "unknown")
+
     if not analysis_result.get("success", False):
         analysis_result = {
             "success": True,
@@ -144,20 +158,69 @@ def _ingest_ipophl_upload(file, *, task_id: str, ipophl_phase: str | None = None
     doc_analysis.text_length = int(analysis_result.get("text_length") or 0)
     doc_analysis.shap_analysis = analysis_result.get("shap_analysis") or ""
     doc_analysis.analysis_timestamp = datetime.utcnow()
+    sb = analysis_result.get("score_breakdown")
+    doc_analysis.score_breakdown = sb if isinstance(sb, dict) else None
+    ipa = analysis_result.get("ip_pillar_assessment")
+    doc_analysis.ip_pillar_assessment = ipa if isinstance(ipa, dict) else None
 
     _persist_document(doc_analysis, is_new=existing_record is None)
     return file_uuid
 
 
+def _persist_document_sqlalchemy(doc_analysis, *, is_new: bool) -> None:
+    """Upsert document_analysis via SQLAlchemy when app DB is reachable."""
+    existing = DocumentAnalysis.query.filter_by(file_uuid=doc_analysis.file_uuid).first()
+    if existing:
+        existing.original_filename = doc_analysis.original_filename
+        existing.file_path = doc_analysis.file_path
+        existing.file_type = doc_analysis.file_type
+        existing.file_size = int(doc_analysis.file_size or 0)
+        existing.ai_score = int(doc_analysis.ai_score or 0)
+        existing.ai_status = doc_analysis.ai_status or "Not Ready"
+        existing.set_detected_features(doc_analysis.detected_features_list)
+        existing.set_missing_requirements(doc_analysis.missing_requirements_list)
+        existing.analysis_method = doc_analysis.analysis_method or "rule_based"
+        existing.text_length = int(doc_analysis.text_length or 0)
+        existing.shap_analysis = doc_analysis.shap_analysis or ""
+        existing.analysis_timestamp = doc_analysis.analysis_timestamp or datetime.utcnow()
+        existing.ipophl_phase = doc_analysis.ipophl_phase or ""
+        existing.task_id = doc_analysis.task_id or ""
+    elif is_new:
+        db.session.add(doc_analysis)
+    else:
+        db.session.merge(doc_analysis)
+    db.session.commit()
+
+
 def _persist_document(doc_analysis, *, is_new: bool) -> str:
     """
-    Save analysis metadata: try app MySQL and HTTP bridge when configured,
-    always mirror to local JSON so ML uploads work when LAN DB is unreachable.
+    Save analysis metadata to local JSON, Supabase REST, SQLAlchemy, and optional HTTP bridge.
     """
+    import beanthentic_env
+
     record = upsert_payload_from_model(doc_analysis)
     upsert_json_document(record)
 
     sources: list[str] = ["local_json"]
+
+    if beanthentic_env.uses_supabase_anon():
+        try:
+            from config.supabase_ipophl_store import upsert_document_analysis_via_rest
+
+            upsert_document_analysis_via_rest(record)
+            sources.append("supabase_rest")
+        except Exception:
+            pass
+
+    if beanthentic_env.is_postgresql() or app_db_params():
+        try:
+            _persist_document_sqlalchemy(doc_analysis, is_new=is_new)
+            if "postgresql" not in sources and "supabase_rest" not in sources:
+                sources.append("postgresql")
+            elif "postgresql" not in sources:
+                sources.append("postgresql")
+        except Exception:
+            db.session.rollback()
 
     # Sync to XAMPP in the background so upload does not wait on LAN :8080 timeouts.
     if app_server_base():
@@ -169,6 +232,7 @@ def _persist_document(doc_analysis, *, is_new: bool) -> str:
                 pass
 
         threading.Thread(target=_sync_http, daemon=True).start()
+        sources.append("app_server_http_async")
 
     return "+".join(sources)
 
@@ -205,6 +269,8 @@ def _doc_record_from_http(data: dict) -> SimpleNamespace:
         analysis_method=analysis.get("analysis_method", "rule_based"),
         text_length=int(analysis.get("text_length") or 0),
         shap_analysis=analysis.get("shap_analysis", ""),
+        score_breakdown=analysis.get("score_breakdown"),
+        ip_pillar_assessment=analysis.get("ip_pillar_assessment"),
         upload_timestamp=data.get("upload_timestamp"),
         analysis_timestamp=analysis.get("analysis_timestamp"),
     )
@@ -227,6 +293,8 @@ def _doc_record_from_json(record: dict) -> SimpleNamespace:
         analysis_method=analysis.get("analysis_method", "rule_based"),
         text_length=int(analysis.get("text_length") or 0),
         shap_analysis=analysis.get("shap_analysis", ""),
+        score_breakdown=analysis.get("score_breakdown"),
+        ip_pillar_assessment=analysis.get("ip_pillar_assessment"),
         upload_timestamp=record.get("upload_timestamp"),
         analysis_timestamp=analysis.get("analysis_timestamp"),
     )
@@ -279,9 +347,19 @@ def _find_document(file_uuid: str):
 
 
 def _delete_document_record(file_uuid: str) -> None:
+    import beanthentic_env
+
     delete_json_document(file_uuid)
 
-    if app_db_params():
+    if beanthentic_env.uses_supabase_anon():
+        try:
+            from config.supabase_ipophl_store import delete_document_analysis_via_rest
+
+            delete_document_analysis_via_rest(file_uuid)
+        except Exception:
+            pass
+
+    if app_db_params() or beanthentic_env.is_postgresql():
         try:
             doc = DocumentAnalysis.query.filter_by(file_uuid=file_uuid).first()
             if doc:
@@ -343,6 +421,47 @@ def _list_documents(phase: str | None, task_id: str | None, limit: int) -> tuple
     return [], "local_json"
 
 
+def _stored_dict_field(record: dict | None, key: str) -> dict | None:
+    if not isinstance(record, dict):
+        return None
+    raw = record.get(key)
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                return parsed
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return None
+
+
+def _dict_field_for_doc(doc, key: str) -> dict | None:
+    raw = getattr(doc, key, None)
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                return parsed
+        except (json.JSONDecodeError, TypeError):
+            pass
+    file_uuid = str(getattr(doc, "file_uuid", "") or "").strip()
+    if file_uuid:
+        return _stored_dict_field(get_json_document(file_uuid), key)
+    return None
+
+
+def _score_breakdown_for_doc(doc) -> dict | None:
+    return _dict_field_for_doc(doc, "score_breakdown")
+
+
+def _ip_pillar_assessment_for_doc(doc) -> dict | None:
+    return _dict_field_for_doc(doc, "ip_pillar_assessment")
+
+
 def _analysis_response(doc) -> dict:
     from machinelearning.ai_engine import gi_analyzer
 
@@ -354,6 +473,8 @@ def _analysis_response(doc) -> dict:
         "analysis_method": doc.analysis_method,
         "text_length": doc.text_length,
         "shap_analysis": doc.shap_analysis,
+        "score_breakdown": _score_breakdown_for_doc(doc),
+        "ip_pillar_assessment": _ip_pillar_assessment_for_doc(doc),
         "analysis_timestamp": (
             doc.analysis_timestamp.isoformat()
             if hasattr(doc.analysis_timestamp, "isoformat") and doc.analysis_timestamp
@@ -361,6 +482,50 @@ def _analysis_response(doc) -> dict:
         ),
     }
     return gi_analyzer.normalize_analysis_payload(payload)
+
+
+def _ipophl_recipient_email() -> str:
+    return (
+        os.getenv("BEANTHENTIC_IPOPHL_EMAIL", "").strip()
+        or "info@ipophl.gov.ph"
+    )
+
+
+def _build_gmail_compose_url(*, to: str, subject: str, body: str) -> str:
+    query = urllib.parse.urlencode(
+        {"view": "cm", "fs": "1", "to": to, "su": subject, "body": body},
+        quote_via=urllib.parse.quote,
+    )
+    return f"https://mail.google.com/mail/?{query}"
+
+
+def _ipophl_gmail_compose_payload(*, file_labels: list[str] | None = None) -> dict:
+    to = _ipophl_recipient_email()
+    subject = "Beanthentic — GI Registration Documents"
+    lines = [
+        "Dear IPOPHL,",
+        "",
+        "Please find attached our GI registration documents for Beanthentic.",
+        "",
+        "This submission was prepared through the Beanthentic admin IPOPHL module.",
+    ]
+    if file_labels:
+        lines.extend(["", "Documents included:", *[f"- {name}" for name in file_labels]])
+    lines.extend(
+        [
+            "",
+            "Attach the downloaded zip file (beanthentic-ipophl-registration.zip) to this email before sending.",
+            "",
+            "Thank you.",
+        ]
+    )
+    body = "\n".join(lines)
+    return {
+        "to": to,
+        "subject": subject,
+        "body": body,
+        "gmail_url": _build_gmail_compose_url(to=to, subject=subject, body=body),
+    }
 
 
 def register_ipophl_routes(app):
@@ -477,6 +642,15 @@ def register_ipophl_routes(app):
                 pass
 
             preview_path = str(getattr(doc_analysis, "file_path", "") or "")
+            gi_publish: dict = {"ok": False}
+            try:
+                gi_publish = publish_ipophl_task_to_gi_updates(
+                    file_uuid=file_uuid,
+                    task_id=task_id,
+                )
+            except Exception as pub_err:
+                gi_publish = {"ok": False, "error": str(pub_err)}
+
             return jsonify({
                 "success": True,
                 "file_uuid": file_uuid,
@@ -486,6 +660,7 @@ def register_ipophl_routes(app):
                 "preview_url": gi_analyzer.get_file_preview_url(preview_path),
                 "ipophl_phase": ipophl_phase,
                 "task_id": task_id,
+                "gi_publish": gi_publish,
             })
 
         except Exception as e:
@@ -505,11 +680,25 @@ def register_ipophl_routes(app):
             if not doc_analysis:
                 return jsonify({"error": "Document not found"}), 404
 
+            from config.ipophl_store import normalize_ipophl_task_id
+            from api.gi_contributions_api import sync_ipophl_category_gi_updates
+
+            task_id = normalize_ipophl_task_id(
+                getattr(doc_analysis, "task_id", None)
+                or (get_json_document(file_uuid) or {}).get("task_id")
+            )
+
             file_path = doc_analysis.file_path
             if file_path and os.path.exists(file_path):
                 os.remove(file_path)
 
             _delete_document_record(file_uuid)
+
+            gi_sync: dict = {"ok": True, "cleared": True}
+            try:
+                gi_sync = sync_ipophl_category_gi_updates(task_id)
+            except Exception as gi_err:
+                gi_sync = {"ok": False, "error": str(gi_err)}
 
             try:
                 user_phone = get_current_user_phone()
@@ -522,7 +711,7 @@ def register_ipophl_routes(app):
             except Exception:
                 pass
 
-            return jsonify({"success": True})
+            return jsonify({"success": True, "gi_sync": gi_sync})
 
         except Exception as e:
             return jsonify({"error": safe_error_message(e, public="Deletion failed.")}), 500
@@ -635,6 +824,12 @@ def register_ipophl_routes(app):
             if not result.get("success"):
                 return jsonify({"error": "Re-analysis failed."}), 500
 
+            resolved_task = result.get("task_id")
+            if resolved_task:
+                doc_analysis.task_id = normalize_ipophl_task_id(resolved_task)
+                if doc_analysis.task_id.startswith("phase"):
+                    doc_analysis.ipophl_phase = doc_analysis.task_id.split("-", 1)[0]
+
             if not isinstance(doc_analysis, DocumentAnalysis):
                 doc_analysis = DocumentAnalysis(
                     file_uuid=file_uuid,
@@ -654,6 +849,10 @@ def register_ipophl_routes(app):
             doc_analysis.text_length = result["text_length"]
             doc_analysis.shap_analysis = result.get("shap_analysis", "")
             doc_analysis.analysis_timestamp = datetime.utcnow()
+            sb = result.get("score_breakdown")
+            doc_analysis.score_breakdown = sb if isinstance(sb, dict) else None
+            ipa = result.get("ip_pillar_assessment")
+            doc_analysis.ip_pillar_assessment = ipa if isinstance(ipa, dict) else None
             _persist_document(doc_analysis, is_new=False)
 
             try:
@@ -702,6 +901,77 @@ def register_ipophl_routes(app):
         from api.gi_contributions_api import check_xampp_for_publish
 
         return jsonify(check_xampp_for_publish())
+
+    @app.route("/api/ipophl/publish-task", methods=["POST"])
+    def api_ipophl_publish_task():
+        """Publish one uploaded IPOPHL document to all farmers' GI Updates."""
+        if not is_authenticated():
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+        body = request.get_json(silent=True) or {}
+        if not isinstance(body, dict):
+            body = {}
+        file_uuid = str(body.get("file_uuid") or request.form.get("file_uuid") or "").strip()
+        task_id = str(body.get("task_id") or request.form.get("task_id") or "").strip() or None
+        if not file_uuid:
+            return jsonify({"ok": False, "error": "file_uuid is required"}), 400
+        try:
+            result = publish_ipophl_task_to_gi_updates(file_uuid=file_uuid, task_id=task_id)
+            return jsonify({"ok": True, **result})
+        except ValueError as e:
+            return jsonify({"ok": False, "error": str(e)}), 400
+        except RuntimeError as e:
+            return jsonify({"ok": False, "error": str(e)}), 503
+        except Exception as e:
+            return jsonify(
+                {"ok": False, "error": safe_error_message(e, public="GI publish failed.")}
+            ), 503
+
+    @app.route("/api/ipophl/registration-zip", methods=["GET"])
+    def api_ipophl_registration_zip():
+        """Zip all saved IPOPHL registration files for Gmail attachment."""
+        if not is_authenticated():
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+        bootstrap_orphan_uploads(limit=500)
+        file_uuids = filter_uuids_on_disk(collect_registration_file_uuids())
+        disk_files = _load_ipophl_disk_files(file_uuids)
+        if not disk_files:
+            return jsonify({"ok": False, "error": "No registration files found on disk."}), 404
+
+        buf = io.BytesIO()
+        used_names: set[str] = set()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for name, path in disk_files:
+                arcname = str(name or path.name).strip() or path.name
+                base, ext = os.path.splitext(arcname)
+                candidate = arcname
+                n = 2
+                while candidate in used_names:
+                    candidate = f"{base}_{n}{ext}"
+                    n += 1
+                used_names.add(candidate)
+                zf.write(path, arcname=candidate)
+        buf.seek(0)
+        return send_file(
+            buf,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name="beanthentic-ipophl-registration.zip",
+        )
+
+    @app.route("/api/ipophl/gmail-compose", methods=["GET"])
+    def api_ipophl_gmail_compose():
+        """Gmail compose URL + recipient for IPOPHL registration email."""
+        if not is_authenticated():
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+        bootstrap_orphan_uploads(limit=500)
+        file_uuids = filter_uuids_on_disk(collect_registration_file_uuids())
+        disk_files = _load_ipophl_disk_files(file_uuids)
+        labels = [str(name or path.name) for name, path in disk_files]
+        payload = _ipophl_gmail_compose_payload(file_labels=labels)
+        return jsonify({"ok": True, **payload, "file_count": len(labels)})
 
     @app.route("/api/ipophl/complete-registration", methods=["POST"])
     def api_ipophl_complete_registration():
@@ -889,12 +1159,21 @@ def register_ipophl_routes(app):
                 msg += " Some files failed: " + "; ".join(upload_errors[:3])
             if skipped:
                 msg += f" {skipped} saved file(s) were missing on disk — select them again, then Complete."
+            bootstrap_orphan_uploads(limit=500)
+            all_uuids = filter_uuids_on_disk(
+                collect_registration_file_uuids(file_uuids=file_uuids if file_uuids else None)
+            )
+            disk_for_email = _load_ipophl_disk_files(all_uuids)
+            gmail = _ipophl_gmail_compose_payload(
+                file_labels=[str(n or p.name) for n, p in disk_for_email]
+            )
             return jsonify(
                 {
                     "ok": True,
                     "file_count": len(file_uuids),
                     "db_rows": db_rows,
                     "message": msg,
+                    "gmail": gmail,
                     **result,
                 }
             )

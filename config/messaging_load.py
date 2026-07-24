@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -24,7 +25,8 @@ from config.app_connection import (
     iter_app_server_bases,
     lan_mysql_fallback_hosts,
 )
-from config.mysql_app_bridge import connect_app_mysql
+from config.mysql_app_bridge import connect_app_db
+import beanthentic_env
 
 
 class MessagesLoadError(Exception):
@@ -48,31 +50,58 @@ class MessagesLoadError(Exception):
 
 def _ensure_shared_messages_table(conn) -> None:
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS shared_messages (
-              message_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-              sender_role ENUM('admin','farmer') NOT NULL,
-              sender_phone VARCHAR(32) NOT NULL,
-              sender_name VARCHAR(255) NULL,
-              recipient_role ENUM('admin','farmer') NOT NULL,
-              recipient_phone VARCHAR(32) NOT NULL DEFAULT '',
-              recipient_name VARCHAR(255) NULL,
-              subject VARCHAR(300) NOT NULL,
-              body TEXT NOT NULL,
-              category VARCHAR(30) NOT NULL DEFAULT 'general',
-              farmer_id BIGINT UNSIGNED NULL,
-              is_read TINYINT(1) NOT NULL DEFAULT 0,
-              is_starred TINYINT(1) NOT NULL DEFAULT 0,
-              is_archived TINYINT(1) NOT NULL DEFAULT 0,
-              created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-              read_at DATETIME NULL,
-              INDEX idx_sm_recipient (recipient_role, recipient_phone, is_read, is_archived),
-              INDEX idx_sm_sender (sender_role, sender_phone),
-              INDEX idx_sm_created (created_at)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-            """
-        )
+        if beanthentic_env.is_postgresql():
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS shared_messages (
+                  message_id BIGSERIAL PRIMARY KEY,
+                  sender_role VARCHAR(20) NOT NULL CHECK (sender_role IN ('admin','farmer')),
+                  sender_phone VARCHAR(32) NOT NULL,
+                  sender_name VARCHAR(255),
+                  recipient_role VARCHAR(20) NOT NULL CHECK (recipient_role IN ('admin','farmer')),
+                  recipient_phone VARCHAR(32) NOT NULL DEFAULT '',
+                  recipient_name VARCHAR(255),
+                  subject VARCHAR(300) NOT NULL,
+                  body TEXT NOT NULL,
+                  category VARCHAR(30) NOT NULL DEFAULT 'general',
+                  farmer_id BIGINT,
+                  is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                  is_starred BOOLEAN NOT NULL DEFAULT FALSE,
+                  is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+                  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  read_at TIMESTAMPTZ
+                );
+                CREATE INDEX IF NOT EXISTS idx_sm_recipient ON shared_messages (recipient_role, recipient_phone, is_read, is_archived);
+                CREATE INDEX IF NOT EXISTS idx_sm_sender ON shared_messages (sender_role, sender_phone);
+                CREATE INDEX IF NOT EXISTS idx_sm_created ON shared_messages (created_at);
+                """
+            )
+        else:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS shared_messages (
+                  message_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                  sender_role ENUM('admin','farmer') NOT NULL,
+                  sender_phone VARCHAR(32) NOT NULL,
+                  sender_name VARCHAR(255) NULL,
+                  recipient_role ENUM('admin','farmer') NOT NULL,
+                  recipient_phone VARCHAR(32) NOT NULL DEFAULT '',
+                  recipient_name VARCHAR(255) NULL,
+                  subject VARCHAR(300) NOT NULL,
+                  body TEXT NOT NULL,
+                  category VARCHAR(30) NOT NULL DEFAULT 'general',
+                  farmer_id BIGINT UNSIGNED NULL,
+                  is_read TINYINT(1) NOT NULL DEFAULT 0,
+                  is_starred TINYINT(1) NOT NULL DEFAULT 0,
+                  is_archived TINYINT(1) NOT NULL DEFAULT 0,
+                  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  read_at DATETIME NULL,
+                  INDEX idx_sm_recipient (recipient_role, recipient_phone, is_read, is_archived),
+                  INDEX idx_sm_sender (sender_role, sender_phone),
+                  INDEX idx_sm_created (created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """
+            )
 
 
 def _normalize_shared_message_row(row: dict) -> dict:
@@ -177,14 +206,22 @@ def _messaging_mysql_hosts() -> list[str]:
 
 
 def connect_messaging_mysql():
-    """MySQL for shared_messages — tries every LAN host before failing."""
+    """MySQL for shared_messages — tries every LAN host before failing (or PostgreSQL)."""
+    if beanthentic_env.is_postgresql():
+        try:
+            conn = connect_app_db({})
+            _ensure_shared_messages_table(conn)
+            return conn
+        except Exception as e:
+            raise e
+            
     params = app_db_params()
     if not params:
         return None
     last_err: Exception | None = None
     for host in _messaging_mysql_hosts():
         try:
-            conn = connect_app_mysql({**params, "host": host})
+            conn = connect_app_db({**params, "host": host})
             _ensure_shared_messages_table(conn)
             return conn
         except Exception as e:
@@ -254,11 +291,88 @@ def send_shared_message(
     farmer_id: int | None,
 ) -> dict:
     """
-    Insert admin/farmer message — HTTP first (port 8080), then MySQL with LAN fallbacks.
+    Insert admin/farmer message — Supabase REST first, then HTTP, then MySQL.
     Returns { id, ... } for the saved row.
     """
     http_err: Exception | None = None
     mysql_err: Exception | None = None
+
+    if beanthentic_env.uses_supabase_anon():
+        try:
+            from config.supabase_messaging_load import send_message as send_via_rest
+
+            return send_via_rest(
+                role=role,
+                phone=phone,
+                sender_name=sender_name,
+                recipient_role=recipient_role,
+                recipient_phone=recipient_phone,
+                recipient_name=recipient_name,
+                subject=subject,
+                body=body,
+                category=category,
+                farmer_id=farmer_id,
+            )
+        except Exception as exc:
+            mysql_err = exc
+
+    if beanthentic_env.is_postgresql():
+        conn = None
+        try:
+            conn = connect_messaging_mysql()
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO shared_messages
+                      (sender_role, sender_phone, sender_name,
+                       recipient_role, recipient_phone, recipient_name,
+                       subject, body, category, farmer_id,
+                       is_read, is_starred, is_archived)
+                    VALUES
+                      (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING message_id
+                    """,
+                    (
+                        role,
+                        phone,
+                        sender_name,
+                        recipient_role,
+                        recipient_phone,
+                        recipient_name,
+                        subject,
+                        body,
+                        category[:30],
+                        farmer_id,
+                        False,
+                        False,
+                        False,
+                    ),
+                )
+                mid = int(cur.fetchone()['message_id'])
+            try:
+                conn.commit()
+            except Exception:
+                pass
+            return {
+                "id": mid,
+                "message_id": mid,
+                "body": body,
+                "sender_name": sender_name,
+                "sender_role": role,
+                "sender_phone": phone,
+                "recipient_role": recipient_role,
+                "recipient_phone": recipient_phone,
+                "recipient_name": recipient_name,
+                "subject": subject,
+                "category": category[:30],
+                "farmer_id": farmer_id,
+                "created_at": datetime.now().isoformat(),
+            }
+        except Exception as e:
+            mysql_err = e
+        finally:
+            if conn:
+                conn.close()
 
     if role == "admin" and _messaging_http_bases():
         try:
@@ -553,7 +667,9 @@ def _list_from_admin_shared_messages_php(
 
 
 def _prefer_http_for_messaging() -> bool:
-    """Remote admin laptops often reach :8080 before MySQL :3306."""
+    """If using PostgreSQL, prefer direct SQL over HTTP."""
+    if beanthentic_env.is_postgresql():
+        return False
     params = app_db_params()
     if not params:
         return bool(_messaging_http_bases() or iter_app_server_bases())
@@ -586,6 +702,10 @@ def _list_from_app_server(
 def _build_folder_where(folder: str, role: str, phone: str) -> tuple[str, list]:
     where: list[str] = ["LOWER(category) <> 'announcement'"]
     args: list = []
+    is_pg = beanthentic_env.is_postgresql()
+    false_val = "FALSE" if is_pg else "0"
+    true_val = "TRUE" if is_pg else "1"
+    
     if folder == "all":
         where.append(
             "(sender_role = 'farmer' OR recipient_role = 'farmer' "
@@ -595,11 +715,11 @@ def _build_folder_where(folder: str, role: str, phone: str) -> tuple[str, list]:
     if folder == "inbox":
         if role == "admin":
             where.append(
-                "recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s) AND is_archived=0"
+                f"recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s) AND is_archived={false_val}"
             )
             args.append(phone)
         else:
-            where.append("recipient_role='farmer' AND recipient_phone=%s AND is_archived=0")
+            where.append(f"recipient_role='farmer' AND recipient_phone=%s AND is_archived={false_val}")
             args.append(phone)
     elif folder == "sent":
         where.append("sender_role=%s AND sender_phone=%s")
@@ -607,55 +727,58 @@ def _build_folder_where(folder: str, role: str, phone: str) -> tuple[str, list]:
     elif folder == "starred":
         if role == "admin":
             where.append(
-                "((recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s)) "
-                "OR (sender_role='admin' AND sender_phone=%s)) AND is_starred=1"
+                f"((recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s)) "
+                f"OR (sender_role='admin' AND sender_phone=%s)) AND is_starred={true_val}"
             )
             args.extend([phone, phone])
         else:
             where.append(
-                "((recipient_role='farmer' AND recipient_phone=%s) "
-                "OR (sender_role='farmer' AND sender_phone=%s)) AND is_starred=1"
+                f"((recipient_role='farmer' AND recipient_phone=%s) "
+                f"OR (sender_role='farmer' AND sender_phone=%s)) AND is_starred={true_val}"
             )
             args.extend([phone, phone])
     elif folder == "archived":
         if role == "admin":
             where.append(
-                "recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s) AND is_archived=1"
+                f"recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s) AND is_archived={true_val}"
             )
             args.append(phone)
         else:
-            where.append("recipient_role='farmer' AND recipient_phone=%s AND is_archived=1")
+            where.append(f"recipient_role='farmer' AND recipient_phone=%s AND is_archived={true_val}")
             args.append(phone)
     else:
         if role == "admin":
             where.append(
-                "recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s) AND is_archived=0"
+                f"recipient_role='admin' AND (recipient_phone='' OR recipient_phone=%s) AND is_archived={false_val}"
             )
             args.append(phone)
         else:
-            where.append("recipient_role='farmer' AND recipient_phone=%s AND is_archived=0")
+            where.append(f"recipient_role='farmer' AND recipient_phone=%s AND is_archived={false_val}")
             args.append(phone)
     return " AND ".join(where), args
 
 
 def _unread_count_mysql(cur, role: str, phone: str) -> int:
+    is_pg = beanthentic_env.is_postgresql()
+    false_val = "FALSE" if is_pg else "0"
+    
     if role == "admin":
         cur.execute(
-            """
+            f"""
             SELECT COUNT(*) AS c FROM shared_messages
             WHERE recipient_role='admin'
               AND (recipient_phone='' OR recipient_phone=%s)
-              AND sender_role='farmer' AND is_read=0 AND is_archived=0
+              AND sender_role='farmer' AND is_read={false_val} AND is_archived={false_val}
               AND LOWER(category) <> 'announcement'
             """,
             (phone,),
         )
     else:
         cur.execute(
-            """
+            f"""
             SELECT COUNT(*) AS c FROM shared_messages
             WHERE recipient_role='farmer' AND recipient_phone=%s
-              AND is_read=0 AND is_archived=0
+              AND is_read={false_val} AND is_archived={false_val}
               AND LOWER(category) <> 'announcement'
             """,
             (phone,),
@@ -672,9 +795,13 @@ def _list_from_mysql(
     role: str,
     phone: str,
 ) -> tuple[list[dict], int]:
-    params = app_db_params()
-    if not params:
-        raise RuntimeError("app_db_host not set in settings.json")
+    if beanthentic_env.is_postgresql():
+        # For PostgreSQL, we still use connect_messaging_mysql() which handles PostgreSQL
+        pass
+    else:
+        params = app_db_params()
+        if not params:
+            raise RuntimeError("app_db_host not set in settings.json")
     conn = connect_messaging_mysql()
     try:
         _ensure_shared_messages_table(conn)
@@ -683,6 +810,14 @@ def _list_from_mysql(
             if category:
                 where_sql += " AND category=%s"
                 args.append(category)
+            
+            if beanthentic_env.is_postgresql():
+                # PostgreSQL uses LIMIT n
+                limit_sql = " LIMIT %s"
+            else:
+                # MySQL uses LIMIT n
+                limit_sql = " LIMIT %s"
+                
             cur.execute(
                 f"""
                 SELECT message_id AS id, sender_phone, sender_name,
@@ -692,7 +827,7 @@ def _list_from_mysql(
                 FROM shared_messages
                 WHERE {where_sql}
                 ORDER BY created_at DESC, message_id DESC
-                LIMIT %s
+                {limit_sql}
                 """,
                 tuple(args + [limit]),
             )
@@ -751,12 +886,22 @@ def load_shared_messages_thread(farmer_phone: str) -> list[dict]:
     if not phone:
         return []
 
+    if beanthentic_env.uses_supabase_anon():
+        try:
+            from config.supabase_messaging_load import list_thread as list_thread_rest
+
+            rows = list_thread_rest(phone)
+            if rows:
+                return rows
+        except Exception:
+            pass
+
     if _prefer_http_for_messaging() and _messaging_http_bases():
         rows = _thread_from_admin_shared_messages_http(phone)
         if rows:
             return rows
 
-    if app_db_params():
+    if app_db_params() or beanthentic_env.is_postgresql():
         variants: list[str] = []
         d = re.sub(r"\D", "", phone)
         if phone.strip():
@@ -805,6 +950,14 @@ def load_shared_messages_thread(farmer_phone: str) -> list[dict]:
 
 def load_unread_message_count(*, role: str, phone: str) -> int:
     """Lightweight unread count for header badge — avoids loading full message lists."""
+    if beanthentic_env.uses_supabase_anon():
+        try:
+            from config.supabase_messaging_load import unread_count as unread_via_rest
+
+            return unread_via_rest(role=role, phone=phone)
+        except Exception:
+            pass
+
     if _prefer_http_for_messaging() and (_messaging_http_bases() or app_server_base()):
         try:
             _items, unread = _list_from_app_server(
@@ -819,7 +972,7 @@ def load_unread_message_count(*, role: str, phone: str) -> int:
         except Exception:
             pass
 
-    if app_db_params():
+    if app_db_params() or beanthentic_env.is_postgresql():
         conn = None
         try:
             conn = connect_messaging_mysql()
@@ -860,8 +1013,24 @@ def load_shared_messages(
     mysql_err: BaseException | None = None
     http_err: BaseException | None = None
 
+    if beanthentic_env.uses_supabase_anon():
+        try:
+            from config.supabase_messaging_load import list_shared_messages as list_via_rest
+
+            items, unread = list_via_rest(
+                folder=folder,
+                search=search,
+                category=category,
+                limit=limit,
+                role=role,
+                phone=phone,
+            )
+            return items, unread, "supabase_rest"
+        except Exception as exc:
+            mysql_err = exc
+
     def _try_mysql() -> tuple[list[dict], int] | None:
-        if not app_db_params():
+        if not app_db_params() and not beanthentic_env.is_postgresql():
             return None
         try:
             return _list_from_mysql(

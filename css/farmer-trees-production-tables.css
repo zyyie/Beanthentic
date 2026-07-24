@@ -1,13 +1,12 @@
 /**
- * Tree Counts (#farmerTableTrees) & Production (#farmerTableProduction) only.
- * Farmer Records — do not reuse selectors for Basic / Affiliation / Farm tables.
+ * Tree Counts, Production, Automated Yields (#farmerTableTrees / #farmerTableProduction /
+ * #farmerTableAutomatedYields) and farmer profile production mini-table.
  */
 
 /* Table width: fit columns; horizontal scroll in .table-wrapper (no huge gap before Actions) */
 #farmerTableTrees.data-table,
 #farmerTableProduction.data-table {
   max-width: none;
-  /* Flush columns — same as Farm/Basic tables (no gutter between cells) */
   border-collapse: collapse !important;
   border-spacing: 0 !important;
 }
@@ -27,9 +26,111 @@
  */
 #farmerTableProduction.data-table {
   width: 100%;
-  min-width: 800px;
+  min-width: 2600px;
   table-layout: fixed;
   box-sizing: border-box;
+}
+
+#farmerTableAutomatedYields.data-table {
+  width: 100%;
+  min-width: 1620px;
+  max-width: none;
+  table-layout: fixed;
+  box-sizing: border-box;
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent;
+}
+
+#farmerTableAutomatedYields.data-table col.ay-col-metric {
+  width: 92px;
+}
+
+/*
+ * Flush multi-row green header: light/white strokes + separate collapse read as
+ * gutters against the table's white background. Match Trees/Production approach.
+ */
+#farmerTableAutomatedYields.data-table thead th {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  box-sizing: border-box;
+  margin: 0 !important;
+  padding: 8px 8px !important;
+  border: 1px solid rgba(15, 61, 32, 0.92) !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background-clip: border-box !important;
+  background-origin: border-box !important;
+  vertical-align: middle;
+}
+
+#farmerTableAutomatedYields.data-table thead tr.header-row-1 .header-variety-group {
+  white-space: normal;
+  line-height: 1.22;
+  padding: 8px 8px !important;
+}
+
+#farmerTableAutomatedYields.data-table thead tr.header-row-2 th,
+#farmerTableAutomatedYields.data-table thead tr.header-row-3 th {
+  white-space: normal;
+  letter-spacing: 0.04em;
+  padding: 7px 6px !important;
+  font-size: 10px;
+  border-color: rgba(12, 48, 26, 0.95) !important;
+}
+
+#farmerTableAutomatedYields.data-table thead tr.header-row-1 th {
+  top: 0;
+  z-index: 6;
+}
+
+#farmerTableAutomatedYields.data-table thead tr.header-row-2 th {
+  top: 28px;
+  z-index: 5;
+}
+
+#farmerTableAutomatedYields.data-table thead tr.header-row-3 th {
+  top: 56px;
+  z-index: 4;
+}
+
+#farmerTableAutomatedYields.data-table tbody td {
+  margin: 0 !important;
+  padding: 4px 7px !important;
+  border: 1px solid rgba(139, 74, 43, 0.12) !important;
+  box-shadow: none !important;
+}
+
+#farmers-module #farmerTableAutomatedYields.data-table th {
+  padding: 8px 8px !important;
+}
+
+#farmers-module #farmerTableAutomatedYields.data-table td {
+  padding: 4px 7px !important;
+}
+
+/* Do not force Actions-column min-width onto metric headers */
+#farmers-module #farmerTableAutomatedYields.data-table thead th:last-child {
+  min-width: 0 !important;
+  overflow: hidden;
+}
+
+body.dashboard-page #farmerTableAutomatedYields.data-table thead th {
+  border: 1px solid rgba(15, 61, 32, 0.92) !important;
+  border-color: rgba(15, 61, 32, 0.92) !important;
+}
+
+body.dashboard-page #farmerTableAutomatedYields.data-table thead tr.header-row-2 th,
+body.dashboard-page #farmerTableAutomatedYields.data-table thead tr.header-row-3 th {
+  border-color: rgba(12, 48, 26, 0.95) !important;
+}
+
+#farmerTableAutomatedYields.data-table thead tr.header-row-3 .header-roasted-sub {
+  font-size: 9px;
+  letter-spacing: 0.06em;
 }
 
 /* Column widths via <colgroup> (authoritative for table-layout: fixed) */
@@ -65,8 +166,227 @@
   width: 138px;
 }
 
+#farmerTableProduction.data-table col.fp-col-class {
+  width: 138px;
+}
+
 #farmerTableProduction.data-table col.fp-col-action {
   width: 88px;
+}
+
+#farmerTableAutomatedYields.data-table col.ay-col-no {
+  width: 52px;
+}
+
+#farmerTableAutomatedYields.data-table col.ay-col-name {
+  width: 118px;
+}
+
+#farmerTableAutomatedYields.data-table col.ay-col-metric {
+  width: 92px;
+}
+
+#farmerTableAutomatedYields.data-table tbody td.ay-bearing,
+#farmerTableAutomatedYields.data-table tbody td.ay-fi,
+#farmerTableAutomatedYields.data-table tbody td.ay-ac,
+#farmerTableAutomatedYields.data-table tbody td.ay-roasted-fi,
+#farmerTableAutomatedYields.data-table tbody td.ay-roasted-ac {
+  overflow: visible;
+  text-overflow: clip;
+  font-variant-numeric: tabular-nums;
+  background: #ffffff !important;
+  color: #25130c !important;
+  border-color: rgba(139, 74, 43, 0.12) !important;
+  font-weight: 500 !important;
+}
+
+#farmerTableAutomatedYields.data-table tbody td.ay-ac,
+#farmerTableAutomatedYields.data-table tbody td.ay-roasted-ac {
+  font-weight: 600 !important;
+  color: #14532d !important;
+}
+
+#farmerTableAutomatedYields.data-table tbody td.ay-match {
+  background: #dcfce7 !important;
+  color: #14532d !important;
+  border-color: #86efac !important;
+  font-weight: 700 !important;
+  cursor: help;
+}
+
+#farmerTableAutomatedYields.data-table tbody td.ay-mismatch {
+  background: #fee2e2 !important;
+  color: #7f1d1d !important;
+  border-color: #fca5a5 !important;
+  font-weight: 700 !important;
+  cursor: help;
+}
+
+/* Farmer profile production mini-table — same green header system as Farmer Records */
+.farmer-profile-production-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(44, 122, 62, 0.22);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.production-sub-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2d1810;
+  margin: 0 0 10px 0;
+  padding: 0;
+}
+
+.farmer-profile-production-table.data-table {
+  width: 100%;
+  min-width: 520px;
+  table-layout: fixed;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  margin: 0;
+  font-size: 12px;
+}
+
+.farmer-profile-production-table.data-table thead th {
+  border: none !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
+  padding: 8px 6px;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  background-clip: padding-box !important;
+}
+
+.farmer-profile-production-table.data-table thead th:last-child {
+  border-right: none !important;
+}
+
+.farmer-profile-production-table.data-table tbody td {
+  padding: 10px 8px;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: #ffffff;
+  border: 1px solid rgba(139, 74, 43, 0.12);
+  color: #25130c;
+}
+
+/* View Production button on farmer profile */
+.btn-view-farmer-production {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(44, 122, 62, 0.28);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(44, 122, 62, 0.08), rgba(56, 161, 105, 0.06));
+  color: #1f3d24;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-view-farmer-production:hover {
+  background: linear-gradient(135deg, rgba(44, 122, 62, 0.14), rgba(56, 161, 105, 0.1));
+  border-color: rgba(44, 122, 62, 0.45);
+}
+
+.btn-view-farmer-production__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.btn-view-farmer-production__text strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.btn-view-farmer-production__hint {
+  font-size: 12px;
+  color: rgba(31, 61, 36, 0.72);
+}
+
+.btn-view-farmer-production > .fa-chevron-right {
+  color: rgba(44, 122, 62, 0.65);
+}
+
+.farmer-production-modal-card {
+  width: min(920px, calc(100vw - 40px));
+  max-width: 920px;
+  max-height: min(88vh, 900px);
+  overflow: auto;
+  padding: 24px 28px;
+  box-sizing: border-box;
+}
+
+.farmer-production-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.farmer-production-modal-card .profile-modal-header {
+  margin-bottom: 12px;
+}
+
+.farmer-production-modal-body .registration-detail-section--production {
+  width: 100%;
+  margin: 0;
+}
+
+.farmer-production-modal-body .farmer-profile-production-table-wrap + .farmer-profile-production-table-wrap {
+  margin-top: 8px;
+}
+
+/* Beat account-module.css (.profile-modal-card max-width: 520px) and farmer-profile spacing */
+#farmerProductionModal.profile-modal .profile-modal-card.farmer-production-modal-card {
+  width: fit-content;
+  max-width: min(calc(100vw - 40px), 780px);
+  min-width: min(calc(100vw - 40px), 520px);
+  padding: 20px 22px;
+}
+
+#farmerProductionModal .profile-modal-header {
+  margin-bottom: 10px;
+}
+
+#farmerProductionModal .farmer-production-modal-body {
+  gap: 4px;
+}
+
+#farmerProductionModal .registration-detail-section {
+  margin: 0 !important;
+}
+
+#farmerProductionModal .registration-detail-section--production .add-farmer-form__header-with-action {
+  margin-bottom: 6px;
+}
+
+#farmerProductionModal .production-sub-header {
+  margin: 0 0 6px;
+}
+
+#farmerProductionModal .farmer-profile-production-table-wrap {
+  overflow-x: visible;
+}
+
+#farmerProductionModal .farmer-profile-production-table.data-table {
+  width: 100%;
+  min-width: 0;
+}
+
+#farmerProductionModal .farmer-profile-production-table--harvest {
+  min-width: 420px;
+}
+
+#farmerProductionModal .farmer-profile-production-table--detail {
+  min-width: 720px;
 }
 
 /*
@@ -112,7 +432,7 @@
 }
 
 #farmerTableProduction.data-table thead tr.header-row-1 .header-group-production,
-#farmerTableProduction.data-table thead tr.header-row-2 .header-dried-cherries {
+#farmerTableProduction.data-table thead tr.header-row-2 .header-production-group {
   white-space: normal;
   line-height: 1.22;
   padding: 5px 8px;
@@ -129,7 +449,9 @@
  */
 #farmerTableTrees.data-table tbody td.highlight-yellow,
 #farmerTableTrees.data-table tbody td.highlight-green,
-#farmerTableProduction.data-table tbody td.highlight-blue {
+#farmerTableProduction.data-table tbody td.highlight-blue,
+#farmerTableProduction.data-table tbody td.highlight-green,
+#farmerTableProduction.data-table tbody td.highlight-yellow {
   overflow: visible;
   text-overflow: clip;
   font-variant-numeric: tabular-nums;
@@ -181,7 +503,7 @@
   background-clip: padding-box;
 }
 
-/* Sub-row header colors stay from dashboard.css gradients; row 2–3 use darker blend */
+/* Sub-row header colors stay from dashboard.css gradients */
 #farmerTableTrees.data-table thead tr.header-row-2 th,
 #farmerTableTrees.data-table thead tr.header-row-3 th,
 #farmerTableProduction.data-table thead tr.header-row-2 th,

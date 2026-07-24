@@ -9,7 +9,7 @@ On the **app server PC** (the machine at `192.168.1.200`), open PowerShell:
 ```powershell
 cd "C:\path\to\LATEST ADMIN\Beanthentic"
 python scripts\install_app_server_bridges.py "C:\path\to\Beanthentic-App"
-pip install pymysql
+pip install psycopg2-binary pymysql
 ```
 
 Stop the old server (Ctrl+C), then start again:
@@ -38,7 +38,7 @@ except ImportError:
     pass
 ```
 
-3. `pip install pymysql`
+3. `pip install psycopg2-binary pymysql`
 4. Restart `python app.py`
 
 After this, the admin dashboard will load farmer photos automatically.

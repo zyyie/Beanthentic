@@ -100,6 +100,12 @@ def upsert_payload_from_model(doc) -> dict:
     analysis_ts = doc.analysis_timestamp
     if isinstance(analysis_ts, datetime):
         analysis_ts = analysis_ts.isoformat()
+    score_breakdown = getattr(doc, "score_breakdown", None)
+    if not isinstance(score_breakdown, dict):
+        score_breakdown = None
+    ip_pillar_assessment = getattr(doc, "ip_pillar_assessment", None)
+    if not isinstance(ip_pillar_assessment, dict):
+        ip_pillar_assessment = None
     return {
         "file_uuid": doc.file_uuid,
         "original_filename": doc.original_filename,
@@ -113,6 +119,8 @@ def upsert_payload_from_model(doc) -> dict:
         "analysis_method": doc.analysis_method or "rule_based",
         "text_length": int(doc.text_length or 0),
         "shap_analysis": doc.shap_analysis or "",
+        "score_breakdown": score_breakdown,
+        "ip_pillar_assessment": ip_pillar_assessment,
         "upload_timestamp": upload_ts or "",
         "analysis_timestamp": analysis_ts or datetime.utcnow().isoformat(),
         "ipophl_phase": doc.ipophl_phase or "",
@@ -133,6 +141,12 @@ def upsert_payload_from_fields(**fields: Any) -> dict:
     upload_ts = fields.get("upload_timestamp")
     if isinstance(upload_ts, datetime):
         upload_ts = upload_ts.isoformat()
+    score_breakdown = fields.get("score_breakdown")
+    if not isinstance(score_breakdown, dict):
+        score_breakdown = None
+    ip_pillar_assessment = fields.get("ip_pillar_assessment")
+    if not isinstance(ip_pillar_assessment, dict):
+        ip_pillar_assessment = None
     return {
         "file_uuid": fields["file_uuid"],
         "original_filename": fields.get("original_filename", "document"),
@@ -146,6 +160,8 @@ def upsert_payload_from_fields(**fields: Any) -> dict:
         "analysis_method": fields.get("analysis_method") or "rule_based",
         "text_length": int(fields.get("text_length") or 0),
         "shap_analysis": fields.get("shap_analysis") or "",
+        "score_breakdown": score_breakdown,
+        "ip_pillar_assessment": ip_pillar_assessment,
         "upload_timestamp": upload_ts or datetime.utcnow().isoformat(),
         "analysis_timestamp": analysis_ts or datetime.utcnow().isoformat(),
         "ipophl_phase": fields.get("ipophl_phase") or "",

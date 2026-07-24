@@ -7,7 +7,8 @@ from __future__ import annotations
 from werkzeug.security import generate_password_hash
 
 from config.app_connection import app_db_params
-from config.mysql_app_bridge import connect_app_mysql
+from config.mysql_app_bridge import connect_app_db
+import beanthentic_env
 from config.validation import validate_phone
 
 
@@ -41,6 +42,17 @@ def _find_password_column(conn) -> str | None:
     return None
 
 
+def _phone_tail(phone: str) -> str:
+    import re
+
+    d = re.sub(r"\D", "", str(phone or ""))
+    if d.startswith("0"):
+        d = d[1:]
+    if d.startswith("63"):
+        d = d[2:]
+    return d
+
+
 def lookup_farmer_by_phone(phone: str) -> tuple[dict | None, str | None]:
     """
     Return farmer row dict: user_id, farmer_id, phone_number, digits10 — or (None, error).
@@ -49,9 +61,51 @@ def lookup_farmer_by_phone(phone: str) -> tuple[dict | None, str | None]:
     if not ok:
         return None, err
 
-    params = app_db_params()
-    if not params:
-        return None, "Farmer account lookup is unavailable until the app database is configured."
+    if beanthentic_env.uses_supabase_anon():
+        try:
+            from config.supabase_client import get_client
+
+            variants = set(_phone_lookup_variants(digits))
+            client = get_client()
+            users = client.table("users").select("user_id,phone_number").limit(1000).execute().data or []
+            matched_uid = None
+            matched_phone = ""
+            for u in users:
+                p = str(u.get("phone_number") or "")
+                if p in variants or _phone_tail(p) == digits:
+                    matched_uid = int(u.get("user_id") or 0)
+                    matched_phone = p
+                    break
+            if not matched_uid:
+                return None, "This phone number is not registered as a farmer."
+            farmers = (
+                client.table("farmers")
+                .select("farmer_id,user_id")
+                .eq("user_id", matched_uid)
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+            if not farmers:
+                return None, "This phone number is not registered as a farmer."
+            fid = int(farmers[0].get("farmer_id") or 0)
+            return {
+                "farmer_id": fid,
+                "user_id": matched_uid,
+                "phone_number": matched_phone,
+                "digits10": digits,
+            }, None
+        except Exception:
+            pass
+
+    if beanthentic_env.is_postgresql():
+        conn = connect_app_db({})
+    else:
+        params = app_db_params()
+        if not params:
+            return None, "Farmer account lookup is unavailable until the app database is configured."
+        conn = connect_app_db(params)
 
     variants = _phone_lookup_variants(digits)
     placeholders = ", ".join(["%s"] * len(variants))
@@ -63,9 +117,7 @@ def lookup_farmer_by_phone(phone: str) -> tuple[dict | None, str | None]:
            OR RIGHT(REPLACE(REPLACE(REPLACE(TRIM(u.phone_number), ' ', ''), '-', ''), '+', ''), 10) = %s
         LIMIT 1
     """
-    conn = None
     try:
-        conn = connect_app_mysql(params)
         with conn.cursor() as cur:
             cur.execute(sql, (*variants, digits))
             row = cur.fetchone()
@@ -96,14 +148,16 @@ def update_farmer_password(user_id: int, new_password: str) -> tuple[bool, str |
     if user_id <= 0:
         return False, "Invalid farmer account."
 
-    params = app_db_params()
-    if not params:
-        return False, "Database is not configured."
+    if beanthentic_env.is_postgresql():
+        conn = connect_app_db({})
+    else:
+        params = app_db_params()
+        if not params:
+            return False, "Database is not configured."
+        conn = connect_app_db(params)
 
     pwd_hash = generate_password_hash(new_password)
-    conn = None
     try:
-        conn = connect_app_mysql(params)
         col = _find_password_column(conn)
         if not col:
             return False, "Users table has no password column. Add password/password_hash in the app database."

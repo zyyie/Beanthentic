@@ -269,14 +269,21 @@
   color: #ffffff;
   font-size: 0.7rem;
   font-weight: 700;
-  width: 18px;
+  min-width: 18px;
   height: 18px;
-  border-radius: 50%;
-  display: flex;
+  padding: 0 4px;
+  border-radius: 999px;
+  display: none;
   align-items: center;
   justify-content: center;
   border: 2px solid #ffffff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.icon-badge.is-visible {
+  display: flex;
 }
 
 /* Wide tables must not grow the page horizontally (keeps sticky header + burger in view) */
@@ -886,9 +893,22 @@ body.dashboard-page {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Farmer Records: keep scroll inside the table wrapper */
+/* Farmer Records + Messaging: keep scroll inside module panes */
 .module-content.lock-scroll {
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
+.module-content.lock-scroll > .module:not(.hidden) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.module-content.lock-scroll > #farmers-module.module {
+  padding-bottom: 0;
 }
 
 /* Avoid global section padding from base.css inside the app layout */
@@ -1550,9 +1570,27 @@ select:focus {
 
 #farmers-module .table-container {
   margin-top: 0;
-  padding: 0.65rem 0.75rem;
-  flex: 1;
+  padding: 0.65rem 0.75rem 0.75rem;
+  flex: 1 1 auto;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#farmers-module .table-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+#farmers-module .table-footer {
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding-top: 0.65rem;
+  gap: 0.65rem;
+  background: linear-gradient(135deg, #ffffff, #faf9f7);
+  border-top: 1px solid rgba(139, 74, 43, 0.12);
 }
 
 .farmer-toolbar {
@@ -1561,15 +1599,49 @@ select:focus {
   gap: 1.25rem;
 }
 
+.farmer-toolbar .toolbar-left.farmer-toolbar-search-wrap {
+  flex: 1 1 calc(100% - 360px);
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.65rem;
+}
+
 .farmer-toolbar-tabs {
   width: 100%;
+  min-width: 0;
+}
+
+.farmer-toolbar-tabs .farmer-table-view-toggle,
+#farmers-module .farmer-toolbar-tabs .farmer-table-view-toggle {
+  display: flex;
+  width: 100%;
+  max-width: none;
+  justify-content: space-between;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: clamp(0.35rem, 1vw, 0.85rem);
+  box-sizing: border-box;
+}
+
+.farmer-toolbar-tabs .farmer-table-view-toggle .view-toggle-btn,
+#farmers-module .farmer-toolbar-tabs .view-toggle-btn {
+  flex: 1 1 0%;
+  min-width: 0;
+  max-width: none;
+  text-align: center;
+  justify-content: center;
+  padding-inline: clamp(0.2rem, 0.6vw, 0.65rem);
 }
 
 /* Tab strip: no outer “card” — only the buttons read as tabs */
 .farmer-toolbar-tabs .table-view-toggle {
   width: 100%;
-  justify-content: flex-start;
-  flex-wrap: wrap;
+  max-width: none;
+  justify-content: space-between;
+  flex-wrap: nowrap;
   box-sizing: border-box;
   padding: 0;
   margin: 0;
@@ -1579,7 +1651,7 @@ select:focus {
   box-shadow: none;
   min-height: 0;
   overflow: visible;
-  gap: 0.35rem 0.5rem;
+  gap: clamp(0.35rem, 1vw, 0.85rem);
 }
 
 .farmer-toolbar-tabs .table-view-toggle::before {
@@ -1597,12 +1669,6 @@ select:focus {
   flex-wrap: nowrap;
   width: 100%;
   min-width: 0;
-}
-
-.farmer-toolbar .toolbar-left.farmer-toolbar-search-wrap {
-  flex: 1 1 calc(100% - 360px);
-  min-width: 0;
-  width: 100%;
 }
 
 .farmer-toolbar .farmer-toolbar-actions {
@@ -1680,23 +1746,31 @@ select:focus {
   color: #3b1f12;
 }
 
-/* Reference-style tabs: plain text + pill active */
-#farmers-module .farmer-toolbar-tabs .farmer-table-view-toggle {
+#farmers-module .farmer-toolbar-search-wrap .table-view-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  width: 100%;
+  max-width: none;
+  margin-top: 0.35rem;
+  padding: 0;
+  gap: 0.2rem 0.35rem;
   background: transparent;
   border: none;
+  border-radius: 0;
   box-shadow: none;
-  padding: 0.35rem 0;
-  margin: 0;
   min-height: 0;
-  gap: 0.2rem 0.35rem;
   overflow: visible;
 }
 
-#farmers-module .farmer-toolbar-tabs .farmer-table-view-toggle::before {
+#farmers-module .farmer-toolbar-search-wrap .table-view-toggle::before {
   display: none;
+  content: none;
 }
 
-#farmers-module .farmer-toolbar-tabs .view-toggle-btn {
+#farmers-module .farmer-toolbar-search-wrap .view-toggle-btn {
+  flex: 0 1 auto;
+  width: auto;
   border: none;
   background: transparent;
   color: #5a2e1c;
@@ -1710,6 +1784,79 @@ select:focus {
   box-shadow: none;
   transform: none;
   text-shadow: none;
+}
+
+#farmers-module .farmer-toolbar-search-wrap .view-toggle-btn::before {
+  display: none;
+}
+
+#farmers-module .farmer-toolbar-search-wrap .view-toggle-btn:hover {
+  color: #3b1f12;
+  background: rgba(139, 74, 43, 0.08);
+  box-shadow: none;
+  transform: none;
+}
+
+#farmers-module .farmer-toolbar-search-wrap .view-toggle-btn.active {
+  background: linear-gradient(135deg, #2c7a3e 0%, #38a169 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(44, 122, 62, 0.25);
+  transform: none;
+}
+
+#farmers-module .farmer-toolbar-search-wrap .view-toggle-btn.active:hover {
+  background: linear-gradient(135deg, #276749 0%, #2f855a 100%);
+  box-shadow: 0 4px 12px rgba(44, 122, 62, 0.3);
+}
+
+body.dashboard-page #farmers-module .farmer-toolbar-search-wrap .view-toggle-btn.active {
+  background: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 100%);
+  color: #ffffff;
+  border: none;
+}
+
+body.dashboard-page #farmers-module .farmer-toolbar-search-wrap .view-toggle-btn.active:hover {
+  background: linear-gradient(135deg, var(--accent-1-dark) 0%, var(--accent-2-dark) 100%);
+}
+
+/* Reference-style tabs: plain text + pill active */
+#farmers-module .farmer-toolbar-tabs .farmer-table-view-toggle {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0.15rem 0 0;
+  margin: 0;
+  min-height: 0;
+  gap: clamp(0.35rem, 1vw, 0.85rem);
+  overflow: visible;
+  justify-content: space-between;
+  width: 100%;
+  max-width: none;
+}
+
+#farmers-module .farmer-toolbar-tabs .farmer-table-view-toggle::before {
+  display: none;
+}
+
+#farmers-module .farmer-toolbar-tabs .view-toggle-btn {
+  border: none;
+  background: transparent;
+  color: #5a2e1c;
+  padding: 0.45rem clamp(0.2rem, 0.6vw, 0.65rem);
+  border-radius: 999px;
+  font-size: clamp(0.62rem, 0.9vw, 0.72rem);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  min-height: 36px;
+  box-shadow: none;
+  transform: none;
+  text-shadow: none;
+  flex: 1 1 0%;
+  min-width: 0;
+  max-width: none;
+  text-align: center;
+  white-space: nowrap;
 }
 
 #farmers-module .farmer-toolbar-tabs .view-toggle-btn::before {
@@ -1737,13 +1884,29 @@ select:focus {
   transform: none;
 }
 
+/* Tabs must span the search bar — override global .table-view-toggle max-width: 500px */
+#farmers-module .farmer-toolbar-search-wrap .farmer-toolbar-tabs .table-view-toggle.farmer-table-view-toggle {
+  display: flex;
+  width: 100%;
+  max-width: none;
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  gap: clamp(0.35rem, 1vw, 0.85rem);
+}
+
+#farmers-module .farmer-toolbar-search-wrap .farmer-toolbar-tabs .view-toggle-btn {
+  flex: 1 1 0%;
+  min-width: 0;
+  max-width: none;
+}
+
 /* One horizontal line: label + input stretches; actions share vertical center with input */
 .farmer-toolbar .farmer-search-field {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 0.65rem;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
   width: 100%;
 }
@@ -2109,6 +2272,28 @@ select:focus {
   font-weight: 800;
   color: #3b2107;
   line-height: 1.2;
+}
+
+.analytics-kpi-value--sm {
+  font-size: 1.15rem;
+  line-height: 1.35;
+}
+
+.analytics-kpi-value--phase {
+  font-size: 1.35rem;
+}
+
+.analytics-section-title {
+  margin: 1.5rem 0 0.85rem;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #4b5563;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.analytics-charts-section .analytics-section-title:first-of-type {
+  margin-top: 0.25rem;
 }
 
 .analytics-kpi-sub {
@@ -2634,75 +2819,13 @@ select:focus {
   }
 }
 
-body.dashboard-page #ipophl-module .phase-btn.complete-btn.is-loading {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.55rem;
-  min-width: 16rem;
-  cursor: wait;
-  pointer-events: none;
-  opacity: 1;
-  background: linear-gradient(135deg, #b45309 0%, #d97706 100%) !important;
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.35);
-  animation: complete-btn-pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes complete-btn-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.35);
-  }
-  50% {
-    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.2);
-  }
-}
-
-.ipophl-complete-status {
-  margin: 0.85rem 0 0;
-  padding: 0.85rem 1rem;
-  border-radius: 10px;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  max-width: 42rem;
-}
-
-.ipophl-complete-status:not([hidden]) {
-  display: block;
-}
-
-.ipophl-complete-status.is-busy {
-  background: #fffbeb;
-  border: 1px solid #f59e0b;
-  color: #92400e;
-}
-
-.ipophl-complete-status.is-ok {
-  background: #ecfdf5;
-  border: 1px solid #34d399;
-  color: #065f46;
-}
-
-.ipophl-complete-status.is-err {
-  background: #fef2f2;
-  border: 1px solid #f87171;
-  color: #991b1b;
-}
-
-.ipophl-complete-status .status-step {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  margin-top: 0.35rem;
-}
-
-.ipophl-complete-status .status-step:first-child {
-  margin-top: 0;
-}
-
-.ipophl-complete-status .status-step i {
-  margin-top: 0.15rem;
-  flex-shrink: 0;
+body.dashboard-page #ipophl-module .phase-btn.complete-btn.is-completed,
+body.dashboard-page #ipophl-module .phase-btn.complete-btn.is-completed:hover {
+  background: linear-gradient(135deg, #9ca3af, #6b7280) !important;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.72;
+  transform: none;
 }
 
 .phase-btn:disabled {
@@ -3026,6 +3149,18 @@ body.dashboard-page #ipophl-module .phase-btn.complete-btn.is-loading {
   background: #f0fdf4;
   color: #16a34a;
   border: 1px solid #dcfce7;
+}
+
+.registration-trend-badge.negative {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fee2e2;
+}
+
+.registration-trend-badge.neutral {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
 }
 
 /* Table Section */
@@ -4094,12 +4229,6 @@ body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.ac
   min-width: 5.75rem;
 }
 
-#farmers-module .table-footer {
-  margin-top: 0.65rem;
-  padding-top: 0.65rem;
-  gap: 0.65rem;
-}
-
 #farmers-module .table-info {
   font-size: 12px;
 }
@@ -5002,8 +5131,15 @@ body.confirm-dialog-active {
     margin-left: 0;
   }
 
-  .farmer-toolbar-tabs .table-view-toggle {
-    justify-content: center;
+  .farmer-toolbar-tabs .farmer-table-view-toggle {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    max-width: none;
+  }
+
+  .farmer-toolbar-tabs .farmer-table-view-toggle .view-toggle-btn {
+    flex: 1 1 0%;
+    min-width: 0;
   }
 
   .controls-row {
@@ -5795,6 +5931,15 @@ body.dashboard-page #farmers-list-module .farmer-card__status-badge::before {
   border-radius: 50%;
 }
 
+body.dashboard-page #farmers-list-module .farmer-card__status-badge.is-blocked {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: #ffffff;
+}
+
+body.dashboard-page #farmers-list-module .farmer-card__status-badge.is-blocked::before {
+  background: #ffffff;
+}
+
 body.dashboard-page #farmers-list-module .farmer-card__menu-dots {
   color: #cbd5e1;
   font-size: 1.2rem;
@@ -5827,11 +5972,17 @@ body.dashboard-page #farmers-list-module .farmer-card__image {
   object-fit: cover;
   position: absolute;
   inset: 0;
+  z-index: 1;
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__avatar-fallback {
   position: relative;
   z-index: 0;
+  pointer-events: none;
+}
+
+body.dashboard-page #farmers-list-module .farmer-card__avatar-circle.has-photo .farmer-card__avatar-fallback {
+  display: none;
 }
 
 body.dashboard-page #farmers-list-module .farmer-card__identity {
@@ -6248,8 +6399,11 @@ body.dashboard-page #maps-module .maps-api-key-banner code {
 }
 
 body.dashboard-page #maps-module .maps-toolbar__variety {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 0.5rem;
   background: #ffffff;
   border-radius: 16px;
   padding: 6px;
@@ -6260,15 +6414,17 @@ body.dashboard-page #maps-module .maps-toolbar__variety {
 }
 
 body.dashboard-page #maps-module .maps-variety-btn {
+  flex: 1 1 0;
+  min-width: 0;
   height: 44px;
-  padding: 0;
-  width: 100%;
+  padding: 0 0.65rem;
+  width: auto;
   border-radius: 12px;
   border: none;
   background: transparent;
   color: #4b5563;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: clamp(0.82rem, 1vw, 0.95rem);
   box-shadow: none;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -6276,6 +6432,7 @@ body.dashboard-page #maps-module .maps-variety-btn {
   display: flex;
   align-items: center;
   justify-content: center;
+  text-align: center;
 }
 
 body.dashboard-page #maps-module .maps-variety-btn:hover {
@@ -6367,6 +6524,15 @@ body.dashboard-page #maps-module .maps-google-canvas {
 
 body.dashboard-page #maps-module .maps-google-canvas.is-hidden {
   display: none;
+}
+
+body.dashboard-page #maps-module .farmer-leaflet-pin {
+  background: transparent;
+  border: none;
+}
+
+body.dashboard-page #maps-module .leaflet-popup-content .map-info-popup {
+  margin: 0;
 }
 
 body.dashboard-page #maps-module .maps-google-fallback {
@@ -6656,7 +6822,15 @@ body.dashboard-page #maps-module .layer-toggle.is-on::after {
 
 @media (max-width: 1120px) {
   body.dashboard-page #maps-module .maps-toolbar__variety {
-    grid-template-columns: 1fr;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+    padding: 5px;
+  }
+
+  body.dashboard-page #maps-module .maps-variety-btn {
+    height: 40px;
+    padding: 0 0.35rem;
+    font-size: 0.78rem;
   }
 
   body.dashboard-page #maps-module .maps-module-layout {
@@ -6718,44 +6892,65 @@ body.dashboard-page .gm-ui-hover-effect > span {
 }
 
 .map-info-popup {
-  min-width: 260px;
-  max-width: 320px;
+  position: relative;
+  min-width: 280px;
+  max-width: 340px;
   font-family: var(--font-sans);
   color: #1e293b;
   overflow: hidden;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+  border: 1px solid rgba(44, 122, 62, 0.14);
+}
+
+.map-info-popup__accent {
+  height: 4px;
+  background: linear-gradient(90deg, #2c7a3e 0%, #38a169 45%, #68d391 100%);
 }
 
 .map-info-popup__header {
   display: flex;
   align-items: flex-start;
-  gap: 0.65rem;
-  padding: 0.85rem 2rem 0.75rem 0.9rem;
-  background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 55%, #ffffff 100%);
-  border-bottom: 1px solid rgba(44, 122, 62, 0.12);
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.85rem;
+  background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);
+  border-bottom: 1px solid rgba(44, 122, 62, 0.1);
 }
 
 .map-info-popup__pin {
   flex-shrink: 0;
-  width: 2rem;
-  height: 2rem;
+  width: 2.35rem;
+  height: 2.35rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 12px;
   background: linear-gradient(135deg, #2c7a3e, #38a169);
   color: #fff;
-  font-size: 0.95rem;
-  box-shadow: 0 4px 10px rgba(44, 122, 62, 0.28);
+  font-size: 1rem;
+  box-shadow: 0 6px 14px rgba(44, 122, 62, 0.28);
 }
 
 .map-info-popup__heading {
   min-width: 0;
   flex: 1;
+  padding-top: 0.05rem;
+}
+
+.map-info-popup__eyebrow {
+  margin: 0 0 0.15rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+  line-height: 1.35;
 }
 
 .map-info-popup__title {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1.12rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #14532d;
@@ -6772,9 +6967,9 @@ body.dashboard-page .gm-ui-hover-effect > span {
 
 .map-info-popup__stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
-  gap: 0.45rem;
-  padding: 0.7rem 0.9rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
   background: #fff;
 }
 
@@ -6783,11 +6978,13 @@ body.dashboard-page .gm-ui-hover-effect > span {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 0.15rem;
-  padding: 0.45rem 0.35rem;
-  border-radius: 10px;
-  background: #f8fafc;
+  gap: 0.2rem;
+  padding: 0.55rem 0.4rem;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   border: 1px solid #e2e8f0;
+  min-height: 4.5rem;
+  justify-content: center;
 }
 
 .map-info-popup__stat-icon {
@@ -6805,20 +7002,20 @@ body.dashboard-page .gm-ui-hover-effect > span {
 
 .map-info-popup__stat-label {
   font-size: 0.62rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #64748b;
-  line-height: 1.2;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  line-height: 1.25;
 }
 
 .map-info-popup__footer {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.65rem 0.9rem 0.8rem;
+  gap: 0.45rem;
+  padding: 0.75rem 1rem 0.95rem;
   background: #fafafa;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid #eef2f7;
 }
 
 .map-info-popup__variety,
@@ -6995,6 +7192,38 @@ body.dashboard-page #ipophl-module .progress-step.completed .step-icon {
   background: #22c55e;
   border-color: #22c55e;
   color: #ffffff;
+}
+
+body.dashboard-page #ipophl-module .progress-step.locked {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+body.dashboard-page #ipophl-module .progress-step.locked .step-icon {
+  box-shadow: none;
+}
+
+body.dashboard-page #ipophl-module .phase-btn.next-phase.is-locked,
+body.dashboard-page #ipophl-module .phase-btn.next-phase:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.ipophl-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #fff;
+  padding: 14px 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(5, 150, 105, 0.35);
+  z-index: 10000;
+  max-width: 360px;
+  font-size: 0.92rem;
+  line-height: 1.45;
 }
 
 body.dashboard-page #ipophl-module .step-title {
@@ -7861,16 +8090,24 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   background-color: #f8fafc;
 }
 
-/* Unread indicator vertical bar */
-.beanthentic-contribution-item.unread::before {
+/* Unread: red dot (matches Messages module) */
+.beanthentic-contribution-item.unread::after {
   content: '';
   position: absolute;
-  left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 4px;
-  background-color: #276749; /* Green vertical indicator */
-  border-radius: 0 4px 4px 0;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 10px;
+  background: #e53e3e;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+}
+
+.beanthentic-contribution-item.unread {
+  padding-right: 36px;
 }
 
 .beanthentic-contribution-checkbox {
@@ -7901,8 +8138,8 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 
 .beanthentic-contribution-farmer {
   font-size: 14px;
-  font-weight: 700;
-  color: #1e293b;
+  font-weight: 500;
+  color: #6b7280;
   width: 150px;
   flex-shrink: 0;
   white-space: nowrap;
@@ -7910,9 +8147,14 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   text-overflow: ellipsis;
 }
 
+.beanthentic-contribution-item.is-read .beanthentic-contribution-farmer {
+  color: #6b7280;
+  font-weight: 500;
+}
+
 .beanthentic-contribution-item.unread .beanthentic-contribution-farmer {
-  color: #0f172a;
-  font-weight: 800;
+  color: #111827;
+  font-weight: 700;
 }
 
 .beanthentic-contribution-subject {
@@ -7926,9 +8168,19 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
 }
 
 .beanthentic-contribution-subject-text {
-.beanthentic-contribution-item.unread .beanthentic-contribution-subject-text {
-  color: #2d3748;
   font-weight: 500;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.beanthentic-contribution-item.is-read .beanthentic-contribution-subject-text {
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.beanthentic-contribution-item.unread .beanthentic-contribution-subject-text {
+  color: #111827;
+  font-weight: 700;
 }
 
 .beanthentic-contribution-tags {
@@ -7986,24 +8238,46 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
   text-transform: none;
 }
 
-.beanthentic-contribution-preview,
-.beanthentic-contribution-date {
-  display: none; /* legacy classes (older markup) */
-  background: rgba(255, 255, 255, 0.2);
+.beanthentic-contribution-preview {
+  display: none; /* legacy class (older markup) */
 }
 
 .beanthentic-contribution-preview-inline {
-  /* Flex truncation:
-     `min-width: 0` is required so the browser allows the element to shrink
-     and `text-overflow: ellipsis` can apply. */
   flex: 1;
   min-width: 0;
-  color: #fff;
-  transition: background-color 0.2s;
+  color: #9ca3af;
+  font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.beanthentic-contribution-item.is-read .beanthentic-contribution-preview-inline {
+  color: #9ca3af;
+  font-weight: 400;
+}
+
+.beanthentic-contribution-item.unread .beanthentic-contribution-preview-inline {
+  color: #374151;
+  font-weight: 600;
+}
+
+.beanthentic-contribution-date {
+  min-width: 80px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 400;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.beanthentic-contribution-item.is-read .beanthentic-contribution-date {
+  color: #9ca3af;
+}
+
+.beanthentic-contribution-item.unread .beanthentic-contribution-date {
+  color: #374151;
+  font-weight: 600;
 }
 
 /* Empty state (shown when list has no items) */
@@ -8028,31 +8302,7 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
     0 4px 16px rgba(15, 23, 42, 0.06);
 }
 
-/* Detail Modal styles handled in modules-enhancement.css */
-.beanthentic-detail-dialog {
-  position: fixed;
-  inset: 0;
-  z-index: 100000; /* Higher z-index to cover everything */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-
-.beanthentic-detail-dialog[hidden] {
-  display: none !important;
-}
-
-.beanthentic-detail-dialog__card {
-  position: relative;
-  width: 90%;
-  max-width: 820px;
-  background: #ffffff;
-  border-radius: 14px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-  padding: 24px;
-  z-index: 2;
-}
+/* Farmer's Contribution detail modal — see modules-enhancement.css (.fc-detail-*) */
 
 .beanthentic-detail-dialog__close {
   position: absolute;

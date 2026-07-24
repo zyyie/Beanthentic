@@ -353,19 +353,62 @@ def _notifications_farmer_moderation_state() -> list[dict]:
     return out
 
 
+def _is_postgresql_db(conn) -> bool:
+    # Check if connection is PostgreSQL
+    try:
+        import os
+        from pathlib import Path
+        import json
+
+        # First check env vars
+        db_url = os.getenv("DATABASE_URL", "").strip()
+        if db_url.startswith("postgresql://") or db_url.startswith("postgres://"):
+            return True
+
+        # Check settings.json
+        settings_path = Path(__file__).resolve().parents[1] / "settings.json"
+        if settings_path.exists():
+            try:
+                settings = json.loads(settings_path.read_text(encoding="utf-8"))
+                conn_settings = settings.get("connection", {})
+                app_db_url = str(conn_settings.get("app_db_url", "")).strip()
+                if app_db_url.startswith("postgresql://") or app_db_url.startswith("postgres://"):
+                    return True
+                dialect = str(conn_settings.get("app_db_dialect", "")).lower()
+                if dialect in ("postgresql", "postgres"):
+                    return True
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return False
+
+
 def _app_db_column_exists(conn, table: str, column: str) -> bool:
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT COUNT(*) AS c
-                FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE()
-                  AND TABLE_NAME = %s
-                  AND COLUMN_NAME = %s
-                """,
-                (table, column),
-            )
+            if _is_postgresql_db(conn):
+                cur.execute(
+                    """
+                    SELECT COUNT(*) AS c
+                    FROM information_schema.columns
+                    WHERE table_schema = CURRENT_SCHEMA()
+                      AND table_name = %s
+                      AND column_name = %s
+                    """,
+                    (table, column),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT COUNT(*) AS c
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = %s
+                      AND COLUMN_NAME = %s
+                    """,
+                    (table, column),
+                )
             return int((cur.fetchone() or {}).get("c") or 0) > 0
     except Exception:
         return False

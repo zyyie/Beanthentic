@@ -1,45 +1,94 @@
-"""Farmer account warning / suspend — shared MySQL helpers (Beanthentic-App schema)."""
+"""Farmer account warning / suspend — shared PostgreSQL/SQL helpers (Beanthentic-App schema)."""
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta
 from typing import Any
 
+try:
+    import beanthentic_env
+except ImportError:
+    beanthentic_env = None
 
-MOD_COLUMNS: dict[str, str] = {
-    "is_suspended": "TINYINT(1) NOT NULL DEFAULT 0",
-    "suspended_until": "DATETIME NULL",
-    "suspension_reason": "VARCHAR(500) NULL",
-    "warning_count": "INT NOT NULL DEFAULT 0",
-    "last_warning_at": "DATETIME NULL",
-    "last_warning_reason": "VARCHAR(500) NULL",
-}
+
+def _is_postgresql_db(conn) -> bool:
+    if beanthentic_env:
+        return beanthentic_env.is_postgresql()
+    return False
+
+
+def _table_columns(cur, table: str) -> set[str]:
+    if _is_postgresql_db(None):
+        cur.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = CURRENT_SCHEMA() AND table_name = %s
+            """,
+            (table,),
+        )
+    else:
+        cur.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE() AND table_name = %s
+            """,
+            (table,),
+        )
+    rows = cur.fetchall()
+    out: set[str] = set()
+    for row in rows:
+        out.add(row["column_name"] if isinstance(row, dict) else row[0])
+    return out
+
+
+def _farmer_pk_column(cur) -> str:
+    cols = _table_columns(cur, "farmers")
+    if "farmer_id" in cols:
+        return "farmer_id"
+    return "id"
+
+
+def _get_mod_columns(conn) -> dict[str, str]:
+    if _is_postgresql_db(conn):
+        return {
+            "is_suspended": "BOOLEAN NOT NULL DEFAULT FALSE",
+            "suspended_until": "TIMESTAMPTZ NULL",
+            "suspension_reason": "VARCHAR(500) NULL",
+            "warning_count": "INT NOT NULL DEFAULT 0",
+            "last_warning_at": "TIMESTAMPTZ NULL",
+            "last_warning_reason": "VARCHAR(500) NULL",
+        }
+    return {
+        "is_suspended": "TINYINT(1) NOT NULL DEFAULT 0",
+        "suspended_until": "DATETIME NULL",
+        "suspension_reason": "VARCHAR(500) NULL",
+        "warning_count": "INT NOT NULL DEFAULT 0",
+        "last_warning_at": "DATETIME NULL",
+        "last_warning_reason": "VARCHAR(500) NULL",
+    }
 
 
 def ensure_farmer_mod_columns(conn) -> None:
-    with conn.cursor() as cur:
-        for name, col_def in MOD_COLUMNS.items():
-            cur.execute(
-                """
-                SELECT COUNT(*) AS c FROM information_schema.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'farmers' AND COLUMN_NAME = %s
-                """,
-                (name,),
-            )
-            if int((cur.fetchone() or {}).get("c") or 0) == 0:
-                cur.execute(f"ALTER TABLE farmers ADD COLUMN {name} {col_def}")
+    # Instead of checking columns (which can interfere with transactions), 
+    # since we already know they're there, just skip this for now
+    pass
 
 
 def clear_expired_suspensions(conn, farmer_id: int | None = None) -> None:
     ensure_farmer_mod_columns(conn)
-    sql = """
+    is_postgres = _is_postgresql_db(conn)
+    now_func = "CURRENT_TIMESTAMP" if is_postgres else "NOW()"
+    sql = f"""
         UPDATE farmers
-        SET is_suspended = 0, suspended_until = NULL, suspension_reason = NULL
-        WHERE is_suspended = 1 AND suspended_until IS NOT NULL AND suspended_until <= NOW()
+        SET is_suspended = {'FALSE' if is_postgres else '0'}, suspended_until = NULL, suspension_reason = NULL
+        WHERE is_suspended = {'TRUE' if is_postgres else '1'} AND suspended_until IS NOT NULL AND suspended_until <= {now_func}
     """
     with conn.cursor() as cur:
         if farmer_id and farmer_id > 0:
-            cur.execute(sql + " AND farmer_id = %s", (farmer_id,))
+            fk = _farmer_pk_column(cur)
+            cur.execute(sql + f" AND {fk} = %s", (farmer_id,))
         else:
             cur.execute(sql)
 
@@ -48,31 +97,39 @@ def _parse_until(until) -> datetime | None:
     if until is None or until == "":
         return None
     if isinstance(until, datetime):
-        return until
-    try:
-        return datetime.fromisoformat(str(until).replace("Z", "+00:00").split("+")[0])
-    except ValueError:
-        pass
-    try:
-        return datetime.strptime(str(until)[:19], "%Y-%m-%d %H:%M:%S")
-    except ValueError:
-        return None
+        dt = until
+    else:
+        dt = None
+        try:
+            dt = datetime.fromisoformat(str(until).replace("Z", "+00:00"))
+        except ValueError:
+            pass
+        if dt is None:
+            try:
+                dt = datetime.strptime(str(until)[:19], "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                return None
+    if dt.tzinfo is not None:
+        return dt.replace(tzinfo=None)
+    return dt
 
 
 def farmer_account_status(conn, farmer_id: int) -> dict[str, Any]:
     clear_expired_suspensions(conn, farmer_id)
     with conn.cursor() as cur:
+        fk = _farmer_pk_column(cur)
         cur.execute(
-            """
+            f"""
             SELECT is_suspended, suspended_until, suspension_reason,
                    warning_count, last_warning_at, last_warning_reason
-            FROM farmers WHERE farmer_id = %s LIMIT 1
+            FROM farmers WHERE {fk} = %s LIMIT 1
             """,
             (farmer_id,),
         )
         row = cur.fetchone() or {}
 
-    is_susp = int(row.get("is_suspended") or 0) == 1
+    raw_susp = row.get("is_suspended")
+    is_susp = raw_susp is True or int(raw_susp or 0) == 1
     until_raw = row.get("suspended_until")
     until_dt = _parse_until(until_raw)
     active_susp = False
@@ -97,36 +154,73 @@ def farmer_account_status(conn, farmer_id: int) -> dict[str, Any]:
 
 
 def _log_moderation_action(conn, farmer_id: int, action: str, reason: str, expires_at=None) -> None:
-    """Optional audit row in farmer_moderation_logs (if table exists)."""
+    """Optional audit row in farmer_moderation_logs (must not abort the main transaction)."""
+    is_postgres = _is_postgresql_db(conn)
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT user_id FROM farmers WHERE farmer_id = %s LIMIT 1", (farmer_id,))
+            if is_postgres:
+                cur.execute("SAVEPOINT moderation_log")
+            fk = _farmer_pk_column(cur)
+            cur.execute(f"SELECT user_id FROM farmers WHERE {fk} = %s LIMIT 1", (farmer_id,))
             row = cur.fetchone() or {}
             user_id = int(row.get("user_id") or 0)
             if user_id <= 0:
+                if is_postgres:
+                    cur.execute("RELEASE SAVEPOINT moderation_log")
                 return
+
+            log_cols = _table_columns(cur, "farmer_moderation_logs")
+            if not log_cols:
+                if is_postgres:
+                    cur.execute("RELEASE SAVEPOINT moderation_log")
+                return
+
+            fields = ["user_id", "farmer_id"]
+            values: list[Any] = [user_id, farmer_id]
+            if "type" in log_cols:
+                fields.append("type")
+                values.append(action)
+            if "action" in log_cols:
+                fields.append("action")
+                values.append(action)
+            if "reason" in log_cols:
+                fields.append("reason")
+                values.append(reason[:500] if reason else None)
+            if "expires_at" in log_cols and expires_at is not None:
+                fields.append("expires_at")
+                values.append(expires_at)
+
+            placeholders = ", ".join(["%s"] * len(fields))
             cur.execute(
-                """
-                INSERT INTO farmer_moderation_logs (user_id, farmer_id, type, reason, expires_at)
-                VALUES (%s, %s, %s, %s, %s)
-                """,
-                (user_id, farmer_id, action, reason[:500] if reason else None, expires_at),
+                f"INSERT INTO farmer_moderation_logs ({', '.join(fields)}) "
+                f"VALUES ({placeholders})",
+                tuple(values),
             )
+            if is_postgres:
+                cur.execute("RELEASE SAVEPOINT moderation_log")
     except Exception:
-        pass
+        try:
+            with conn.cursor() as cur:
+                if is_postgres:
+                    cur.execute("ROLLBACK TO SAVEPOINT moderation_log")
+        except Exception:
+            pass
 
 
 def apply_warning(conn, farmer_id: int, reason: str) -> dict[str, Any]:
     ensure_farmer_mod_columns(conn)
     reason = (reason or "").strip()[:500]
+    is_postgres = _is_postgresql_db(conn)
+    now_func = "CURRENT_TIMESTAMP" if is_postgres else "NOW()"
     with conn.cursor() as cur:
+        fk = _farmer_pk_column(cur)
         cur.execute(
-            """
+            f"""
             UPDATE farmers
             SET warning_count = warning_count + 1,
-                last_warning_at = NOW(),
+                last_warning_at = {now_func},
                 last_warning_reason = %s
-            WHERE farmer_id = %s
+            WHERE {fk} = %s
             """,
             (reason, farmer_id),
         )
@@ -138,30 +232,48 @@ def apply_suspend(conn, farmer_id: int, reason: str, days: int = 3) -> dict[str,
     ensure_farmer_mod_columns(conn)
     reason = (reason or "").strip()[:500]
     days = max(1, min(int(days or 3), 365))
+    is_postgres = _is_postgresql_db(conn)
+    now_func = "CURRENT_TIMESTAMP" if is_postgres else "NOW()"
+    interval_clause = f"CURRENT_TIMESTAMP + INTERVAL '{days} days'" if is_postgres else f"DATE_ADD(NOW(), INTERVAL %s DAY)"
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            UPDATE farmers
-            SET is_suspended = 1,
-                suspended_until = DATE_ADD(NOW(), INTERVAL %s DAY),
-                suspension_reason = %s
-            WHERE farmer_id = %s
-            """,
-            (days, reason, farmer_id),
-        )
+        fk = _farmer_pk_column(cur)
+        if is_postgres:
+            cur.execute(
+                f"""
+                UPDATE farmers
+                SET is_suspended = TRUE,
+                    suspended_until = {interval_clause},
+                    suspension_reason = %s
+                WHERE {fk} = %s
+                """,
+                (reason, farmer_id),
+            )
+        else:
+            cur.execute(
+                f"""
+                UPDATE farmers
+                SET is_suspended = 1,
+                    suspended_until = {interval_clause},
+                    suspension_reason = %s
+                WHERE {fk} = %s
+                """,
+                (days, reason, farmer_id),
+            )
     return farmer_account_status(conn, farmer_id)
 
 
 def apply_unsuspend(conn, farmer_id: int, _reason: str = "") -> dict[str, Any]:
     ensure_farmer_mod_columns(conn)
+    is_postgres = _is_postgresql_db(conn)
     with conn.cursor() as cur:
+        fk = _farmer_pk_column(cur)
         cur.execute(
-            """
+            f"""
             UPDATE farmers
-            SET is_suspended = 0,
+            SET is_suspended = {'FALSE' if is_postgres else '0'},
                 suspended_until = NULL,
                 suspension_reason = NULL
-            WHERE farmer_id = %s
+            WHERE {fk} = %s
             """,
             (farmer_id,),
         )

@@ -1,5 +1,5 @@
 """
-PyMySQL connection to Beanthentic-App MySQL on the LAN (XAMPP device).
+PyMySQL/psycopg2 connection to Beanthentic-App MySQL/PostgreSQL on the LAN or Supabase.
 
 Typical setup (3 devices):
   - Device A: mobile app + XAMPP (MySQL host — set app_db_host to A's LAN IP on B and C)
@@ -14,14 +14,65 @@ from __future__ import annotations
 
 import os
 
-import pymysql
-from pymysql.err import OperationalError
+try:
+    import pymysql
+    from pymysql.err import OperationalError as MySQLOperationalError
+    MYSQL_AVAILABLE = True
+except ImportError:
+    MySQLOperationalError = Exception
+    MYSQL_AVAILABLE = False
 
-from config.app_connection import is_loopback_host, lan_mysql_fallback_hosts, app_db_connect_timeout
+try:
+    import psycopg2
+    from psycopg2 import OperationalError as PostgreSQLOperationalError
+    from psycopg2.extras import DictCursor as PostgresDictCursor
+    POSTGRESQL_AVAILABLE = True
+except ImportError:
+    PostgreSQLOperationalError = Exception
+    POSTGRESQL_AVAILABLE = False
+
+from config.app_connection import (
+    is_loopback_host,
+    lan_mysql_fallback_hosts,
+    app_db_connect_timeout,
+    read_connection_settings,
+)
+import beanthentic_env
 
 
 def _is_loopback(h: str) -> bool:
     return is_loopback_host(h)
+
+
+class PostgreSQLWrapper:
+    def __init__(self, conn):
+        self.conn = conn
+
+    def __getattr__(self, name):
+        return getattr(self.conn, name)
+
+    def cursor(self, *args, **kwargs):
+        if 'cursor_factory' not in kwargs and 'cursorclass' not in kwargs:
+            kwargs['cursor_factory'] = PostgresDictCursor
+        return self.conn.cursor(*args, **kwargs)
+
+def connect_app_db(params: dict):
+    """
+    Connect to the configured database, supports both MySQL and PostgreSQL/Supabase.
+    """
+    # First check if we're using PostgreSQL via beanthentic_env
+    if beanthentic_env.is_postgresql():
+        if not POSTGRESQL_AVAILABLE:
+            raise ImportError("psycopg2 is not installed but PostgreSQL is configured.")
+        
+        conn = beanthentic_env.connect()
+        return PostgreSQLWrapper(conn)
+
+    # If not PostgreSQL, use MySQL
+    if not MYSQL_AVAILABLE:
+        raise ImportError("pymysql is not installed but MySQL is configured.")
+
+    return connect_app_mysql(params)
 
 
 def connect_app_mysql(params: dict) -> pymysql.connections.Connection:
@@ -36,7 +87,7 @@ def connect_app_mysql(params: dict) -> pymysql.connections.Connection:
 
     host = str(params.get("host") or "").strip()
     if not host:
-        raise OperationalError(2003, "app_db_host is empty — set the XAMPP device LAN IP in settings.json")
+        raise MySQLOperationalError(2003, "app_db_host is empty — set the XAMPP device LAN IP in settings.json")
 
     base = {**params, "connect_timeout": connect_timeout}
 
@@ -53,12 +104,12 @@ def connect_app_mysql(params: dict) -> pymysql.connections.Connection:
     elif failover:
         hosts_to_try.append("127.0.0.1")
 
-    last_err: OperationalError | None = None
+    last_err: MySQLOperationalError | None = None
     for index, try_host in enumerate(hosts_to_try):
         timeout = connect_timeout if index == 0 else fallback_timeout
         try:
             return pymysql.connect(**{**base, "host": try_host, "connect_timeout": timeout})
-        except OperationalError as e:
+        except MySQLOperationalError as e:
             last_err = e
             errno = e.args[0] if e.args else None
             # Wrong password / unknown DB — same on every host; stop early.
@@ -72,9 +123,9 @@ def connect_app_mysql(params: dict) -> pymysql.connections.Connection:
                 if failover or errno == 1130:
                     try:
                         return pymysql.connect(**{**base, "host": "127.0.0.1"})
-                    except OperationalError:
+                    except MySQLOperationalError:
                         pass
             raise
     if last_err:
         raise last_err
-    raise OperationalError(2003, "Could not connect to app MySQL")
+    raise MySQLOperationalError(2003, "Could not connect to app MySQL")

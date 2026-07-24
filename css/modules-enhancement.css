@@ -1317,19 +1317,31 @@
 }
 
 #register-module .beanthentic-contribution-item.unread {
-    background: #ffffff; /* Unread is still white in Gmail, just bold text */
+    background: #ffffff;
 }
 
-/* Unread Indicator Bar */
+/* Unread: red dot (same cue as Messages module) */
 #register-module .beanthentic-contribution-item.unread::before {
+    display: none;
+}
+
+#register-module .beanthentic-contribution-item.unread::after {
     content: '';
     position: absolute;
-    left: 4px;
-    top: 15%;
-    height: 70%;
-    width: 4px;
-    background: #2d6a4f;
-    border-radius: 10px;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 10px;
+    height: 10px;
+    background: #e53e3e;
+    border-radius: 50%;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    pointer-events: none;
+}
+
+#register-module .beanthentic-contribution-item.unread {
+    padding-right: 36px;
 }
 
 #register-module .beanthentic-contribution-left {
@@ -1370,7 +1382,7 @@
 
 #register-module .beanthentic-contribution-farmer {
     font-weight: 500;
-    color: #202124;
+    color: #6b7280;
     font-size: 0.9rem;
     white-space: nowrap;
     overflow: hidden;
@@ -1378,8 +1390,14 @@
     padding-left: 8px;
 }
 
+#register-module .beanthentic-contribution-item.is-read .beanthentic-contribution-farmer {
+    font-weight: 500;
+    color: #6b7280;
+}
+
 #register-module .beanthentic-contribution-item.unread .beanthentic-contribution-farmer {
     font-weight: 700;
+    color: #111827;
 }
 
 #register-module .beanthentic-contribution-subject {
@@ -1393,18 +1411,24 @@
 
 #register-module .beanthentic-contribution-subject-text {
     font-weight: 500;
-    color: #202124;
+    color: #9ca3af;
     font-size: 0.9rem;
     white-space: nowrap;
     flex-shrink: 0;
 }
 
+#register-module .beanthentic-contribution-item.is-read .beanthentic-contribution-subject-text {
+    font-weight: 500;
+    color: #9ca3af;
+}
+
 #register-module .beanthentic-contribution-item.unread .beanthentic-contribution-subject-text {
     font-weight: 700;
+    color: #111827;
 }
 
 #register-module .beanthentic-contribution-preview-inline {
-    color: #5f6368;
+    color: #9ca3af;
     font-weight: 400;
     font-size: 0.9rem;
     white-space: nowrap;
@@ -1412,30 +1436,279 @@
     text-overflow: ellipsis;
 }
 
+#register-module .beanthentic-contribution-item.is-read .beanthentic-contribution-preview-inline {
+    color: #9ca3af;
+    font-weight: 400;
+}
+
+#register-module .beanthentic-contribution-item.unread .beanthentic-contribution-preview-inline {
+    color: #374151;
+    font-weight: 600;
+}
+
 #register-module .beanthentic-contribution-date {
     min-width: 80px;
     text-align: right;
     font-size: 0.75rem;
-    font-weight: 500;
-    color: #5f6368;
+    font-weight: 400;
+    color: #9ca3af;
     padding-right: 16px;
 }
 
-#register-module .beanthentic-contribution-item.unread .beanthentic-contribution-date {
-    font-weight: 700;
-    color: #202124;
+#register-module .beanthentic-contribution-item.is-read .beanthentic-contribution-date {
+    color: #9ca3af;
+    font-weight: 400;
 }
 
-/* Modal Improvements */
-.beanthentic-detail-dialog__backdrop {
-    position: absolute;
+#register-module .beanthentic-contribution-item.unread .beanthentic-contribution-date {
+    font-weight: 600;
+    color: #374151;
+}
+
+/* Farmer's Contribution detail modal — viewport-centered (lives outside .module) */
+body.beanthentic-dialog-open {
+    overflow: hidden;
+}
+
+.beanthentic-detail-dialog {
+    position: fixed;
     inset: 0;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(16px, 4vw, 32px);
+    box-sizing: border-box;
+}
+
+.beanthentic-detail-dialog[hidden] {
+    display: none !important;
+}
+
+.beanthentic-detail-dialog__backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+.beanthentic-detail-dialog__card.fc-detail-card {
+    position: relative;
+    width: min(100%, 640px);
+    max-height: min(88vh, 820px);
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 0;
+    box-shadow:
+        0 24px 48px rgba(15, 23, 42, 0.18),
+        0 0 0 1px rgba(44, 122, 62, 0.08);
+    animation: modalScaleUp 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    z-index: 1;
+    overflow: hidden;
+}
+
+.fc-detail-header {
+    padding: 28px 28px 12px;
+    padding-right: 56px;
+    border-bottom: 1px solid #eef2f6;
+    background: linear-gradient(180deg, #f4faf5 0%, #ffffff 100%);
+}
+
+.fc-detail-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #1a4d33;
+    background: rgba(44, 122, 62, 0.12);
+    padding: 4px 10px;
+    border-radius: 999px;
+    margin-bottom: 12px;
+}
+
+.fc-detail-subject {
+    margin: 0;
+    font-size: clamp(1.15rem, 2.5vw, 1.45rem);
+    font-weight: 700;
+    line-height: 1.35;
+    color: #0f172a;
+    word-break: break-word;
+}
+
+.fc-detail-sender {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 28px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.fc-detail-avatar {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2c7a3e, #1a4d33);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.fc-detail-sender-meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.fc-detail-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #1e293b;
+}
+
+.fc-detail-email {
+    font-size: 0.82rem;
+    color: #64748b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fc-detail-email[hidden] {
+    display: none;
+}
+
+.fc-detail-date {
+    flex-shrink: 0;
+    font-size: 0.82rem;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+.fc-detail-body {
+    padding: 20px 28px 28px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.fc-detail-message {
+    font-size: 0.98rem;
+    line-height: 1.65;
+    color: #334155;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+}
+
+.fc-detail-attachments {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #eef2f6;
+}
+
+.fc-detail-attachments[hidden] {
+    display: none !important;
+}
+
+.fc-detail-attachments-title {
+    margin: 0 0 14px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.fc-detail-attachments-empty {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #94a3b8;
+    line-height: 1.5;
+}
+
+.fc-detail-attachment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px;
+}
+
+.fc-detail-attachment-thumb--image .fc-detail-attachment-img {
+    height: 140px;
+}
+
+.fc-detail-attachment-doc--broken {
+    height: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    background: #f1f5f9;
+}
+
+.fc-detail-attachment-doc--broken i {
+    font-size: 1.6rem;
+    color: #94a3b8;
+}
+
+.fc-detail-attachment-thumb {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    background: #f8fafc;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fc-detail-attachment-thumb:hover {
+    border-color: #2c7a3e;
+    box-shadow: 0 4px 12px rgba(44, 122, 62, 0.12);
+}
+
+.fc-detail-attachment-img {
     width: 100%;
-    height: 100%;
-    background: rgba(255, 255, 255, 0.1); /* Almost transparent background */
-    backdrop-filter: blur(10px); /* Clean blur effect */
-    -webkit-backdrop-filter: blur(10px);
-    transition: all 0.3s ease;
+    height: 100px;
+    object-fit: cover;
+    display: block;
+    background: #e2e8f0;
+}
+
+.fc-detail-attachment-doc {
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: #2c7a3e;
+    background: #eef6f0;
+}
+
+.fc-detail-attachment-name {
+    padding: 10px 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #334155;
+    line-height: 1.3;
+    word-break: break-word;
 }
 
 .beanthentic-detail-dialog__card {
@@ -1449,7 +1722,6 @@
     animation: modalScaleUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     z-index: 2;
     overflow: hidden;
-    /* Card is centered by parent flexbox */
 }
 
 @keyframes modalScaleUp {
@@ -1749,4 +2021,207 @@
     padding: 12px;
     border-radius: 10px;
     margin-bottom: 20px;
+}
+
+/* Coffee Pricing Module */
+#coffee-pricing-module .coffee-pricing-section {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    border: 1px solid #f0f0f0;
+}
+
+#coffee-pricing-module .coffee-pricing-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+#coffee-pricing-module .coffee-pricing-subtitle {
+    margin: 0.35rem 0 0;
+    color: #64748b;
+    font-size: 0.92rem;
+}
+
+#coffee-pricing-module .coffee-pricing-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+}
+
+#coffee-pricing-module .coffee-pricing-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1rem;
+    background: #fafafa;
+}
+
+#coffee-pricing-module .pricing-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 0.75rem;
+    background: #ffffff;
+    padding: 8px 12px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+
+#coffee-pricing-module .pricing-page-label,
+#coffee-pricing-module .pricing-page-of {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+#coffee-pricing-module .pricing-page-input-wrapper input {
+    width: 40px;
+    height: 32px;
+    text-align: center;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    font-weight: 700;
+    color: #1e293b;
+    outline: none;
+}
+
+#coffee-pricing-module .pricing-page-input-wrapper input:focus {
+    border-color: #2c7a3e;
+    box-shadow: 0 0 0 3px rgba(44, 122, 62, 0.12);
+}
+
+#coffee-pricing-module .pricing-page-controls {
+    display: flex;
+    gap: 6px;
+}
+
+#coffee-pricing-module .pricing-page-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#coffee-pricing-module .pricing-page-btn:hover:not(:disabled) {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #1e293b;
+}
+
+#coffee-pricing-module .pricing-page-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    background: #f1f5f9;
+}
+
+#coffee-pricing-module .coffee-pricing-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+#coffee-pricing-module .coffee-pricing-card-head h3 {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+#coffee-pricing-module .coffee-pricing-filter {
+    min-width: 150px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    padding: 0 0.65rem;
+    background: #fff;
+}
+
+#coffee-pricing-module .pricelist-inline-input {
+    width: 100%;
+    min-width: 90px;
+    height: 34px;
+    border: 1px solid #dbeafe;
+    border-radius: 8px;
+    padding: 0 0.5rem;
+    font-size: 0.88rem;
+}
+
+#coffee-pricing-module #coffeePricelistTable th:last-child,
+#coffee-pricing-module #coffeePricelistTable td:last-child,
+#coffee-pricing-module #coffeePricingAppsTable th:last-child,
+#coffee-pricing-module #coffeePricingAppsTable td:last-child {
+    width: 10.5rem;
+    min-width: 10.5rem;
+    max-width: 10.5rem;
+    overflow: visible;
+    text-overflow: clip;
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
+}
+
+#coffee-pricing-module .pricing-action-group {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 0.25rem;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+#coffee-pricing-module .pricing-action-group .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    justify-content: center;
+    white-space: nowrap;
+    padding: 0.28rem 0.35rem;
+    font-size: 0.7rem;
+    line-height: 1.15;
+    background: #2c7a3e;
+    color: #ffffff;
+    border: none;
+}
+
+#coffee-pricing-module .pricing-action-group .btn:hover {
+    background: #276749;
+    color: #ffffff;
+}
+
+#coffee-pricing-module .pricing-status-badge {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+#coffee-pricing-module .pricing-status-badge.pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+#coffee-pricing-module .pricing-status-badge.approved {
+    background: #dcfce7;
+    color: #166534;
+}
+
+#coffee-pricing-module .pricing-status-badge.rejected {
+    background: #fee2e2;
+    color: #991b1b;
 }

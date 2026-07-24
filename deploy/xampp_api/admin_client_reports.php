@@ -22,24 +22,49 @@ if ($method === 'POST' && $override === 'PATCH') {
 }
 
 $pdo = db_conn();
-$pdo->exec("
-CREATE TABLE IF NOT EXISTS client_misconduct_report (
-  report_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  reporter_name VARCHAR(255) NOT NULL,
-  reporter_contact VARCHAR(255) NOT NULL DEFAULT '',
-  reason_category VARCHAR(255) NOT NULL,
-  reason_detail VARCHAR(255) NOT NULL DEFAULT '',
-  allegation TEXT NOT NULL,
-  chat_json TEXT NULL,
-  farmer_id BIGINT UNSIGNED NULL,
-  farmer_no VARCHAR(50) NULL,
-  farmer_name VARCHAR(255) NOT NULL DEFAULT '',
-  status VARCHAR(40) NOT NULL DEFAULT 'under review',
-  INDEX idx_cmr_status (status),
-  INDEX idx_cmr_created (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-");
+$driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+if ($driver === 'pgsql') {
+    // PostgreSQL version
+    $pdo->exec("
+    CREATE TABLE IF NOT EXISTS client_misconduct_report (
+      report_id BIGSERIAL PRIMARY KEY,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      reporter_name VARCHAR(255) NOT NULL,
+      reporter_contact VARCHAR(255) NOT NULL DEFAULT '',
+      reason_category VARCHAR(255) NOT NULL,
+      reason_detail VARCHAR(255) NOT NULL DEFAULT '',
+      allegation TEXT NOT NULL,
+      chat_json TEXT NULL,
+      farmer_id BIGINT NULL,
+      farmer_no VARCHAR(50) NULL,
+      farmer_name VARCHAR(255) NOT NULL DEFAULT '',
+      status VARCHAR(40) NOT NULL DEFAULT 'under review'
+    )
+    ");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_cmr_status ON client_misconduct_report(status)");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_cmr_created ON client_misconduct_report(created_at)");
+} else {
+    // MySQL version
+    $pdo->exec("
+    CREATE TABLE IF NOT EXISTS client_misconduct_report (
+      report_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      reporter_name VARCHAR(255) NOT NULL,
+      reporter_contact VARCHAR(255) NOT NULL DEFAULT '',
+      reason_category VARCHAR(255) NOT NULL,
+      reason_detail VARCHAR(255) NOT NULL DEFAULT '',
+      allegation TEXT NOT NULL,
+      chat_json TEXT NULL,
+      farmer_id BIGINT UNSIGNED NULL,
+      farmer_no VARCHAR(50) NULL,
+      farmer_name VARCHAR(255) NOT NULL DEFAULT '',
+      status VARCHAR(40) NOT NULL DEFAULT 'under review',
+      INDEX idx_cmr_status (status),
+      INDEX idx_cmr_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+}
 
 if ($method === 'PATCH') {
     $raw = file_get_contents('php://input') ?: '{}';

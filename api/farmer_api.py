@@ -8,11 +8,13 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 import json
 import os
+import re
 from pathlib import Path
+from http.client import RemoteDisconnected
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from flask import Response, jsonify, request
+from flask import Response, jsonify, make_response, request
 import pymysql
 from pymysql.cursors import DictCursor
 
@@ -22,6 +24,7 @@ from config.app_connection import (
     app_server_base,
     friendly_load_failure,
     iter_app_server_bases,
+    iter_legacy_asset_bases,
     prefer_app_http_bridge,
 )
 from config.farmer_moderation import (
@@ -31,8 +34,17 @@ from config.farmer_moderation import (
     ensure_farmer_mod_columns,
     farmer_account_status,
 )
+from config.production_fields import (
+    PRODUCTION_DETAIL_SELECT_SQL,
+    ensure_production_detail_columns,
+    expand_production_detail_into_row,
+    gcb_qty_for_variety,
+    production_detail_payload,
+    production_row_extensions,
+    roasted_qty_for_variety,
+)
 from config.models import Farmer, FarmerCoffeeTransaction, db
-from config.mysql_app_bridge import connect_app_mysql
+from config.mysql_app_bridge import connect_app_db
 from config.ownership import ownership_columns, resolve_ownership_status
 from config.security import api_error, safe_error_message
 from config.validation import (
@@ -45,6 +57,7 @@ from config.validation import (
     validate_positive_int,
 )
 from config.utils import get_current_user_phone, is_authenticated, log_activity
+import beanthentic_env
 
 
 def _app_db_params() -> dict | None:
@@ -73,12 +86,9 @@ def _app_server_base() -> str:
 
 def _app_shared_db_configured() -> bool:
     """True when admin should use Beanthentic-App MySQL / HTTP (not legacy admin-only tables)."""
-    if _app_db_params() or _app_server_base():
-        return True
-    conn = _read_connection_settings()
-    return bool(str(conn.get("app_db_host") or "").strip()) or bool(
-        str(conn.get("app_server_base") or "").strip()
-    )
+    from config.app_connection import is_app_db_configured
+
+    return is_app_db_configured()
 
 
 def _load_dashboard_transactions(limit: int, farmer_id: int | None = None) -> tuple[list[dict], str, list[str]]:
@@ -289,20 +299,61 @@ def _fetch_customer_transactions_via_app_server(
 _FARM_INFO_COLUMNS: set[str] | None = None
 
 
+def _is_postgresql_db(conn) -> bool:
+    # Check if connection is PostgreSQL
+    try:
+        import os
+        from pathlib import Path
+        import json
+
+        # First check env vars
+        db_url = os.getenv("DATABASE_URL", "").strip()
+        if db_url.startswith("postgresql://") or db_url.startswith("postgres://"):
+            return True
+
+        # Check settings.json
+        settings_path = Path(__file__).resolve().parents[1] / "settings.json"
+        if settings_path.exists():
+            try:
+                settings = json.loads(settings_path.read_text(encoding="utf-8"))
+                conn_settings = settings.get("connection", {})
+                app_db_url = str(conn_settings.get("app_db_url", "")).strip()
+                if app_db_url.startswith("postgresql://") or app_db_url.startswith("postgres://"):
+                    return True
+                dialect = str(conn_settings.get("app_db_dialect", "")).lower()
+                if dialect in ("postgresql", "postgres"):
+                    return True
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return False
+
+
 def _farm_information_columns(conn) -> set[str]:
     global _FARM_INFO_COLUMNS
     if _FARM_INFO_COLUMNS is not None:
         return _FARM_INFO_COLUMNS
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT COLUMN_NAME
-                FROM information_schema.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE()
-                  AND TABLE_NAME = 'farm_information'
-                """
-            )
+            if _is_postgresql_db(conn):
+                cur.execute(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = CURRENT_SCHEMA()
+                      AND table_name = 'farm_information'
+                    """
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT COLUMN_NAME
+                    FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'farm_information'
+                    """
+                )
             rows = cur.fetchall() or []
             _FARM_INFO_COLUMNS = {
                 str(row.get("COLUMN_NAME") or row[0]).strip()
@@ -333,21 +384,38 @@ def _ensure_ownership_varchar(conn) -> None:
     """Allow wizard values in farm_information.ownership_status (ENUM drops landowner, etc.)."""
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT COLUMN_TYPE FROM information_schema.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE()
-                  AND TABLE_NAME = 'farm_information'
-                  AND COLUMN_NAME = 'ownership_status'
-                LIMIT 1
-                """
-            )
-            row = cur.fetchone() or {}
-            col_type = str(row.get("COLUMN_TYPE") or "").lower()
-            if "enum" in col_type:
+            if _is_postgresql_db(conn):
                 cur.execute(
-                    "ALTER TABLE farm_information MODIFY ownership_status VARCHAR(40) NULL"
+                    """
+                    SELECT data_type FROM information_schema.columns
+                    WHERE table_schema = CURRENT_SCHEMA()
+                      AND table_name = 'farm_information'
+                      AND column_name = 'ownership_status'
+                    LIMIT 1
+                    """
                 )
+                row = cur.fetchone() or {}
+                col_type = str(row.get("data_type") or "").lower()
+                if col_type in ("user-defined", "enum"):
+                    cur.execute(
+                        "ALTER TABLE farm_information ALTER COLUMN ownership_status TYPE VARCHAR(40)"
+                    )
+            else:
+                cur.execute(
+                    """
+                    SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'farm_information'
+                      AND COLUMN_NAME = 'ownership_status'
+                    LIMIT 1
+                    """
+                )
+                row = cur.fetchone() or {}
+                col_type = str(row.get("COLUMN_TYPE") or "").lower()
+                if "enum" in col_type:
+                    cur.execute(
+                        "ALTER TABLE farm_information MODIFY ownership_status VARCHAR(40) NULL"
+                    )
         conn.commit()
     except Exception:
         try:
@@ -357,10 +425,14 @@ def _ensure_ownership_varchar(conn) -> None:
 
 
 def _app_db_connect():
+    # First try using beanthentic_env directly for PostgreSQL/Supabase
+    if beanthentic_env.is_postgresql():
+        return connect_app_db({})
+    
     params = _app_db_params()
     if not params:
         return None
-    return connect_app_mysql(params)
+    return connect_app_db(params)
 
 
 def _farmer_account_action_via_http(
@@ -481,14 +553,17 @@ def _moderation_mysql_hosts() -> list[str]:
 
 
 def _connect_moderation_mysql():
-    """MySQL connection for warning/suspend — tries every candidate host before giving up."""
+    """Connection for warning/suspend — tries every candidate host before giving up."""
+    if beanthentic_env.is_postgresql():
+        return connect_app_db({})
+    
     params = _app_db_params()
     if not params:
         return None
     last_err: Exception | None = None
     for host in _moderation_mysql_hosts():
         try:
-            return connect_app_mysql({**params, "host": host})
+            return connect_app_db({**params, "host": host})
         except Exception as e:
             last_err = e
     if last_err:
@@ -504,13 +579,53 @@ def _run_farmer_account_action(
 ) -> tuple[dict | None, Exception | None, Exception | None]:
     """
     Warning / suspend / unsuspend for cross-device admin.
-    HTTP (port 8080) first, then MySQL with LAN fallback hosts.
+    PostgreSQL/Supabase first, then HTTP (port 8080), then MySQL.
     Returns (status, http_error, mysql_error).
     """
     http_err: Exception | None = None
     mysql_err: Exception | None = None
     status: dict | None = None
 
+    # Try PostgreSQL/Supabase first
+    if beanthentic_env.is_postgresql():
+        conn = None
+        try:
+            conn = _connect_moderation_mysql()
+            ensure_farmer_mod_columns(conn)
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT farmer_id FROM farmers WHERE farmer_id = %s LIMIT 1",
+                    (farmer_id,),
+                )
+                if not cur.fetchone():
+                    raise LookupError("Farmer not found.")
+
+            if action == "warning":
+                status = apply_warning(conn, farmer_id, reason)
+            elif action == "suspend":
+                status = apply_suspend(conn, farmer_id, reason, days=days)
+            else:
+                status = apply_unsuspend(conn, farmer_id, reason)
+
+            try:
+                conn.commit()
+            except Exception:
+                pass
+            return status, None, None
+        except LookupError:
+            raise
+        except Exception as e:
+            mysql_err = e
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+        finally:
+            if conn:
+                conn.close()
+
+    # Then try HTTP if no PostgreSQL
     if _moderation_http_bases():
         try:
             status = _farmer_account_action_via_http(farmer_id, action, reason, days)
@@ -519,6 +634,7 @@ def _run_farmer_account_action(
         except Exception as e:
             http_err = e
 
+    # Then try MySQL
     if _app_db_params():
         conn = None
         try:
@@ -591,7 +707,7 @@ def _list_app_customer_transactions(limit: int, farmer_id: int | None = None) ->
         raise RuntimeError("APP_DB_NOT_CONFIGURED")
 
     limit = max(1, min(int(limit or 400), 800))
-    sql = """
+    inner_sql = """
         SELECT
           ct.customer_transaction_id,
           ct.farmer_id,
@@ -635,12 +751,13 @@ def _list_app_customer_transactions(limit: int, farmer_id: int | None = None) ->
           LIMIT 1
         ) IN ('approved', 'sent_to_client')
     """
+    sql = f"SELECT * FROM ({inner_sql.strip()}) AS txn WHERE 1=1"
     params: list = []
     if farmer_id:
-        sql += " AND ct.farmer_id = %s"
+        sql += " AND txn.farmer_id = %s"
         params.append(int(farmer_id))
     sql += """
-        ORDER BY COALESCE(approved_at, ct.transaction_date) DESC, ct.customer_transaction_id DESC
+        ORDER BY COALESCE(txn.approved_at, txn.transaction_date) DESC, txn.customer_transaction_id DESC
         LIMIT %s
     """
     params.append(limit)
@@ -730,6 +847,173 @@ def _rsbsa_status_label(raw) -> str:
     return ""
 
 
+def _map_app_row_to_dashboard(
+    r: dict,
+    *,
+    sqlite_by_name: dict | None = None,
+    sqlite_by_phone: dict | None = None,
+    sqlite_by_email: dict | None = None,
+) -> dict:
+    """Map Beanthentic-App DB row keys to dashboard table column labels."""
+    from config.farmer_registration_complete import farmer_display_name
+
+    row = expand_production_detail_into_row(dict(r))
+    first = (row.get("first_name") or row.get("FIRST NAME") or "").strip()
+    last = (row.get("last_name") or row.get("LAST NAME") or "").strip()
+    fid = int(row.get("farmer_id") or 0)
+    display = farmer_display_name(row, farmer_id=fid)
+    phone_raw = (row.get("phone_number") or row.get("contact_number") or "").strip()
+
+    rb = int(row.get("robusta_bearing") or 0)
+    rn = int(row.get("robusta_non_bearing") or 0)
+    lb = int(row.get("liberica_bearing") or 0)
+    ln = int(row.get("liberica_non_bearing") or 0)
+    eb = int(row.get("excelsa_bearing") or 0)
+    en = int(row.get("excelsa_non_bearing") or 0)
+    total_bearing = lb + eb + rb
+    total_non_bearing = ln + en + rn
+    total_trees = total_bearing + total_non_bearing
+
+    own_raw = resolve_ownership_status(
+        row.get("ownership_status") or row.get("STATUS OF OWNERSHIP"),
+        first_name=first,
+        last_name=last,
+        phone=phone_raw,
+        email=(row.get("user_email") or row.get("email") or ""),
+        sqlite_by_name=sqlite_by_name or {},
+        sqlite_by_phone=sqlite_by_phone or {},
+        sqlite_by_email=sqlite_by_email or {},
+        row_flags=row,
+    )
+    own_flags = ownership_columns(own_raw)
+
+    rsbsa_reg = _rsbsa_label_from_db(row.get("rsbsa_registered"))
+    rsbsa_status = _rsbsa_status_label(row.get("rsbsa_status"))
+    if not rsbsa_status:
+        if rsbsa_reg == "Yes":
+            rsbsa_status = "Registered"
+        elif rsbsa_reg == "Pending":
+            rsbsa_status = "Pending RSBSA"
+        else:
+            rsbsa_status = "Not Yet Applied"
+
+    federation = str(row.get("federation_assoc") or "").strip() or "—"
+    rsbsa_number = str(row.get("rsbsa_number") or "").strip() or "—"
+    ncfrs = _ncfrs_label(row.get("ncfrs"))
+
+    is_susp = int(row.get("is_suspended") or 0) == 1
+    until_raw = row.get("suspended_until")
+    active_susp = False
+    if is_susp:
+        if until_raw is None:
+            active_susp = True
+        else:
+            try:
+                until_dt = (
+                    until_raw
+                    if isinstance(until_raw, datetime)
+                    else datetime.strptime(str(until_raw)[:19], "%Y-%m-%d %H:%M:%S")
+                )
+                active_susp = until_dt > datetime.now()
+            except (TypeError, ValueError):
+                active_susp = True
+    suspended_until_ms = None
+    if until_raw and active_susp:
+        try:
+            until_dt = (
+                until_raw
+                if isinstance(until_raw, datetime)
+                else datetime.strptime(str(until_raw)[:19], "%Y-%m-%d %H:%M:%S")
+            )
+            suspended_until_ms = int(until_dt.timestamp() * 1000)
+        except (TypeError, ValueError):
+            suspended_until_ms = None
+
+    farm_ha = float(row.get("farm_size_ha") or 0) if row.get("farm_size_ha") is not None else 0
+    lib_prod = gcb_qty_for_variety(row, "liberica")
+    exc_prod = gcb_qty_for_variety(row, "excelsa")
+    rob_prod = gcb_qty_for_variety(row, "robusta")
+    prod_ext = production_row_extensions(row)
+
+    row_out = _json_safe_row_values(row)
+    photo_ref = _json_safe_photo_ref(row.get("profile_photo_data") or row.get("profile_photo"))
+    mapped = {
+        **row_out,
+        "NO.": fid,
+        "farmer_id": fid,
+        "user_id": int(row.get("user_id") or 0) or None,
+        "is_blocked": active_susp,
+        "self_sale_enabled": bool(row.get("self_sale_enabled")),
+        "suspended_until": suspended_until_ms,
+        "suspension_reason": str(row.get("suspension_reason") or ""),
+        "warning_count": int(row.get("warning_count") or 0),
+        "last_warning_reason": str(row.get("last_warning_reason") or ""),
+        "first_name": first,
+        "last_name": last,
+        "LAST NAME": last,
+        "FIRST NAME": first,
+        "NAME OF FARMER": display,
+        "PHONE": phone_raw,
+        "phone": phone_raw,
+        "phone_number": phone_raw,
+        "CONTACT NUMBER": phone_raw,
+        "registered_at": _json_safe_value(row.get("registered_at")),
+        "created_at": _json_safe_value(row.get("registered_at") or row.get("created_at")),
+        "ADDRESS (BARANGAY)": (row.get("barangay") or "").strip() or "—",
+        "barangay": (row.get("barangay") or "").strip(),
+        "BIRTHDAY": _fmt_birthday(row.get("birthday")),
+        "birthday": _fmt_birthday(row.get("birthday")),
+        "FA OFFICER / MEMBER": federation,
+        "FA OFFICER/MEMBER": federation,
+        "federation_assoc": federation if federation != "—" else "",
+        "RSBSA Registered (Yes/No)": rsbsa_reg,
+        "RSBSA REGISTERED (YES/NO)": rsbsa_reg.upper() if rsbsa_reg != "Pending" else "PENDING",
+        "RSBSA NUMBER": rsbsa_number,
+        "RSBSA Registered Number": rsbsa_number if rsbsa_number != "—" else "",
+        "RSBSA Status": rsbsa_status,
+        "RSBSA STATUS": rsbsa_status.upper(),
+        "rsbsa_registered": row.get("rsbsa_registered"),
+        "rsbsa_number": row.get("rsbsa_number") or "",
+        "rsbsa_status": row.get("rsbsa_status") or "",
+        "NCFRS": ncfrs,
+        "ncfrs": row.get("ncfrs"),
+        "STATUS OF OWNERSHIP": own_raw,
+        **own_flags,
+        "TOTAL AREA PLANTED (HA.)": farm_ha,
+        "Total Area Planted (HA.)": farm_ha,
+        "farm_size_ha": row.get("farm_size_ha"),
+        "LIBERICA BEARING": lb,
+        "LIBERICA NON-BEARING": ln,
+        "EXCELSA BEARING": eb,
+        "EXCELSA NON-BEARING": en,
+        "ROBUSTA BEARING": rb,
+        "ROBUSTA NON-BEARING": rn,
+        "TOTAL BEARING": total_bearing,
+        "TOTAL NON-BEARING": total_non_bearing,
+        "TOTAL TREES": total_trees,
+        "total_bearing_trees": total_bearing,
+        "LIBERICA PRODUCTION": lib_prod,
+        "EXCELSA PRODUCTION": exc_prod,
+        "ROBUSTA PRODUCTION": rob_prod,
+        "LIBERICA (KG)": lib_prod,
+        "EXCELSA (KG)": exc_prod,
+        "ROBUSTA (KG)": rob_prod,
+        "LIBERICA ROASTED QTY": roasted_qty_for_variety(row, "liberica"),
+        "EXCELSA ROASTED QTY": roasted_qty_for_variety(row, "excelsa"),
+        "ROBUSTA ROASTED QTY": roasted_qty_for_variety(row, "robusta"),
+        "production_detail": production_detail_payload(row),
+        **prod_ext,
+        "STATUS": row.get("status") or "",
+        "status": row.get("status") or "",
+        "profile_photo": photo_ref,
+        "profile_photo_data": photo_ref,
+        "profile_photo_url": row.get("profile_photo_url") or "",
+        "photo_url": row.get("photo_url") or row.get("profile_photo_url") or "",
+        "REMARKS": "",
+    }
+    return _json_safe_row_values(mapped)
+
+
 _PHOTOS_MANIFEST_CACHE: dict[str, object] = {"at": 0.0, "data": {}}
 
 
@@ -749,13 +1033,14 @@ def _fetch_farmer_photos_manifest_via_http() -> dict[int, str]:
         return cached
 
     manifest: dict[int, str] = {}
-    if not iter_app_server_bases():
+    photo_bases = list(iter_app_server_bases()) or list(iter_legacy_asset_bases())
+    if not photo_bases:
         _PHOTOS_MANIFEST_CACHE["at"] = now
         _PHOTOS_MANIFEST_CACHE["data"] = manifest
         return manifest
 
     timeout = min(app_http_timeout(), 20.0)
-    for base in iter_app_server_bases():
+    for base in photo_bases:
         url = f"{base}/api/admin_farmer_photos.php"
         try:
             req = Request(url, headers={"Accept": "application/json"})
@@ -783,7 +1068,16 @@ def _fetch_farmer_photos_manifest_via_http() -> dict[int, str]:
                     manifest[fid] = photo
             if manifest:
                 break
-        except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
+        except (
+            HTTPError,
+            URLError,
+            TimeoutError,
+            ValueError,
+            json.JSONDecodeError,
+            RemoteDisconnected,
+            ConnectionResetError,
+            OSError,
+        ):
             continue
 
     _PHOTOS_MANIFEST_CACHE["at"] = now
@@ -793,43 +1087,66 @@ def _fetch_farmer_photos_manifest_via_http() -> dict[int, str]:
 
 def _attach_farmer_photo_fields(rows: list) -> list[dict]:
     """Embed photo data URLs or API paths on each farmer row."""
-    from config.farmer_profile_photo import farmer_profile_photo_api_path
+    from config.app_connection import iter_app_server_bases, iter_legacy_asset_bases
+    from config.farmer_profile_photo import (
+        farmer_profile_photo_api_path,
+        normalize_profile_photo_url,
+        resolve_farmer_profile_photo_display_url,
+    )
 
-    manifest = _fetch_farmer_photos_manifest_via_http()
+    manifest: dict[int, str] = {}
+    if iter_app_server_bases() or iter_legacy_asset_bases():
+        try:
+            manifest = _fetch_farmer_photos_manifest_via_http()
+        except Exception:
+            manifest = {}
     out: list[dict] = []
     for item in rows:
-        if not isinstance(item, dict):
+        if not item:
             continue
+        # Convert psycopg2 DictRow to dict if needed
         row = dict(item)
         fid = int(row.get("farmer_id") or row.get("NO.") or 0)
         if fid > 0:
-            inline = manifest.get(fid) or str(
-                row.get("profile_photo_data")
+            raw_photo = (
+                manifest.get(fid)
+                or row.get("profile_photo_data")
+                or row.get("profile_photo")
                 or row.get("PHOTO")
                 or row.get("profile_photo_url")
-                or ""
-            ).strip()
-            if inline.startswith("data:image/"):
+            )
+            inline = normalize_profile_photo_url(raw_photo)
+            if inline:
                 row["profile_photo_url"] = inline
                 row["photo_url"] = inline
                 row["PHOTO"] = inline
             else:
-                url = farmer_profile_photo_api_path(fid)
+                url = resolve_farmer_profile_photo_display_url(
+                    raw_photo,
+                    fid,
+                    api_path_fn=farmer_profile_photo_api_path,
+                )
                 row["profile_photo_url"] = url
                 row["photo_url"] = url
                 row["PHOTO"] = url
+            if raw_photo:
+                row["profile_photo"] = str(raw_photo).strip()
         out.append(row)
     return out
 
 
 def _farmer_profile_photo_via_http(farmer_id: int) -> tuple[bytes, str] | None:
-    if not iter_app_server_bases():
+    photo_bases = list(iter_app_server_bases()) or list(iter_legacy_asset_bases())
+    if not photo_bases:
         return None
     fid = int(farmer_id or 0)
     if fid < 1:
         return None
 
-    manifest = _fetch_farmer_photos_manifest_via_http()
+    try:
+        manifest = _fetch_farmer_photos_manifest_via_http()
+    except Exception:
+        manifest = {}
     inline = manifest.get(fid)
     if inline and inline.startswith("data:image/"):
         from config.farmer_profile_photo import _parse_data_url
@@ -838,8 +1155,8 @@ def _farmer_profile_photo_via_http(farmer_id: int) -> tuple[bytes, str] | None:
         if parsed:
             return parsed
 
-    timeout = min(app_http_timeout(), 12.0)
-    for base in iter_app_server_bases():
+    timeout = min(app_http_timeout(), 6.0)
+    for base in photo_bases:
         url = f"{base}/api/admin_farmer_profile_photo.php?farmer_id={fid}"
         try:
             req = Request(url, headers={"Accept": "image/*,*/*"})
@@ -853,58 +1170,293 @@ def _farmer_profile_photo_via_http(farmer_id: int) -> tuple[bytes, str] | None:
         except HTTPError as e:
             if e.code == 404:
                 continue
-        except (URLError, TimeoutError, ValueError):
+        except (URLError, TimeoutError, ValueError, RemoteDisconnected, ConnectionResetError, OSError):
             continue
     return None
 
 
-def _serve_farmer_profile_photo_bytes(farmer_id: int) -> tuple[bytes, str] | None:
-    from config.farmer_profile_photo import fetch_farmer_photo_record
+def _fetch_profile_photo_from_url(url: str) -> tuple[bytes, str] | None:
+    from config.farmer_profile_photo import _parse_data_url
+
+    text = str(url or "").strip()
+    if not text:
+        return None
+    parsed = _parse_data_url(text)
+    if parsed:
+        return parsed
+    if not re.match(r"^https?://", text, re.I):
+        return None
+    timeout = min(app_http_timeout(), 6.0)
+    try:
+        req = Request(text, headers={"Accept": "image/*,*/*"})
+        with urlopen(req, timeout=timeout) as resp:
+            ctype = (resp.headers.get("Content-Type") or "image/jpeg").split(";")[0].strip()
+            body = resp.read()
+            if body and ctype.startswith("image/"):
+                return body, ctype
+    except (HTTPError, URLError, TimeoutError, ValueError, RemoteDisconnected, ConnectionResetError, OSError):
+        return None
+    return None
+
+
+def _json_safe_photo_ref(value) -> str:
+    """String path/URL for JSON responses — never raw bytes."""
+    if value is None:
+        return ""
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return ""
+    return str(value).strip()
+
+
+def _json_safe_value(value):
+    """Convert a single DB value for jsonify."""
+    if value is None:
+        return None
+    if isinstance(value, (datetime, date)):
+        return value.isoformat(sep=" ", timespec="seconds") if isinstance(value, datetime) else value.isoformat()
+    if isinstance(value, Decimal):
+        try:
+            return float(value)
+        except (InvalidOperation, ValueError):
+            return str(value)
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return ""
+    return value
+
+
+def _json_safe_row_values(row: dict) -> dict:
+    """Convert DB types (date, Decimal, bytes) for jsonify."""
+    out: dict = {}
+    for key, value in row.items():
+        if key == "profile_photo_data":
+            text = _json_safe_photo_ref(value)
+            if text.startswith("data:image/") or (
+                text.startswith("https://") and "supabase.co/storage/" in text
+            ):
+                out[key] = text
+            continue
+        out[key] = _json_safe_value(value)
+    return out
+
+
+def _mime_from_photo_path(path: str) -> str:
+    ext = os.path.splitext(str(path or ""))[1].lower()
+    return {
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+    }.get(ext, "image/jpeg")
+
+
+def _serve_farmer_profile_photo_path(raw_path: str, farmer_id: int) -> tuple[bytes, str] | None:
+    from config.app_connection import iter_legacy_asset_bases
+    from config.farmer_profile_photo import resolve_farmer_upload_path, supabase_public_photo_url
+
+    text = str(raw_path or "").strip()
+    if not text:
+        return None
 
     fid = int(farmer_id or 0)
-    if fid < 1:
-        return None
+
+    local_path = resolve_farmer_upload_path(text)
+    if local_path and local_path.is_file():
+        try:
+            data = local_path.read_bytes()
+            if data and len(data) > 32:
+                return data, _mime_from_photo_path(str(local_path))
+        except OSError:
+            pass
+
+    import beanthentic_env
+    from config.farmer_profile_photo import (
+        profile_photo_storage_candidates,
+        fetch_photo_bytes_from_app_server,
+        backfill_farmer_photo_to_storage,
+    )
+
+    for name in profile_photo_storage_candidates(text, fid):
+        stored = beanthentic_env.download_from_supabase_storage(name)
+        if stored:
+            return stored
+
+    fetched = fetch_photo_bytes_from_app_server(text)
+    if fetched:
+        backfill_farmer_photo_to_storage(fid, fetched[0], fetched[1])
+        return fetched
+
+    if re.match(r"^https?://", text, re.I):
+        served = _fetch_profile_photo_from_url(text)
+        if served:
+            return served
+
+    public = supabase_public_photo_url(text, fid)
+    if public:
+        served = _fetch_profile_photo_from_url(public)
+        if served:
+            return served
 
     http = _farmer_profile_photo_via_http(fid)
     if http:
         return http
 
-    if not _app_db_params():
+    rel = text if text.startswith("/") else f"/{text}"
+    for base in iter_legacy_asset_bases():
+        served = _fetch_profile_photo_from_url(f"{base.rstrip('/')}{rel}")
+        if served:
+            return served
+        served = _fetch_profile_photo_from_url(
+            f"{base.rstrip('/')}/api/admin_farmer_profile_photo.php?farmer_id={fid}"
+        )
+        if served:
+            return served
+
+    return None
+
+
+def _try_supabase_storage_photo(profile_photo: str | None, farmer_id: int) -> tuple[bytes, str] | None:
+    """Download farmer photo from Supabase Storage or public URL — no PostgreSQL."""
+    import beanthentic_env
+    from config.farmer_profile_photo import profile_photo_storage_candidates, supabase_public_photo_url
+
+    for name in profile_photo_storage_candidates(profile_photo, farmer_id):
+        stored = beanthentic_env.download_from_supabase_storage(name)
+        if stored:
+            return stored
+        public = supabase_public_photo_url(name, farmer_id)
+        if public:
+            served = _fetch_profile_photo_from_url(public)
+            if served:
+                return served
+    return None
+
+
+def _serve_farmer_profile_photo_from_db(farmer_id: int) -> tuple[bytes, str] | None:
+    from config.farmer_profile_photo import (
+        fetch_farmer_photo_record,
+        fetch_farmer_photo_record_rest,
+        photo_record_to_bytes,
+    )
+
+    fid = int(farmer_id or 0)
+    if fid < 1:
         return None
-    conn = None
+
+    import beanthentic_env
+
+    if beanthentic_env.uses_supabase_anon():
+        try:
+            rec = fetch_farmer_photo_record_rest(fid)
+            if rec:
+                served = photo_record_to_bytes(rec, fid)
+                if served:
+                    return served
+                if rec.get("kind") in ("path", "url"):
+                    served = _serve_farmer_profile_photo_path(str(rec.get("value") or ""), fid)
+                    if served:
+                        return served
+                raw_ref = str(rec.get("value") or "")
+                served = _try_supabase_storage_photo(raw_ref, fid)
+                if served:
+                    return served
+        except Exception:
+            pass
+        return _try_supabase_storage_photo(None, fid)
+
+    conn = _app_db_connect()
+    if not conn:
+        return None
     try:
-        conn = _app_db_connect()
-        if not conn:
-            return None
         rec = fetch_farmer_photo_record(conn, fid)
         if not rec:
             return None
         if rec.get("kind") == "blob":
             return bytes(rec["value"]), str(rec.get("mime") or "image/jpeg")
-        return _farmer_profile_photo_via_http(fid)
+        if rec.get("kind") == "url":
+            return _fetch_profile_photo_from_url(str(rec.get("value") or ""))
+        if rec.get("kind") == "path":
+            return _serve_farmer_profile_photo_path(str(rec.get("value") or ""), fid)
     except Exception:
         return None
     finally:
-        if conn:
-            conn.close()
+        conn.close()
+    return None
 
+
+def _serve_farmer_profile_photo_bytes(farmer_id: int) -> tuple[bytes, str] | None:
+    fid = int(farmer_id or 0)
+    if fid < 1:
+        return None
+
+    import beanthentic_env
+
+    if beanthentic_env.uses_supabase_anon() or beanthentic_env.is_postgresql():
+        served = _serve_farmer_profile_photo_from_db(fid)
+        if served:
+            return served
+        if beanthentic_env.uses_supabase_anon():
+            http = _farmer_profile_photo_via_http(fid)
+            if http:
+                return http
+            return None
+
+    http = _farmer_profile_photo_via_http(fid)
+    if http:
+        return http
+
+    return _serve_farmer_profile_photo_from_db(fid)
+
+
+def _detect_schema_mode(conn):
+    """Detect if using legacy_supabase (id as farmer PK) or app (farmer_id)."""
+    try:
+        with conn.cursor() as cur:
+            if _is_postgresql_db(conn):
+                cur.execute("""
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_schema = CURRENT_SCHEMA() AND table_name = 'farmers' AND column_name = 'farmer_id'
+                """)
+            else:
+                cur.execute("""
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_schema = DATABASE() AND table_name = 'farmers' AND column_name = 'farmer_id'
+                """)
+            has_farmer_id = len(cur.fetchall()) > 0
+            return 'app' if has_farmer_id else 'legacy_supabase'
+    except:
+        return 'legacy_supabase'
+
+def _get_farmer_pk(conn):
+    mode = _detect_schema_mode(conn)
+    return 'farmer_id' if mode == 'app' else 'id'
 
 def _app_fetch_farmer_rows(limit: int = 2000) -> list[dict]:
     """
-    Fetch farmer dataset from XAMPP MySQL schema used by Beanthentic-App.
+    Fetch farmer dataset from XAMPP MySQL/Supabase PostgreSQL schema used by Beanthentic-App.
     Returns dict rows ready to map to dashboard keys.
     """
+    import beanthentic_env
+
+    if beanthentic_env.uses_supabase_anon():
+        from config.supabase_farmer_load import fetch_farmer_rows_via_rest
+
+        return fetch_farmer_rows_via_rest(limit=limit)
+
     conn = _app_db_connect()
     if not conn:
         return []
     limit = max(1, min(int(limit or 2000), 5000))
     flag_select = _farm_info_flag_select(conn)
+    farmer_pk = _get_farmer_pk(conn)
+    from config.farmer_profile_photo import farmer_photo_select_sql
+
+    photo_select = farmer_photo_select_sql(conn) or ", f.profile_photo AS profile_photo_data"
     sql = f"""
       SELECT
-        f.farmer_id,
+        f.{farmer_pk} AS farmer_id,
         u.user_id,
         u.username,
         u.phone_number,
+        u.created_at AS registered_at,
         u.email AS user_email,
         f.status,
         pi.first_name,
@@ -928,33 +1480,42 @@ def _app_fetch_farmer_rows(limit: int = 2000) -> list[dict]:
         prod.robusta_qty_kg,
         prod.liberica_qty_kg,
         prod.excelsa_qty_kg,
+        {PRODUCTION_DETAIL_SELECT_SQL},
         f.is_suspended,
         f.suspended_until,
         f.suspension_reason,
         f.warning_count,
         f.last_warning_at,
-        f.last_warning_reason
+        f.last_warning_reason,
+        COALESCE(f.self_sale_enabled, FALSE) AS self_sale_enabled{photo_select}
       FROM farmers f
       LEFT JOIN users u ON u.user_id = f.user_id
-      LEFT JOIN personal_information pi ON pi.farmer_id = f.farmer_id
-      LEFT JOIN farm_information fi ON fi.farmer_id = f.farmer_id
-      LEFT JOIN affiliation_information ai ON ai.farmer_id = f.farmer_id
+      LEFT JOIN personal_information pi ON pi.farmer_id = f.{farmer_pk}
+      LEFT JOIN farm_information fi ON fi.farmer_id = f.{farmer_pk}
+      LEFT JOIN affiliation_information ai ON ai.farmer_id = f.{farmer_pk}
       LEFT JOIN tree_counts tc
-        ON tc.farmer_id = f.farmer_id
+        ON tc.farmer_id = f.{farmer_pk}
        AND tc.record_year = (
-          SELECT MAX(t2.record_year) FROM tree_counts t2 WHERE t2.farmer_id = f.farmer_id
+          SELECT MAX(t2.record_year) FROM tree_counts t2 WHERE t2.farmer_id = f.{farmer_pk}
         )
       LEFT JOIN production_information prod
-        ON prod.farmer_id = f.farmer_id
+        ON prod.farmer_id = f.{farmer_pk}
        AND prod.production_year = (
-          SELECT MAX(p2.production_year) FROM production_information p2 WHERE p2.farmer_id = f.farmer_id
+          SELECT MAX(p2.production_year) FROM production_information p2 WHERE p2.farmer_id = f.{farmer_pk}
         )
-      ORDER BY f.farmer_id ASC
+      ORDER BY f.{farmer_pk} ASC
       LIMIT %s
     """
     try:
         _ensure_ownership_varchar(conn)
         ensure_farmer_mod_columns(conn)
+        ensure_production_detail_columns(conn)
+        try:
+            from config.pricing_store import ensure_pricing_schema
+
+            ensure_pricing_schema(conn)
+        except Exception:
+            pass
         with conn.cursor() as cur:
             cur.execute(sql, (limit,))
             rows = cur.fetchall() or []
@@ -1022,7 +1583,9 @@ def register_farmer_routes(app):
         if not mysql_ok:
             return jsonify(out), 200
         try:
-            conn = connect_app_mysql(params)
+            from config.mysql_app_bridge import connect_app_db
+
+            conn = connect_app_db(params)
             with conn.cursor() as cur:
                 cur.execute("SELECT COUNT(*) AS c FROM farmers")
                 out["farmers_count"] = int((cur.fetchone() or {}).get("c") or 0)
@@ -1067,14 +1630,39 @@ def register_farmer_routes(app):
 
     @app.route("/api/farmer-data", methods=["GET"])
     def api_farmer_data():
-        """Provide farmer data for dashboard from XAMPP beanthentic_app."""
+        """Provide farmer data for dashboard from XAMPP beanthentic_app or Supabase."""
         from config.farmer_registration_complete import (
             farmer_display_name,
             filter_completed_registration_rows,
         )
+        import beanthentic_env
 
         if not is_authenticated():
             return jsonify({"error": "Unauthorized", "message": "Admin login required."}), 401
+
+        # If using Supabase/PostgreSQL, use that directly
+        if beanthentic_env.is_postgresql():
+            try:
+                try:
+                    # Keep production types (GCB/roasted/harvest) in sync with app-side
+                    # production_bean_classifications on each dashboard refresh.
+                    from config.mysql_app_bridge import connect_app_db
+                    from config.supabase_production_sync import sync_production_bean_classifications
+
+                    sync_conn = connect_app_db({})
+                    try:
+                        sync_production_bean_classifications(sync_conn)
+                    finally:
+                        sync_conn.close()
+                except Exception:
+                    pass
+                rows_from_db = filter_completed_registration_rows(_app_fetch_farmer_rows(limit=2500))
+                raw = [dict(r) for r in rows_from_db]
+                with_photos = _attach_farmer_photo_fields(raw)
+                mapped = [_map_app_row_to_dashboard(r) for r in with_photos]
+                return jsonify(mapped)
+            except Exception as e:
+                return jsonify({"error": "SUPABASE_LOAD_FAILED", "detail": str(e)}), 503
 
         def _sync_registrations(rows: list[dict]) -> None:
             try:
@@ -1149,8 +1737,21 @@ def register_farmer_routes(app):
             ), 503
 
         try:
+            raw_rows = filter_completed_registration_rows(_app_fetch_farmer_rows(limit=2500))
+            supplement = _fetch_ownership_supplement_via_app_server() or {}
+            sqlite_by_name = supplement.get("by_name") if isinstance(supplement.get("by_name"), dict) else {}
+            sqlite_by_phone = supplement.get("by_phone") if isinstance(supplement.get("by_phone"), dict) else {}
+            sqlite_by_email = supplement.get("by_email") if isinstance(supplement.get("by_email"), dict) else {}
             rows = _attach_farmer_photo_fields(
-                filter_completed_registration_rows(_app_fetch_farmer_rows(limit=2500))
+                [
+                    _map_app_row_to_dashboard(
+                        dict(r),
+                        sqlite_by_name=sqlite_by_name,
+                        sqlite_by_phone=sqlite_by_phone,
+                        sqlite_by_email=sqlite_by_email,
+                    )
+                    for r in raw_rows
+                ]
             )
             _sync_registrations(rows)
             return jsonify(rows)
@@ -1309,15 +1910,8 @@ def register_farmer_routes(app):
                     "TOTAL BEARING": lb + eb + rb,
                     "TOTAL NON-BEARING": ln + en + rn,
                     "TOTAL TREES": lb + eb + rb + ln + en + rn,
-                    "LIBERICA PRODUCTION": float(r.get("liberica_qty_kg") or 0)
-                    if r.get("liberica_qty_kg") is not None
-                    else 0,
-                    "EXCELSA PRODUCTION": float(r.get("excelsa_qty_kg") or 0)
-                    if r.get("excelsa_qty_kg") is not None
-                    else 0,
-                    "ROBUSTA PRODUCTION": float(r.get("robusta_qty_kg") or 0)
-                    if r.get("robusta_qty_kg") is not None
-                    else 0,
+                    **production_row_extensions(r),
+                    "production_detail": production_detail_payload(r),
                     "NCFRS": _ncfrs_label(r.get("ncfrs")),
                     "REMARKS": "",
                 }
@@ -1325,12 +1919,84 @@ def register_farmer_routes(app):
 
         return jsonify(_attach_farmer_photo_fields(out))
 
+    @app.route("/api/farmer-production-detail", methods=["POST"])
+    def api_farmer_production_detail():
+        """Upsert GCB/roasted classification + qty for a farmer's latest production row."""
+        if not is_authenticated():
+            return jsonify({"error": "Unauthorized", "message": "Admin login required."}), 401
+
+        data = request.get_json(silent=True) or {}
+        ok_fid, fid_err, farmer_id = validate_positive_int(
+            data.get("farmer_id"), field="farmer_id", minimum=1
+        )
+        if not ok_fid:
+            return api_error(fid_err, 400)
+
+        conn = _app_db_connect()
+        if not conn:
+            return api_error("App database not configured.", 503)
+
+        try:
+            from config.supabase_production_sync import upsert_production_detail
+
+            saved = upsert_production_detail(conn, farmer_id, data)
+            if not saved:
+                return api_error("No production detail fields to save for this farmer.", 400)
+
+            rows = _app_fetch_farmer_rows(limit=2500)
+            row = next((r for r in rows if int(r.get("farmer_id") or 0) == farmer_id), None)
+            if not row:
+                return jsonify({"ok": True, "farmer_id": farmer_id, "message": "Saved."})
+
+            mapped = _map_app_row_to_dashboard(dict(row))
+            return jsonify({"ok": True, "farmer_id": farmer_id, "production": mapped})
+        except Exception as exc:
+            return api_error(safe_error_message(exc, public="Could not save production detail."), 500)
+        finally:
+            conn.close()
+
+    @app.route("/api/app/production-detail", methods=["POST", "OPTIONS"])
+    def api_app_production_detail():
+        """Mobile app: sync GCB/roasted classifications + qty into production_information."""
+        if request.method == "OPTIONS":
+            return make_response("", 204)
+
+        data = request.get_json(silent=True) or {}
+        ok_fid, fid_err, farmer_id = validate_positive_int(
+            data.get("farmer_id"), field="farmer_id", minimum=1
+        )
+        if not ok_fid:
+            return jsonify({"ok": False, "error": fid_err}), 400
+
+        conn = _app_db_connect()
+        if not conn:
+            return jsonify({"ok": False, "error": "APP_DB_NOT_CONFIGURED"}), 503
+
+        try:
+            from config.supabase_production_sync import upsert_production_detail
+
+            saved = upsert_production_detail(conn, farmer_id, data)
+            if not saved:
+                return jsonify(
+                    {
+                        "ok": False,
+                        "error": "NO_PRODUCTION_FIELDS",
+                        "detail": "Include GCB/roasted qty or classification fields.",
+                    }
+                ), 400
+            return jsonify({"ok": True, "farmer_id": farmer_id})
+        except Exception as exc:
+            return jsonify({"ok": False, "error": safe_error_message(exc)}), 500
+        finally:
+            conn.close()
+
     @app.route("/api/farmer-profile-photo/<int:farmer_id>", methods=["GET"])
     def api_farmer_profile_photo(farmer_id: int):
-        """Serve farmer profile image from Beanthentic-App DB (HTTP bridge or direct MySQL)."""
-        if not is_authenticated():
-            return jsonify({"error": "Unauthorized"}), 401
-        served = _serve_farmer_profile_photo_bytes(farmer_id)
+        """Serve farmer profile image from Supabase REST/Storage (no PostgreSQL pooler)."""
+        try:
+            served = _serve_farmer_profile_photo_bytes(farmer_id)
+        except Exception:
+            served = None
         if not served:
             return jsonify({"error": "not_found"}), 404
         data, mime = served
@@ -1377,7 +2043,7 @@ def register_farmer_routes(app):
                 ), 404
 
             if status is None:
-                if not _app_db_params() and not _moderation_http_bases():
+                if not beanthentic_env.is_postgresql() and not _app_db_params() and not _moderation_http_bases():
                     return jsonify(
                         {
                             "error": "APP_DB_NOT_CONFIGURED",

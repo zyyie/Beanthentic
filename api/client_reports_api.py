@@ -21,7 +21,8 @@ from config.app_connection import (
 )
 from config.app_data_load import load_with_app_bridge
 from config.app_http_bridge import app_http_get_json, app_http_patch_json
-from config.mysql_app_bridge import connect_app_mysql
+from config.mysql_app_bridge import connect_app_db
+import beanthentic_env
 from config.utils import is_authenticated
 
 ALLOWED_STATUSES = {"under review", "blocked", "resolved", "dismissed", "open", "under_review"}
@@ -89,34 +90,66 @@ def _row_to_item(r: dict) -> dict:
 
 
 def _ensure_table(conn) -> None:
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS client_misconduct_report (
-              report_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-              created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-              reporter_name VARCHAR(255) NOT NULL,
-              reporter_contact VARCHAR(255) NOT NULL DEFAULT '',
-              reason_category VARCHAR(255) NOT NULL,
-              reason_detail VARCHAR(255) NOT NULL DEFAULT '',
-              allegation TEXT NOT NULL,
-              chat_json TEXT NULL,
-              farmer_id BIGINT UNSIGNED NULL,
-              farmer_no VARCHAR(50) NULL,
-              farmer_name VARCHAR(255) NOT NULL DEFAULT '',
-              status VARCHAR(40) NOT NULL DEFAULT 'under review',
-              INDEX idx_cmr_status (status),
-              INDEX idx_cmr_created (created_at)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-            """
-        )
+    if beanthentic_env.is_postgresql():
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS client_misconduct_report (
+                  report_id BIGSERIAL PRIMARY KEY,
+                  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  reporter_name VARCHAR(255) NOT NULL,
+                  reporter_contact VARCHAR(255) NOT NULL DEFAULT '',
+                  reason_category VARCHAR(255) NOT NULL,
+                  reason_detail VARCHAR(255) NOT NULL DEFAULT '',
+                  allegation TEXT NOT NULL,
+                  chat_json TEXT NULL,
+                  farmer_id BIGINT NULL,
+                  farmer_no VARCHAR(50) NULL,
+                  farmer_name VARCHAR(255) NOT NULL DEFAULT '',
+                  status VARCHAR(40) NOT NULL DEFAULT 'under review'
+                )
+                """
+            )
+            # Create indexes if they don't exist
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_cmr_status ON client_misconduct_report (status)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_cmr_created ON client_misconduct_report (created_at)
+            """)
+    else:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS client_misconduct_report (
+                  report_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  reporter_name VARCHAR(255) NOT NULL,
+                  reporter_contact VARCHAR(255) NOT NULL DEFAULT '',
+                  reason_category VARCHAR(255) NOT NULL,
+                  reason_detail VARCHAR(255) NOT NULL DEFAULT '',
+                  allegation TEXT NOT NULL,
+                  chat_json TEXT NULL,
+                  farmer_id BIGINT UNSIGNED NULL,
+                  farmer_no VARCHAR(50) NULL,
+                  farmer_name VARCHAR(255) NOT NULL DEFAULT '',
+                  status VARCHAR(40) NOT NULL DEFAULT 'under review',
+                  INDEX idx_cmr_status (status),
+                  INDEX idx_cmr_created (created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """
+            )
 
 
 def _load_from_mysql(limit: int, status: str, q: str) -> list[dict]:
-    params = app_db_params()
-    if not params:
-        raise RuntimeError("app_db_host not set in settings.json")
-    conn = connect_app_mysql(params)
+    if beanthentic_env.is_postgresql():
+        conn = connect_app_db({})
+    else:
+        params = app_db_params()
+        if not params:
+            raise RuntimeError("app_db_host not set in settings.json")
+        conn = connect_app_db(params)
+        
     try:
         _ensure_table(conn)
         sql = "SELECT * FROM client_misconduct_report WHERE 1=1"
@@ -164,6 +197,13 @@ def _load_from_app_http(limit: int, status: str, q: str) -> list[dict]:
 def load_admin_client_reports(limit: int = 500, status: str = "", q: str = "") -> tuple[list[dict], str]:
     """MySQL or HTTP bridge — reads client_misconduct_report only."""
     limit = clamp_limit(limit or 500, maximum=1000)
+
+    if beanthentic_env.uses_supabase_anon():
+        from config.supabase_client_reports_load import fetch_client_reports_via_rest
+
+        rows = fetch_client_reports_via_rest(limit=limit, status=status, q=q)
+        return [_row_to_item(r) for r in rows], "supabase_rest"
+
     return load_with_app_bridge(
         module_label="client reports",
         mysql_loader=lambda: _load_from_mysql(limit, status, q),
@@ -191,11 +231,21 @@ def update_report_status(report_id: int, status: str) -> dict:
     if status not in ALLOWED_STATUSES:
         raise ValueError("Invalid status")
 
+    if beanthentic_env.uses_supabase_anon():
+        from config.supabase_client_reports_load import update_client_report_status_via_rest
+
+        row = update_client_report_status_via_rest(report_id, status)
+        return _row_to_item(row)
+
     def _mysql_update() -> dict:
-        params = app_db_params()
-        if not params:
-            raise RuntimeError("app_db_host not set in settings.json")
-        conn = connect_app_mysql(params)
+        if beanthentic_env.is_postgresql():
+            conn = connect_app_db({})
+        else:
+            params = app_db_params()
+            if not params:
+                raise RuntimeError("app_db_host not set in settings.json")
+            conn = connect_app_db(params)
+            
         try:
             _ensure_table(conn)
             with conn.cursor() as cur:
@@ -215,6 +265,10 @@ def update_report_status(report_id: int, status: str) -> dict:
             return _row_to_item(row)
         finally:
             conn.close()
+
+    # If using Supabase/PostgreSQL, just use the direct update
+    if beanthentic_env.is_postgresql():
+        return _mysql_update()
 
     if prefer_app_http_bridge() and app_server_base():
         try:

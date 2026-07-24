@@ -5,12 +5,9 @@
     "update_check_url": ""
   },
   "connection": {
-    "app_db_host": "192.168.0.174",
-    "app_db_port": 3306,
-    "app_db_user": "root",
-    "app_db_pass": "",
-    "app_db_name": "beanthentic_app",
-    "app_server_base": "http://192.168.0.174:8080"
+    "supabase_url": "https://jvxvxdyrfsgtesazqjqo.supabase.co",
+    "supabase_anon_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2eHZ4ZHlyZnNndGVzYXpxanFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3OTM1MDYsImV4cCI6MjA5NjM2OTUwNn0.lBhCPUpnBpWrsddN5QtAzgic5lCcQ9Y8kPqfQDaIkuI",
+    "supabase_project_ref": "jvxvxdyrfsgtesazqjqo"
   },
   "notifications": {
     "email_system_events": true,
@@ -32,13 +29,13 @@
     "enabled": true,
     "provider": "sms_gateway",
     "sender_name": "Beanthentic",
-    "public_base_url": "http://192.168.100.252:5000",
+    "public_base_url": "",
     "sms_gateway": {
-      "mode": "auto",
-      "local_base_url": "http://192.168.100.63:8080",
+      "mode": "cloud",
+      "local_base_url": "",
       "local_path": "/message",
       "local_username": "sms",
-      "local_password": "0_bjRllk",
+      "local_password": "",
       "cloud_url": "https://api.sms-gate.app/3rdparty/v1/messages",
       "cloud_device_id": "",
       "username": "B4U_TR",

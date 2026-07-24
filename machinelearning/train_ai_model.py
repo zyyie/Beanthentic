@@ -454,20 +454,15 @@ class GIDocumentTrainer:
             'max_features': ['sqrt', 'log2']
         }
 
-        # Initialize and train model
-        rf = RandomForestClassifier(random_state=42)
+        # Initialize and train model (balanced weights help mixed Ready / Not Ready sets)
+        rf = RandomForestClassifier(random_state=42, class_weight="balanced")
 
-        # Grid search with cross-validation
-        if len(feature_matrix) < 10:
-            # For very small datasets, use simpler validation
-            grid_search = GridSearchCV(
-                rf, param_grid, cv=2, scoring='accuracy', n_jobs=-1, verbose=1
-            )
-        else:
-            # For larger datasets, use standard 5-fold CV
-            grid_search = GridSearchCV(
-                rf, param_grid, cv=5, scoring='accuracy', n_jobs=-1, verbose=1
-            )
+        n_samples = len(feature_matrix)
+        n_folds = 5 if n_samples >= 25 else (3 if n_samples >= 15 else 2)
+
+        grid_search = GridSearchCV(
+            rf, param_grid, cv=n_folds, scoring="accuracy", n_jobs=-1, verbose=1
+        )
 
         grid_search.fit(feature_train, label_train)
 
@@ -478,11 +473,8 @@ class GIDocumentTrainer:
         predictions = best_model.predict(feature_test)
         accuracy = accuracy_score(label_test, predictions)
 
-        # Cross-validation score
-        if len(feature_matrix) >= 10:
-            cv_scores = cross_val_score(best_model, feature_matrix, labels, cv=5)
-        else:
-            cv_scores = cross_val_score(best_model, feature_matrix, labels, cv=2)
+        cv_folds = 5 if n_samples >= 25 else (3 if n_samples >= 15 else 2)
+        cv_scores = cross_val_score(best_model, feature_matrix, labels, cv=cv_folds)
 
         # Feature importance
         feature_names = (['text_length', 'word_count'] +
@@ -675,6 +667,7 @@ def main():
 
     if args.train_documents:
         doc_results = trainer.train_document_model()
+        dataset = trainer.load_dataset(create_sample_if_missing=False)
         training_results = {
             "accuracy": doc_results["accuracy"],
             "cv_mean": doc_results["cv_mean"],
@@ -684,6 +677,9 @@ def main():
             "confusion_matrix": doc_results["confusion_matrix"],
             "training_date": datetime.now().isoformat(),
             "model_type": "document",
+            "sample_count": len(dataset),
+            "ready_count": sum(1 for d in dataset if d.get("label") == "Ready"),
+            "not_ready_count": sum(1 for d in dataset if d.get("label") != "Ready"),
         }
         with open(trainer.models_dir / "document_training_results.json", "w", encoding="utf-8") as f:
             json.dump(training_results, f, indent=2)

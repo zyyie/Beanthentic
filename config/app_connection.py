@@ -12,6 +12,10 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import beanthentic_env
+
 from pymysql.cursors import DictCursor
 from pymysql.err import OperationalError, ProgrammingError
 
@@ -20,6 +24,23 @@ _SETTINGS_PATH = Path(__file__).resolve().parents[1] / "settings.json"
 GI_UPLOAD_STATUSES = frozenset({"pending", "approved", "archived", "rejected"})
 
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
+def is_transient_socket_error(exc: BaseException) -> bool:
+    """True for Windows WSAEWOULDBLOCK and similar short-lived network glitches."""
+    if isinstance(exc, (TimeoutError, socket.timeout)):
+        return True
+    if isinstance(exc, OSError):
+        winerr = getattr(exc, "winerror", None)
+        if winerr in (10035, 10060, 10054):
+            return True
+    text = str(exc).lower()
+    return (
+        "10035" in text
+        or "woouldblock" in text
+        or "non-blocking socket" in text
+        or "temporarily unavailable" in text
+    )
 
 
 def read_connection_settings() -> dict:
@@ -56,16 +77,9 @@ def _host_from_url(url: str) -> str | None:
 
 
 def lan_fallback_hosts(*, include_request_host: bool = True) -> list[str]:
-    """
-    Infer XAMPP / app-server LAN IPs from settings (read-only) and optionally the HTTP request.
-
-    Used when connection.app_db_host or app_server_base still say 127.0.0.1 but admin is
-    opened from another device on the Wi‑Fi (Host: 192.168.x.x) or XAMPP runs on the phone/PC
-    listed under sms.public_base_url / sms_gateway.local_base_url.
-
-    For MySQL, pass include_request_host=False — request Host is usually the admin laptop,
-    not the XAMPP machine, and causes long connect timeouts when retried as a DB host.
-    """
+    """Disabled when Supabase anon is configured (no LAN bridges)."""
+    if beanthentic_env.uses_supabase_anon():
+        return []
     seen: set[str] = set()
     out: list[str] = []
 
@@ -183,7 +197,9 @@ def repair_connection_block(conn: dict, *, admin_lan_ip: str = "") -> tuple[dict
 
 
 def repair_settings_on_disk(settings_path: Path | None = None) -> list[str]:
-    """Persist connection + SMS public_base_url repairs. Returns log lines."""
+    """No-op when using Supabase anon (LAN repair not applicable)."""
+    if beanthentic_env.uses_supabase_anon():
+        return []
     path = settings_path or _SETTINGS_PATH
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -228,7 +244,9 @@ def repair_settings_on_disk(settings_path: Path | None = None) -> list[str]:
 
 
 def probe_app_server_http(timeout: float = 4.0) -> tuple[bool, str, str]:
-    """Quick GET admin_farmer_data.php on each candidate base. Returns (ok, base_used, error)."""
+    """LAN app-server probes disabled — all apps use Supabase anon key."""
+    if beanthentic_env.uses_supabase_anon():
+        return False, "", "LAN app server disabled — use Supabase (BEANTHENTIC_SUPABASE_ANON_KEY)"
     last_err = ""
     for base in iter_app_server_bases():
         url = f"{base.rstrip('/')}/api/admin_farmer_data.php"
@@ -253,8 +271,51 @@ def probe_app_server_http(timeout: float = 4.0) -> tuple[bool, str, str]:
     )
 
 
+def optional_app_server_base() -> str:
+    """Optional LAN app HTTP base (registration profile photos), even in Supabase mode."""
+    base = os.getenv("BEANTHENTIC_APP_SERVER_BASE", "").strip().rstrip("/")
+    if base:
+        return base
+    cfg = read_connection_settings()
+    base = str(cfg.get("app_server_base") or "").strip().rstrip("/")
+    if base:
+        return base
+    try:
+        app_env = Path(__file__).resolve().parents[1].parent / "Beanthentic-App" / ".env"
+        if app_env.is_file():
+            for raw in app_env.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, val = line.split("=", 1)
+                if key.strip() == "BEANTHENTIC_APP_SERVER_BASE":
+                    val = val.strip().strip('"').strip("'").rstrip("/")
+                    if val:
+                        return val
+    except OSError:
+        pass
+    return ""
+
+
+def iter_legacy_asset_bases() -> list[str]:
+    """HTTP bases for farmer upload files; works alongside Supabase."""
+    bases: list[str] = []
+    seen: set[str] = set()
+
+    def add(base: str | None) -> None:
+        b = (base or "").strip().rstrip("/")
+        if b and b not in seen:
+            seen.add(b)
+            bases.append(b)
+
+    add(optional_app_server_base())
+    return bases
+
+
 def iter_app_server_bases() -> list[str]:
-    """Beanthentic-App (:8080) URLs — app_db_host first, then configured base, then LAN fallbacks."""
+    """Empty when Supabase anon is configured."""
+    if beanthentic_env.uses_supabase_anon():
+        return []
     conn = read_connection_settings()
     db_host = str(conn.get("app_db_host") or "").strip()
     primary = normalize_app_server_base_url(app_server_base(), db_host=db_host)
@@ -294,9 +355,31 @@ def iter_app_server_bases() -> list[str]:
     return bases
 
 
+def is_app_db_configured() -> bool:
+    """True when Supabase anon key is set or legacy MySQL host is configured."""
+    if beanthentic_env.uses_supabase_anon():
+        return True
+    cfg = read_connection_settings()
+    if str(cfg.get("supabase_url") or "").strip() and str(cfg.get("supabase_anon_key") or "").strip():
+        return True
+    if str(cfg.get("app_db_url") or "").strip():
+        return True
+    if app_db_params():
+        return True
+    return False
+
+
 def app_db_params() -> dict | None:
     cfg = read_connection_settings()
     host = os.getenv("BEANTHENTIC_APP_DB_HOST", "").strip() or str(cfg.get("app_db_host") or "").strip()
+    if not host:
+        full_url = str(cfg.get("app_db_url") or beanthentic_env.get_db_url() or "").strip()
+        if full_url and "://" in full_url:
+            try:
+                parsed = urlparse(full_url)
+                host = (parsed.hostname or "").strip()
+            except Exception:
+                host = ""
     if not host:
         return None
     return {
@@ -312,6 +395,8 @@ def app_db_params() -> dict | None:
 
 
 def app_server_base() -> str:
+    if beanthentic_env.uses_supabase_anon():
+        return ""
     base = os.getenv("BEANTHENTIC_APP_SERVER_BASE", "").strip()
     if base:
         return base.rstrip("/")
@@ -320,12 +405,11 @@ def app_server_base() -> str:
 
 
 def prefer_app_http_bridge() -> bool:
-    """
-    True when admin should load app data over HTTP (:8080) before remote MySQL.
-
-    Typical setup: XAMPP + python app.py on 192.168.x.x; admin laptop on same Wi‑Fi
-    can reach :8080 but not MySQL :3306 unless remote grants/firewall are opened.
-    """
+    """Never use LAN HTTP when Supabase anon is configured."""
+    if beanthentic_env.uses_supabase_anon():
+        return False
+    if beanthentic_env.is_postgresql():
+        return False
     if not app_server_base():
         return False
     params = app_db_params()
@@ -385,6 +469,33 @@ def friendly_mysql_error(exc: BaseException, host: str | None = None) -> str:
     h = (host or str(cfg.get("app_db_host") or "")).strip() or "the app database host"
     errno = _mysql_errno(exc)
     text = str(exc).lower()
+
+    if beanthentic_env.is_postgresql():
+        if "undefinedcolumn" in text or ("column" in text and "does not exist" in text):
+            return (
+                f"Supabase schema mismatch ({h}). "
+                "Run python fix_supabase_schema.py or update the admin SQL for PostgreSQL."
+            )
+        if "password authentication failed" in text or "authentication failed" in text:
+            return (
+                "Supabase login failed. Check BEANTHENTIC_DB_PASS and "
+                "BEANTHENTIC_SUPABASE_PROJECT_REF in .env."
+            )
+        if "tenant identifier" in text or "enoidentifier" in text:
+            return (
+                "Supabase pooler needs BEANTHENTIC_SUPABASE_PROJECT_REF in .env "
+                "(Dashboard → Settings → General → Reference ID)."
+            )
+        if is_transient_socket_error(exc):
+            return (
+                "Temporary network glitch reaching Supabase. Refresh the page or wait a few seconds "
+                "and try again. If it keeps happening, check Wi‑Fi and BEANTHENTIC_SUPABASE_URL in .env."
+            )
+        if "could not connect" in text or "timeout" in text or "timed out" in text:
+            return (
+                f"Cannot reach Supabase at {h}. Check Wi‑Fi, firewall, and .env BEANTHENTIC_DB_HOST."
+            )
+        return f"Supabase/PostgreSQL error ({h}): {exc}"
 
     if errno == 1045 or "access denied" in text:
         return (
@@ -474,11 +585,21 @@ def friendly_load_failure(
 
 def load_error_payload(module_code: str, message: str, hint: str | None = None) -> dict:
     cfg = read_connection_settings()
-    default_hint = (
-        "Open /connection-settings or edit Beanthentic/settings.json - "
-        f"app_db_host={cfg.get('app_db_host') or '(not set)'}, "
-        f"app_server_base={cfg.get('app_server_base') or '(not set)'}."
-    )
+    if beanthentic_env.uses_supabase_anon():
+        default_hint = (
+            "Check BEANTHENTIC_SUPABASE_URL and BEANTHENTIC_SUPABASE_ANON_KEY in .env. "
+            "For server SQL, also verify BEANTHENTIC_DB_URL / BEANTHENTIC_DB_PASS."
+        )
+    elif beanthentic_env.is_postgresql():
+        default_hint = (
+            "Check BEANTHENTIC_DB_URL, BEANTHENTIC_DB_PASS, and BEANTHENTIC_SUPABASE_PROJECT_REF in .env."
+        )
+    else:
+        default_hint = (
+            "Open /connection-settings or edit Beanthentic/settings.json - "
+            f"app_db_host={cfg.get('app_db_host') or '(not set)'}, "
+            f"app_server_base={cfg.get('app_server_base') or '(not set)'}."
+        )
     return {
         "ok": False,
         "error": module_code,

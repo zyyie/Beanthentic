@@ -3,6 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      var loc = window.location;
+      if (loc.protocol !== 'https:') return;
+      var host = (loc.hostname || '').toLowerCase();
+      if (host === '127.0.0.1' || host === 'localhost' || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+        loc.replace('http://' + loc.host + loc.pathname + loc.search + loc.hash);
+      }
+    })();
+  </script>
   <title>Beanthentic Coffee - Dashboard</title>
   
   <!-- CSS Files -->
@@ -21,6 +31,9 @@
   
   <!-- Chart.js for data visualization -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Leaflet map (farmer pins when Google Maps API key is not configured) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- SheetJS for Excel file reading -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
@@ -71,6 +84,10 @@
               <a href="#client-report" class="nav-link" data-module="client-report" id="sidebarClientReportLink">
                 <i class="nav-icon fa-solid fa-file-lines" aria-hidden="true"></i>
                 <span>Client Report</span>
+              </a>
+              <a href="#coffee-pricing" class="nav-link" data-module="coffee-pricing" id="sidebarCoffeePricingLink">
+                <i class="nav-icon fa-solid fa-tags" aria-hidden="true"></i>
+                <span>Coffee Pricing</span>
               </a>
             </div>
             <a href="#ipophl" class="nav-link has-submenu" data-module="ipophl" id="sidebarIpophlLink">
@@ -240,13 +257,13 @@
           
           <div class="header-right">
             <div class="header-icon-actions">
-              <button class="icon-action-btn" id="messagingBtn" type="button" aria-label="Messages" title="Messages" style="position:relative">
+              <button class="icon-action-btn" id="messagingBtn" type="button" aria-label="Messages" title="Messages">
                 <i class="fa-solid fa-message"></i>
-                <span class="messaging-badge" id="headerMessageBadge"></span>
+                <span class="icon-badge" id="headerMessageBadge"></span>
               </button>
               <button class="icon-action-btn" id="notificationBtn" type="button" aria-label="Notifications" title="Notifications">
                 <i class="fa-solid fa-bell"></i>
-                <span class="icon-badge" id="headerNotificationBadge">3</span>
+                <span class="icon-badge" id="headerNotificationBadge"></span>
               </button>
               <button class="icon-action-btn" id="accountBtn" type="button" aria-label="Account" title="Administrator Account">
                 <i class="fa-solid fa-user"></i>
@@ -338,8 +355,9 @@
                   <div class="widget-header">
                     <h3>Farmer Registration Volume</h3>
                     <div class="widget-header-actions">
-                      <span class="registration-trend-badge positive">
-                        <i class="fa-solid fa-arrow-up"></i> 12%
+                      <span class="registration-trend-badge positive" id="registrationTrendBadge" hidden>
+                        <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+                        <span id="registrationTrendBadgeText">—</span>
                       </span>
                     </div>
                   </div>
@@ -383,12 +401,15 @@
                     <span class="field-label">Search</span>
                     <input id="farmerSearch" type="search" placeholder="Search name, barangay, officer, NCFRS…" autocomplete="off" />
                   </label>
-                  <div class="table-view-toggle" role="group" aria-label="Farmer table view">
-                    <button type="button" class="view-toggle-btn active" data-table-view="basic" aria-pressed="true">Basic Info</button>
-                    <button type="button" class="view-toggle-btn" data-table-view="affiliation" aria-pressed="false">Affiliation</button>
-                    <button type="button" class="view-toggle-btn" data-table-view="farm" aria-pressed="false">Farm Info</button>
-                    <button type="button" class="view-toggle-btn" data-table-view="trees" aria-pressed="false">Tree Counts</button>
-                    <button type="button" class="view-toggle-btn" data-table-view="production" aria-pressed="false">Production</button>
+                  <div class="farmer-toolbar-tabs" aria-label="Farmer table view">
+                    <div class="table-view-toggle farmer-table-view-toggle" role="group">
+                      <button type="button" class="view-toggle-btn active" data-table-view="basic" aria-pressed="true">Basic Info</button>
+                      <button type="button" class="view-toggle-btn" data-table-view="affiliation" aria-pressed="false">Affiliation</button>
+                      <button type="button" class="view-toggle-btn" data-table-view="farm" aria-pressed="false">Farm Info</button>
+                      <button type="button" class="view-toggle-btn" data-table-view="trees" aria-pressed="false">Tree Counts</button>
+                      <button type="button" class="view-toggle-btn" data-table-view="production" aria-pressed="false">Production</button>
+                      <button type="button" class="view-toggle-btn" data-table-view="yields" aria-pressed="false">Yields</button>
+                    </div>
                   </div>
                 </div>
                 <div class="toolbar-right farmer-toolbar-actions" role="group" aria-label="Farmer records actions">
@@ -483,24 +504,119 @@
                     <col class="fp-col-kg" />
                     <col class="fp-col-kg" />
                     <col class="fp-col-kg" />
+                    <col class="fp-col-class" />
+                    <col class="fp-col-kg" />
+                    <col class="fp-col-class" />
+                    <col class="fp-col-kg" />
+                    <col class="fp-col-class" />
+                    <col class="fp-col-kg" />
+                    <col class="fp-col-class" />
+                    <col class="fp-col-kg" />
+                    <col class="fp-col-class" />
+                    <col class="fp-col-kg" />
+                    <col class="fp-col-class" />
+                    <col class="fp-col-kg" />
                   </colgroup>
                   <thead>
                     <tr class="header-row-1">
                       <th rowspan="3" class="header-no">No.</th>
                       <th rowspan="3" class="header-last-name">Last Name</th>
                       <th rowspan="3" class="header-first-name">First Name</th>
-                      <th colspan="3" class="header-group-production">Total Production (KILOS)</th>
+                      <th colspan="3" class="header-group-production">Harvest (KILOS)</th>
+                      <th colspan="6" class="header-group-production header-green-beans">Green Coffee Beans</th>
+                      <th colspan="6" class="header-group-production header-roasted-beans">Roasted Coffee Beans</th>
                     </tr>
                     <tr class="header-row-2">
-                      <th colspan="3" class="header-dried-cherries">Dried Coffee Cherries</th>
-                    </tr>
-                    <tr class="header-row-3">
                       <th class="header-liberica">Liberica</th>
                       <th class="header-excelsa">Excelsa</th>
                       <th class="header-robusta">Robusta</th>
+                      <th colspan="2" class="header-liberica">Liberica</th>
+                      <th colspan="2" class="header-excelsa">Excelsa</th>
+                      <th colspan="2" class="header-robusta">Robusta</th>
+                      <th colspan="2" class="header-liberica">Liberica</th>
+                      <th colspan="2" class="header-excelsa">Excelsa</th>
+                      <th colspan="2" class="header-robusta">Robusta</th>
+                    </tr>
+                    <tr class="header-row-3">
+                      <th class="header-liberica">Qty</th>
+                      <th class="header-excelsa">Qty</th>
+                      <th class="header-robusta">Qty</th>
+                      <th class="header-liberica">Class</th>
+                      <th class="header-liberica">Qty</th>
+                      <th class="header-excelsa">Class</th>
+                      <th class="header-excelsa">Qty</th>
+                      <th class="header-robusta">Class</th>
+                      <th class="header-robusta">Qty</th>
+                      <th class="header-liberica">Type</th>
+                      <th class="header-liberica">Qty</th>
+                      <th class="header-excelsa">Type</th>
+                      <th class="header-excelsa">Qty</th>
+                      <th class="header-robusta">Type</th>
+                      <th class="header-robusta">Qty</th>
                     </tr>
                   </thead>
                   <tbody id="tableBodyProduction">
+                    <!-- Data will be populated here -->
+                  </tbody>
+                </table>
+
+                <table id="farmerTableAutomatedYields" class="data-table is-hidden" aria-hidden="true">
+                  <colgroup>
+                    <col class="ay-col-no" />
+                    <col class="ay-col-name" />
+                    <col class="ay-col-name" />
+                    <col class="ay-col-metric" />
+                    <col class="ay-col-metric" />
+                    <col class="ay-col-metric" />
+                    <col class="ay-col-metric" />
+                    <col class="ay-col-metric" />
+                    <col class="ay-col-metric" />
+                    <col class="ay-col-metric" />
+                    <col class="ay-col-metric" />
+                    <col class="ay-col-metric" />
+                    <col class="ay-col-metric" />
+                    <col class="ay-col-metric" />
+                    <col class="ay-col-metric" />
+                    <col class="ay-col-metric" />
+                    <col class="ay-col-metric" />
+                    <col class="ay-col-metric" />
+                  </colgroup>
+                  <thead>
+                    <tr class="header-row-1">
+                      <th rowspan="3" class="header-no">No.</th>
+                      <th rowspan="3" class="header-last-name">Last Name</th>
+                      <th rowspan="3" class="header-first-name">First Name</th>
+                      <th colspan="5" class="header-variety-group header-liberica">Liberica</th>
+                      <th colspan="5" class="header-variety-group header-robusta">Robusta</th>
+                      <th colspan="5" class="header-variety-group header-excelsa">Excelsa</th>
+                    </tr>
+                    <tr class="header-row-2">
+                      <th rowspan="2" class="header-bearing">Bearing</th>
+                      <th colspan="2" class="header-gcb">GCB (kg)</th>
+                      <th colspan="2" class="header-roasted">Roasted (kg)</th>
+                      <th rowspan="2" class="header-bearing">Bearing</th>
+                      <th colspan="2" class="header-gcb">GCB (kg)</th>
+                      <th colspan="2" class="header-roasted">Roasted (kg)</th>
+                      <th rowspan="2" class="header-bearing">Bearing</th>
+                      <th colspan="2" class="header-gcb">GCB (kg)</th>
+                      <th colspan="2" class="header-roasted">Roasted (kg)</th>
+                    </tr>
+                    <tr class="header-row-3">
+                      <th class="header-fi">FI</th>
+                      <th class="header-ac">AC</th>
+                      <th class="header-fi header-roasted-sub">FI</th>
+                      <th class="header-ac header-roasted-sub">AC</th>
+                      <th class="header-fi">FI</th>
+                      <th class="header-ac">AC</th>
+                      <th class="header-fi header-roasted-sub">FI</th>
+                      <th class="header-ac header-roasted-sub">AC</th>
+                      <th class="header-fi">FI</th>
+                      <th class="header-ac">AC</th>
+                      <th class="header-fi header-roasted-sub">FI</th>
+                      <th class="header-ac header-roasted-sub">AC</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tableBodyAutomatedYields">
                     <!-- Data will be populated here -->
                   </tbody>
                 </table>
@@ -618,6 +734,41 @@
                         <div class="farmer-profile-actions-btns">
                           <button class="btn-profile-action" id="farmerProfileMessageBtn"><i class="fa-solid fa-message"></i> MESSAGE</button>
                         </div>
+
+                        <div class="farmer-self-sale-panel" id="farmerSelfSalePanel">
+                          <div class="farmer-self-sale-header">
+                            <div>
+                              <h4 class="farmer-self-sale-title">Self-Sale (Direct Selling)</h4>
+                              <p class="farmer-self-sale-desc">Enable when the farmer will sell beans themselves instead of sending all production to the drop-off center.</p>
+                            </div>
+                            <label class="self-sale-toggle" title="Enable farmer self-sale">
+                              <input type="checkbox" id="farmerSelfSaleToggle" />
+                              <span class="self-sale-toggle-slider"></span>
+                            </label>
+                          </div>
+                          <p class="farmer-self-sale-status" id="farmerSelfSaleStatus">Self-sale is disabled for this farmer.</p>
+                          <div class="farmer-self-sale-applications" id="farmerSelfSaleApplicationsWrap" hidden>
+                            <h5>Price Applications</h5>
+                            <div class="table-wrapper">
+                              <table class="data-table farmer-self-sale-apps-table" id="farmerSelfSaleAppsTable">
+                                <thead>
+                                  <tr>
+                                    <th>Submitted</th>
+                                    <th>Variety</th>
+                                    <th>Type</th>
+                                    <th>Qty (kg)</th>
+                                    <th>Requested</th>
+                                    <th>Reference</th>
+                                    <th>Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody id="farmerSelfSaleAppsBody">
+                                  <tr><td colspan="7">No applications yet.</td></tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
                         
                         <div class="farmer-profile-demographics">
                           <div class="demo-item">
@@ -730,26 +881,16 @@
                             </div>
                           </section>
 
-                          <!-- Production -->
-                          <section class="registration-detail-section">
-                            <div class="add-farmer-form__header-with-action">
-                              <h3>Production <span class="year-label">(2026)</span></h3>
-                              <span id="farmerProfileProdUnitText" class="unit-badge">kg</span>
-                            </div>
-                            <div class="registration-detail-grid">
-                              <div class="detail-field">
-                                <label>Liberica (Kapeng Barako)</label>
-                                <span id="farmerProfileLibProdText" class="bold-value">0</span>
-                              </div>
-                              <div class="detail-field">
-                                <label>Robusta</label>
-                                <span id="farmerProfileRobProdText" class="bold-value">0</span>
-                              </div>
-                              <div class="detail-field">
-                                <label>Excelsa</label>
-                                <span id="farmerProfileExcProdText" class="bold-value">0</span>
-                              </div>
-                            </div>
+                          <!-- Production (opens modal) -->
+                          <section class="registration-detail-section registration-detail-section--production">
+                            <button type="button" class="btn-view-farmer-production" id="btnViewFarmerProduction" aria-haspopup="dialog">
+                              <span class="btn-view-farmer-production__text">
+                                <strong>Production</strong>
+                                <span class="year-label">(2026)</span>
+                              </span>
+                              <span class="btn-view-farmer-production__hint">View harvest &amp; bean production</span>
+                              <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                            </button>
                           </section>
                         </div>
                         
@@ -905,7 +1046,7 @@
                   style="position:absolute; inset:0; width:100%; height:100%; border:0;"
                 ></iframe>
                 <p id="mapsGoogleFallback" class="maps-google-fallback" hidden>
-                  Google Maps unavailable. Add a valid API key to enable map rendering.
+                  Loading map… Farmer pins appear at each registered barangay in Lipa City.
                 </p>
               </div>
             </section>
@@ -1120,84 +1261,13 @@
             </div>
           </div>
 
-          <!-- Farmer's Contribution Detail Modal (Gmail-style) -->
-          <div
-            id="beanthenticContributionDetailModal"
-            class="beanthentic-detail-dialog"
-            hidden
-            aria-hidden="true"
-            inert
-          >
-            <div class="beanthentic-detail-dialog__backdrop" tabindex="-1"></div>
-            <div
-              class="beanthentic-detail-dialog__card beanthentic-gmail-card"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="beanthenticContributionDetailSubject"
-            >
-              <button
-                type="button"
-                class="beanthentic-detail-dialog__close"
-                id="beanthenticContributionDetailClose"
-                aria-label="Close contribution details"
-              >
-                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-              </button>
-
-              <div class="beanthentic-gmail-header">
-                <h2 id="beanthenticContributionDetailSubject" class="beanthentic-gmail-subject">GI Certification Application - Farm ID #1234</h2>
-                <div class="beanthentic-gmail-sender-row">
-                  <div class="beanthentic-gmail-avatar" id="beanthenticContributionAvatar">J</div>
-                  <div class="beanthentic-gmail-sender-info">
-                    <div class="beanthentic-gmail-sender-name-container">
-                      <span class="beanthentic-gmail-sender-name" id="beanthenticContributionDetailFarmer">Juan Dela Cruz</span>
-                      <span class="beanthentic-gmail-email" id="beanthenticContributionDetailEmail">juan.dc@gmail.com</span>
-                    </div>
-                    <div class="beanthentic-gmail-to-me">
-                      to me <i class="fa-solid fa-caret-down"></i>
-                    </div>
-                  </div>
-                  <div class="beanthentic-gmail-date-container" id="beanthenticContributionDetailDate">2:30 PM</div>
-                </div>
-              </div>
-
-              <div class="beanthentic-gmail-body">
-                <div id="beanthenticContributionDetailPreview" class="beanthentic-gmail-message">
-                  Submitted complete documentation for geographical indication certification including farm ownership papers and coffee variety verification...
-                </div>
-
-                <div class="beanthentic-gmail-attachments">
-                  <div class="beanthentic-gmail-attachments-header">
-                    <span class="beanthentic-gmail-attachment-count" id="beanthenticAttachmentCount">2 Attachments</span>
-                    <span class="beanthentic-gmail-scanned">
-                      • Scanned by Beanthentic <i class="fa-solid fa-circle-info"></i>
-                    </span>
-                    <div class="beanthentic-gmail-attachment-actions">
-                      <div class="beanthentic-gmail-action-icon" title="Download all"><i class="fa-solid fa-download"></i></div>
-                      <div class="beanthentic-gmail-action-icon" title="Add all to Drive"><i class="fa-brands fa-google-drive"></i></div>
-                      <div class="beanthentic-gmail-add-drive-btn">Add all to Drive</div>
-                    </div>
-                  </div>
-                  <div class="beanthentic-gmail-attachment-grid" id="beanthenticAttachmentGrid">
-                    <!-- Thumbnails populated by JS -->
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <!-- Analytics Module -->
           <div class="module hidden" id="analytics-module" data-module="analytics">
             <section class="analytics-summary-grid" aria-label="Analytics summary">
               <article class="analytics-kpi-card">
-                <h3>Lipa GI Readiness</h3>
-                <p class="analytics-kpi-value" id="cityGiReadinessRate">0.0%</p>
-                <p class="analytics-kpi-sub">City-wide eligible rate</p>
-              </article>
-              <article class="analytics-kpi-card">
-                <h3>GI-Ready Farmers</h3>
-                <p class="analytics-kpi-value" id="giEligibleCount">0</p>
-                <p class="analytics-kpi-sub" id="giEligibleRate">0.0% of farmers</p>
+                <h3>Documents Passed AI Review</h3>
+                <p class="analytics-kpi-value" id="analyticsDocsPassed">0</p>
+                <p class="analytics-kpi-sub" id="analyticsDocsPassedSub">Score ≥ 70%</p>
               </article>
               <article class="analytics-kpi-card">
                 <h3>IPOPHL Progress</h3>
@@ -1208,6 +1278,18 @@
 
             <section class="charts-section analytics-charts-section">
               <div class="charts-grid analytics-grid-3">
+                <div class="chart-card">
+                  <h3>IPOPHL Phase Completion</h3>
+                  <div class="chart-container">
+                    <canvas id="ipophlPhaseCompletionChart"></canvas>
+                  </div>
+                </div>
+                <div class="chart-card">
+                  <h3>Document Upload Timeline</h3>
+                  <div class="chart-container">
+                    <canvas id="ipophlUploadTimelineChart"></canvas>
+                  </div>
+                </div>
                 <div class="chart-card">
                   <h3>Top 5 Barangays with Most Coffee Farms</h3>
                   <div class="chart-container">
@@ -1221,9 +1303,9 @@
                   </div>
                 </div>
                 <div class="chart-card">
-                  <h3>IPOPHL Document Compliance</h3>
+                  <h3>GI Readiness Gauge (Farmers)</h3>
                   <div class="chart-container">
-                    <canvas id="ipophlComplianceChart"></canvas>
+                    <canvas id="giReadinessGaugeChart"></canvas>
                   </div>
                 </div>
               </div>
@@ -1274,6 +1356,96 @@
                 </div>
               </div>
 
+            </section>
+          </div>
+
+          <!-- Coffee Pricing Module -->
+          <div class="module hidden" id="coffee-pricing-module" data-module="coffee-pricing">
+            <section class="table-section coffee-pricing-section" aria-label="Coffee bean pricelist and price applications">
+              <div class="table-header coffee-pricing-header">
+                <div>
+                  <h2 style="margin: 0;">Coffee Bean Pricing</h2>
+                  <p class="coffee-pricing-subtitle">Manage drop-off reference prices and review farmer self-sale price applications.</p>
+                </div>
+                <button type="button" class="action-btn" id="coffeePricingRefreshBtn">
+                  <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                  Refresh
+                </button>
+              </div>
+
+              <div class="coffee-pricing-grid">
+                <div class="coffee-pricing-card">
+                  <div class="coffee-pricing-card-head">
+                    <h3>Official Pricelist</h3>
+                    <button type="button" class="btn btn-secondary btn-sm" id="coffeePricelistAddBtn">
+                      <i class="fa-solid fa-plus"></i> Add price row
+                    </button>
+                  </div>
+                  <div class="table-wrapper">
+                    <table class="data-table" id="coffeePricelistTable">
+                      <thead>
+                        <tr>
+                          <th>Variety</th>
+                          <th>Bean type</th>
+                          <th>Classification</th>
+                          <th>Price / kg</th>
+                          <th>Notes</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody id="coffeePricelistBody">
+                        <tr><td colspan="6" class="transactions-loading-cell">Loading pricelist...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="pricing-pagination" id="coffeePricelistPagination">
+                    <span class="pricing-page-label">Page</span>
+                    <div class="pricing-page-input-wrapper">
+                      <input type="number" value="1" min="1" id="coffeePricelistPageInput" aria-label="Pricelist page number">
+                    </div>
+                    <span class="pricing-page-of" id="coffeePricelistPageOf">of 1</span>
+                    <div class="pricing-page-controls">
+                      <button type="button" class="pricing-page-btn" id="coffeePricelistPrevBtn" title="Previous page" aria-label="Previous page">
+                        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                      </button>
+                      <button type="button" class="pricing-page-btn" id="coffeePricelistNextBtn" title="Next page" aria-label="Next page">
+                        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="coffee-pricing-card">
+                  <div class="coffee-pricing-card-head">
+                    <h3>Pending Price Applications</h3>
+                    <select id="coffeePricingAppFilter" class="coffee-pricing-filter">
+                      <option value="pending">Pending</option>
+                      <option value="">All statuses</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                  </div>
+                  <div class="table-wrapper">
+                    <table class="data-table" id="coffeePricingAppsTable">
+                      <thead>
+                        <tr>
+                          <th>Farmer</th>
+                          <th>Variety</th>
+                          <th>Type</th>
+                          <th>Qty (kg)</th>
+                          <th>Requested</th>
+                          <th>Reference</th>
+                          <th>Status</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody id="coffeePricingAppsBody">
+                        <tr><td colspan="8" class="transactions-loading-cell">Loading applications...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
             </section>
           </div>
 
@@ -1572,7 +1744,7 @@
                       <h4>Registration Documents</h4>
                       <div class="file-upload-zone" data-service="phase5-cert">
                         <i class="fa-solid fa-cloud-upload-alt"></i>
-                        <p>Select files here — uploads to GI Updates when you click Complete Registration below</p>
+                        <p>Select files here — each upload is published to farmers' GI Updates right away. Complete Registration sends everything to IPOPHL via Gmail.</p>
                         <input type="file" class="file-input" multiple accept="image/*,.pdf">
                       </div>
                       <div class="attached-files" id="phase5-cert-files"></div>
@@ -1587,7 +1759,7 @@
                       <h4>Compliance Documentation</h4>
                       <div class="file-upload-zone" data-service="phase5-compliance">
                         <i class="fa-solid fa-cloud-upload-alt"></i>
-                        <p>Select compliance files — saved to GI Updates on Complete Registration</p>
+                        <p>Select compliance files — published to GI Updates on upload; included in Gmail to IPOPHL on Complete Registration</p>
                         <input type="file" class="file-input" multiple accept="image/*,.pdf,.doc,.docx">
                       </div>
                       <div class="attached-files" id="phase5-compliance-files"></div>
@@ -1599,7 +1771,6 @@
                   <button class="phase-btn prev-phase" data-prev="4">Back to Phase 4</button>
                   <button type="button" class="phase-btn complete-btn" data-action="ipophl-complete-registration" aria-label="Complete registration and publish to GI Updates">Complete Registration</button>
                 </div>
-                <div id="ipophl-complete-status" class="ipophl-complete-status" role="status" aria-live="polite" hidden></div>
               </div>
             </section>
           </div>
@@ -1947,6 +2118,150 @@
     </div>
   </main>
 
+  <!-- Farmer's Contribution detail (outside .module — centered on viewport) -->
+  <div
+    id="beanthenticContributionDetailModal"
+    class="beanthentic-detail-dialog"
+    hidden
+    aria-hidden="true"
+    inert
+  >
+    <div class="beanthentic-detail-dialog__backdrop" tabindex="-1" aria-hidden="true"></div>
+    <div
+      class="beanthentic-detail-dialog__card fc-detail-card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="beanthenticContributionDetailSubject"
+    >
+      <button
+        type="button"
+        class="beanthentic-detail-dialog__close"
+        id="beanthenticContributionDetailClose"
+        aria-label="Close contribution details"
+      >
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      </button>
+
+      <header class="fc-detail-header">
+        <span class="fc-detail-badge"><i class="fa-solid fa-seedling" aria-hidden="true"></i> Farmer message</span>
+        <h2 id="beanthenticContributionDetailSubject" class="fc-detail-subject">Contribution</h2>
+      </header>
+
+      <div class="fc-detail-sender">
+        <div class="fc-detail-avatar" id="beanthenticContributionAvatar" aria-hidden="true">F</div>
+        <div class="fc-detail-sender-meta">
+          <span class="fc-detail-name" id="beanthenticContributionDetailFarmer">Farmer</span>
+          <span class="fc-detail-email" id="beanthenticContributionDetailEmail"></span>
+        </div>
+        <time class="fc-detail-date" id="beanthenticContributionDetailDate"></time>
+      </div>
+
+      <div class="fc-detail-body">
+        <div id="beanthenticContributionDetailPreview" class="fc-detail-message"></div>
+        <section class="fc-detail-attachments" id="beanthenticAttachmentsSection" hidden>
+          <h3 class="fc-detail-attachments-title" id="beanthenticAttachmentCount">Attachments</h3>
+          <div class="fc-detail-attachment-grid" id="beanthenticAttachmentGrid"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Farmer production modal (outside .module so it is not clipped) -->
+  <div id="farmerProductionModal" class="profile-modal farmer-production-modal" hidden aria-hidden="true">
+    <div class="profile-modal-backdrop" id="farmerProductionModalBackdrop"></div>
+    <div class="profile-modal-card farmer-production-modal-card" role="dialog" aria-modal="true" aria-labelledby="farmerProductionModalTitle">
+      <div class="profile-modal-header">
+        <h2 id="farmerProductionModalTitle">Production <span class="year-label">(2026)</span></h2>
+        <button type="button" class="profile-modal-close" id="closeFarmerProductionModalBtn" aria-label="Close">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="farmer-production-modal-body">
+        <section class="registration-detail-section registration-detail-section--production">
+          <div class="add-farmer-form__header-with-action">
+            <h3>Production for Harvest <span class="year-label">(2026)</span></h3>
+            <span class="unit-badge">kg</span>
+          </div>
+          <div class="farmer-profile-production-table-wrap">
+            <table class="data-table farmer-profile-production-table farmer-profile-production-table--harvest" aria-label="Harvest production by variety">
+              <thead>
+                <tr class="header-row-3">
+                  <th class="header-liberica">Liberica</th>
+                  <th class="header-excelsa">Excelsa</th>
+                  <th class="header-robusta">Robusta</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td id="farmerProfileHarvestLibQtyText">0</td>
+                  <td id="farmerProfileHarvestExcQtyText">0</td>
+                  <td id="farmerProfileHarvestRobQtyText">0</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="registration-detail-section registration-detail-section--production">
+          <div class="add-farmer-form__header-with-action">
+            <h3>Production <span class="year-label">(2026)</span></h3>
+            <span id="farmerProfileProdUnitText" class="unit-badge">kg</span>
+          </div>
+          <div class="farmer-profile-production-table-wrap">
+            <h4 class="production-sub-header">Green Coffee Beans (GCB)</h4>
+            <table class="data-table farmer-profile-production-table farmer-profile-production-table--detail" aria-label="GCB production by variety">
+              <thead>
+                <tr class="header-row-3">
+                  <th class="header-liberica">Liberica (Class)</th>
+                  <th class="header-liberica">Liberica (Qty)</th>
+                  <th class="header-excelsa">Excelsa (Class)</th>
+                  <th class="header-excelsa">Excelsa (Qty)</th>
+                  <th class="header-robusta">Robusta (Class)</th>
+                  <th class="header-robusta">Robusta (Qty)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td id="farmerProfileGcbLibClassText">—</td>
+                  <td id="farmerProfileGcbLibQtyText">0</td>
+                  <td id="farmerProfileGcbExcClassText">—</td>
+                  <td id="farmerProfileGcbExcQtyText">0</td>
+                  <td id="farmerProfileGcbRobClassText">—</td>
+                  <td id="farmerProfileGcbRobQtyText">0</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="farmer-profile-production-table-wrap">
+            <h4 class="production-sub-header">Roasted Coffee Beans</h4>
+            <table class="data-table farmer-profile-production-table farmer-profile-production-table--detail" aria-label="Roasted production by variety">
+              <thead>
+                <tr class="header-row-3">
+                  <th class="header-liberica">Liberica (Type)</th>
+                  <th class="header-liberica">Liberica (Qty)</th>
+                  <th class="header-excelsa">Excelsa (Type)</th>
+                  <th class="header-excelsa">Excelsa (Qty)</th>
+                  <th class="header-robusta">Robusta (Type)</th>
+                  <th class="header-robusta">Robusta (Qty)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td id="farmerProfileRoastedLibClassText">—</td>
+                  <td id="farmerProfileRoastedLibQtyText">0</td>
+                  <td id="farmerProfileRoastedExcClassText">—</td>
+                  <td id="farmerProfileRoastedExcQtyText">0</td>
+                  <td id="farmerProfileRoastedRobClassText">—</td>
+                  <td id="farmerProfileRoastedRobQtyText">0</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
   <!-- Profile photo modal (outside .module so it is not clipped) -->
   <div id="profilePhotoModal" class="profile-modal profile-photo-modal" hidden aria-hidden="true">
     <div class="profile-modal-backdrop" id="profilePhotoModalBackdrop"></div>
@@ -1957,7 +2272,7 @@
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
-      <p class="profile-photo-modal-hint">Upload an image or use your camera. JPEG, PNG, or WebP up to 5&nbsp;MB.</p>
+      <p class="profile-photo-modal-hint">Upload an image or take a picture on this computer. Camera works at <strong>http://127.0.0.1:5000</strong> (same admin, no extra setup). JPEG, PNG, or WebP up to 5&nbsp;MB.</p>
       <div class="profile-photo-actions">
         <button type="button" class="profile-photo-action-btn" id="profilePhotoUploadBtn">
           <i class="fa-solid fa-upload" aria-hidden="true"></i>
@@ -2400,34 +2715,22 @@
           </div>
           <div class="analysis-section">
             <div class="analysis-header">
-              <h4><i class="fa-solid fa-brain"></i> AI Analysis Results</h4>
+              <div class="analysis-header__title">
+                <h4><i class="fa-solid fa-file-lines"></i> Beanthentic AI Reviewer</h4>
+                <span class="analysis-header__subtitle">Automated IPOPHL document review</span>
+              </div>
               <div class="analysis-status">
                 <span class="status-badge" id="analysisStatusBadge">Analyzing...</span>
               </div>
             </div>
             <div class="analysis-scroll-area">
-              <div class="gi-progress-indicator analysis-card">
-                <div class="progress-label">
-                  <i class="fa-solid fa-gauge-high"></i> Document Quality Score
-                </div>
-                <div class="progress-row">
-                  <div class="progress-bar-container">
-                    <div class="progress-bar" id="giProgressBar" style="width: 0%"></div>
-                  </div>
-                  <div class="progress-percentage" id="giProgressPercentage">0%</div>
-                </div>
-              </div>
-              <div class="analysis-results" id="analysisResults">
-                <div class="result-section analysis-card">
-                  <h5><i class="fa-solid fa-circle-check"></i> Information Found</h5>
-                  <ul class="feature-list" id="detectedFeaturesList">
-                    <li class="placeholder">No mandatory sections or information found in this document.</li>
-                  </ul>
-                </div>
-                <div class="result-section analysis-card improvement-analysis-section">
-                  <h5><i class="fa-solid fa-wand-magic-sparkles text-primary"></i> What Needs to be Improved</h5>
-                  <div class="improvement-paragraph" id="improvementAnalysisParagraph">
-                    <p class="placeholder">Generating in-depth analysis and improvement recommendations...</p>
+              <div class="analysis-results ai-chat-results" id="analysisResults">
+                <div id="requirementAnalysisContent" class="ai-chat-thread">
+                  <div class="ai-chat-typing" id="aiChatTyping" hidden>
+                    <div class="ai-typing-panel">
+                      <span class="ai-typing-dots"><span></span><span></span><span></span></span>
+                      <span class="ai-typing-label">Reviewing document…</span>
+                    </div>
                   </div>
                 </div>
               </div>
