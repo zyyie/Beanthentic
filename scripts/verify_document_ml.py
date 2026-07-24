@@ -13,17 +13,30 @@ status = a.ml_status()
 print(f"Training CV: {status.get('training', {})}")
 
 tests = [
-    ("phase1-product ready", "phase1-product", """
-        SYNTHETIC IPOPHL SUBMISSION DOCUMENT
-        Upload zone: phase1-product
-        Lipa Barako coffee. Flavor Profile. Geographical Origin. Distinctive Quality.
-        Product Photos. Aroma. Roasting Process. Farming Practices.
-    """),
-    ("phase1-product incomplete", "phase1-product", "We grow coffee in Philippines. Good taste."),
-    ("phase2-mop ready", "phase2-mop", """
-        Manual of Specifications. Causal Link. Production Process. Quality Control.
-        Labeling Rules. Geographical Area. Lipa City Batangas Barako Coffee GI.
-    """),
+    (
+        "phase1-introduction ready",
+        "phase1-introduction",
+        """
+        Kapeng Barako Liberica from Batangas has a strong reputation as a
+        geographical indication product. Coffea liberica is distinctive and
+        known for tradition and origin in Lipa.
+        """,
+    ),
+    (
+        "phase1-introduction incomplete",
+        "phase1-introduction",
+        "We grow coffee in Philippines. Good taste.",
+    ),
+    (
+        "phase3-control ready",
+        "phase3-control",
+        """
+        Internal control requires growers registered with BaCoFFed
+        (Batangas Coffee Farmers Federation). Traceability records are kept
+        with the Provincial Technical Working Group under the Code of Practice.
+        LGU certificate of locality and batch/lot records are maintained.
+        """,
+    ),
 ]
 
 tmp = Path("machinelearning/uploads/_verify_ml.txt")

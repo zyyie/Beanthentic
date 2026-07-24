@@ -1,15 +1,24 @@
 """
 Build in-app admin notification feed (messages, transactions, moderation, registrations, etc.).
+
+Live sources are merged into a durable JSON history so notifications remain visible
+after logout/login (and after messages are marked read / events age out).
 """
 
 from __future__ import annotations
 
+import json
 import re
+import threading
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Callable
 
 _NOTIF_SOURCE_TIMEOUT_SEC = 3
+_FEED_MAX_ITEMS = 200
+_FEED_LOCK = threading.Lock()
+_FEED_PATH = Path(__file__).resolve().parent.parent / "data" / "admin_notifications_feed.json"
 
 from config.models import ActivityLogEntry, DocumentAnalysis
 from config.utils import get_current_user_phone, load_settings
@@ -34,6 +43,92 @@ def _parse_ts(val: Any) -> datetime | None:
         return datetime.fromisoformat(s.replace(" ", "T", 1) if "T" not in s and " " in s else s)
     except ValueError:
         return None
+
+
+def _load_feed_store() -> dict:
+    if not _FEED_PATH.exists():
+        return {"items": [], "dismissed_ids": []}
+    try:
+        data = json.loads(_FEED_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"items": [], "dismissed_ids": []}
+    if not isinstance(data, dict):
+        return {"items": [], "dismissed_ids": []}
+    items = data.get("items") if isinstance(data.get("items"), list) else []
+    dismissed = data.get("dismissed_ids") if isinstance(data.get("dismissed_ids"), list) else []
+    return {
+        "items": [i for i in items if isinstance(i, dict) and i.get("id")],
+        "dismissed_ids": [str(x) for x in dismissed if x],
+    }
+
+
+def _save_feed_store(store: dict) -> None:
+    _FEED_PATH.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "items": store.get("items") or [],
+        "dismissed_ids": store.get("dismissed_ids") or [],
+        "updated_at": datetime.now().isoformat(),
+    }
+    tmp = _FEED_PATH.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(_FEED_PATH)
+
+
+def _merge_live_into_store(live_items: list[dict]) -> list[dict]:
+    """Upsert live notifications into durable history; drop dismissed; keep newest first."""
+    with _FEED_LOCK:
+        store = _load_feed_store()
+        dismissed = set(store.get("dismissed_ids") or [])
+        by_id: dict[str, dict] = {}
+        for item in store.get("items") or []:
+            nid = str(item.get("id") or "")
+            if nid and nid not in dismissed:
+                by_id[nid] = item
+        for item in live_items or []:
+            nid = str(item.get("id") or "")
+            if not nid or nid in dismissed:
+                continue
+            prev = by_id.get(nid) or {}
+            merged = {**prev, **item}
+            # Keep first-seen timestamp if live item lacks a usable one
+            if not merged.get("timestamp") and prev.get("timestamp"):
+                merged["timestamp"] = prev["timestamp"]
+            by_id[nid] = merged
+
+        unique = list(by_id.values())
+
+        def sort_key(item: dict) -> datetime:
+            return _parse_ts(item.get("timestamp")) or datetime.min
+
+        unique.sort(key=sort_key, reverse=True)
+        unique = unique[:_FEED_MAX_ITEMS]
+        store["items"] = unique
+        store["dismissed_ids"] = sorted(dismissed)
+        try:
+            _save_feed_store(store)
+        except OSError:
+            pass
+        return unique
+
+
+def dismiss_admin_notification(notification_id: str) -> bool:
+    """Permanently hide a notification from the durable feed."""
+    nid = str(notification_id or "").strip()
+    if not nid:
+        return False
+    with _FEED_LOCK:
+        store = _load_feed_store()
+        dismissed = set(store.get("dismissed_ids") or [])
+        dismissed.add(nid)
+        store["dismissed_ids"] = sorted(dismissed)
+        store["items"] = [
+            i for i in (store.get("items") or []) if str(i.get("id") or "") != nid
+        ]
+        try:
+            _save_feed_store(store)
+        except OSError:
+            return False
+        return True
 
 
 def _item(
@@ -202,7 +297,7 @@ def _notifications_transactions() -> list[dict]:
     except Exception:
         return []
 
-    cutoff = datetime.now() - timedelta(days=14)
+    cutoff = datetime.now() - timedelta(days=90)
     out: list[dict] = []
     for txn in rows:
         at = _parse_ts(txn.get("recorded_at"))
@@ -227,7 +322,7 @@ def _notifications_transactions() -> list[dict]:
                 target_payload={"farmerId": fid, "transactionId": tid},
             )
         )
-    return out[:12]
+    return out[:40]
 
 
 def _notifications_moderation_activity() -> list[dict]:
@@ -712,4 +807,5 @@ def build_admin_notifications(*, admin_phone: str | None = None) -> list[dict]:
         return _parse_ts(item.get("timestamp")) or datetime.min
 
     unique.sort(key=sort_key, reverse=True)
-    return unique[:80]
+    # Persist history so items remain after logout / message read / ageing out of live sources
+    return _merge_live_into_store(unique)

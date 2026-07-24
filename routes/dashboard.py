@@ -204,6 +204,21 @@ def register_dashboard_routes(app):
 
         return jsonify({"ok": True, "items": items, "count": len(items)})
 
+    @app.route("/api/admin-notifications/dismiss", methods=["POST"])
+    def api_admin_notifications_dismiss():
+        """Remove a notification from the durable feed (survives refresh/login)."""
+        if not is_authenticated():
+            return jsonify({"error": "Unauthorized"}), 401
+
+        from config.admin_notifications import dismiss_admin_notification
+
+        payload = request.get_json(silent=True) or {}
+        nid = str(payload.get("id") or "").strip()
+        if not nid:
+            return jsonify({"ok": False, "error": "Missing notification id."}), 400
+        ok = dismiss_admin_notification(nid)
+        return jsonify({"ok": ok, "id": nid})
+
     @app.route("/settings/security", methods=["POST"])
     def settings_security():
         """Handle security settings changes."""

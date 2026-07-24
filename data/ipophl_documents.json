@@ -1313,5 +1313,1305 @@
     "analysis_timestamp": "2026-06-09T18:40:48.881398+00:00",
     "ipophl_phase": "unknown",
     "task_id": "ipophl-other"
+  },
+  "ae9063fe-2dc4-4ea9-ac5f-8152588aa869": {
+    "file_uuid": "ae9063fe-2dc4-4ea9-ac5f-8152588aa869",
+    "original_filename": "History_of_Kapeng_Barako.docx",
+    "file_path": "machinelearning/uploads/ae9063fe-2dc4-4ea9-ac5f-8152588aa869.docx",
+    "file_type": ".docx",
+    "file_size": 28013,
+    "ai_score": 85,
+    "ai_status": "Ready",
+    "detected_features": [
+      "Lipa Barako coffee",
+      "Flavor Profile",
+      "Geographical Origin",
+      "Distinctive Quality",
+      "Aroma",
+      "Farming Practices"
+    ],
+    "missing_requirements": [],
+    "analysis_method": "ml_hybrid",
+    "text_length": 27160,
+    "shap_analysis": "<p>The keyword checklist for <strong>Phase1 Product</strong> produced a readiness score of <strong>85%</strong> (highly compliant). Mandatory terms matched: <strong>4 of 4</strong> (Lipa Barako coffee, Flavor Profile, Geographical Origin, Distinctive Quality).</p><p><strong>Gap analysis:</strong> All mandatory keywords for this upload zone were found. Optional terms not detected: Product Photos, Roasting Process. </p><p><strong>ML irregularities:</strong> The Random Forest model rated this document at <strong>51%</strong>, which is <strong>34 points lower</strong> than the keyword score (85%). The model may under-weight domain terms that are present but phrased differently from training samples.</p>",
+    "score_breakdown": {
+      "keyword_score": 85,
+      "final_score": 85,
+      "formula": "70% mandatory keywords + 30% optional keywords; all mandatory found \u2192 keyword score final",
+      "terms": [
+        {
+          "term": "Lipa Barako coffee",
+          "type": "mandatory",
+          "found": true,
+          "points": 17.5,
+          "max_points": 17.5
+        },
+        {
+          "term": "Flavor Profile",
+          "type": "mandatory",
+          "found": true,
+          "points": 17.5,
+          "max_points": 17.5
+        },
+        {
+          "term": "Geographical Origin",
+          "type": "mandatory",
+          "found": true,
+          "points": 17.5,
+          "max_points": 17.5
+        },
+        {
+          "term": "Distinctive Quality",
+          "type": "mandatory",
+          "found": true,
+          "points": 17.5,
+          "max_points": 17.5
+        },
+        {
+          "term": "Product Photos",
+          "type": "optional",
+          "found": false,
+          "points": 0,
+          "max_points": 7.5
+        },
+        {
+          "term": "Aroma",
+          "type": "optional",
+          "found": true,
+          "points": 7.5,
+          "max_points": 7.5
+        },
+        {
+          "term": "Roasting Process",
+          "type": "optional",
+          "found": false,
+          "points": 0,
+          "max_points": 7.5
+        },
+        {
+          "term": "Farming Practices",
+          "type": "optional",
+          "found": true,
+          "points": 7.5,
+          "max_points": 7.5
+        }
+      ],
+      "section_score": 75,
+      "sections": [
+        {
+          "id": "product_identity",
+          "label": "Product name & variety (Barako / Liberica)",
+          "found": true
+        },
+        {
+          "id": "sensory_profile",
+          "label": "Sensory / quality characteristics",
+          "found": true
+        },
+        {
+          "id": "geo_link",
+          "label": "Geographical origin linkage",
+          "found": true
+        },
+        {
+          "id": "visual_evidence",
+          "label": "Product imagery or description evidence",
+          "found": false
+        }
+      ],
+      "sections_found": 3,
+      "sections_total": 4
+    },
+    "ip_pillar_assessment": {
+      "pillars": [
+        {
+          "id": "trademark",
+          "label": "Trademark",
+          "scope": "Geographical indications, signs, labels, product names, branding, filing with the Bureau of Trademarks, publication, opposition, and GI registration.",
+          "status": "addressed",
+          "met": [
+            "Lipa Barako coffee",
+            "Flavor Profile",
+            "Geographical Origin",
+            "Distinctive Quality",
+            "Aroma",
+            "Product name & variety (Barako / Liberica)",
+            "Geographical origin linkage"
+          ],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [
+            "\u2026a had gained widespread acclaim worldwide, liberica was not readily accepted by coffee enthusiasts, except those seeking unique and diverse flavor profiles. This scenario unfolded against an increasing global demand for coffee, which the current supply could not sufficiently satisfy. The dep\u2026",
+            "\u2026tion of coffee cultivation in the Philippines has undergone numerous shifts primarily due to economic demands, colonial influences, and changing agricultural conditions. The world recognized the Philippines as one of the leading producers of coffee globally during the early days.\u2026"
+          ],
+          "narrative": "Trademark \u2014 Addressed. This upload provides clear support for the Trademark pillar under the IPOPHL four-pillar Geographical Indication framework. The following requirements were identified in the submitted text: Lipa Barako coffee, Flavor Profile, Geographical Origin, Distinctive Quality, Aroma, Product name & variety (Barako / Liberica), Geographical origin linkage. Relevant passages from the document include: \u2026a had gained widespread acclaim worldwide, liberica was not readily accepted by coffee enthusiasts, except those seeking unique and diverse flavor profiles. This scenario unfolded against an increasing global demand for coffee, which the current supply could not sufficiently satisfy. The dep\u2026 Further supporting language was found where the file states: \u2026tion of coffee cultivation in the Philippines has undergone numerous shifts primarily due to economic demands, colonial influences, and changing agricultural conditions. The world recognized the Philippines as one of the leading producers of coffee globally during the early days.\u2026 For Kapeng Barako / Lipa Barako GI registration, this satisfies examiner expectations for geographical indications, signs, labels, product names, branding, filing with the bureau of trademarks, publication, opposition, and gi registration. No immediate revision is required for this pillar in this specific upload."
+        },
+        {
+          "id": "copyright",
+          "label": "Copyright",
+          "scope": "Original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation.",
+          "status": "partial",
+          "met": [],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [
+            "\u2026kano (likely because it was the Americans who introduced this variety to the region); this later transformed into the name kapeng barako (homophonic), derived from the Coffea liberica (kape [li]berica) variety. Kape liberica traditionally adopted the term kapeng barako. However, a\u2026"
+          ],
+          "narrative": "Copyright \u2014 Partially addressed. The document references Copyright-related content, but the evidence is not yet complete enough for this filing stage. The submission includes related wording such as: \u2026kano (likely because it was the Americans who introduced this variety to the region); this later transformed into the name kapeng barako (homophonic), derived from the Coffea liberica (kape [li]berica) variety. Kape liberica traditionally adopted the term kapeng barako. However, a\u2026 To strengthen the Copyright pillar, expand sections that document original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        },
+        {
+          "id": "industrial_design",
+          "label": "Industrial Design",
+          "scope": "Ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers.",
+          "status": "not_addressed",
+          "met": [],
+          "gaps": [
+            "Product imagery or description evidence"
+          ],
+          "signal_detected": true,
+          "evidence": [],
+          "narrative": "Industrial Design \u2014 Incomplete. The file contains language that suggests Industrial Design relevance, but mandatory checklist requirements for this pillar are not fully demonstrated. Missing or undocumented items include: Product imagery or description evidence. Examiners at the Bureau of Trademarks expect these to appear in structured, auditable form. Add dedicated sections covering ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers. Cross-reference the Manual of Specifications, supporting annexes, and any labels or process descriptions that belong to this pillar."
+        },
+        {
+          "id": "patent",
+          "label": "Patent",
+          "scope": "Technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing.",
+          "status": "addressed",
+          "met": [
+            "Farming Practices",
+            "Sensory / quality characteristics"
+          ],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [
+            "\u2026cluding the Philippine Coffee Board\u2014alongside various local NGOs\u2014have collaborated with governmental entities to advance sustainable coffee farming practices, provide essential training and rejuvenate coffee production. In the Province of Batangas, the Batangas Provincial Agriculturist Office,\u2026"
+          ],
+          "narrative": "Patent \u2014 Addressed. This upload provides clear support for the Patent pillar under the IPOPHL four-pillar Geographical Indication framework. The following requirements were identified in the submitted text: Farming Practices, Sensory / quality characteristics. Relevant passages from the document include: \u2026cluding the Philippine Coffee Board\u2014alongside various local NGOs\u2014have collaborated with governmental entities to advance sustainable coffee farming practices, provide essential training and rejuvenate coffee production. In the Province of Batangas, the Batangas Provincial Agriculturist Office,\u2026 For Kapeng Barako / Lipa Barako GI registration, this satisfies examiner expectations for technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing. No immediate revision is required for this pillar in this specific upload."
+        }
+      ],
+      "ready_pillars": 2,
+      "partial_pillars": 1,
+      "gap_pillars": 1,
+      "pillar_total": 4,
+      "executive_summary": "This review evaluates your Qualifying Product identification under the IPOPHL four-pillar standard applied to Kapeng Barako / Lipa Barako Geographical Indication registration. Based on extracted text, this upload is Ready for its current IPOPHL phase and may proceed subject to review of companion documents in the full GI package. Four-pillar breakdown: 2 pillar(s) fully addressed, 1 partially addressed, and 1 requiring substantive revision, measured against Trademark, Copyright, Industrial Design, and Patent standards used in IPOPHL GI examination. The analysis prioritizes Copyright, Industrial Design for revision because these pillars show the largest gap between submitted content and phase-specific checklist expectations. The sections below summarize what was detected in the uploaded file, what is missing, and pillar-by-pillar findings drawn from the document text itself.",
+      "recommendations": [
+        "Industrial Design pillar: Attach or describe product imagery, packaging layouts, label design, and visual presentation of the goods. Missing elements: Product imagery or description evidence.",
+        "This file meets the current phase checklist based on extracted text. Before Complete Registration, verify that companion uploads in other IPOPHL phases cover any pillar not fully addressed in this document alone, so the full GI package collectively satisfies Trademark, Copyright, Industrial Design, and Patent requirements."
+      ],
+      "document_insights": {
+        "document_type": "Qualifying Product identification",
+        "word_count": 3921,
+        "text_length": 27160,
+        "checklist_met": 4,
+        "checklist_total": 4,
+        "sections_found": [
+          "Product name & variety (Barako / Liberica)",
+          "Sensory / quality characteristics",
+          "Geographical origin linkage"
+        ],
+        "sections_missing": [
+          "Product imagery or description evidence"
+        ],
+        "detected_features": [
+          "Lipa Barako coffee",
+          "Flavor Profile",
+          "Geographical Origin",
+          "Distinctive Quality",
+          "Aroma",
+          "Farming Practices"
+        ],
+        "missing_requirements": []
+      }
+    },
+    "upload_timestamp": "",
+    "analysis_timestamp": "2026-07-24T16:16:15.888327",
+    "ipophl_phase": "phase1",
+    "task_id": "phase1-product"
+  },
+  "d42e7aa1-0185-4b1e-a86f-82df416d2418": {
+    "file_uuid": "d42e7aa1-0185-4b1e-a86f-82df416d2418",
+    "original_filename": "History_of_Kapeng_Barako.docx",
+    "file_path": "machinelearning/uploads/d42e7aa1-0185-4b1e-a86f-82df416d2418.docx",
+    "file_type": ".docx",
+    "file_size": 28013,
+    "ai_score": 100,
+    "ai_status": "Ready",
+    "detected_features": [
+      "History of Kapeng Barako",
+      "history",
+      "historical"
+    ],
+    "missing_requirements": [],
+    "analysis_method": "mop_reference_qualitative",
+    "text_length": 27160,
+    "shap_analysis": "<p>This review evaluates the uploaded <strong>Phase1 History</strong> document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About <strong>3,976</strong> words were extracted for review. Overall classification: <strong>Ready</strong> \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.</p><p><strong>What is already working:</strong> The document shows useful coverage of <strong>History of Kapeng Barako</strong>. These sections align with how an approved GI specification presents product identity, territorial link, technical description, and/or control systems for Liberica Barako.</p><p><strong>Completeness:</strong> Critical themes appear adequately developed for this upload zone. Confirm companion documents still cover any Part I\u2013IV topics not expected in this single file.</p><p><strong>Theme-by-theme findings (MoP basis):</strong></p><ul><li><strong>History of Kapeng Barako</strong> (Part I \u2014 Justification) \u2014 well covered. Expectation: Narrate the historical development of Kapeng Barako in Batangas: introduction of the crop, cultural role, and continuity of production. Evidence cues found: history, historical, century, spanish.</li></ul>",
+    "score_breakdown": {
+      "analysis_mode": "mop_reference_qualitative",
+      "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako",
+      "final_score": 100,
+      "formula": "Qualitative MoP theme coverage (no keyword percentage)",
+      "sections": [
+        {
+          "id": "history",
+          "label": "History of Kapeng Barako",
+          "found": true,
+          "coverage": "well_covered",
+          "part": "Part I \u2014 Justification",
+          "expectation": "Narrate the historical development of Kapeng Barako in Batangas: introduction of the crop, cultural role, and continuity of production.",
+          "evidence": [
+            "history",
+            "historical",
+            "century",
+            "spanish",
+            "colonial",
+            "tradition",
+            "heritage",
+            "batangas coffee"
+          ]
+        }
+      ],
+      "sections_found": 1,
+      "sections_total": 1,
+      "improvements": [
+        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
+      ],
+      "terms": [
+        {
+          "term": "History of Kapeng Barako",
+          "found": true,
+          "coverage": "well_covered"
+        }
+      ]
+    },
+    "ip_pillar_assessment": {
+      "pillars": [
+        {
+          "id": "trademark",
+          "label": "Trademark",
+          "scope": "Geographical indications, signs, labels, product names, branding, filing with the Bureau of Trademarks, publication, opposition, and GI registration.",
+          "status": "addressed",
+          "met": [
+            "History of Kapeng Barako",
+            "history",
+            "historical"
+          ],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [
+            "History of Kapeng Barako (An Excerpt from the book \u201cMapping Out the Batangue\u00f1o Identity: The Batangas Kapeng Barako\u201d) The evolution of coffee cultivation in the\u2026",
+            "History of Kapeng Barako (An Excerpt from the book \u201cMapping Out the Batangue\u00f1o Identity: The Batangas Kapeng Barako\u201d) The evolution of coffee cu\u2026"
+          ],
+          "narrative": "Trademark \u2014 Addressed. This upload provides clear support for the Trademark pillar under the IPOPHL four-pillar Geographical Indication framework. The following requirements were identified in the submitted text: History of Kapeng Barako, history, historical. Relevant passages from the document include: History of Kapeng Barako (An Excerpt from the book \u201cMapping Out the Batangue\u00f1o Identity: The Batangas Kapeng Barako\u201d) The evolution of coffee cultivation in the\u2026 Further supporting language was found where the file states: History of Kapeng Barako (An Excerpt from the book \u201cMapping Out the Batangue\u00f1o Identity: The Batangas Kapeng Barako\u201d) The evolution of coffee cu\u2026 For Kapeng Barako / Lipa Barako GI registration, this satisfies examiner expectations for geographical indications, signs, labels, product names, branding, filing with the bureau of trademarks, publication, opposition, and gi registration. No immediate revision is required for this pillar in this specific upload."
+        },
+        {
+          "id": "copyright",
+          "label": "Copyright",
+          "scope": "Original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation.",
+          "status": "partial",
+          "met": [],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [
+            "\u2026kano (likely because it was the Americans who introduced this variety to the region); this later transformed into the name kapeng barako (homophonic), derived from the Coffea liberica (kape [li]berica) variety. Kape liberica traditionally adopted the term kapeng barako. However, a\u2026"
+          ],
+          "narrative": "Copyright \u2014 Partially addressed. The document references Copyright-related content, but the evidence is not yet complete enough for this filing stage. The submission includes related wording such as: \u2026kano (likely because it was the Americans who introduced this variety to the region); this later transformed into the name kapeng barako (homophonic), derived from the Coffea liberica (kape [li]berica) variety. Kape liberica traditionally adopted the term kapeng barako. However, a\u2026 To strengthen the Copyright pillar, expand sections that document original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        },
+        {
+          "id": "industrial_design",
+          "label": "Industrial Design",
+          "scope": "Ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers.",
+          "status": "partial",
+          "met": [],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [],
+          "narrative": "Industrial Design \u2014 Partially addressed. The document references Industrial Design-related content, but the evidence is not yet complete enough for this filing stage. To strengthen the Industrial Design pillar, expand sections that document ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        },
+        {
+          "id": "patent",
+          "label": "Patent",
+          "scope": "Technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing.",
+          "status": "partial",
+          "met": [],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [],
+          "narrative": "Patent \u2014 Partially addressed. The document references Patent-related content, but the evidence is not yet complete enough for this filing stage. To strengthen the Patent pillar, expand sections that document technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        }
+      ],
+      "ready_pillars": 1,
+      "partial_pillars": 3,
+      "gap_pillars": 0,
+      "pillar_total": 4,
+      "executive_summary": "This review evaluates the uploaded  Phase1 History  document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About  3,976  words were extracted for review. Overall classification:  Ready  \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.",
+      "recommendations": [
+        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
+      ],
+      "document_insights": {
+        "document_type": "Phase1 History",
+        "word_count": 3976,
+        "checklist_met": 1,
+        "checklist_total": 1,
+        "detected_features": [
+          "History of Kapeng Barako"
+        ],
+        "missing_requirements": [],
+        "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako"
+      }
+    },
+    "upload_timestamp": "",
+    "analysis_timestamp": "2026-07-24T16:41:36.216608Z",
+    "ipophl_phase": "phase1",
+    "task_id": "phase1-history"
+  },
+  "df82c3d7-3657-4e74-ab3d-da238ed3f17b": {
+    "file_uuid": "df82c3d7-3657-4e74-ab3d-da238ed3f17b",
+    "original_filename": "Physical_link_to_the_territory.docx",
+    "file_path": "machinelearning/uploads/df82c3d7-3657-4e74-ab3d-da238ed3f17b.docx",
+    "file_type": ".docx",
+    "file_size": 1594373,
+    "ai_score": 100,
+    "ai_status": "Ready",
+    "detected_features": [
+      "Physical / causal link to the territory",
+      "volcanic",
+      "soil"
+    ],
+    "missing_requirements": [],
+    "analysis_method": "mop_reference_qualitative",
+    "text_length": 14727,
+    "shap_analysis": "<p>This review evaluates the uploaded <strong>Phase1 Physical Link</strong> document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About <strong>2,321</strong> words were extracted for review. Overall classification: <strong>Ready</strong> \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.</p><p><strong>What is already working:</strong> The document shows useful coverage of <strong>Physical / causal link to the territory</strong>. These sections align with how an approved GI specification presents product identity, territorial link, technical description, and/or control systems for Liberica Barako.</p><p><strong>Completeness:</strong> Critical themes appear adequately developed for this upload zone. Confirm companion documents still cover any Part I\u2013IV topics not expected in this single file.</p><p><strong>Theme-by-theme findings (MoP basis):</strong></p><ul><li><strong>Physical / causal link to the territory</strong> (Part I \u2014 Justification) \u2014 well covered. Expectation: Show how Batangas geography (volcanic soils, slope, climate Type I/III, elevation, rainfall) causally shapes Liberica quality \u2014 not just naming the place. Evidence cues found: volcanic, soil, climate, elevation.</li></ul>",
+    "score_breakdown": {
+      "analysis_mode": "mop_reference_qualitative",
+      "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako",
+      "final_score": 100,
+      "formula": "Qualitative MoP theme coverage (no keyword percentage)",
+      "sections": [
+        {
+          "id": "physical_link",
+          "label": "Physical / causal link to the territory",
+          "found": true,
+          "coverage": "well_covered",
+          "part": "Part I \u2014 Justification",
+          "expectation": "Show how Batangas geography (volcanic soils, slope, climate Type I/III, elevation, rainfall) causally shapes Liberica quality \u2014 not just naming the place.",
+          "evidence": [
+            "volcanic",
+            "soil",
+            "climate",
+            "elevation",
+            "slope",
+            "taal",
+            "physiography",
+            "suitability"
+          ]
+        }
+      ],
+      "sections_found": 1,
+      "sections_total": 1,
+      "improvements": [
+        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
+      ],
+      "terms": [
+        {
+          "term": "Physical / causal link to the territory",
+          "found": true,
+          "coverage": "well_covered"
+        }
+      ]
+    },
+    "ip_pillar_assessment": {
+      "pillars": [
+        {
+          "id": "trademark",
+          "label": "Trademark",
+          "scope": "Geographical indications, signs, labels, product names, branding, filing with the Bureau of Trademarks, publication, opposition, and GI registration.",
+          "status": "addressed",
+          "met": [
+            "Physical / causal link to the territory",
+            "volcanic",
+            "soil"
+          ],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [
+            "\u2026oy, Tuy Tingloy and Cities of Tanauan, Batangas and Lipa. Figure _. Slope Map Soil Physiography Batangas Province is endowed with rich, volcanic soil above par in quality and easy to cultivate. The geographical formation of soil consists mostly of water-laid volcanic tuff. The tuffac\u2026",
+            "\u2026Mataasnakahoy, San Jose, San Juan, San Luis, Taysan, Tingloy, Tuy Tingloy and Cities of Tanauan, Batangas and Lipa. Figure _. Slope Map Soil Physiography Batangas Province is endowed with rich, volcanic soil above par in quality and easy to cultivate. The geographical formation\u2026"
+          ],
+          "narrative": "Trademark \u2014 Addressed. This upload provides clear support for the Trademark pillar under the IPOPHL four-pillar Geographical Indication framework. The following requirements were identified in the submitted text: Physical / causal link to the territory, volcanic, soil. Relevant passages from the document include: \u2026oy, Tuy Tingloy and Cities of Tanauan, Batangas and Lipa. Figure _. Slope Map Soil Physiography Batangas Province is endowed with rich, volcanic soil above par in quality and easy to cultivate. The geographical formation of soil consists mostly of water-laid volcanic tuff. The tuffac\u2026 Further supporting language was found where the file states: \u2026Mataasnakahoy, San Jose, San Juan, San Luis, Taysan, Tingloy, Tuy Tingloy and Cities of Tanauan, Batangas and Lipa. Figure _. Slope Map Soil Physiography Batangas Province is endowed with rich, volcanic soil above par in quality and easy to cultivate. The geographical formation\u2026 For Kapeng Barako / Lipa Barako GI registration, this satisfies examiner expectations for geographical indications, signs, labels, product names, branding, filing with the bureau of trademarks, publication, opposition, and gi registration. No immediate revision is required for this pillar in this specific upload."
+        },
+        {
+          "id": "copyright",
+          "label": "Copyright",
+          "scope": "Original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation.",
+          "status": "partial",
+          "met": [],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [],
+          "narrative": "Copyright \u2014 Partially addressed. The document references Copyright-related content, but the evidence is not yet complete enough for this filing stage. To strengthen the Copyright pillar, expand sections that document original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        },
+        {
+          "id": "industrial_design",
+          "label": "Industrial Design",
+          "scope": "Ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers.",
+          "status": "not_addressed",
+          "met": [],
+          "gaps": [],
+          "signal_detected": false,
+          "evidence": [],
+          "narrative": "Industrial Design \u2014 Not addressed. This upload does not yet contain sufficient documented support for the Industrial Design pillar. IPOPHL GI examiners will look for explicit evidence of ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers. Without this, the document may receive deficiency notices during formality or substantive review. Revise the file to include pillar-specific content before proceeding to Complete Registration."
+        },
+        {
+          "id": "patent",
+          "label": "Patent",
+          "scope": "Technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing.",
+          "status": "not_addressed",
+          "met": [],
+          "gaps": [],
+          "signal_detected": false,
+          "evidence": [],
+          "narrative": "Patent \u2014 Not addressed. This upload does not yet contain sufficient documented support for the Patent pillar. IPOPHL GI examiners will look for explicit evidence of technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing. Without this, the document may receive deficiency notices during formality or substantive review. Revise the file to include pillar-specific content before proceeding to Complete Registration."
+        }
+      ],
+      "ready_pillars": 1,
+      "partial_pillars": 1,
+      "gap_pillars": 2,
+      "pillar_total": 4,
+      "executive_summary": "This review evaluates the uploaded  Phase1 Physical Link  document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About  2,321  words were extracted for review. Overall classification:  Ready  \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.",
+      "recommendations": [
+        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
+      ],
+      "document_insights": {
+        "document_type": "Phase1 Physical Link",
+        "word_count": 2321,
+        "checklist_met": 1,
+        "checklist_total": 1,
+        "detected_features": [
+          "Physical / causal link to the territory"
+        ],
+        "missing_requirements": [],
+        "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako"
+      }
+    },
+    "upload_timestamp": "",
+    "analysis_timestamp": "2026-07-24T16:41:36.562454Z",
+    "ipophl_phase": "phase1",
+    "task_id": "phase1-physical-link"
+  },
+  "2e510c67-b7d2-4eff-bd34-9f590d5c291b": {
+    "file_uuid": "2e510c67-b7d2-4eff-bd34-9f590d5c291b",
+    "original_filename": "TECHNICAL_-_General_Description.docx",
+    "file_path": "machinelearning/uploads/2e510c67-b7d2-4eff-bd34-9f590d5c291b.docx",
+    "file_type": ".docx",
+    "file_size": 18496,
+    "ai_score": 100,
+    "ai_status": "Ready",
+    "detected_features": [
+      "Morphological characteristics",
+      "Harvesting index",
+      "Sensory profile (taste / acidity / body)",
+      "Genetic / authenticity profile",
+      "morphological",
+      "plant height",
+      "harvesting index",
+      "maturity",
+      "sensory",
+      "aroma",
+      "genetic",
+      "dna"
+    ],
+    "missing_requirements": [],
+    "analysis_method": "mop_reference_qualitative",
+    "text_length": 4126,
+    "shap_analysis": "<p>This review evaluates the uploaded <strong>Phase2 General</strong> document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About <strong>632</strong> words were extracted for review. Overall classification: <strong>Ready</strong> \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.</p><p><strong>What is already working:</strong> The document shows useful coverage of <strong>Morphological characteristics, Harvesting index, Sensory profile (taste / acidity / body), Genetic / authenticity profile</strong>. These sections align with how an approved GI specification presents product identity, territorial link, technical description, and/or control systems for Liberica Barako.</p><p><strong>Completeness:</strong> Critical themes appear adequately developed for this upload zone. Confirm companion documents still cover any Part I\u2013IV topics not expected in this single file.</p><p><strong>Theme-by-theme findings (MoP basis):</strong></p><ul><li><strong>Morphological characteristics</strong> (Part II \u2014 Technical (General Description)) \u2014 well covered. Expectation: Describe Liberica plant, cherry, and bean morphology (height, leaves, flowers, oblong cherries, almond-shaped beans, size vs Arabica/Robusta). Evidence cues found: morphological, plant height, leaf, elliptic.</li><li><strong>Harvesting index</strong> (Part II \u2014 Technical (General Description)) \u2014 well covered. Expectation: State maturity indicators for picking (color progression, firmness, fully grown cherries) aligned with quality Liberica harvest practice. Evidence cues found: harvesting index, maturity, ripe, cherry color.</li><li><strong>Sensory profile (taste / acidity / body)</strong> (Part II \u2014 Technical (General Description)) \u2014 well covered. Expectation: Document sensory attributes of Barako/Liberica: flavor notes, acidity range, body/mouthfeel, and how roasted or ground product is characterized. Evidence cues found: sensory, aroma, acidity, body.</li><li><strong>Genetic / authenticity profile</strong> (Part II \u2014 Technical (General Description)) \u2014 well covered. Expectation: Reference molecular or genetic verification of Coffea liberica (e.g. BARAKO Project / matK gene work) as a baseline for authenticity. Evidence cues found: genetic, dna, matk, molecular.</li></ul>",
+    "score_breakdown": {
+      "analysis_mode": "mop_reference_qualitative",
+      "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako",
+      "final_score": 100,
+      "formula": "Qualitative MoP theme coverage (no keyword percentage)",
+      "sections": [
+        {
+          "id": "morphology",
+          "label": "Morphological characteristics",
+          "found": true,
+          "coverage": "well_covered",
+          "part": "Part II \u2014 Technical (General Description)",
+          "expectation": "Describe Liberica plant, cherry, and bean morphology (height, leaves, flowers, oblong cherries, almond-shaped beans, size vs Arabica/Robusta).",
+          "evidence": [
+            "morphological",
+            "plant height",
+            "leaf",
+            "elliptic",
+            "cherry",
+            "bean",
+            "almond",
+            "inflorescence"
+          ]
+        },
+        {
+          "id": "harvesting_index",
+          "label": "Harvesting index",
+          "found": true,
+          "coverage": "well_covered",
+          "part": "Part II \u2014 Technical (General Description)",
+          "expectation": "State maturity indicators for picking (color progression, firmness, fully grown cherries) aligned with quality Liberica harvest practice.",
+          "evidence": [
+            "harvesting index",
+            "maturity",
+            "ripe",
+            "cherry color",
+            "firmness",
+            "harvest"
+          ]
+        },
+        {
+          "id": "sensory",
+          "label": "Sensory profile (taste / acidity / body)",
+          "found": true,
+          "coverage": "well_covered",
+          "part": "Part II \u2014 Technical (General Description)",
+          "expectation": "Document sensory attributes of Barako/Liberica: flavor notes, acidity range, body/mouthfeel, and how roasted or ground product is characterized.",
+          "evidence": [
+            "sensory",
+            "aroma",
+            "acidity",
+            "body",
+            "flavor",
+            "sweetness",
+            "taste"
+          ]
+        },
+        {
+          "id": "genetic_profile",
+          "label": "Genetic / authenticity profile",
+          "found": true,
+          "coverage": "well_covered",
+          "part": "Part II \u2014 Technical (General Description)",
+          "expectation": "Reference molecular or genetic verification of Coffea liberica (e.g. BARAKO Project / matK gene work) as a baseline for authenticity.",
+          "evidence": [
+            "genetic",
+            "dna",
+            "matk",
+            "molecular",
+            "barako project",
+            "genbank",
+            "authenticity",
+            "pcr"
+          ]
+        }
+      ],
+      "sections_found": 4,
+      "sections_total": 4,
+      "improvements": [
+        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
+      ],
+      "terms": [
+        {
+          "term": "Morphological characteristics",
+          "found": true,
+          "coverage": "well_covered"
+        },
+        {
+          "term": "Harvesting index",
+          "found": true,
+          "coverage": "well_covered"
+        },
+        {
+          "term": "Sensory profile (taste / acidity / body)",
+          "found": true,
+          "coverage": "well_covered"
+        },
+        {
+          "term": "Genetic / authenticity profile",
+          "found": true,
+          "coverage": "well_covered"
+        }
+      ]
+    },
+    "ip_pillar_assessment": {
+      "pillars": [
+        {
+          "id": "trademark",
+          "label": "Trademark",
+          "scope": "Geographical indications, signs, labels, product names, branding, filing with the Bureau of Trademarks, publication, opposition, and GI registration.",
+          "status": "addressed",
+          "met": [
+            "Morphological characteristics",
+            "Harvesting index",
+            "Sensory profile (taste / acidity / body)",
+            "Genetic / authenticity profile",
+            "morphological",
+            "plant height",
+            "harvesting index",
+            "maturity",
+            "sensory",
+            "aroma",
+            "genetic",
+            "dna"
+          ],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [
+            "General Description I.I. Morphological Characteristics Morphological characteristics in coffee refer to the physical attributes and features of coffee plants, beans, or cherries. These characte\u2026",
+            "\u2026-Shape almond shape and asymmetry -Size larger than arabica and robusta -Color tough skin and are creamy-white when raw I.II. Harvesting Index The Harvesting Index in coffee refers to the optimal stage of maturity at which coffee cherries should be picked to ensure the best quality\u2026"
+          ],
+          "narrative": "Trademark \u2014 Addressed. This upload provides clear support for the Trademark pillar under the IPOPHL four-pillar Geographical Indication framework. The following requirements were identified in the submitted text: Morphological characteristics, Harvesting index, Sensory profile (taste / acidity / body), Genetic / authenticity profile, morphological, plant height, harvesting index, maturity, and 4 more. Relevant passages from the document include: General Description I.I. Morphological Characteristics Morphological characteristics in coffee refer to the physical attributes and features of coffee plants, beans, or cherries. These characte\u2026 Further supporting language was found where the file states: \u2026-Shape almond shape and asymmetry -Size larger than arabica and robusta -Color tough skin and are creamy-white when raw I.II. Harvesting Index The Harvesting Index in coffee refers to the optimal stage of maturity at which coffee cherries should be picked to ensure the best quality\u2026 For Kapeng Barako / Lipa Barako GI registration, this satisfies examiner expectations for geographical indications, signs, labels, product names, branding, filing with the bureau of trademarks, publication, opposition, and gi registration. No immediate revision is required for this pillar in this specific upload."
+        },
+        {
+          "id": "copyright",
+          "label": "Copyright",
+          "scope": "Original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation.",
+          "status": "partial",
+          "met": [],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [],
+          "narrative": "Copyright \u2014 Partially addressed. The document references Copyright-related content, but the evidence is not yet complete enough for this filing stage. To strengthen the Copyright pillar, expand sections that document original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        },
+        {
+          "id": "industrial_design",
+          "label": "Industrial Design",
+          "scope": "Ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers.",
+          "status": "not_addressed",
+          "met": [],
+          "gaps": [],
+          "signal_detected": false,
+          "evidence": [],
+          "narrative": "Industrial Design \u2014 Not addressed. This upload does not yet contain sufficient documented support for the Industrial Design pillar. IPOPHL GI examiners will look for explicit evidence of ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers. Without this, the document may receive deficiency notices during formality or substantive review. Revise the file to include pillar-specific content before proceeding to Complete Registration."
+        },
+        {
+          "id": "patent",
+          "label": "Patent",
+          "scope": "Technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing.",
+          "status": "partial",
+          "met": [],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [],
+          "narrative": "Patent \u2014 Partially addressed. The document references Patent-related content, but the evidence is not yet complete enough for this filing stage. To strengthen the Patent pillar, expand sections that document technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        }
+      ],
+      "ready_pillars": 1,
+      "partial_pillars": 2,
+      "gap_pillars": 1,
+      "pillar_total": 4,
+      "executive_summary": "This review evaluates the uploaded  Phase2 General  document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About  632  words were extracted for review. Overall classification:  Ready  \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.",
+      "recommendations": [
+        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
+      ],
+      "document_insights": {
+        "document_type": "Phase2 General",
+        "word_count": 632,
+        "checklist_met": 4,
+        "checklist_total": 4,
+        "detected_features": [
+          "Morphological characteristics",
+          "Harvesting index",
+          "Sensory profile (taste / acidity / body)",
+          "Genetic / authenticity profile"
+        ],
+        "missing_requirements": [],
+        "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako"
+      }
+    },
+    "upload_timestamp": "",
+    "analysis_timestamp": "2026-07-24T16:41:36.635239Z",
+    "ipophl_phase": "phase2",
+    "task_id": "phase2-general"
+  },
+  "55640d78-4579-41f7-9f7d-d0f111d5635e": {
+    "file_uuid": "55640d78-4579-41f7-9f7d-d0f111d5635e",
+    "original_filename": "TECHNICAL_-_Specific_Description_of_the_Production.docx",
+    "file_path": "machinelearning/uploads/55640d78-4579-41f7-9f7d-d0f111d5635e.docx",
+    "file_type": ".docx",
+    "file_size": 14092,
+    "ai_score": 100,
+    "ai_status": "Ready",
+    "detected_features": [
+      "Specific product description (roasted / ground)",
+      "Sensory profile (taste / acidity / body)",
+      "roasted coffee",
+      "ground coffee",
+      "aroma",
+      "acidity"
+    ],
+    "missing_requirements": [],
+    "analysis_method": "mop_reference_qualitative",
+    "text_length": 341,
+    "shap_analysis": "<p>This review evaluates the uploaded <strong>Phase2 Specific</strong> document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About <strong>56</strong> words were extracted for review. Overall classification: <strong>Ready</strong> \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.</p><p><strong>What is already working:</strong> The document shows useful coverage of <strong>Specific product description (roasted / ground), Sensory profile (taste / acidity / body)</strong>. These sections align with how an approved GI specification presents product identity, territorial link, technical description, and/or control systems for Liberica Barako.</p><p><strong>Completeness:</strong> Critical themes appear adequately developed for this upload zone. Confirm companion documents still cover any Part I\u2013IV topics not expected in this single file.</p><p><strong>Theme-by-theme findings (MoP basis):</strong></p><ul><li><strong>Specific product description (roasted / ground)</strong> (Part II \u2014 Technical (Specific Description)) \u2014 well covered. Expectation: Specify roasted beans and/or ground coffee attributes: Liberica aroma, degree of roast (light/medium/dark), taste/body, and acidity. Evidence cues found: roasted coffee, ground coffee, degree of roast, light roast.</li><li><strong>Sensory profile (taste / acidity / body)</strong> (Part II \u2014 Technical (General Description)) \u2014 well covered. Expectation: Document sensory attributes of Barako/Liberica: flavor notes, acidity range, body/mouthfeel, and how roasted or ground product is characterized. Evidence cues found: aroma, acidity, body, bitterness.</li></ul>",
+    "score_breakdown": {
+      "analysis_mode": "mop_reference_qualitative",
+      "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako",
+      "final_score": 100,
+      "formula": "Qualitative MoP theme coverage (no keyword percentage)",
+      "sections": [
+        {
+          "id": "product_specification",
+          "label": "Specific product description (roasted / ground)",
+          "found": true,
+          "coverage": "well_covered",
+          "part": "Part II \u2014 Technical (Specific Description)",
+          "expectation": "Specify roasted beans and/or ground coffee attributes: Liberica aroma, degree of roast (light/medium/dark), taste/body, and acidity.",
+          "evidence": [
+            "roasted coffee",
+            "ground coffee",
+            "degree of roast",
+            "light roast",
+            "medium roast",
+            "dark roast",
+            "roasted beans",
+            "specific description"
+          ]
+        },
+        {
+          "id": "sensory",
+          "label": "Sensory profile (taste / acidity / body)",
+          "found": true,
+          "coverage": "well_covered",
+          "part": "Part II \u2014 Technical (General Description)",
+          "expectation": "Document sensory attributes of Barako/Liberica: flavor notes, acidity range, body/mouthfeel, and how roasted or ground product is characterized.",
+          "evidence": [
+            "aroma",
+            "acidity",
+            "body",
+            "bitterness",
+            "sweetness",
+            "roast",
+            "taste"
+          ]
+        }
+      ],
+      "sections_found": 2,
+      "sections_total": 2,
+      "improvements": [
+        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
+      ],
+      "terms": [
+        {
+          "term": "Specific product description (roasted / ground)",
+          "found": true,
+          "coverage": "well_covered"
+        },
+        {
+          "term": "Sensory profile (taste / acidity / body)",
+          "found": true,
+          "coverage": "well_covered"
+        }
+      ]
+    },
+    "ip_pillar_assessment": {
+      "pillars": [
+        {
+          "id": "trademark",
+          "label": "Trademark",
+          "scope": "Geographical indications, signs, labels, product names, branding, filing with the Bureau of Trademarks, publication, opposition, and GI registration.",
+          "status": "addressed",
+          "met": [
+            "Specific product description (roasted / ground)",
+            "Sensory profile (taste / acidity / body)",
+            "aroma",
+            "acidity"
+          ],
+          "gaps": [],
+          "signal_detected": false,
+          "evidence": [
+            "II. Specific Description of the product II.I Roasted Coffee Beans Aroma (Specific for liberica) Degree of Roast (It could be light, medium or dark roast) II.I Ground Coffee Aroma (Specific for liberica) Taste\u2026"
+          ],
+          "narrative": "Trademark \u2014 Addressed. This upload provides clear support for the Trademark pillar under the IPOPHL four-pillar Geographical Indication framework. The following requirements were identified in the submitted text: Specific product description (roasted / ground), Sensory profile (taste / acidity / body), aroma, acidity. Relevant passages from the document include: II. Specific Description of the product II.I Roasted Coffee Beans Aroma (Specific for liberica) Degree of Roast (It could be light, medium or dark roast) II.I Ground Coffee Aroma (Specific for liberica) Taste\u2026 For Kapeng Barako / Lipa Barako GI registration, this satisfies examiner expectations for geographical indications, signs, labels, product names, branding, filing with the bureau of trademarks, publication, opposition, and gi registration. No immediate revision is required for this pillar in this specific upload."
+        },
+        {
+          "id": "copyright",
+          "label": "Copyright",
+          "scope": "Original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation.",
+          "status": "partial",
+          "met": [],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [],
+          "narrative": "Copyright \u2014 Partially addressed. The document references Copyright-related content, but the evidence is not yet complete enough for this filing stage. To strengthen the Copyright pillar, expand sections that document original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        },
+        {
+          "id": "industrial_design",
+          "label": "Industrial Design",
+          "scope": "Ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers.",
+          "status": "not_addressed",
+          "met": [],
+          "gaps": [],
+          "signal_detected": false,
+          "evidence": [],
+          "narrative": "Industrial Design \u2014 Not addressed. This upload does not yet contain sufficient documented support for the Industrial Design pillar. IPOPHL GI examiners will look for explicit evidence of ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers. Without this, the document may receive deficiency notices during formality or substantive review. Revise the file to include pillar-specific content before proceeding to Complete Registration."
+        },
+        {
+          "id": "patent",
+          "label": "Patent",
+          "scope": "Technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing.",
+          "status": "addressed",
+          "met": [
+            "roasted coffee",
+            "ground coffee"
+          ],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [
+            "II. Specific Description of the product II.I Roasted Coffee Beans Aroma (Specific for liberica) Degree of Roast (It could be light, medium or dark roast) II.I Ground Coffee Aroma (Specific for lib\u2026",
+            "\u2026ion of the product II.I Roasted Coffee Beans Aroma (Specific for liberica) Degree of Roast (It could be light, medium or dark roast) II.I Ground Coffee Aroma (Specific for liberica) Taste/Body (Bitterness/Sweetness) Acidity (What is the range of acidity) Degree of Roast (It could be lig\u2026"
+          ],
+          "narrative": "Patent \u2014 Addressed. This upload provides clear support for the Patent pillar under the IPOPHL four-pillar Geographical Indication framework. The following requirements were identified in the submitted text: roasted coffee, ground coffee. Relevant passages from the document include: II. Specific Description of the product II.I Roasted Coffee Beans Aroma (Specific for liberica) Degree of Roast (It could be light, medium or dark roast) II.I Ground Coffee Aroma (Specific for lib\u2026 Further supporting language was found where the file states: \u2026ion of the product II.I Roasted Coffee Beans Aroma (Specific for liberica) Degree of Roast (It could be light, medium or dark roast) II.I Ground Coffee Aroma (Specific for liberica) Taste/Body (Bitterness/Sweetness) Acidity (What is the range of acidity) Degree of Roast (It could be lig\u2026 For Kapeng Barako / Lipa Barako GI registration, this satisfies examiner expectations for technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing. No immediate revision is required for this pillar in this specific upload."
+        }
+      ],
+      "ready_pillars": 2,
+      "partial_pillars": 1,
+      "gap_pillars": 1,
+      "pillar_total": 4,
+      "executive_summary": "This review evaluates the uploaded  Phase2 Specific  document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About  56  words were extracted for review. Overall classification:  Ready  \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.",
+      "recommendations": [
+        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
+      ],
+      "document_insights": {
+        "document_type": "Phase2 Specific",
+        "word_count": 56,
+        "checklist_met": 2,
+        "checklist_total": 2,
+        "detected_features": [
+          "Specific product description (roasted / ground)",
+          "Sensory profile (taste / acidity / body)"
+        ],
+        "missing_requirements": [],
+        "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako"
+      }
+    },
+    "upload_timestamp": "",
+    "analysis_timestamp": "2026-07-24T16:41:36.693038Z",
+    "ipophl_phase": "phase2",
+    "task_id": "phase2-specific"
+  },
+  "2ef40afd-f78a-4451-8d84-24b52f42a2b5": {
+    "file_uuid": "2ef40afd-f78a-4451-8d84-24b52f42a2b5",
+    "original_filename": "TECHNICAL_-_The_Production_Process.docx",
+    "file_path": "machinelearning/uploads/2ef40afd-f78a-4451-8d84-24b52f42a2b5.docx",
+    "file_type": ".docx",
+    "file_size": 30085,
+    "ai_score": 100,
+    "ai_status": "Ready",
+    "detected_features": [
+      "Production process (farm to finished product)",
+      "production process",
+      "planting materials"
+    ],
+    "missing_requirements": [],
+    "analysis_method": "mop_reference_qualitative",
+    "text_length": 18267,
+    "shap_analysis": "<p>This review evaluates the uploaded <strong>Phase2 Production</strong> document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About <strong>2,900</strong> words were extracted for review. Overall classification: <strong>Ready</strong> \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.</p><p><strong>What is already working:</strong> The document shows useful coverage of <strong>Production process (farm to finished product)</strong>. These sections align with how an approved GI specification presents product identity, territorial link, technical description, and/or control systems for Liberica Barako.</p><p><strong>Completeness:</strong> Critical themes appear adequately developed for this upload zone. Confirm companion documents still cover any Part I\u2013IV topics not expected in this single file.</p><p><strong>Theme-by-theme findings (MoP basis):</strong></p><ul><li><strong>Production process (farm to finished product)</strong> (Part II \u2014 Technical (Production Process)) \u2014 well covered. Expectation: Detail production: planting materials (BPI/NSIC), soil/layout, transplanting, care, harvesting, post-harvest, processing, and roasting steps for Liberica. Evidence cues found: production process, planting materials, seedling, transplanting.</li></ul>",
+    "score_breakdown": {
+      "analysis_mode": "mop_reference_qualitative",
+      "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako",
+      "final_score": 100,
+      "formula": "Qualitative MoP theme coverage (no keyword percentage)",
+      "sections": [
+        {
+          "id": "production_process",
+          "label": "Production process (farm to finished product)",
+          "found": true,
+          "coverage": "well_covered",
+          "part": "Part II \u2014 Technical (Production Process)",
+          "expectation": "Detail production: planting materials (BPI/NSIC), soil/layout, transplanting, care, harvesting, post-harvest, processing, and roasting steps for Liberica.",
+          "evidence": [
+            "production process",
+            "planting materials",
+            "seedling",
+            "transplanting",
+            "weeding",
+            "mulching",
+            "fertilization",
+            "pruning"
+          ]
+        }
+      ],
+      "sections_found": 1,
+      "sections_total": 1,
+      "improvements": [
+        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
+      ],
+      "terms": [
+        {
+          "term": "Production process (farm to finished product)",
+          "found": true,
+          "coverage": "well_covered"
+        }
+      ]
+    },
+    "ip_pillar_assessment": {
+      "pillars": [
+        {
+          "id": "trademark",
+          "label": "Trademark",
+          "scope": "Geographical indications, signs, labels, product names, branding, filing with the Bureau of Trademarks, publication, opposition, and GI registration.",
+          "status": "addressed",
+          "met": [
+            "planting materials"
+          ],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [
+            "\u2026he Production Process III.I. Newly established plantation III.I.I. Recommended requirements III.I.I.I. Before planting Planting materials Planting materials or seedlings should be free from pests and diseases. For the establishment of new farms, planting materials/varieties r\u2026",
+            "\u2026Planting materials or seedlings should be free from pests and diseases. For the establishment of new farms, planting materials/varieties registered at the Bureau of Plant Industry (BPI) - National Seed Industry Council (NSIC) are recommended. Likewise, quality planting material\u2026"
+          ],
+          "narrative": "Trademark \u2014 Addressed. This upload provides clear support for the Trademark pillar under the IPOPHL four-pillar Geographical Indication framework. The following requirements were identified in the submitted text: planting materials. Relevant passages from the document include: \u2026he Production Process III.I. Newly established plantation III.I.I. Recommended requirements III.I.I.I. Before planting Planting materials Planting materials or seedlings should be free from pests and diseases. For the establishment of new farms, planting materials/varieties r\u2026 Further supporting language was found where the file states: \u2026Planting materials or seedlings should be free from pests and diseases. For the establishment of new farms, planting materials/varieties registered at the Bureau of Plant Industry (BPI) - National Seed Industry Council (NSIC) are recommended. Likewise, quality planting material\u2026 For Kapeng Barako / Lipa Barako GI registration, this satisfies examiner expectations for geographical indications, signs, labels, product names, branding, filing with the bureau of trademarks, publication, opposition, and gi registration. No immediate revision is required for this pillar in this specific upload."
+        },
+        {
+          "id": "copyright",
+          "label": "Copyright",
+          "scope": "Original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation.",
+          "status": "partial",
+          "met": [],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [],
+          "narrative": "Copyright \u2014 Partially addressed. The document references Copyright-related content, but the evidence is not yet complete enough for this filing stage. To strengthen the Copyright pillar, expand sections that document original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        },
+        {
+          "id": "industrial_design",
+          "label": "Industrial Design",
+          "scope": "Ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers.",
+          "status": "partial",
+          "met": [],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [],
+          "narrative": "Industrial Design \u2014 Partially addressed. The document references Industrial Design-related content, but the evidence is not yet complete enough for this filing stage. To strengthen the Industrial Design pillar, expand sections that document ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        },
+        {
+          "id": "patent",
+          "label": "Patent",
+          "scope": "Technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing.",
+          "status": "addressed",
+          "met": [
+            "Production process (farm to finished product)",
+            "production process"
+          ],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [
+            "III. The Production Process III.I. Newly established plantation III.I.I. Recommended requirements III.I.I.I. Before planting Planting materials Pl\u2026"
+          ],
+          "narrative": "Patent \u2014 Addressed. This upload provides clear support for the Patent pillar under the IPOPHL four-pillar Geographical Indication framework. The following requirements were identified in the submitted text: Production process (farm to finished product), production process. Relevant passages from the document include: III. The Production Process III.I. Newly established plantation III.I.I. Recommended requirements III.I.I.I. Before planting Planting materials Pl\u2026 For Kapeng Barako / Lipa Barako GI registration, this satisfies examiner expectations for technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing. No immediate revision is required for this pillar in this specific upload."
+        }
+      ],
+      "ready_pillars": 2,
+      "partial_pillars": 2,
+      "gap_pillars": 0,
+      "pillar_total": 4,
+      "executive_summary": "This review evaluates the uploaded  Phase2 Production  document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About  2,900  words were extracted for review. Overall classification:  Ready  \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.",
+      "recommendations": [
+        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
+      ],
+      "document_insights": {
+        "document_type": "Phase2 Production",
+        "word_count": 2900,
+        "checklist_met": 1,
+        "checklist_total": 1,
+        "detected_features": [
+          "Production process (farm to finished product)"
+        ],
+        "missing_requirements": [],
+        "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako"
+      }
+    },
+    "upload_timestamp": "",
+    "analysis_timestamp": "2026-07-24T16:41:36.836389Z",
+    "ipophl_phase": "phase2",
+    "task_id": "phase2-production"
+  },
+  "c8825593-e123-451f-91e9-51989f1ff2e2": {
+    "file_uuid": "c8825593-e123-451f-91e9-51989f1ff2e2",
+    "original_filename": "CONTROL__TRACEABILITY__LABELLING.docx",
+    "file_path": "machinelearning/uploads/c8825593-e123-451f-91e9-51989f1ff2e2.docx",
+    "file_type": ".docx",
+    "file_size": 14160,
+    "ai_score": 100,
+    "ai_status": "Ready",
+    "detected_features": [
+      "Internal control (producer registration)",
+      "Traceability & records",
+      "bacoffed",
+      "batangas coffee farmers federation",
+      "traceability",
+      "technical working group"
+    ],
+    "missing_requirements": [],
+    "analysis_method": "mop_reference_qualitative",
+    "text_length": 504,
+    "shap_analysis": "<p>This review evaluates the uploaded <strong>Phase3 Control</strong> document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About <strong>75</strong> words were extracted for review. Overall classification: <strong>Ready</strong> \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.</p><p><strong>What is already working:</strong> The document shows useful coverage of <strong>Internal control (producer registration), Traceability & records</strong>. These sections align with how an approved GI specification presents product identity, territorial link, technical description, and/or control systems for Liberica Barako.</p><p><strong>Completeness:</strong> Critical themes appear adequately developed for this upload zone. Confirm companion documents still cover any Part I\u2013IV topics not expected in this single file.</p><p><strong>Theme-by-theme findings (MoP basis):</strong></p><ul><li><strong>Internal control (producer registration)</strong> (Part III \u2014 Control & Traceability) \u2014 well covered. Expectation: Require growers to be registered with Batangas Coffee Farmers Federation (BaCoFFed) or equivalent internal control body. Evidence cues found: bacoffed, batangas coffee farmers federation, registered, internal control.</li><li><strong>Traceability & records</strong> (Part III \u2014 Control & Traceability) \u2014 well covered. Expectation: Describe how Provincial Technical Working Group and BaCoFFed maintain records and control compliance with the Code of Practice; LGU certificate of locality. Evidence cues found: traceability, technical working group, code of practice, records.</li></ul>",
+    "score_breakdown": {
+      "analysis_mode": "mop_reference_qualitative",
+      "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako",
+      "final_score": 100,
+      "formula": "Qualitative MoP theme coverage (no keyword percentage)",
+      "sections": [
+        {
+          "id": "internal_control",
+          "label": "Internal control (producer registration)",
+          "found": true,
+          "coverage": "well_covered",
+          "part": "Part III \u2014 Control & Traceability",
+          "expectation": "Require growers to be registered with Batangas Coffee Farmers Federation (BaCoFFed) or equivalent internal control body.",
+          "evidence": [
+            "bacoffed",
+            "batangas coffee farmers federation",
+            "registered",
+            "internal control",
+            "producers organization"
+          ]
+        },
+        {
+          "id": "traceability_system",
+          "label": "Traceability & records",
+          "found": true,
+          "coverage": "well_covered",
+          "part": "Part III \u2014 Control & Traceability",
+          "expectation": "Describe how Provincial Technical Working Group and BaCoFFed maintain records and control compliance with the Code of Practice; LGU certificate of locality.",
+          "evidence": [
+            "traceability",
+            "technical working group",
+            "code of practice",
+            "records"
+          ]
+        }
+      ],
+      "sections_found": 2,
+      "sections_total": 2,
+      "improvements": [
+        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
+      ],
+      "terms": [
+        {
+          "term": "Internal control (producer registration)",
+          "found": true,
+          "coverage": "well_covered"
+        },
+        {
+          "term": "Traceability & records",
+          "found": true,
+          "coverage": "well_covered"
+        }
+      ]
+    },
+    "ip_pillar_assessment": {
+      "pillars": [
+        {
+          "id": "trademark",
+          "label": "Trademark",
+          "scope": "Geographical indications, signs, labels, product names, branding, filing with the Bureau of Trademarks, publication, opposition, and GI registration.",
+          "status": "addressed",
+          "met": [
+            "Internal control (producer registration)",
+            "Traceability & records",
+            "bacoffed",
+            "traceability"
+          ],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [
+            "Part III. Control and Traceability III.I. Internal All coffee growers should be registered to Batangas Coffee Farmers Federation (BaCoFFed). III.II. Traceability Provincial Technical Working Group and Batangas Coffee Farmers Federation will maintain the records and control comp\u2026",
+            "Part III. Control and Traceability III.I. Internal All coffee growers should be registered to Batangas Coffee Farmers Federation (BaCoFFed). III.II. Traceability Provincial Technical Working Group and Batangas Coffee Farmers\u2026"
+          ],
+          "narrative": "Trademark \u2014 Addressed. This upload provides clear support for the Trademark pillar under the IPOPHL four-pillar Geographical Indication framework. The following requirements were identified in the submitted text: Internal control (producer registration), Traceability & records, bacoffed, traceability. Relevant passages from the document include: Part III. Control and Traceability III.I. Internal All coffee growers should be registered to Batangas Coffee Farmers Federation (BaCoFFed). III.II. Traceability Provincial Technical Working Group and Batangas Coffee Farmers Federation will maintain the records and control comp\u2026 Further supporting language was found where the file states: Part III. Control and Traceability III.I. Internal All coffee growers should be registered to Batangas Coffee Farmers Federation (BaCoFFed). III.II. Traceability Provincial Technical Working Group and Batangas Coffee Farmers\u2026 For Kapeng Barako / Lipa Barako GI registration, this satisfies examiner expectations for geographical indications, signs, labels, product names, branding, filing with the bureau of trademarks, publication, opposition, and gi registration. No immediate revision is required for this pillar in this specific upload."
+        },
+        {
+          "id": "copyright",
+          "label": "Copyright",
+          "scope": "Original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation.",
+          "status": "partial",
+          "met": [],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [
+            "\u2026. Traceability Provincial Technical Working Group and Batangas Coffee Farmers Federation will maintain the records and control compliant to Code of Practice. Part IV. Labelling The Batangas Kapeng Barako will have a distinct seal. Only producers who comply with the specifications contained in\u2026"
+          ],
+          "narrative": "Copyright \u2014 Partially addressed. The document references Copyright-related content, but the evidence is not yet complete enough for this filing stage. The submission includes related wording such as: \u2026. Traceability Provincial Technical Working Group and Batangas Coffee Farmers Federation will maintain the records and control compliant to Code of Practice. Part IV. Labelling The Batangas Kapeng Barako will have a distinct seal. Only producers who comply with the specifications contained in\u2026 To strengthen the Copyright pillar, expand sections that document original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        },
+        {
+          "id": "industrial_design",
+          "label": "Industrial Design",
+          "scope": "Ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers.",
+          "status": "not_addressed",
+          "met": [],
+          "gaps": [],
+          "signal_detected": false,
+          "evidence": [],
+          "narrative": "Industrial Design \u2014 Not addressed. This upload does not yet contain sufficient documented support for the Industrial Design pillar. IPOPHL GI examiners will look for explicit evidence of ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers. Without this, the document may receive deficiency notices during formality or substantive review. Revise the file to include pillar-specific content before proceeding to Complete Registration."
+        },
+        {
+          "id": "patent",
+          "label": "Patent",
+          "scope": "Technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing.",
+          "status": "addressed",
+          "met": [
+            "batangas coffee farmers federation",
+            "technical working group"
+          ],
+          "gaps": [],
+          "signal_detected": false,
+          "evidence": [
+            "Part III. Control and Traceability III.I. Internal All coffee growers should be registered to Batangas Coffee Farmers Federation (BaCoFFed). III.II. Traceability Provincial Technical Working Group and Batangas Coffee Farmers Federation will maintain the records and co\u2026",
+            "\u2026III.I. Internal All coffee growers should be registered to Batangas Coffee Farmers Federation (BaCoFFed). III.II. Traceability Provincial Technical Working Group and Batangas Coffee Farmers Federation will maintain the records and control compliant to Code of Practice. Part IV. Labelling The Batang\u2026"
+          ],
+          "narrative": "Patent \u2014 Addressed. This upload provides clear support for the Patent pillar under the IPOPHL four-pillar Geographical Indication framework. The following requirements were identified in the submitted text: batangas coffee farmers federation, technical working group. Relevant passages from the document include: Part III. Control and Traceability III.I. Internal All coffee growers should be registered to Batangas Coffee Farmers Federation (BaCoFFed). III.II. Traceability Provincial Technical Working Group and Batangas Coffee Farmers Federation will maintain the records and co\u2026 Further supporting language was found where the file states: \u2026III.I. Internal All coffee growers should be registered to Batangas Coffee Farmers Federation (BaCoFFed). III.II. Traceability Provincial Technical Working Group and Batangas Coffee Farmers Federation will maintain the records and control compliant to Code of Practice. Part IV. Labelling The Batang\u2026 For Kapeng Barako / Lipa Barako GI registration, this satisfies examiner expectations for technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing. No immediate revision is required for this pillar in this specific upload."
+        }
+      ],
+      "ready_pillars": 2,
+      "partial_pillars": 1,
+      "gap_pillars": 1,
+      "pillar_total": 4,
+      "executive_summary": "This review evaluates the uploaded  Phase3 Control  document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About  75  words were extracted for review. Overall classification:  Ready  \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.",
+      "recommendations": [
+        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
+      ],
+      "document_insights": {
+        "document_type": "Phase3 Control",
+        "word_count": 75,
+        "checklist_met": 2,
+        "checklist_total": 2,
+        "detected_features": [
+          "Internal control (producer registration)",
+          "Traceability & records"
+        ],
+        "missing_requirements": [],
+        "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako"
+      }
+    },
+    "upload_timestamp": "",
+    "analysis_timestamp": "2026-07-24T16:41:36.901295Z",
+    "ipophl_phase": "phase3",
+    "task_id": "phase3-control"
+  },
+  "2da67bdb-d1af-4e8e-a113-37520d3dffa8": {
+    "file_uuid": "2da67bdb-d1af-4e8e-a113-37520d3dffa8",
+    "original_filename": "Introduction__Reputation.docx",
+    "file_path": "machinelearning/uploads/2da67bdb-d1af-4e8e-a113-37520d3dffa8.docx",
+    "file_type": ".docx",
+    "file_size": 16603,
+    "ai_score": 100,
+    "ai_status": "Ready",
+    "detected_features": [
+      "Introduction, reputation & origin",
+      "reputation",
+      "geographical indication"
+    ],
+    "missing_requirements": [],
+    "analysis_method": "mop_reference_qualitative",
+    "text_length": 5216,
+    "shap_analysis": "<p>This review evaluates the uploaded <strong>Phase1 Introduction</strong> document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About <strong>828</strong> words were extracted for review. Overall classification: <strong>Ready</strong> \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.</p><p><strong>What is already working:</strong> The document shows useful coverage of <strong>Introduction, reputation & origin</strong>. These sections align with how an approved GI specification presents product identity, territorial link, technical description, and/or control systems for Liberica Barako.</p><p><strong>Completeness:</strong> Critical themes appear adequately developed for this upload zone. Confirm companion documents still cover any Part I\u2013IV topics not expected in this single file.</p><p><strong>Theme-by-theme findings (MoP basis):</strong></p><ul><li><strong>Introduction, reputation & origin</strong> (Part I \u2014 Justification) \u2014 well covered. Expectation: Explain why Batangas / Lipa Kapeng Barako deserves GI protection: product identity (Coffea liberica / Barako), geographic origin, and reputation among producers and consumers. Evidence cues found: reputation, geographical indication, geographical origin.</li></ul>",
+    "score_breakdown": {
+      "analysis_mode": "mop_reference_qualitative",
+      "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako",
+      "final_score": 100,
+      "formula": "Qualitative MoP theme coverage (no keyword percentage)",
+      "sections": [
+        {
+          "id": "reputation_origin",
+          "label": "Introduction, reputation & origin",
+          "found": true,
+          "coverage": "well_covered",
+          "part": "Part I \u2014 Justification",
+          "expectation": "Explain why Batangas / Lipa Kapeng Barako deserves GI protection: product identity (Coffea liberica / Barako), geographic origin, and reputation among producers and consumers.",
+          "evidence": [
+            "reputation",
+            "geographical indication",
+            "geographical origin"
+          ]
+        }
+      ],
+      "sections_found": 1,
+      "sections_total": 1,
+      "improvements": [
+        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
+      ],
+      "terms": [
+        {
+          "term": "Introduction, reputation & origin",
+          "found": true,
+          "coverage": "well_covered"
+        }
+      ]
+    },
+    "ip_pillar_assessment": {
+      "pillars": [
+        {
+          "id": "trademark",
+          "label": "Trademark",
+          "scope": "Geographical indications, signs, labels, product names, branding, filing with the Bureau of Trademarks, publication, opposition, and GI registration.",
+          "status": "addressed",
+          "met": [
+            "Introduction, reputation & origin",
+            "reputation",
+            "geographical indication"
+          ],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [
+            "\u2026e Philippines (IPOPHL). A geographical indication is a sign used on products that have a specific geographical origin and hold qualities or reputation that are due to that origin. Moreover, the qualities, characteristics or reputation of the product should be essentially due to the place o\u2026",
+            "\u2026t-smelling aroma, thin seeds as well as peel (Eligio, 2017). The GMGPDC (the collective group) intends to register the Guimaras Mango as a Geographical Indication (GI) with the Intellectual Property Office of the Philippines (IPOPHL). A geographical indication is a sign used on products that have a sp\u2026"
+          ],
+          "narrative": "Trademark \u2014 Addressed. This upload provides clear support for the Trademark pillar under the IPOPHL four-pillar Geographical Indication framework. The following requirements were identified in the submitted text: Introduction, reputation & origin, reputation, geographical indication. Relevant passages from the document include: \u2026e Philippines (IPOPHL). A geographical indication is a sign used on products that have a specific geographical origin and hold qualities or reputation that are due to that origin. Moreover, the qualities, characteristics or reputation of the product should be essentially due to the place o\u2026 Further supporting language was found where the file states: \u2026t-smelling aroma, thin seeds as well as peel (Eligio, 2017). The GMGPDC (the collective group) intends to register the Guimaras Mango as a Geographical Indication (GI) with the Intellectual Property Office of the Philippines (IPOPHL). A geographical indication is a sign used on products that have a sp\u2026 For Kapeng Barako / Lipa Barako GI registration, this satisfies examiner expectations for geographical indications, signs, labels, product names, branding, filing with the bureau of trademarks, publication, opposition, and gi registration. No immediate revision is required for this pillar in this specific upload."
+        },
+        {
+          "id": "copyright",
+          "label": "Copyright",
+          "scope": "Original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation.",
+          "status": "partial",
+          "met": [],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [],
+          "narrative": "Copyright \u2014 Partially addressed. The document references Copyright-related content, but the evidence is not yet complete enough for this filing stage. To strengthen the Copyright pillar, expand sections that document original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        },
+        {
+          "id": "industrial_design",
+          "label": "Industrial Design",
+          "scope": "Ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers.",
+          "status": "not_addressed",
+          "met": [],
+          "gaps": [],
+          "signal_detected": false,
+          "evidence": [],
+          "narrative": "Industrial Design \u2014 Not addressed. This upload does not yet contain sufficient documented support for the Industrial Design pillar. IPOPHL GI examiners will look for explicit evidence of ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers. Without this, the document may receive deficiency notices during formality or substantive review. Revise the file to include pillar-specific content before proceeding to Complete Registration."
+        },
+        {
+          "id": "patent",
+          "label": "Patent",
+          "scope": "Technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing.",
+          "status": "partial",
+          "met": [],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [],
+          "narrative": "Patent \u2014 Partially addressed. The document references Patent-related content, but the evidence is not yet complete enough for this filing stage. To strengthen the Patent pillar, expand sections that document technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        }
+      ],
+      "ready_pillars": 1,
+      "partial_pillars": 2,
+      "gap_pillars": 1,
+      "pillar_total": 4,
+      "executive_summary": "This review evaluates the uploaded  Phase1 Introduction  document against the Batangas Kapeng Barako Manual of Specifications drafting basis (Part I Justification, Part II Technical description and production process, and Part III\u2013IV Control, Traceability, and Labelling). About  828  words were extracted for review. Overall classification:  Ready  \u2014 the text substantively addresses the critical MoP themes expected for this filing zone.",
+      "recommendations": [
+        "Cross-check companion uploads so Part I reputation/history/link, Part II technical/process, and Part III\u2013IV control/labelling remain consistent across the full package."
+      ],
+      "document_insights": {
+        "document_type": "Phase1 Introduction",
+        "word_count": 828,
+        "checklist_met": 1,
+        "checklist_total": 1,
+        "detected_features": [
+          "Introduction, reputation & origin"
+        ],
+        "missing_requirements": [],
+        "reference_source": "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling for Batangas Kapeng Barako"
+      }
+    },
+    "upload_timestamp": "",
+    "analysis_timestamp": "2026-07-24T16:46:39.049931",
+    "ipophl_phase": "phase1",
+    "task_id": "phase1-introduction"
   }
 }

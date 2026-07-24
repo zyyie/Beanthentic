@@ -1,5 +1,6 @@
 // Dashboard functionality for coffee database
 const NOTIFICATIONS_READ_STORAGE_KEY = 'beanthentic_dashboard_notification_read';
+const NOTIFICATIONS_FEED_STORAGE_KEY = 'beanthentic_dashboard_notification_feed';
 const LAST_MAX_FARMER_ID_KEY = 'beanthentic_last_max_farmer_id';
 const KNOWN_FARMER_IDS_KEY = 'beanthentic_known_farmer_ids';
 const NOTIFIED_COMPLETE_FARMER_IDS_KEY = 'beanthentic_notified_complete_farmer_ids';
@@ -236,7 +237,39 @@ class DashboardApp {
   }
 
   hydrateNotificationsFeed() {
+    try {
+      const raw = localStorage.getItem(NOTIFICATIONS_FEED_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length) {
+          return this.applyReadStateToItems(parsed);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
     return this.applyReadStateToItems([]);
+  }
+
+  persistNotificationsFeedCache() {
+    try {
+      const slim = (this.notificationsFeed || []).map((n) => ({
+        id: n.id,
+        icon: n.icon,
+        title: n.title,
+        meta: n.meta,
+        detail: n.detail,
+        category: n.category,
+        categoryLabel: n.categoryLabel,
+        targetModule: n.targetModule,
+        targetId: n.targetId,
+        targetPayload: n.targetPayload,
+        read: !!n.read,
+      }));
+      localStorage.setItem(NOTIFICATIONS_FEED_STORAGE_KEY, JSON.stringify(slim));
+    } catch (e) {
+      console.warn('Could not cache notification feed', e);
+    }
   }
 
   iconForActivityAction(action) {
@@ -309,6 +342,7 @@ class DashboardApp {
       const adminItems = rows.map((row, i) => this.mapAdminNotificationToFeedItem(row, i));
       const merged = this.mergeAdminNotificationFeed(adminItems);
       this.notificationsFeed = this.applyReadStateToItems(merged);
+      this.persistNotificationsFeedCache();
       this.renderNotificationsList();
       this.updateNotificationBadges();
 
@@ -720,6 +754,7 @@ class DashboardApp {
       categoryLabel: 'Registrations',
     };
     this.notificationsFeed = this.applyReadStateToItems([item, ...(this.notificationsFeed || [])]);
+    this.persistNotificationsFeedCache();
     this.renderNotificationsList();
     this.updateNotificationBadges();
     this.showNotification(`New farmer: ${name}`, 'success');
@@ -745,6 +780,7 @@ class DashboardApp {
     } catch (e) {
       console.warn('Could not save notification read state', e);
     }
+    this.persistNotificationsFeedCache();
   }
 
   markNotificationRead(id) {
@@ -768,12 +804,22 @@ class DashboardApp {
     this.renderNotificationsList();
   }
 
-  deleteNotification(id) {
+  async deleteNotification(id) {
     const idx = this.notificationsFeed.findIndex((n) => n.id === id);
     if (idx === -1) return;
     this.notificationsFeed.splice(idx, 1);
     this.persistNotificationReadState();
     this.renderNotificationsList();
+    try {
+      await fetch(beanthenticApiUrl('/api/admin-notifications/dismiss'), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+    } catch (e) {
+      console.warn('Could not dismiss notification on server', e);
+    }
   }
 
   /**
@@ -6880,6 +6926,14 @@ class DashboardApp {
 
   getIpophlGroupLabel(taskId) {
     const labels = {
+      'phase1-introduction': 'Introduction & Reputation',
+      'phase1-history': 'History of Kapeng Barako',
+      'phase1-physical-link': 'Physical Link',
+      'phase2-general': 'General Description',
+      'phase2-specific': 'Specific Description',
+      'phase2-production': 'Production Process',
+      'phase3-control': 'Control & Traceability',
+      // Legacy labels for older uploads
       'phase1-product': 'Qualifying Product',
       'phase1-entity': 'Applicant Entity',
       'phase1-stakeholders': 'Stakeholders',
@@ -6899,11 +6953,10 @@ class DashboardApp {
 
   getIpophlPhaseMeta() {
     return {
-      1: { short: 'Phase 1', title: 'Product & Entity', sub: 'Product & entity documents' },
-      2: { short: 'Phase 2', title: 'MoP & Specs', sub: 'Manual of production & specs' },
-      3: { short: 'Phase 3', title: 'Filing & Payment', sub: 'Application filing & fees' },
-      4: { short: 'Phase 4', title: 'Examination', sub: 'Formality & substantive exam' },
-      5: { short: 'Phase 5', title: 'Registration', sub: 'Certificate & compliance' },
+      1: { short: 'Phase 1', title: 'Justification', sub: 'Reputation, history & territorial link' },
+      2: { short: 'Phase 2', title: 'Technical Part', sub: 'General, specific & production process' },
+      3: { short: 'Phase 3', title: 'Control & Traceability', sub: 'Internal control and records' },
+      4: { short: 'Phase 4', title: 'Compile', sub: 'Merge all docs into one PDF or DOCX' },
     };
   }
 
@@ -6917,29 +6970,38 @@ class DashboardApp {
     const items = Array.isArray(docs) ? docs : [];
     const servicesByPhase = this.getIpophlServicesByPhase();
     const allServices = Object.values(servicesByPhase).flat();
+    const isReadyDoc = (d) => {
+      const status = String(d?.ai_status || '').trim().toLowerCase();
+      if (status === 'ready') return true;
+      if (status === 'not ready' || status === 'not_ready') return false;
+      // Legacy rows that still only store a percent
+      return Number(d?.ai_score || 0) >= 100;
+    };
     const scores = items.map((d) => Number(d.ai_score || 0)).filter((n) => !Number.isNaN(n));
     const avgScore = scores.length
       ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
       : 0;
-    const passThreshold = 70;
-    const passedFiles = items.filter((d) => Number(d.ai_score || 0) >= passThreshold).length;
+    const passedFiles = items.filter((d) => isReadyDoc(d)).length;
     const pendingAi = items.filter((d) => {
-      const score = Number(d.ai_score || 0);
       const status = String(d.ai_status || '').toLowerCase();
-      return score <= 15 || status === 'uploaded' || status === 'pending';
+      return !status || status === 'uploaded' || status === 'pending' || status === 'analyzed';
     }).length;
 
     const groupScores = allServices.map((service) => {
       const groupDocs = items.filter((d) => String(d.task_id || '') === service);
       const groupFileDocs = (this.ipophlFiles?.[service] || []).map((f) => ({
         ai_score: Number(f.ai_score || 0),
+        ai_status: f.ai_status,
       }));
       const source = groupDocs.length ? groupDocs : groupFileDocs;
-      const best = source.length
-        ? Math.max(...source.map((d) => Number(d.ai_score || 0)))
-        : this.isIpophlServiceComplete(service)
-          ? 50
-          : 0;
+      const anyReady = source.some((d) => isReadyDoc(d));
+      const best = anyReady
+        ? 100
+        : source.length
+          ? Math.max(...source.map((d) => Number(d.ai_score || 0)))
+          : this.isIpophlServiceComplete(service)
+            ? 50
+            : 0;
       const phaseNum = Object.keys(servicesByPhase).find((p) =>
         servicesByPhase[p].includes(service)
       );
@@ -6949,26 +7011,39 @@ class DashboardApp {
         score: best,
         complete: this.isIpophlServiceComplete(service),
         phase: Number(phaseNum || 0),
-        passed: best >= passThreshold,
-        failed: source.length > 0 && best < passThreshold,
+        passed: anyReady,
+        failed: source.length > 0 && !anyReady,
       };
     });
 
-    const phaseStats = [1, 2, 3, 4, 5].map((phase) => {
+    const phaseStats = [1, 2, 3, 4].map((phase) => {
       const services = servicesByPhase[phase] || [];
-      const completed = services.filter((s) => this.isIpophlServiceComplete(s)).length;
-      const pending = services.length - completed;
+      const completed = phase === 4
+        ? (this._ipophlCompiledOnce ? 1 : 0)
+        : services.filter((s) => this.isIpophlServiceComplete(s)).length;
+      const pending = phase === 4
+        ? (this._ipophlCompiledOnce ? 0 : 1)
+        : services.length - completed;
       const phaseDocs = items.filter((d) => String(d.ipophl_phase || '').includes(String(phase)) || services.includes(String(d.task_id || '')));
-      const pass = phaseDocs.filter((d) => Number(d.ai_score || 0) >= passThreshold).length;
-      const fail = phaseDocs.filter((d) => Number(d.ai_score || 0) > 0 && Number(d.ai_score || 0) < passThreshold).length;
-      return { phase, completed, pending, pass, fail, totalGroups: services.length };
+      const pass = phaseDocs.filter((d) => isReadyDoc(d)).length;
+      const fail = phaseDocs.filter((d) => String(d.ai_status || '').trim() && !isReadyDoc(d)).length;
+      return {
+        phase,
+        completed,
+        pending,
+        pass,
+        fail,
+        totalGroups: phase === 4 ? 1 : services.length,
+      };
     });
 
-    let currentPhase = 5;
-    let currentMeta = this.getIpophlPhaseMeta()[5];
-    for (let p = 1; p <= 5; p += 1) {
+    let currentPhase = 4;
+    let currentMeta = this.getIpophlPhaseMeta()[4];
+    for (let p = 1; p <= 4; p += 1) {
       const services = servicesByPhase[p] || [];
-      const allDone = services.every((s) => this.isIpophlServiceComplete(s));
+      const allDone = p === 4
+        ? Boolean(this._ipophlCompiledOnce)
+        : services.every((s) => this.isIpophlServiceComplete(s));
       if (!allDone) {
         currentPhase = p;
         currentMeta = this.getIpophlPhaseMeta()[p];
@@ -7089,8 +7164,8 @@ class DashboardApp {
     this.setText(
       'analyticsDocsPassedSub',
       ipophl.totalFiles
-        ? `${ipophl.passedFiles} of ${ipophl.totalFiles} files · score ≥ 70%`
-        : 'Score ≥ 70%'
+        ? `${ipophl.passedFiles} of ${ipophl.totalFiles} files · Ready`
+        : 'Ready documents'
     );
     this.setText('ipophlProgressRate', `${ipophlSnapshot.percentage}%`);
     this.setText('ipophlProgressSub', `${ipophlSnapshot.completed} of ${ipophlSnapshot.total} groups`);
@@ -7229,19 +7304,197 @@ class DashboardApp {
     
     nextPhaseBtns.forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const nextPhase = parseInt(e.target.dataset.next);
+        const nextPhase = parseInt(e.currentTarget.dataset.next, 10);
         this.navigateToPhase(nextPhase);
       });
     });
     
     prevPhaseBtns.forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const prevPhase = parseInt(e.target.dataset.prev);
+        const prevPhase = parseInt(e.currentTarget.dataset.prev, 10);
         this.navigateToPhase(prevPhase);
       });
     });
+
+    this.initIpophlCompilePhase();
     
     // Complete Registration is bound once via initIpophlCompleteRegistration() (delegated).
+  }
+
+  initIpophlCompilePhase() {
+    if (this._ipophlCompileBound) return;
+    this._ipophlCompileBound = true;
+    this._ipophlCompiledOnce = false;
+
+    const panel = document.getElementById('ipophlCompilePanel');
+    if (!panel) return;
+
+    panel.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.getAttribute('data-action');
+      if (action === 'ipophl-compile-refresh') {
+        e.preventDefault();
+        this.refreshIpophlCompileSources();
+      } else if (action === 'ipophl-compile-download') {
+        e.preventDefault();
+        this.downloadIpophlCompiledPackage();
+      }
+    });
+  }
+
+  getSelectedIpophlCompileFormat() {
+    const checked = document.querySelector('input[name="ipophl-compile-format"]:checked');
+    const fmt = String(checked?.value || 'pdf').toLowerCase();
+    return fmt === 'docx' ? 'docx' : 'pdf';
+  }
+
+  async refreshIpophlCompileSources() {
+    const listEl = document.getElementById('ipophlCompileList');
+    const metaEl = document.getElementById('ipophlCompileMeta');
+    const downloadBtn = document.getElementById('ipophlCompileDownloadBtn');
+    if (!listEl || !metaEl) return;
+
+    metaEl.textContent = 'Loading uploaded documents…';
+    listEl.innerHTML = '';
+    if (downloadBtn) downloadBtn.disabled = true;
+
+    const clientFallback = () => {
+      const items = [];
+      const seen = new Set();
+      (this.getOfficialIpophlTaskIds() || []).forEach((taskId) => {
+        const files = this.ipophlFiles?.[taskId] || [];
+        files.forEach((f) => {
+          const id = String(f.id || f.file_uuid || '').trim();
+          const key = id || `${taskId}:${f.name || ''}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          items.push({
+            file_uuid: id,
+            task_id: taskId,
+            label: this.getIpophlGroupLabel(taskId),
+            original_filename: f.name || f.original_filename || id || 'Uploaded file',
+          });
+        });
+      });
+      return items;
+    };
+
+    try {
+      const res = await fetch(beanthenticApiUrl('/api/ipophl/compile-preview'), {
+        credentials: 'same-origin',
+      });
+      if (res.status === 401) {
+        metaEl.textContent = 'Session expired. Sign in again, then reopen Phase 4.';
+        listEl.innerHTML = '<li class="ipophl-compile-empty">Unauthorized — please log in again.</li>';
+        return;
+      }
+      if (res.status === 404) {
+        throw new Error(
+          'Compile API not found. Restart python web.py, then hard-refresh (Ctrl+F5).'
+        );
+      }
+      const data = await beanthenticParseJsonResponse(res).catch(() => ({}));
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.error || 'Could not load compile sources.');
+      }
+      let items = Array.isArray(data.items) ? data.items : [];
+      if (!items.length) {
+        items = clientFallback();
+      }
+      this._ipophlCompileSources = items;
+      metaEl.textContent = items.length
+        ? `${items.length} file(s) will be combined into one package`
+        : 'No Phase 1–3 uploads found yet. Add documents in earlier phases first.';
+
+      listEl.innerHTML = items.length
+        ? items
+            .map(
+              (item) =>
+                `<li><span class="ipophl-compile-label">${this.escapeHtml(item.label || item.task_id || 'Document')}</span>` +
+                `<span class="ipophl-compile-file">${this.escapeHtml(item.original_filename || item.file_uuid || '')}</span></li>`
+            )
+            .join('')
+        : '<li class="ipophl-compile-empty">No source files available.</li>';
+
+      if (downloadBtn) downloadBtn.disabled = items.length === 0;
+    } catch (err) {
+      const fallback = clientFallback();
+      if (fallback.length) {
+        this._ipophlCompileSources = fallback;
+        metaEl.textContent = `${fallback.length} file(s) from this session (server list unavailable)`;
+        listEl.innerHTML = fallback
+          .map(
+            (item) =>
+              `<li><span class="ipophl-compile-label">${this.escapeHtml(item.label || item.task_id || 'Document')}</span>` +
+              `<span class="ipophl-compile-file">${this.escapeHtml(item.original_filename || item.file_uuid || '')}</span></li>`
+          )
+          .join('');
+        if (downloadBtn) downloadBtn.disabled = false;
+        return;
+      }
+      metaEl.textContent = err?.message || 'Could not load compile sources.';
+      listEl.innerHTML = '<li class="ipophl-compile-empty">Unable to load sources.</li>';
+      if (downloadBtn) downloadBtn.disabled = true;
+    }
+  }
+
+  async downloadIpophlCompiledPackage() {
+    const fmt = this.getSelectedIpophlCompileFormat();
+    const downloadBtn = document.getElementById('ipophlCompileDownloadBtn');
+    const labelEl = downloadBtn?.querySelector('.ipophl-compile-download-label');
+    const defaultLabel = labelEl?.textContent || 'Save / Download compiled file';
+    if (downloadBtn) {
+      downloadBtn.disabled = true;
+      if (labelEl) labelEl.textContent = `Preparing ${fmt.toUpperCase()}…`;
+    }
+
+    try {
+      const res = await fetch(
+        beanthenticApiUrl(`/api/ipophl/compile-package?format=${encodeURIComponent(fmt)}`),
+        { credentials: 'same-origin' }
+      );
+      const contentType = String(res.headers.get('content-type') || '');
+      if (!res.ok) {
+        let message = 'Compile failed.';
+        if (contentType.includes('application/json')) {
+          const data = await beanthenticParseJsonResponse(res).catch(() => ({}));
+          message = data.error || message;
+        }
+        throw new Error(message);
+      }
+
+      const blob = await res.blob();
+      let filename = `Kapeng_Barako_GI_Compiled.${fmt}`;
+      const disposition = res.headers.get('content-disposition') || '';
+      const match = disposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+      if (match) {
+        filename = decodeURIComponent(match[1].replace(/"/g, '').trim());
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      this._ipophlCompiledOnce = true;
+      this.updateGiProcessIndicator();
+      this.showIpophlNotification(
+        `Compiled package saved as ${fmt.toUpperCase()}. Choose the other format anytime to download again.`
+      );
+    } catch (err) {
+      this.showIpophlNotification(err?.message || 'Could not download compiled package.');
+    } finally {
+      if (downloadBtn) {
+        const sources = this._ipophlCompileSources || [];
+        downloadBtn.disabled = sources.length === 0;
+        if (labelEl) labelEl.textContent = defaultLabel;
+      }
+    }
   }
 
   initIpophlCompleteRegistration() {
@@ -7249,30 +7502,12 @@ class DashboardApp {
     this._ipophlCompleteDelegated = true;
   }
 
-  canNavigateToPhase(targetPhase) {
-    if (targetPhase < 1 || targetPhase > 5) return false;
-    const current = this.currentPhase || 1;
-    if (targetPhase <= current) return true;
-    for (let phase = current; phase < targetPhase; phase += 1) {
-      if (!this.isIpophlPhaseComplete(phase)) return false;
-    }
-    return true;
-  }
-
-  getBlockedPhaseForNavigation(targetPhase) {
-    const current = this.currentPhase || 1;
-    if (targetPhase <= current) return null;
-    for (let phase = current; phase < targetPhase; phase += 1) {
-      if (!this.isIpophlPhaseComplete(phase)) return phase;
-    }
-    return null;
-  }
-
   navigateToPhase(phaseNum) {
-    if (phaseNum < 1 || phaseNum > 5) return;
+    const phase = Number(phaseNum);
+    if (!Number.isFinite(phase) || phase < 1 || phase > 4) return;
 
-    if (!this.canNavigateToPhase(phaseNum)) {
-      const blocked = this.getBlockedPhaseForNavigation(phaseNum);
+    if (!this.canNavigateToPhase(phase)) {
+      const blocked = this.getBlockedPhaseForNavigation(phase);
       this.showIpophlNotification(
         blocked
           ? `Upload all required documents in ${this.getPhaseTitle(blocked)} before continuing.`
@@ -7281,10 +7516,34 @@ class DashboardApp {
       return;
     }
 
-    this.currentPhase = phaseNum;
-    this.showPhase(phaseNum);
-    this.updateProgress(phaseNum);
+    this.currentPhase = phase;
+    this.showPhase(phase);
+    this.updateProgress(phase);
     this.updateGiProcessIndicator();
+    if (phase === 4) {
+      this.refreshIpophlCompileSources();
+    }
+  }
+
+  canNavigateToPhase(targetPhase) {
+    const target = Number(targetPhase);
+    if (!Number.isFinite(target) || target < 1 || target > 4) return false;
+    const current = this.currentPhase || 1;
+    if (target <= current) return true;
+    for (let phase = current; phase < target; phase += 1) {
+      if (!this.isIpophlPhaseComplete(phase)) return false;
+    }
+    return true;
+  }
+
+  getBlockedPhaseForNavigation(targetPhase) {
+    const target = Number(targetPhase);
+    const current = this.currentPhase || 1;
+    if (!Number.isFinite(target) || target <= current) return null;
+    for (let phase = current; phase < target; phase += 1) {
+      if (!this.isIpophlPhaseComplete(phase)) return phase;
+    }
+    return null;
   }
 
   showPhase(phaseNum) {
@@ -7313,6 +7572,9 @@ class DashboardApp {
   }
 
   isIpophlPhaseComplete(phaseNum) {
+    if (Number(phaseNum) === 4) {
+      return Boolean(this._ipophlCompiledOnce);
+    }
     const services = this.getIpophlServicesByPhase()[phaseNum];
     if (!services?.length) return false;
     return services.every((service) => this.isIpophlServiceComplete(service));
@@ -7410,7 +7672,7 @@ class DashboardApp {
   }
 
   collectPhase5FileUuids() {
-    const services = ['phase5-cert', 'phase5-compliance'];
+    const services = this.getOfficialIpophlTaskIds();
     const uuids = [];
     const seen = new Set();
     const addUuid = (id) => {
@@ -7469,6 +7731,7 @@ class DashboardApp {
         uuids.push(id);
       }
     };
+    const official = new Set(this.getOfficialIpophlTaskIds());
 
     try {
       const res = await fetch(beanthenticApiUrl('/api/ipo-documents?limit=200'), { credentials: 'same-origin' });
@@ -7476,7 +7739,7 @@ class DashboardApp {
       const items = data.items || [];
       items.forEach((doc) => {
         const tid = String(doc.task_id || '');
-        if (tid.startsWith('phase5-')) add(doc.file_uuid);
+        if (official.has(tid) || /^phase[1-3]-/.test(tid)) add(doc.file_uuid);
       });
       if (!uuids.length) {
         items.slice(0, 20).forEach((doc) => add(doc.file_uuid));
@@ -7609,7 +7872,7 @@ class DashboardApp {
     content += `Applicant: ${this.getCurrentUserIdentifier() || 'Not specified'}\n\n`;
     
     // Add phase summaries
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= 4; i++) {
       const phaseKey = `phase${i}`;
       const phase = registrationData[phaseKey];
       
@@ -7643,11 +7906,10 @@ class DashboardApp {
 
   getPhaseTitle(phaseNum) {
     const titles = {
-      1: 'Pre-Application Groundwork',
-      2: 'Preparing Application Documents', 
-      3: 'Filing with IPOPHL',
-      4: 'Examination and Publication',
-      5: 'Registration and Ongoing Compliance'
+      1: 'Justification for the Request for Protection',
+      2: 'Technical Part',
+      3: 'Control & Traceability',
+      4: 'Compile GI Package',
     };
     return titles[phaseNum] || `Phase ${phaseNum}`;
   }
@@ -7660,7 +7922,7 @@ class DashboardApp {
   collectAllPhaseData() {
     const phases = {};
     
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= 4; i++) {
       phases[`phase${i}`] = {
         files: [],
         links: []
@@ -7929,11 +8191,11 @@ class DashboardApp {
 
   getIpophlServicesByPhase() {
     return {
-      1: ['phase1-product', 'phase1-entity', 'phase1-stakeholders'],
-      2: ['phase2-mop', 'phase2-cert', 'phase2-details'],
-      3: ['phase3-filing', 'phase3-payment'],
-      4: ['phase4-exam', 'phase4-response', 'phase4-pub'],
-      5: ['phase5-cert', 'phase5-compliance']
+      1: ['phase1-introduction', 'phase1-history', 'phase1-physical-link'],
+      2: ['phase2-general', 'phase2-specific', 'phase2-production'],
+      3: ['phase3-control'],
+      // Phase 4 is compile/download only (no upload zones)
+      4: [],
     };
   }
 

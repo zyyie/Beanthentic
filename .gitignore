@@ -31,5 +31,6 @@ android-app/.idea/shelf/
 activity_log.json
 data/password_reset_tokens.json
 data/otp_codes.json
+data/admin_notifications_feed.json
 data/profile_photos/
 instance/

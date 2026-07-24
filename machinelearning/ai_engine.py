@@ -86,9 +86,40 @@ class GIAnalyzer:
             }
         }
 
-        # Task-specific checklists based on IPOPHL requirements (Total 13 documents)
+        # Task-specific checklists aligned to MoP drafting package (7 document groups)
         self.task_checklists = {
-            # Phase 1: Pre-Application Groundwork
+            # Phase 1: Justification for the Request for Protection
+            "phase1-introduction": {
+                "mandatory": ["Kapeng Barako", "Liberica", "Batangas", "Reputation", "Geographical Indication"],
+                "optional": ["Lipa", "Tradition", "Distinctive", "Coffea liberica", "Origin"],
+            },
+            "phase1-history": {
+                "mandatory": ["History", "Kapeng Barako", "Batangas", "Heritage"],
+                "optional": ["Colonial", "Spanish", "BaCoFFed", "Farmers Federation", "Tradition"],
+            },
+            "phase1-physical-link": {
+                "mandatory": ["Soil", "Climate", "Elevation", "Causal Link", "Territory"],
+                "optional": ["Volcanic", "Rainfall", "Taal", "Microclimate", "Physiography"],
+            },
+            # Phase 2: Technical Part
+            "phase2-general": {
+                "mandatory": ["Morphological", "Liberica", "Cherry", "Bean", "Sensory"],
+                "optional": ["Harvesting Index", "Genetic", "Leaf", "Almond", "Plant Height"],
+            },
+            "phase2-specific": {
+                "mandatory": ["Roasted Coffee", "Ground Coffee", "Degree of Roast", "Aroma"],
+                "optional": ["Light Roast", "Medium Roast", "Dark Roast", "Acidity", "Body"],
+            },
+            "phase2-production": {
+                "mandatory": ["Production Process", "Harvesting", "Post-Harvest", "Roasting"],
+                "optional": ["Seedling", "Transplanting", "Pruning", "Pulping", "Drying", "NSIC"],
+            },
+            # Phase 3: Control & Traceability (labelling excluded)
+            "phase3-control": {
+                "mandatory": ["Internal Control", "Traceability", "BaCoFFed", "Records"],
+                "optional": ["Technical Working Group", "Code of Practice", "Certificate of Locality", "LGU"],
+            },
+            # Legacy procedural zones (older uploads)
             "phase1-product": {
                 "mandatory": ["Lipa Barako coffee", "Flavor Profile", "Geographical Origin", "Distinctive Quality"],
                 "optional": ["Product Photos", "Aroma", "Roasting Process", "Farming Practices"]
@@ -101,9 +132,8 @@ class GIAnalyzer:
                 "mandatory": ["Stakeholder Consultations", "Meeting Minutes", "Consensus", "Governance Board"],
                 "optional": ["Attendance Sheets", "Agreement Documents", "Industry Groups", "Community Support"]
             },
-            # Phase 2: Preparing Application Documents
             "phase2-mop": {
-                "mandatory": ["Manual of Specifications", "Causal Link", "Production Process", "Quality Control", "Labeling Rules"],
+                "mandatory": ["Manual of Specifications", "Causal Link", "Production Process", "Quality Control"],
                 "optional": ["Geographical Area", "Territorial Boundaries", "Soil Composition", "Climate Factors"]
             },
             "phase2-cert": {
@@ -114,7 +144,6 @@ class GIAnalyzer:
                 "mandatory": ["Application Form", "Applicant Name", "Domicile", "Industrial Establishment"],
                 "optional": ["Representative Designation", "Commercial Establishment", "Contact Details"]
             },
-            # Phase 3: Filing with IPOPHL
             "phase3-filing": {
                 "mandatory": ["File Application", "Bureau of Trademarks", "Application Package", "Cover Letter"],
                 "optional": ["Submission Receipt", "Acknowledgment", "Tracking Number"]
@@ -123,7 +152,6 @@ class GIAnalyzer:
                 "mandatory": ["Official Receipt", "Application Fee", "Proof of Payment"],
                 "optional": ["Exemption Certificate", "Bank Transfer Confirmation", "Payment Date"]
             },
-            # Phase 4: Examination and Publication
             "phase4-exam": {
                 "mandatory": ["Formality Examination", "Substantive Examination", "IP Code Compliance"],
                 "optional": ["Examination Reports", "Clarifications", "Technical Responses"]
@@ -136,7 +164,6 @@ class GIAnalyzer:
                 "mandatory": ["Publication for Opposition", "Public Notice Period", "Opposition Period"],
                 "optional": ["Third-party Observations", "Opposition Filings", "Response to Objections"]
             },
-            # Phase 5: Registration and Ongoing Compliance
             "phase5-cert": {
                 "mandatory": ["GI Registration Certificate", "Official Notice of Registration", "Registration Number"],
                 "optional": ["Award Ceremony", "Public Announcement", "Marketing Materials"]
@@ -976,134 +1003,111 @@ class GIAnalyzer:
             }
 
     def _rule_based_analysis(self, text: str, checklist: Dict = None, task_id: str | None = None) -> Dict:
-        """Rule-based analysis using keyword matching + optional section rubric."""
+        """Qualitative MoP-basis analysis (PART 1 / PART 2 / Control & Labelling).
+
+        Does not use a keyword percentage readiness score. Status is Ready / Not Ready
+        from theme coverage against the Kapeng Barako specification drafting package.
+        """
         if checklist is None:
             checklist = self.gi_checklist
 
         try:
-            from machinelearning.gi_rubrics import (
-                blend_scores,
-                build_term_breakdown,
-                evaluate_gi_rubric,
-            )
-        except ImportError:
-            from gi_rubrics import blend_scores, build_term_breakdown, evaluate_gi_rubric
-            
-        text_lower = text.lower()
-
-        # Check for mandatory terms
-        detected_mandatory = []
-        missing_mandatory = []
-
-        for term in checklist["mandatory_terms"]:
-            if self._term_matches(text_lower, term):
-                detected_mandatory.append(term)
-            else:
-                missing_mandatory.append(term)
-
-        # Check for optional terms
-        detected_optional = []
-        for term in checklist["optional_terms"]:
-            if self._term_matches(text_lower, term):
-                detected_optional.append(term)
-
-        keyword_score = self._compute_readiness_score(
-            detected_mandatory, missing_mandatory, detected_optional, checklist
-        )
-        rubric = evaluate_gi_rubric(text_lower, task_id, self._term_matches)
-        all_mandatory_found = len(missing_mandatory) == 0
-        readiness_score = blend_scores(
-            keyword_score, rubric, all_mandatory_found=all_mandatory_found
-        )
-
-        # Determine status
-        status = "Ready" if readiness_score >= 75 else "Not Ready"
-
-        term_breakdown = build_term_breakdown(checklist, detected_mandatory, detected_optional)
-        score_breakdown = {
-            "keyword_score": keyword_score,
-            "final_score": readiness_score,
-            "formula": "70% mandatory keywords + 30% optional keywords"
-            + (
-                "; all mandatory found → keyword score final"
-                if all_mandatory_found
-                else "; otherwise 65% keyword + 35% section rubric"
-            ),
-            "terms": term_breakdown,
-        }
-        if rubric:
-            score_breakdown["section_score"] = rubric["section_score"]
-            score_breakdown["sections"] = rubric["sections"]
-            score_breakdown["sections_found"] = rubric["sections_found"]
-            score_breakdown["sections_total"] = rubric["sections_total"]
-
-        # Generate structured 2-3 paragraph analysis
-        p1 = f"<p>The rule-based analysis has identified <strong>{len(detected_mandatory)}</strong> out of <strong>{len(checklist['mandatory_terms'])}</strong> mandatory requirements within this document. The keyword checklist score is <strong>{keyword_score}%</strong>"
-        if rubric and not all_mandatory_found and readiness_score != keyword_score:
-            p1 += f"; after section rubric blending the readiness score is <strong>{readiness_score}%</strong>"
-        else:
-            p1 += f", yielding a readiness score of <strong>{readiness_score}%</strong>"
-        p1 += ". "
-        if readiness_score >= 75:
-            p1 += "The document demonstrates strong compliance with IPOPHL standards, showing a consistent use of technical terminology required for this specific registration stage.</p>"
-        else:
-            p1 += "Current findings indicate that the document lacks several critical structural elements and key technical terms that are essential for this part of the Geographical Indication application.</p>"
-
-        p2 = "<p>A detailed review of the missing components reveals that the following areas require immediate attention: "
-        if missing_mandatory:
-            p2 += f"<strong>{', '.join(missing_mandatory[:3])}</strong> and other related identifiers. "
-        p2 += "The absence of these specific requirements may lead to formality examination deficiencies, as they are necessary to validate the document's relevance to the Lipa Barako coffee registration process.</p>"
-
-        if rubric:
-            missing_sections = [s["label"] for s in rubric["sections"] if not s["found"]]
-            p2b = (
-                f"<p><strong>Section rubric ({rubric['sections_found']}/{rubric['sections_total']} sections):</strong> "
-            )
-            if missing_sections:
-                p2b += f"Missing structural sections: <strong>{', '.join(missing_sections[:4])}</strong>"
-                if len(missing_sections) > 4:
-                    p2b += "…"
-                p2b += ". Align content with IPOPHL Rule 10 / Code of Practice structure (as in approved GI filings).</p>"
-            else:
-                p2b += "All expected document sections for this upload zone were detected.</p>"
-        else:
-            p2b = ""
-
-        p3 = "<p>To improve this document's standing, it is recommended to explicitly integrate the missing mandatory requirements identified above. "
-        p3 += "Ensuring that all task-specific details are fully addressed will help achieve a higher compliance score and facilitate a smoother approval workflow with IPOPHL. Once updated, the document should be re-analyzed to verify readiness.</p>"
-
-        try:
+            from machinelearning.gi_reference_basis import evaluate_against_reference
             from machinelearning.ip_pillars import evaluate_ip_pillars
         except ImportError:
+            from gi_reference_basis import evaluate_against_reference
             from ip_pillars import evaluate_ip_pillars
+
+        text_lower = (text or "").lower()
+        review = evaluate_against_reference(
+            text or "",
+            task_id=task_id,
+            term_matches=self._term_matches,
+        )
+        status = review.get("status") or "Not Ready"
+        # Persist 100/0 for legacy DB fields only — never shown as a readiness %.
+        readiness_score = 100 if status == "Ready" else 0
+        strengths = list(review.get("strengths") or [])
+        missing = list(review.get("missing_requirements") or [])
+        detected = list(review.get("detected_features") or strengths)
+        themes = list(review.get("themes") or [])
+        improvements = list(review.get("improvements") or [])
+
+        sections = [
+            {
+                "id": t.get("id"),
+                "label": t.get("label"),
+                "found": t.get("coverage") == "well_covered",
+                "coverage": t.get("coverage"),
+                "part": t.get("part"),
+                "expectation": t.get("expectation"),
+                "evidence": t.get("evidence_signals") or [],
+            }
+            for t in themes
+        ]
+        score_breakdown = {
+            "analysis_mode": "mop_reference_qualitative",
+            "reference_source": review.get("reference_source"),
+            "final_score": readiness_score,
+            "formula": "Qualitative MoP theme coverage (no keyword percentage)",
+            "sections": sections,
+            "sections_found": sum(1 for s in sections if s.get("found")),
+            "sections_total": len(sections),
+            "improvements": improvements,
+            "terms": [
+                {
+                    "term": t.get("label"),
+                    "found": t.get("coverage") != "missing",
+                    "coverage": t.get("coverage"),
+                }
+                for t in themes
+            ],
+        }
 
         ip_pillar_assessment = evaluate_ip_pillars(
             text_lower,
-            detected_features=detected_mandatory + detected_optional,
-            missing_requirements=missing_mandatory,
-            rubric_sections=(rubric or {}).get("sections"),
+            detected_features=detected,
+            missing_requirements=missing,
+            rubric_sections=sections,
             term_matches=self._term_matches,
             task_id=task_id,
             document_ready=(status == "Ready"),
             source_text=text,
-            text_length=len(text),
-            mandatory_met=len(detected_mandatory),
-            mandatory_total=len(checklist["mandatory_terms"]),
+            text_length=len(text or ""),
+            mandatory_met=sum(1 for t in themes if t.get("critical") and t.get("coverage") != "missing"),
+            mandatory_total=max(1, sum(1 for t in themes if t.get("critical"))),
         )
+        if isinstance(ip_pillar_assessment, dict):
+            ip_pillar_assessment["executive_summary"] = re.sub(
+                r"<[^>]+>",
+                " ",
+                (review.get("shap_analysis") or "").split("</p>")[0],
+            ).strip()
+            ip_pillar_assessment["recommendations"] = improvements
+            ip_pillar_assessment["document_insights"] = {
+                "document_type": (task_id or "gi-document").replace("-", " ").title(),
+                "word_count": review.get("word_count") or 0,
+                "checklist_met": sum(1 for t in themes if t.get("coverage") == "well_covered"),
+                "checklist_total": len(themes),
+                "detected_features": strengths[:10],
+                "missing_requirements": missing[:10],
+                "reference_source": review.get("reference_source"),
+            }
 
         return {
             "success": True,
             "readiness_score": readiness_score,
             "status": status,
-            "detected_features": detected_mandatory + detected_optional,
-            "missing_requirements": missing_mandatory,
-            "text_length": len(text),
-            "analysis_method": "rule_based",
-            "shap_analysis": p1 + p2 + p2b + p3,
+            "detected_features": detected[:40],
+            "missing_requirements": missing,
+            "text_length": len(text or ""),
+            "analysis_method": "mop_reference_qualitative",
+            "shap_analysis": review.get("shap_analysis") or "",
             "score_breakdown": score_breakdown,
-            "keyword_score": keyword_score,
-            "section_score": rubric["section_score"] if rubric else None,
+            "keyword_score": None,
+            "section_score": None,
             "ip_pillar_assessment": ip_pillar_assessment,
+            "improvements": improvements,
         }
 
     def _task_keyword_ml_score(self, text: str, checklist: Dict) -> int:
@@ -1139,31 +1143,17 @@ class GIAnalyzer:
         task_id: str = None,
         checklist: Dict = None,
     ) -> Dict:
-        """Keyword checklist is the final score; RF score is advisory (SHAP / ml_score)."""
+        """Qualitative MoP review is authoritative; RF score is advisory only."""
         rule_score = int(rule_result.get("readiness_score") or 0)
         ml_score = int(ml_result.get("readiness_score") or 0)
         rf_score = ml_result.get("rf_score")
         merged_score = rule_score
         detected = list(rule_result.get("detected_features") or [])
         missing = list(rule_result.get("missing_requirements") or [])
-        status = "Ready" if merged_score >= 75 else "Not Ready"
+        status = rule_result.get("status") or ("Ready" if merged_score >= 100 else "Not Ready")
 
-        shap = ""
-        if text and self.document_model is not None:
-            try:
-                features = self._extract_features(text)
-                shap = self._generate_shap_explanation(
-                    features,
-                    merged_score,
-                    task_id,
-                    rule_result=rule_result,
-                    rf_score=rf_score if rf_score is not None else ml_score,
-                    checklist=checklist,
-                )
-            except Exception as exc:
-                logging.warning("Merged SHAP regeneration failed: %s", exc)
-                shap = self._keyword_shap_fallback(rule_result, merged_score, task_id)
-        else:
+        shap = rule_result.get("shap_analysis") or ""
+        if not shap:
             shap = self._keyword_shap_fallback(rule_result, merged_score, task_id)
 
         return self.normalize_analysis_payload({
@@ -1173,27 +1163,32 @@ class GIAnalyzer:
             "detected_features": detected,
             "missing_requirements": missing,
             "text_length": rule_result.get("text_length") or ml_result.get("text_length") or 0,
-            "analysis_method": "ml_hybrid",
+            "analysis_method": "mop_reference_qualitative",
             "shap_analysis": shap,
             "ml_score": ml_score,
             "rule_score": rule_score,
             "rf_score": rf_score,
             "score_breakdown": rule_result.get("score_breakdown"),
-            "keyword_score": rule_result.get("keyword_score"),
-            "section_score": rule_result.get("section_score"),
+            "keyword_score": None,
+            "section_score": None,
             "ip_pillar_assessment": rule_result.get("ip_pillar_assessment"),
+            "improvements": rule_result.get("improvements"),
         })
 
     def _keyword_shap_fallback(self, rule_result: Dict, score: int, task_id: str | None) -> str:
         doc_type = task_id.replace("-", " ").title() if task_id else "Document"
         detected = rule_result.get("detected_features") or []
         missing = rule_result.get("missing_requirements") or []
+        status = rule_result.get("status") or ("Ready" if score >= 100 else "Not Ready")
         p1 = (
-            f"<p>Keyword analysis for <strong>{doc_type}</strong>: readiness "
-            f"<strong>{score}%</strong>. Matched: {', '.join(detected) if detected else 'none'}.</p>"
+            f"<p>Qualitative MoP review for <strong>{doc_type}</strong>: "
+            f"classification <strong>{status}</strong>. "
+            f"Strengths detected: {', '.join(detected[:8]) if detected else 'none yet'}.</p>"
         )
         p2 = (
-            f"<p>Missing mandatory terms: {', '.join(missing) if missing else 'none'}.</p>"
+            f"<p>Themes still needing work: {', '.join(missing) if missing else 'none'}. "
+            f"Revise against PART 1 Justification, PART 2 Technical Part, and "
+            f"CONTROL & TRACEABILITY & LABELLING, then re-analyze.</p>"
         )
         return p1 + p2
 

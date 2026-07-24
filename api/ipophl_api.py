@@ -960,6 +960,101 @@ def register_ipophl_routes(app):
             download_name="beanthentic-ipophl-registration.zip",
         )
 
+    @app.route("/api/ipophl/compile-preview", methods=["GET"])
+    def api_ipophl_compile_preview():
+        """List Phase 1–3 source files that will be merged in Compile."""
+        if not is_authenticated():
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+        try:
+            from config.ipophl_compile import collect_compile_sources
+
+            bootstrap_orphan_uploads(limit=500)
+            sources = collect_compile_sources()
+            return jsonify(
+                {
+                    "ok": True,
+                    "count": len(sources),
+                    "items": [
+                        {
+                            "file_uuid": s["file_uuid"],
+                            "task_id": s["task_id"],
+                            "label": s["label"],
+                            "original_filename": s["original_filename"],
+                        }
+                        for s in sources
+                    ],
+                }
+            )
+        except Exception as e:
+            return jsonify(
+                {"ok": False, "error": safe_error_message(e, public="Could not list compile sources.")}
+            ), 500
+
+    @app.route("/api/ipophl/compile-package", methods=["GET", "POST"])
+    def api_ipophl_compile_package():
+        """
+        Merge all Phase 1–3 IPOPHL uploads into one PDF or DOCX for local download.
+        Query/body: format=pdf|docx, optional file_uuids[].
+        """
+        if not is_authenticated():
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+        body: dict = {}
+        if request.method == "POST" and request.is_json:
+            body = request.get_json(silent=True) or {}
+            if not isinstance(body, dict):
+                body = {}
+
+        fmt = (
+            str(body.get("format") or request.args.get("format") or "pdf")
+            .strip()
+            .lower()
+        )
+        raw_uuids = body.get("file_uuids") if isinstance(body.get("file_uuids"), list) else None
+        if raw_uuids is None:
+            q = request.args.get("file_uuids") or ""
+            raw_uuids = [u.strip() for u in q.split(",") if u.strip()] if q else None
+
+        try:
+            from config.ipophl_compile import compile_ipophl_package
+
+            bootstrap_orphan_uploads(limit=500)
+            payload, download_name, mime, summaries = compile_ipophl_package(
+                fmt=fmt,
+                file_uuids=raw_uuids,
+            )
+            try:
+                log_activity(
+                    get_current_user_phone() or "admin",
+                    "ipophl_compile_package",
+                    f"format={fmt}; files={len(summaries)}",
+                    request.remote_addr,
+                )
+            except Exception:
+                pass
+            buf = io.BytesIO(payload)
+            buf.seek(0)
+            response = send_file(
+                buf,
+                mimetype=mime,
+                as_attachment=True,
+                download_name=download_name,
+            )
+            response.headers["X-Beanthentic-Compile-Count"] = str(len(summaries))
+            response.headers["X-Beanthentic-Compile-Format"] = fmt
+            return response
+        except ValueError as e:
+            return jsonify({"ok": False, "error": str(e)}), 400
+        except Exception as e:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": safe_error_message(
+                        e, public="Could not compile documents. Try again or check uploads."
+                    ),
+                }
+            ), 500
+
     @app.route("/api/ipophl/gmail-compose", methods=["GET"])
     def api_ipophl_gmail_compose():
         """Gmail compose URL + recipient for IPOPHL registration email."""

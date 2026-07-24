@@ -19,7 +19,20 @@ STORE_PATH = Path(__file__).resolve().parent.parent / "data" / "ipophl_documents
 UPLOADS_DIR = Path(__file__).resolve().parent.parent / "machinelearning" / "uploads"
 
 # Matches IPOPHL dashboard h4 titles (one GI Updates card per category).
+# Official zones follow MoP drafting package folders (Part 1 / Part 2 / Control).
+# Legacy phase1–5 procedural IDs are kept so older uploads still resolve labels.
 IPOPHL_TASK_LABELS: dict[str, str] = {
+    # Official — Part 1 Justification
+    "phase1-introduction": "Introduction & Reputation",
+    "phase1-history": "History of Kapeng Barako",
+    "phase1-physical-link": "Physical Link to the Territory",
+    # Official — Part 2 Technical
+    "phase2-general": "TECHNICAL — General Description",
+    "phase2-specific": "TECHNICAL — Specific Description",
+    "phase2-production": "TECHNICAL — The Production Process",
+    # Official — Control & Traceability (labelling excluded from this phase)
+    "phase3-control": "Control & Traceability",
+    # Legacy procedural zones (pre–MoP folder restructure)
     "phase1-product": "Product Documentation",
     "phase1-entity": "Entity Documentation",
     "phase1-stakeholders": "Consultation Records",
@@ -38,21 +51,15 @@ IPOPHL_TASK_LABELS: dict[str, str] = {
 
 IPOPHL_TASK_ORDER: list[str] = list(IPOPHL_TASK_LABELS.keys())
 
-# Thirteen IPOPHL upload zones on the dashboard (excludes ipophl-other).
+# Seven MoP document groups on the dashboard (excludes ipophl-other / legacy).
 OFFICIAL_IPOPHL_TASK_IDS: list[str] = [
-    "phase1-product",
-    "phase1-entity",
-    "phase1-stakeholders",
-    "phase2-mop",
-    "phase2-cert",
-    "phase2-details",
-    "phase3-filing",
-    "phase3-payment",
-    "phase4-exam",
-    "phase4-response",
-    "phase4-pub",
-    "phase5-cert",
-    "phase5-compliance",
+    "phase1-introduction",
+    "phase1-history",
+    "phase1-physical-link",
+    "phase2-general",
+    "phase2-specific",
+    "phase2-production",
+    "phase3-control",
 ]
 
 _TASK_ID_RE = re.compile(r"^phase[1-5]-[a-z0-9-]+$", re.I)
@@ -213,17 +220,18 @@ def collect_registration_file_uuids(
             add(raw)
         return out
 
-    phase5_tasks = task_ids or ["phase5-cert", "phase5-compliance"]
-    for tid in phase5_tasks:
+    preferred_tasks = task_ids or list(OFFICIAL_IPOPHL_TASK_IDS)
+    for tid in preferred_tasks:
         for record in list_documents(task_id=str(tid).strip(), limit=50):
             add(str(record.get("file_uuid") or ""))
 
-    for record in list_documents(phase="phase5", limit=50):
-        add(str(record.get("file_uuid") or ""))
+    for phase_key in ("phase1", "phase2", "phase3"):
+        for record in list_documents(phase=phase_key, limit=50):
+            add(str(record.get("file_uuid") or ""))
 
     for record in list_documents(limit=300):
         tid = str(record.get("task_id") or "")
-        if tid.startswith("phase5-"):
+        if tid.startswith(("phase1-", "phase2-", "phase3-")):
             add(str(record.get("file_uuid") or ""))
 
     # Complete registration: include every uploaded IPOPHL file (all phases / categories).

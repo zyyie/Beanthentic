@@ -10,7 +10,45 @@ from __future__ import annotations
 from typing import Callable
 
 # task_id -> list of {id, label, signals[]}
+# Official zones follow PART 1 / PART 2 folders + Control & Traceability.
 TASK_RUBRICS: dict[str, list[dict]] = {
+    "phase1-introduction": [
+        {"id": "product_identity", "label": "Kapeng Barako / Liberica identity", "signals": ["kapeng barako", "barako", "coffea liberica", "liberica"]},
+        {"id": "reputation", "label": "Reputation among producers/consumers", "signals": ["reputation", "renowned", "known for", "distinctive"]},
+        {"id": "geo_origin", "label": "Batangas / Lipa geographic origin", "signals": ["batangas", "lipa", "geographical indication", "geographical origin"]},
+    ],
+    "phase1-history": [
+        {"id": "historical_narrative", "label": "Historical development narrative", "signals": ["history", "historical", "century", "heritage"]},
+        {"id": "cultural_continuity", "label": "Cultural / farming continuity", "signals": ["tradition", "heritage", "farmers", "bacoffed", "batangas coffee"]},
+        {"id": "colonial_context", "label": "Introduction / colonial context (if present)", "signals": ["spanish", "colonial", "introduced", "plantation"]},
+    ],
+    "phase1-physical-link": [
+        {"id": "soil_climate", "label": "Soil / climate / elevation factors", "signals": ["volcanic", "soil", "climate", "elevation", "rainfall"]},
+        {"id": "causal_link", "label": "Causal link to Liberica quality", "signals": ["causal link", "attributable", "suitability", "territory", "microclimate"]},
+        {"id": "physiography", "label": "Physiography of the territory", "signals": ["physiography", "slope", "taal", "temperature", "type i"]},
+    ],
+    "phase2-general": [
+        {"id": "morphology", "label": "Morphological characteristics", "signals": ["morphological", "plant height", "leaf", "cherry", "bean", "almond"]},
+        {"id": "harvest_index", "label": "Harvesting index / maturity cues", "signals": ["harvesting", "maturity", "ripe", "harvest index"]},
+        {"id": "sensory", "label": "Sensory / cup profile", "signals": ["aroma", "flavor", "taste", "sensory", "cup"]},
+        {"id": "genetic", "label": "Genetic authenticity / variety", "signals": ["genetic", "nsic", "variety", "liberica", "coffea"]},
+    ],
+    "phase2-specific": [
+        {"id": "roasted_ground", "label": "Roasted beans / ground coffee form", "signals": ["roasted coffee", "ground coffee", "roasted beans"]},
+        {"id": "roast_degree", "label": "Degree of roast", "signals": ["degree of roast", "light roast", "medium roast", "dark roast"]},
+        {"id": "taste_body", "label": "Taste, body, acidity", "signals": ["taste", "body", "acidity", "aroma", "specific description"]},
+    ],
+    "phase2-production": [
+        {"id": "establishment", "label": "Farm establishment / planting materials", "signals": ["planting materials", "seedling", "transplanting", "nsic", "bureau of plant industry"]},
+        {"id": "care_harvest", "label": "Care, harvest & post-harvest", "signals": ["weeding", "pruning", "harvest", "post-harvest", "pulping", "drying"]},
+        {"id": "processing", "label": "Processing / roasting steps", "signals": ["production process", "processing", "roasting", "fermentation"]},
+    ],
+    "phase3-control": [
+        {"id": "internal_control", "label": "Internal control / producer registration", "signals": ["bacoffed", "batangas coffee farmers federation", "internal control", "registered", "membership"]},
+        {"id": "traceability", "label": "Traceability & records", "signals": ["traceability", "records", "technical working group", "ptwg", "code of practice"]},
+        {"id": "locality", "label": "Locality / LGU attestation", "signals": ["certificate of locality", "lgu", "agriculturist", "batch", "lot"]},
+    ],
+    # Legacy procedural rubrics
     "phase1-product": [
         {"id": "product_identity", "label": "Product name & variety (Barako / Liberica)", "signals": ["lipa barako", "kapeng barako", "coffea liberica", "kape barako"]},
         {"id": "sensory_profile", "label": "Sensory / quality characteristics", "signals": ["flavor profile", "aroma", "taste", "distinctive quality", "cup profile"]},

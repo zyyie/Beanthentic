@@ -64,7 +64,12 @@ def supabase_project_ref() -> str:
     ref = (os.environ.get("BEANTHENTIC_SUPABASE_PROJECT_REF") or "").strip()
     if ref:
         return ref
-    url = supabase_url()
+    # Read URL from env/settings only — do not call supabase_url() (would recurse).
+    url = (
+        os.environ.get("BEANTHENTIC_SUPABASE_URL")
+        or os.environ.get("SUPABASE_URL")
+        or str(_settings_connection().get("supabase_url") or "")
+    ).strip().rstrip("/")
     if url:
         try:
             host = urlparse(url).hostname or ""
@@ -252,11 +257,11 @@ def sqlalchemy_database_url() -> str:
             except ImportError:
                 url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
         return url
-    if uses_supabase_anon():
-        raise RuntimeError(
-            "Supabase anon key is set but no BEANTHENTIC_DB_URL for admin SQLAlchemy. "
-            "Add the Supabase pooler URI to .env for server-side admin tables, "
-            "or use REST-only routes."
+    # Prefer MySQL/local admin DB when pooler URI is not set (REST anon can still work).
+    if uses_supabase_anon() and not get_db_url():
+        print(
+            "[Beanthentic] WARNING: Supabase anon is set but BEANTHENTIC_DB_URL is missing; "
+            "falling back to MySQL for SQLAlchemy admin tables."
         )
     p = mysql_params()
     user = quote(p["user"], safe="")

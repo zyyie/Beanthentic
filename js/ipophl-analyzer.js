@@ -27,7 +27,7 @@ class IPOPHLAnalyzer {
             
             if (data.items) {
                 data.items.forEach(doc => {
-                    // task_id should be the full service name (e.g. phase1-product)
+                    // task_id should be the full service name (e.g. phase1-introduction)
                     const container = document.getElementById(`${doc.task_id}-files`);
                     if (container) {
                         this.renderDocumentCard(container, doc);
@@ -97,10 +97,9 @@ class IPOPHLAnalyzer {
         fileItem.className = 'file-item success ai-enhanced';
         fileItem.dataset.fileUuid = doc.file_uuid;
         fileItem.dataset.taskId = zoneTaskId || doc.task_id || '';
-        const meta =
-            doc.ai_score != null
-                ? `AI ${doc.ai_score}% · ${doc.ai_status || 'Analyzed'}`
-                : this.formatFileSize(doc.file_size || 0);
+        const meta = doc.ai_status
+            ? `AI review · ${doc.ai_status}`
+            : this.formatFileSize(doc.file_size || 0);
         fileItem.innerHTML = `
             <div class="file-info">
                 <i class="fa-solid ${iconClass}"></i>
@@ -491,7 +490,7 @@ class IPOPHLAnalyzer {
     }
 
     parseServiceName(service) {
-        // Extract phase and task from service names like "phase1-product"
+        // Extract phase and task from service names like "phase1-introduction"
         const parts = service.split('-');
         const phase = parts[0] || 'unknown';
         const task = parts.slice(1).join('-') || 'unknown';
@@ -861,24 +860,32 @@ class IPOPHLAnalyzer {
         const breakdown = analysis.score_breakdown || {};
         const sections = breakdown.sections || [];
         const sectionRows = sections.length
-            ? sections.map((s) =>
-                `<li class="${s.found ? 'ai-insight-ok' : 'ai-insight-gap'}">${this.escapeHtml(s.label || 'Section')} — ${s.found ? 'Found' : 'Missing'}</li>`
-            ).join('')
+            ? sections.map((s) => {
+                const cov = String(s.coverage || (s.found ? 'well_covered' : 'missing')).replace(/_/g, ' ');
+                const cls = s.coverage === 'well_covered' || s.found
+                    ? 'ai-insight-ok'
+                    : (s.coverage === 'partial' ? 'ai-insight-partial' : 'ai-insight-gap');
+                return `<li class="${cls}">${this.escapeHtml(s.label || 'Theme')} — ${this.escapeHtml(cov)}</li>`;
+            }).join('')
             : '';
 
         const detected = (insights.detected_features || []).slice(0, 8);
         const missing = (insights.missing_requirements || []).slice(0, 8);
+        const ref = insights.reference_source
+            ? `<p class="ai-doc-insights__ref">${this.escapeHtml(insights.reference_source)}</p>`
+            : '';
 
         return `<div class="ai-doc-insights">
             <h5 class="ai-doc-insights__title">Document profile</h5>
+            ${ref}
             <dl class="ai-doc-insights__meta">
                 <div><dt>Type</dt><dd>${this.escapeHtml(insights.document_type || 'GI document')}</dd></div>
                 <div><dt>Content</dt><dd>${Number(insights.word_count || 0).toLocaleString()} words extracted</dd></div>
-                <div><dt>Checklist</dt><dd>${insights.checklist_met || 0} of ${insights.checklist_total || 0} items detected</dd></div>
+                <div><dt>MoP themes</dt><dd>${insights.checklist_met || 0} of ${insights.checklist_total || 0} well covered</dd></div>
             </dl>
-            ${detected.length ? `<p class="ai-doc-insights__label">Detected in this file</p>${this.renderPillarTags(detected, 'met')}` : ''}
-            ${missing.length ? `<p class="ai-doc-insights__label">Not found in this file</p>${this.renderPillarTags(missing, 'gap')}` : ''}
-            ${sectionRows ? `<p class="ai-doc-insights__label">Structural sections</p><ul class="ai-section-list">${sectionRows}</ul>` : ''}
+            ${detected.length ? `<p class="ai-doc-insights__label">Strengths in this file</p>${this.renderPillarTags(detected, 'met')}` : ''}
+            ${missing.length ? `<p class="ai-doc-insights__label">Themes still thin or missing</p>${this.renderPillarTags(missing, 'gap')}` : ''}
+            ${sectionRows ? `<p class="ai-doc-insights__label">MoP theme coverage</p><ul class="ai-section-list">${sectionRows}</ul>` : ''}
         </div>`;
     }
 
@@ -895,10 +902,11 @@ class IPOPHLAnalyzer {
             focus = ` Priority revision areas: ${[...partial, ...gaps].slice(0, 3).join(', ')}.`;
         }
         return (
-            `This review evaluates the submitted document against the IPOPHL four-pillar framework ` +
-            `(Trademark, Copyright, Industrial Design, and Patent) for Kapeng Barako GI registration. ` +
+            `This review evaluates the submitted document against the Batangas Kapeng Barako ` +
+            `Manual of Specifications basis (Part I Justification, Part II Technical & production, ` +
+            `Part III–IV Control, Traceability & Labelling). ` +
             `Overall classification: ${ready ? 'Ready' : 'Not Ready'}.${focus} ` +
-            `The findings below are derived from text extracted from this specific upload.`
+            `Findings are drawn from text extracted from this upload — not a keyword percentage score.`
         );
     }
 
@@ -933,6 +941,7 @@ class IPOPHLAnalyzer {
         const summary = this.buildExecutiveSummary(analysis, assessment);
         const recommendations = this.buildRecommendations(analysis, assessment, gaps);
         const docInsights = this.renderDocumentInsights(analysis, assessment);
+        const deepHtml = this.renderInDepthReview(analysis);
 
         this.showChatTyping(false);
 
@@ -941,18 +950,30 @@ class IPOPHLAnalyzer {
             <p class="ai-analysis-block__text">${this.formatPlainText(summary)}</p>
         </section>`;
 
-        const pillarBlock = pillars.length ? this.renderPillarCards(pillars) : `<section class="ai-analysis-block">
-            <p class="ai-analysis-block__text">Re-run Refresh Analysis to generate four-pillar classification for this upload.</p>
-        </section>`;
+        const pillarBlock = pillars.length ? this.renderPillarCards(pillars) : '';
 
         const recBlock = `<section class="ai-analysis-block">
-            <h5 class="ai-analysis-block__title">Recommended next steps</h5>
+            <h5 class="ai-analysis-block__title">What the admin can improve</h5>
             <ul class="ai-rec-list">${recommendations.map((r) =>
                 `<li>${this.formatPlainText(r)}</li>`
             ).join('')}</ul>
         </section>`;
 
-        container.innerHTML = `${intro}${docInsights}${pillarBlock}${recBlock}`;
+        container.innerHTML = `${intro}${deepHtml}${docInsights}${pillarBlock}${recBlock}`;
+    }
+
+    renderInDepthReview(analysis) {
+        const raw = String(analysis.shap_analysis || '').trim();
+        if (!raw) return '';
+        // Strip leftover percentage mentions from older stored analyses
+        const cleaned = raw
+            .replace(/\b\d{1,3}\s*%/g, '')
+            .replace(/readiness score of\s*/gi, '')
+            .replace(/keyword checklist score[^.<]*/gi, 'MoP theme review');
+        return `<section class="ai-analysis-block ai-analysis-block--depth">
+            <h5 class="ai-analysis-block__title">In-depth MoP review</h5>
+            <div class="ai-analysis-depth">${cleaned}</div>
+        </section>`;
     }
 
     displayAnalysisResults(analysis) {

@@ -1327,7 +1327,7 @@ def publish_ipophl_registration_to_gi_updates(
     replace_existing: bool = True,
 ) -> dict:
     """
-    Publish IPOPHL to farmers' GI Updates — one feed card per document group (13 zones).
+    Publish IPOPHL to farmers' GI Updates — one feed card per document group (7 MoP zones).
     Each card carries every file attached in that group; republishing replaces the old card.
     """
     from config.ipophl_store import (

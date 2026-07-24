@@ -228,6 +228,14 @@ def _pillar_status(met: list[str], gaps: list[str], signal_hit: bool) -> str:
 
 
 TASK_DOC_LABELS: dict[str, str] = {
+    "phase1-introduction": "Introduction & Reputation",
+    "phase1-history": "History of Kapeng Barako",
+    "phase1-physical-link": "Physical Link to the Territory",
+    "phase2-general": "Technical — General Description",
+    "phase2-specific": "Technical — Specific Description of the Production",
+    "phase2-production": "Technical — The Production Process",
+    "phase3-control": "Control & Traceability",
+    # Legacy
     "phase1-product": "Qualifying Product identification",
     "phase1-entity": "Applicant Entity documentation",
     "phase1-stakeholders": "Stakeholder Consultation records",
