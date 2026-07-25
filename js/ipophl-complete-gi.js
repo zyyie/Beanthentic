@@ -293,9 +293,14 @@
       if (preData.ok === false) {
         const parts = [];
         if (preData.mysql_reachable === false && preData.mysql_error) {
-          parts.push('Database: ' + preData.mysql_error);
+          // REST-only setups should not look like a missing MySQL password.
+          const label =
+            preData.source === 'supabase_rest' || preData.source === 'supabase'
+              ? 'Database'
+              : 'Database';
+          parts.push(label + ': ' + preData.mysql_error);
         }
-        if (preData.xampp_reachable === false && preData.source !== 'supabase') {
+        if (preData.xampp_reachable === false && preData.source !== 'supabase' && preData.source !== 'supabase_rest') {
           parts.push(
             preData.error ||
               'App server (port 8080) hindi maabot. I-start ang python app.py sa XAMPP PC.'

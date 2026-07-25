@@ -739,13 +739,14 @@
                           <div class="farmer-self-sale-header">
                             <div>
                               <h4 class="farmer-self-sale-title">Self-Sale (Direct Selling)</h4>
-                              <p class="farmer-self-sale-desc">Enable when the farmer will sell beans themselves instead of sending all production to the drop-off center.</p>
+                              <p class="farmer-self-sale-desc">Tied to the farmer’s app delivery preference. Enabling Self-sale unlocks the Records module for sell / drop-off &amp; sell accounts.</p>
                             </div>
                             <label class="self-sale-toggle" title="Enable farmer self-sale">
                               <input type="checkbox" id="farmerSelfSaleToggle" />
                               <span class="self-sale-toggle-slider"></span>
                             </label>
                           </div>
+                          <p class="farmer-self-sale-pref" id="farmerSelfSalePreference">Delivery preference: —</p>
                           <p class="farmer-self-sale-status" id="farmerSelfSaleStatus">Self-sale is disabled for this farmer.</p>
                           <div class="farmer-self-sale-applications" id="farmerSelfSaleApplicationsWrap" hidden>
                             <h5>Price Applications</h5>
@@ -1407,9 +1408,9 @@
               <div class="table-header coffee-pricing-header">
                 <div>
                   <h2 style="margin: 0;">Coffee Bean Pricing</h2>
-                  <p class="coffee-pricing-subtitle">Manage drop-off reference prices and review farmer self-sale price applications.</p>
+                  <p class="coffee-pricing-subtitle">Official drop-off prices, delivery-preference unlocks, and farmer self-sale price applications.</p>
                   <div class="coffee-pricing-self-sale-bar" id="coffeePricingSelfSaleBar">
-                    <label for="coffeePricingSelfSaleFarmerSelect" class="coffee-pricing-self-sale-label">Self-sale control</label>
+                    <label for="coffeePricingSelfSaleFarmerSelect" class="coffee-pricing-self-sale-label">Self-sale / Records unlock</label>
                     <select id="coffeePricingSelfSaleFarmerSelect" class="coffee-pricing-self-sale-select">
                       <option value="">Select farmer</option>
                     </select>
@@ -1417,13 +1418,39 @@
                       <input type="checkbox" id="coffeePricingSelfSaleToggle" />
                       <span class="self-sale-toggle-slider"></span>
                     </label>
-                    <span id="coffeePricingSelfSaleStatus" class="coffee-pricing-self-sale-status">Select a farmer to manage self-sale.</span>
+                    <span id="coffeePricingSelfSaleStatus" class="coffee-pricing-self-sale-status">Select a farmer to manage self-sale (unlocks Records in their app).</span>
                   </div>
+                  <p id="coffeePricingPreferenceMeta" class="coffee-pricing-preference-meta">Delivery preference and Records status appear here after selecting a farmer.</p>
                 </div>
                 <button type="button" class="action-btn" id="coffeePricingRefreshBtn">
                   <i class="fa-solid fa-rotate" aria-hidden="true"></i>
                   Refresh
                 </button>
+              </div>
+
+              <div class="coffee-pricing-card coffee-pricing-unlock-card" id="coffeePricingUnlockCard">
+                <div class="coffee-pricing-card-head">
+                  <h3>Records Unlock Queue</h3>
+                  <span class="coffee-pricing-queue-count" id="coffeePricingUnlockCount">0 waiting</span>
+                </div>
+                <p class="coffee-pricing-queue-hint">Farmers who chose Sell or Drop-off &amp; Sell stay frozen in Records until Self-sale is enabled (or their pricelist is approved).</p>
+                <div class="table-wrapper">
+                  <table class="data-table" id="coffeePricingUnlockTable">
+                    <thead>
+                      <tr>
+                        <th>Farmer</th>
+                        <th>Delivery preference</th>
+                        <th>Pricelist</th>
+                        <th>Self-sale</th>
+                        <th>Records</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="coffeePricingUnlockBody">
+                      <tr><td colspan="6" class="transactions-loading-cell">Loading farmers…</td></tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               <div class="coffee-pricing-grid">

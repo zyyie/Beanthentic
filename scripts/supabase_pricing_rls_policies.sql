@@ -77,3 +77,21 @@ TO anon
 USING (true)
 WITH CHECK (true);
 
+-- production_information.pricelist_status unlock when admin enables self-sale / Records.
+ALTER TABLE public.production_information ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS beanthentic_production_pricelist_select_anon ON public.production_information;
+DROP POLICY IF EXISTS beanthentic_production_pricelist_update_anon ON public.production_information;
+
+CREATE POLICY beanthentic_production_pricelist_select_anon
+ON public.production_information
+FOR SELECT
+TO anon
+USING (true);
+
+CREATE POLICY beanthentic_production_pricelist_update_anon
+ON public.production_information
+FOR UPDATE
+TO anon
+USING (true)
+WITH CHECK (true);
+

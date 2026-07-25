@@ -18,7 +18,7 @@ from config.pricing_store import (
     upsert_pricelist,
 )
 from config.security import safe_error_message
-from config.supabase_client import is_configured
+from config.supabase_client import get_client, is_configured
 from config.utils import is_authenticated
 from config.validation import validate_positive_int
 
@@ -105,7 +105,13 @@ def register_pricing_routes(app):
         enabled = bool(data.get("enabled"))
         try:
             set_farmer_self_sale(farmer_id, enabled)
-            return jsonify({"ok": True, "farmer_id": farmer_id, "self_sale_enabled": enabled})
+            return jsonify({
+                "ok": True,
+                "farmer_id": farmer_id,
+                "self_sale_enabled": enabled,
+                "records_module_enabled": bool(enabled),
+                "records_unlocked": bool(enabled),
+            })
         except Exception as exc:
             return jsonify({"ok": False, "error": safe_error_message(exc, public="Could not update self-sale status.")}), 500
 
@@ -183,7 +189,30 @@ def register_pricing_routes(app):
         if not ok_fid:
             return jsonify({"ok": False, "error": fid_err}), 400
         enabled = get_farmer_self_sale(farmer_id)
-        return jsonify({"ok": True, "farmer_id": farmer_id, "self_sale_enabled": enabled})
+        # Active + self-sale => Records unlocked for this account.
+        farmer_status = "pending"
+        try:
+            fr = (
+                get_client()
+                .table("farmers")
+                .select("status")
+                .eq("farmer_id", farmer_id)
+                .limit(1)
+                .execute()
+            )
+            if fr.data:
+                farmer_status = str((fr.data[0] or {}).get("status") or "pending")
+        except Exception:
+            pass
+        records_unlocked = bool(enabled) and farmer_status.strip().lower() == "active"
+        return jsonify({
+            "ok": True,
+            "farmer_id": farmer_id,
+            "self_sale_enabled": enabled,
+            "farmer_status": farmer_status,
+            "records_module_enabled": records_unlocked,
+            "records_unlocked": records_unlocked,
+        })
 
     @app.route("/api/app/farmer-price-application", methods=["POST", "OPTIONS"])
     def api_app_farmer_price_application():

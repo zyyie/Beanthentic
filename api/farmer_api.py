@@ -956,6 +956,8 @@ def _map_app_row_to_dashboard(
         "user_id": int(row.get("user_id") or 0) or None,
         "is_blocked": active_susp,
         "self_sale_enabled": bool(row.get("self_sale_enabled")),
+        "consolidation_preference": str(row.get("consolidation_preference") or "").strip() or None,
+        "pricelist_status": str(row.get("pricelist_status") or "").strip().lower() or None,
         "suspended_until": suspended_until_ms,
         "suspension_reason": str(row.get("suspension_reason") or ""),
         "warning_count": int(row.get("warning_count") or 0),
@@ -1617,6 +1619,20 @@ def _app_fetch_farmer_rows(limit: int = 2000) -> list[dict]:
                 "distribution_method",
                 "delivery_method",
             ),
+        ),
+        _optional_select_expr(
+            conn,
+            table_name="production_information",
+            table_alias="prod",
+            alias="consolidation_preference",
+            candidates=("consolidation_preference",),
+        ),
+        _optional_select_expr(
+            conn,
+            table_name="production_information",
+            table_alias="prod",
+            alias="pricelist_status",
+            candidates=("pricelist_status",),
         ),
     ]
     for variety in ("liberica", "excelsa", "robusta"):

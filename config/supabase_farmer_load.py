@@ -123,6 +123,8 @@ def _merge_farmer_row(
         "robusta_qty_kg": prod.get("robusta_qty_kg"),
         "liberica_qty_kg": prod.get("liberica_qty_kg"),
         "excelsa_qty_kg": prod.get("excelsa_qty_kg"),
+        "consolidation_preference": prod.get("consolidation_preference"),
+        "pricelist_status": prod.get("pricelist_status"),
         **{
             key: prod.get(key)
             for key in (

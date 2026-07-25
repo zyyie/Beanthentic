@@ -139,6 +139,17 @@ def ensure_pricing_schema(conn) -> None:
                     "ALTER TABLE farmers ADD COLUMN self_sale_enabled TINYINT(1) NOT NULL DEFAULT 0"
                 )
 
+        prod_cols = _table_columns(cur, "production_information")
+        if prod_cols and "pricelist_status" not in prod_cols:
+            if is_pg:
+                cur.execute(
+                    "ALTER TABLE production_information ADD COLUMN IF NOT EXISTS pricelist_status VARCHAR(40) NOT NULL DEFAULT 'approved'"
+                )
+            else:
+                cur.execute(
+                    "ALTER TABLE production_information ADD COLUMN pricelist_status VARCHAR(40) NOT NULL DEFAULT 'approved'"
+                )
+
         if is_pg:
             cur.execute(
                 """
@@ -474,6 +485,60 @@ def set_farmer_self_sale(farmer_id: int, enabled: bool) -> bool:
         .eq("farmer_id", farmer_id)
         .execute()
     )
+    # Enabling self-sale unlocks the app Records module (clears pending pricelist gate).
+    if enabled:
+        try:
+            unlock = (
+                client.table("production_information")
+                .update({"pricelist_status": "approved"})
+                .eq("farmer_id", farmer_id)
+                .execute()
+            )
+            if not (unlock.data or []):
+                print(
+                    f"[Beanthentic] WARNING: self-sale on for farmer {farmer_id} "
+                    "but pricelist_status unlock returned 0 rows (check RLS on production_information)."
+                )
+        except Exception as exc:
+            print(f"[Beanthentic] pricelist unlock on self-sale failed: {exc}")
+
+    # Mirror onto the app MySQL/Postgres DB so every farmer account sees the same flag.
+    try:
+        from config.app_connection import read_connection_settings
+        from config.mysql_app_bridge import connect_app_db
+
+        settings = read_connection_settings() or {}
+        params = {
+            "host": str(settings.get("app_db_host") or "").strip(),
+            "port": int(settings.get("app_db_port") or 3306),
+            "user": settings.get("app_db_user") or "root",
+            "password": settings.get("app_db_password") or "",
+            "database": settings.get("app_db_name") or "beanthentic_app",
+            "charset": "utf8mb4",
+        }
+        if params["host"]:
+            conn = connect_app_db(params)
+            try:
+                ensure_pricing_schema(conn)
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE farmers SET self_sale_enabled = %s WHERE farmer_id = %s",
+                        (1 if enabled else 0, farmer_id),
+                    )
+                    if enabled:
+                        try:
+                            cur.execute(
+                                "UPDATE production_information SET pricelist_status = %s WHERE farmer_id = %s",
+                                ("approved", farmer_id),
+                            )
+                        except Exception:
+                            pass
+                conn.commit()
+            finally:
+                conn.close()
+    except Exception as exc:
+        print(f"[Beanthentic] app DB self-sale mirror skipped: {exc}")
+
     return bool(resp.data)
 
 

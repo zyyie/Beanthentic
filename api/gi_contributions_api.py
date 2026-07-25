@@ -56,15 +56,33 @@ GI_MULTIPART_FILE_FIELD = "files[]"
 
 
 def _can_use_app_db() -> bool:
-    """True when Supabase/PostgreSQL or legacy MySQL app DB is configured."""
-    if beanthentic_env.is_postgresql():
+    """True when Supabase (REST or SQL) or legacy MySQL app DB is configured."""
+    if beanthentic_env.uses_supabase_anon():
         return True
+    if beanthentic_env.is_postgresql() and beanthentic_env.get_db_url():
+        return True
+    return bool(app_db_params())
+
+
+def _can_use_server_sql() -> bool:
+    """True when direct PostgreSQL/MySQL SQL is available (not REST-only)."""
+    if beanthentic_env.uses_supabase_anon() and beanthentic_env.get_db_url():
+        return True
+    if beanthentic_env.is_postgresql() and beanthentic_env.get_db_url():
+        return True
+    if beanthentic_env.uses_supabase_anon():
+        return False
     return bool(app_db_params())
 
 
 def _open_app_db():
     """Open app DB (Supabase PostgreSQL or legacy MySQL)."""
     if beanthentic_env.is_postgresql():
+        if not beanthentic_env.get_db_url():
+            raise RuntimeError(
+                "BEANTHENTIC_DB_URL required for server SQL. "
+                "App/client should use BEANTHENTIC_SUPABASE_ANON_KEY via REST."
+            )
         return connect_app_db({})
     params = app_db_params()
     if not params:
@@ -79,9 +97,25 @@ def _sql_bool(value: bool):
 
 
 def probe_app_mysql(timeout: float = 4.0) -> tuple[bool, str]:
-    """Can admin PC reach XAMPP MySQL (settings.json app_db_host) or PostgreSQL/Supabase?"""
-    # Check if we're using PostgreSQL first
-    if beanthentic_env.is_postgresql():
+    """Can admin reach app data via Supabase REST, PostgreSQL, or MySQL?"""
+    # Preferred path for this project: anon REST (no BEANTHENTIC_DB_URL needed).
+    if beanthentic_env.uses_supabase_anon():
+        try:
+            from config.supabase_gi_load import probe_supabase_rest
+
+            ok, err = probe_supabase_rest()
+            if ok:
+                return True, ""
+            # Fall through to optional server SQL if configured.
+            if not beanthentic_env.get_db_url():
+                return False, err or "Supabase REST unreachable"
+        except Exception as e:
+            if not beanthentic_env.get_db_url():
+                from config.app_connection import friendly_mysql_error
+
+                return False, friendly_mysql_error(e, host="Supabase REST")
+
+    if beanthentic_env.is_postgresql() and beanthentic_env.get_db_url():
         try:
             conn = connect_app_db({})
             with conn.cursor() as cur:
@@ -91,7 +125,12 @@ def probe_app_mysql(timeout: float = 4.0) -> tuple[bool, str]:
             return True, ""
         except Exception as e:
             from config.app_connection import friendly_mysql_error
+
             return False, friendly_mysql_error(e, host="Supabase/PostgreSQL")
+
+    if beanthentic_env.uses_supabase_anon() and not beanthentic_env.get_db_url():
+        # Already failed REST above.
+        return False, "Supabase REST unreachable"
 
     params = app_db_params()
     if not params:
@@ -105,6 +144,7 @@ def probe_app_mysql(timeout: float = 4.0) -> tuple[bool, str]:
         return True, ""
     except Exception as e:
         from config.app_connection import friendly_mysql_error
+
         return False, friendly_mysql_error(e, host=str(params.get("host") or ""))
     finally:
         if conn:
@@ -151,8 +191,11 @@ def probe_gi_app_server(timeout: float = 4.0) -> tuple[bool, str, str]:
 
 def check_xampp_for_publish() -> dict:
     """JSON for browser preflight before Complete Registration."""
-    if beanthentic_env.is_postgresql() or is_app_db_configured():
+    if beanthentic_env.uses_supabase_anon() or beanthentic_env.is_postgresql() or is_app_db_configured():
         mysql_ok, mysql_err = probe_app_mysql(timeout=4.0)
+        source = "supabase_rest" if beanthentic_env.uses_supabase_anon() else (
+            "supabase" if beanthentic_env.is_postgresql() else "app_db"
+        )
         return {
             "ok": mysql_ok,
             "prefer_http": False,
@@ -161,11 +204,12 @@ def check_xampp_for_publish() -> dict:
             "app_server_base": "",
             "reachable_base": "",
             "xampp_reachable": False,
-            "source": "supabase" if beanthentic_env.is_postgresql() else "app_db",
+            "source": source,
             "error": None if mysql_ok else mysql_err,
             "hint": (
-                "Check BEANTHENTIC_DB_HOST / BEANTHENTIC_DB_URL in .env for Supabase pooler access."
-                if beanthentic_env.is_postgresql()
+                "Check BEANTHENTIC_SUPABASE_URL / BEANTHENTIC_SUPABASE_ANON_KEY in .env "
+                "(REST). Optional: BEANTHENTIC_DB_URL for direct SQL."
+                if beanthentic_env.uses_supabase_anon() or beanthentic_env.is_postgresql()
                 else "Set app_db_host in settings.json or Supabase keys in connection settings."
             ),
         }
@@ -839,6 +883,18 @@ def _broadcast_admin_submissions_mysql(
     set_progress_percent: float | None = 100.0,
 ) -> list[int]:
     """Insert admin_submission rows for many farmers in one transaction (must commit)."""
+    if beanthentic_env.uses_supabase_anon() and not beanthentic_env.get_db_url():
+        from config.supabase_gi_load import broadcast_admin_submissions_via_rest
+
+        return broadcast_admin_submissions_via_rest(
+            farmer_ids=farmer_ids,
+            title=title,
+            content=content,
+            category=category,
+            attachments=attachments,
+            sender_name=sender_name,
+        )
+
     # Check if we're using PostgreSQL/Supabase
     if beanthentic_env.is_postgresql():
         conn = connect_app_db({})
@@ -961,9 +1017,22 @@ def _set_gi_progress_after_ipophl_publish(
     note: str = "",
     sender_name: str = "IPOPHL Administrator",
 ) -> None:
-    """Write admin_progress row(s) so mobile GI Process Update bar moves (MySQL or HTTP)."""
+    """Write admin_progress row(s) so mobile GI Process Update bar moves (REST, SQL, or HTTP)."""
     if not farmer_ids:
         return
+    if beanthentic_env.uses_supabase_anon() and not beanthentic_env.get_db_url():
+        try:
+            from config.supabase_gi_load import set_gi_progress_via_rest
+
+            set_gi_progress_via_rest(
+                farmer_ids,
+                progress_percent=progress_percent,
+                note=note,
+                sender_name=sender_name,
+            )
+            return
+        except Exception:
+            pass
     if _can_use_app_db():
         try:
             _set_gi_progress_mysql(
@@ -1110,6 +1179,17 @@ def _delete_ipophl_gi_updates_by_categories(categories: list[str]) -> int:
     cats = [str(c or "").strip()[:30] for c in categories if str(c or "").strip()]
     if not cats or not _can_use_app_db():
         return 0
+
+    if beanthentic_env.uses_supabase_anon() and not beanthentic_env.get_db_url():
+        try:
+            from config.supabase_gi_load import delete_ipophl_gi_updates_by_categories_via_rest
+
+            return delete_ipophl_gi_updates_by_categories_via_rest(
+                cats, sender_name=IPOPHL_GI_SENDER
+            )
+        except Exception:
+            return 0
+
     conn = connect_app_db({}) if beanthentic_env.is_postgresql() else connect_app_db(app_db_params())
     removed = 0
     try:
@@ -1175,7 +1255,7 @@ def publish_gi_registration_fallback_to_gi_updates(
     """
     farmer_ids: list[int] = []
     farmer_list_err: Exception | None = None
-    if app_db_params():
+    if _can_use_app_db() or app_db_params():
         try:
             farmer_ids = _list_active_farmer_ids()
         except Exception as e:
@@ -1422,6 +1502,7 @@ def publish_ipophl_registration_to_gi_updates(
     attachment_cache = _build_ipophl_attachment_cache(all_disk_for_sync)
 
     mysql_reachable, _mysql_probe_err = probe_app_mysql(timeout=5.0)
+    # REST-only Supabase counts as "db reachable" for broadcast via REST helpers.
     use_mysql_first = mysql_reachable and _can_use_app_db()
 
     for group in task_groups:
@@ -2154,11 +2235,23 @@ def _farmer_ids_from_http() -> list[int]:
 
 
 def _list_active_farmer_ids() -> list[int]:
-    """Load farmer_id list — HTTP first when LAN MySQL is usually blocked."""
+    """Load farmer_id list — REST first when anon-only, else SQL / HTTP."""
     from config.app_connection import prefer_app_http_bridge
 
-    # If using PostgreSQL/Supabase, use that directly
-    if beanthentic_env.is_postgresql():
+    if beanthentic_env.uses_supabase_anon():
+        try:
+            from config.supabase_gi_load import list_active_farmer_ids_via_rest
+
+            ids = list_active_farmer_ids_via_rest()
+            if ids:
+                return ids
+            raise RuntimeError("No farmers in app database")
+        except Exception:
+            if not beanthentic_env.get_db_url():
+                raise
+
+    # If using PostgreSQL/Supabase SQL pooler, use that directly
+    if beanthentic_env.is_postgresql() and beanthentic_env.get_db_url():
         conn = connect_app_db({})
         try:
             with conn.cursor() as cur:
@@ -2243,6 +2336,18 @@ def _insert_admin_submission(
 ) -> int:
     if not _can_use_app_db():
         raise RuntimeError("app database not configured in settings.json")
+    if beanthentic_env.uses_supabase_anon() and not beanthentic_env.get_db_url():
+        from config.supabase_gi_load import broadcast_admin_submissions_via_rest
+
+        ids = broadcast_admin_submissions_via_rest(
+            farmer_ids=[int(farmer_id)],
+            title=title,
+            content=content,
+            category=category,
+            attachments=attachments,
+            sender_name=sender_name,
+        )
+        return int(ids[0] or 0) if ids else 0
     preview = " ".join(content.split())[:200]
     attachments_json = json.dumps(attachments) if attachments else None
     if beanthentic_env.is_postgresql():

@@ -2365,7 +2365,126 @@ class DashboardApp {
         }
       });
     }
+
+    const unlockBody = document.getElementById('coffeePricingUnlockBody');
+    if (unlockBody) {
+      unlockBody.addEventListener('click', async (e) => {
+        const unlockBtn = e.target.closest('[data-unlock-self-sale]');
+        if (!unlockBtn) return;
+        const fid = Number(unlockBtn.dataset.unlockSelfSale || 0);
+        if (fid < 1) return;
+        const farmerRow = (this.data || []).find((f) => this.farmerIdFromRow(f) === fid) || { farmer_id: fid };
+        await this.setFarmerSelfSale(fid, true, farmerRow);
+        this.renderCoffeePricingUnlockQueue();
+        this.syncCoffeePricingSelfSaleControls(fid);
+      });
+    }
     this.syncCoffeePricingSelfSaleControls();
+    this.renderCoffeePricingUnlockQueue();
+  }
+
+  consolidationPreferenceOf(row) {
+    return String(
+      this.getValue(row, ['consolidation_preference', 'CONSOLIDATION PREFERENCE', 'delivery_preference']) || ''
+    )
+      .trim()
+      .toLowerCase();
+  }
+
+  pricelistStatusOf(row) {
+    return String(this.getValue(row, ['pricelist_status', 'PRICELIST STATUS']) || '')
+      .trim()
+      .toLowerCase();
+  }
+
+  isSelfSaleEnabledRow(row) {
+    if (!row) return false;
+    return row.self_sale_enabled === true || row.self_sale_enabled === 'true' || row.self_sale_enabled === 1;
+  }
+
+  isSellPathPreference(pref) {
+    const p = String(pref || '').toLowerCase();
+    return p === 'sell_produce' || p === 'drop_off_and_sell' || p === 'all_to_consolidator';
+  }
+
+  formatConsolidationPreference(pref) {
+    const p = String(pref || '').trim().toLowerCase();
+    if (p === 'all_to_consolidator') return 'Drop off at consolidator';
+    if (p === 'sell_produce') return 'Sell produce';
+    if (p === 'drop_off_and_sell') return 'Drop off and sell';
+    if (p === 'drop_off_to_admin') return 'Drop-off to admin';
+    return p ? this.formatPricingLabel(p) : 'Not set';
+  }
+
+  farmerRecordsAccessState(row) {
+    const status = String(this.getValue(row, ['STATUS', 'status', 'farmer_status']) || '').trim().toLowerCase();
+    const pref = this.consolidationPreferenceOf(row);
+    const pls = this.pricelistStatusOf(row);
+    const selfSale = this.isSelfSaleEnabledRow(row);
+    const active = !status || status === 'active';
+    if (!active) {
+      return { unlocked: false, reason: 'inactive', label: 'Frozen (account inactive)', pref, pls, selfSale };
+    }
+    if (selfSale) {
+      return { unlocked: true, reason: '', label: 'Unlocked (self-sale)', pref, pls: pls || 'approved', selfSale };
+    }
+    if (this.isSellPathPreference(pref) && pls === 'pending') {
+      return { unlocked: false, reason: 'pricelist', label: 'Frozen (awaiting self-sale / pricelist)', pref, pls, selfSale };
+    }
+    return { unlocked: true, reason: '', label: 'Unlocked', pref, pls: pls || 'approved', selfSale };
+  }
+
+  farmerDisplayName(row) {
+    return (
+      this.getValue(row, ['NAME OF FARMER', 'name']) ||
+      [this.getValue(row, ['FIRST NAME', 'first_name']), this.getValue(row, ['LAST NAME', 'last_name'])]
+        .filter(Boolean)
+        .join(' ')
+        .trim() ||
+      `Farmer #${this.farmerIdFromRow(row)}`
+    );
+  }
+
+  renderCoffeePricingUnlockQueue() {
+    const tbody = document.getElementById('coffeePricingUnlockBody');
+    const countEl = document.getElementById('coffeePricingUnlockCount');
+    if (!tbody) return;
+    const rows = (Array.isArray(this.data) ? this.data : [])
+      .map((row) => {
+        const access = this.farmerRecordsAccessState(row);
+        return { row, access, id: this.farmerIdFromRow(row) };
+      })
+      .filter((item) => item.id > 0 && !item.access.unlocked && item.access.reason === 'pricelist')
+      .sort((a, b) => String(this.farmerDisplayName(a.row)).localeCompare(String(this.farmerDisplayName(b.row))));
+
+    if (countEl) {
+      countEl.textContent = rows.length ? `${rows.length} waiting` : 'All clear';
+      countEl.classList.toggle('is-clear', rows.length === 0);
+    }
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6">No farmers waiting for Records unlock.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows
+      .map(({ row, access, id }) => {
+        const prefLabel = this.formatConsolidationPreference(access.pref);
+        const pls = access.pls || 'pending';
+        return `<tr data-farmer-id="${id}">
+          <td>${this.escapeHtml(this.farmerDisplayName(row))}</td>
+          <td>${this.escapeHtml(prefLabel)}</td>
+          <td>${this.escapeHtml(this.formatPricingLabel(pls))}</td>
+          <td>${access.selfSale ? 'On' : 'Off'}</td>
+          <td>${this.escapeHtml(access.label)}</td>
+          <td>
+            <button type="button" class="btn btn-primary btn-sm coffee-pricing-unlock-action" data-unlock-self-sale="${id}">
+              Enable self-sale
+            </button>
+          </td>
+        </tr>`;
+      })
+      .join('');
   }
 
   formatPhpAmount(value) {
@@ -2383,12 +2502,14 @@ class DashboardApp {
   async loadCoffeePricingData() {
     await Promise.all([this.loadCoffeePricelist(), this.loadCoffeePricingApplications()]);
     this.syncCoffeePricingSelfSaleControls();
+    this.renderCoffeePricingUnlockQueue();
   }
 
   syncCoffeePricingSelfSaleControls(selectedFarmerId = null) {
     const farmerSelect = document.getElementById('coffeePricingSelfSaleFarmerSelect');
     const selfSaleToggle = document.getElementById('coffeePricingSelfSaleToggle');
     const statusEl = document.getElementById('coffeePricingSelfSaleStatus');
+    const metaEl = document.getElementById('coffeePricingPreferenceMeta');
     if (!farmerSelect || !selfSaleToggle || !statusEl) return;
 
     const rows = Array.isArray(this.data) ? this.data : [];
@@ -2396,12 +2517,8 @@ class DashboardApp {
     const options = rows
       .map((row) => ({
         id: this.farmerIdFromRow(row),
-        name:
-          this.getValue(row, ['NAME OF FARMER', 'name']) ||
-          [this.getValue(row, ['FIRST NAME', 'first_name']), this.getValue(row, ['LAST NAME', 'last_name'])]
-            .filter(Boolean)
-            .join(' ')
-            .trim(),
+        name: this.farmerDisplayName(row),
+        needsUnlock: !this.farmerRecordsAccessState(row).unlocked,
       }))
       .filter((item) => item.id > 0);
 
@@ -2412,8 +2529,19 @@ class DashboardApp {
       return true;
     });
 
+    // Prefer farmers waiting for unlock near the top of the select list.
+    uniqueOptions.sort((a, b) => {
+      if (a.needsUnlock !== b.needsUnlock) return a.needsUnlock ? -1 : 1;
+      return String(a.name).localeCompare(String(b.name));
+    });
+
     farmerSelect.innerHTML = `<option value="">Select farmer</option>${uniqueOptions
-      .map((item) => `<option value="${item.id}">${this.escapeHtml(item.name || `Farmer #${item.id}`)}</option>`)
+      .map(
+        (item) =>
+          `<option value="${item.id}">${this.escapeHtml(item.name || `Farmer #${item.id}`)}${
+            item.needsUnlock ? ' · needs unlock' : ''
+          }</option>`
+      )
       .join('')}`;
 
     const targetId = uniqueOptions.some((o) => o.id === previous)
@@ -2424,21 +2552,28 @@ class DashboardApp {
     farmerSelect.value = targetId ? String(targetId) : '';
 
     const row = rows.find((f) => this.farmerIdFromRow(f) === Number(targetId));
-    const enabled = row
-      ? row.self_sale_enabled === true || row.self_sale_enabled === 'true' || row.self_sale_enabled === 1
-      : false;
+    const enabled = this.isSelfSaleEnabledRow(row);
+    const access = row ? this.farmerRecordsAccessState(row) : null;
     selfSaleToggle.disabled = !targetId;
     selfSaleToggle.checked = enabled;
 
     if (!targetId) {
       statusEl.textContent = 'No farmer records loaded yet.';
       statusEl.classList.remove('is-enabled');
+      if (metaEl) metaEl.textContent = 'Delivery preference and Records status appear here after selecting a farmer.';
       return;
     }
     statusEl.textContent = enabled
-      ? 'Self-sale enabled for selected farmer.'
-      : 'Self-sale disabled for selected farmer.';
+      ? 'Self-sale enabled — Records unlocked for direct selling.'
+      : access && !access.unlocked
+        ? 'Self-sale off — Records frozen until you enable self-sale.'
+        : 'Self-sale disabled for selected farmer.';
     statusEl.classList.toggle('is-enabled', enabled);
+    if (metaEl && access) {
+      metaEl.textContent = `Delivery preference: ${this.formatConsolidationPreference(access.pref)} · Pricelist: ${
+        access.pls ? this.formatPricingLabel(access.pls) : '—'
+      } · Records: ${access.label}`;
+    }
   }
 
   async loadCoffeePricelist() {
@@ -2671,9 +2806,17 @@ class DashboardApp {
   initFarmerSelfSalePanel(farmer) {
     const toggle = document.getElementById('farmerSelfSaleToggle');
     const statusEl = document.getElementById('farmerSelfSaleStatus');
+    const prefEl = document.getElementById('farmerSelfSalePreference');
     const appsWrap = document.getElementById('farmerSelfSaleApplicationsWrap');
     const farmerId = this.farmerIdFromRow(farmer);
-    const enabled = farmer.self_sale_enabled === true || farmer.self_sale_enabled === 'true' || farmer.self_sale_enabled === 1;
+    const enabled = this.isSelfSaleEnabledRow(farmer);
+    const access = this.farmerRecordsAccessState(farmer);
+
+    if (prefEl) {
+      prefEl.textContent = `Delivery preference: ${this.formatConsolidationPreference(access.pref)} · Pricelist: ${
+        access.pls ? this.formatPricingLabel(access.pls) : '—'
+      } · Records: ${access.label}`;
+    }
 
     if (toggle) {
       toggle.checked = enabled;
@@ -2687,9 +2830,12 @@ class DashboardApp {
 
     if (statusEl) {
       statusEl.textContent = enabled
-        ? 'Self-sale enabled — farmer can submit price applications for beans they sell directly.'
-        : 'Self-sale is disabled for this farmer.';
+        ? 'Self-sale enabled — farmer can use Records and submit price applications for beans they sell directly.'
+        : access.reason === 'pricelist'
+          ? 'Self-sale is off — Records is frozen until you enable self-sale for this sell/drop-off account.'
+          : 'Self-sale is disabled for this farmer.';
       statusEl.classList.toggle('is-enabled', enabled);
+      statusEl.classList.toggle('is-locked', !enabled && access.reason === 'pricelist');
     }
 
     if (appsWrap) {
@@ -2715,12 +2861,24 @@ class DashboardApp {
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || 'Update failed.');
-      if (farmerRow) farmerRow.self_sale_enabled = !!enabled;
+      if (farmerRow) {
+        farmerRow.self_sale_enabled = !!enabled;
+        if (enabled) farmerRow.pricelist_status = 'approved';
+      }
       const cached = (this.data || []).find((f) => this.farmerIdFromRow(f) === Number(farmerId));
-      if (cached) cached.self_sale_enabled = !!enabled;
-      this.initFarmerSelfSalePanel(farmerRow || { farmer_id: farmerId, self_sale_enabled: enabled });
+      if (cached) {
+        cached.self_sale_enabled = !!enabled;
+        if (enabled) cached.pricelist_status = 'approved';
+      }
+      this.initFarmerSelfSalePanel(farmerRow || { farmer_id: farmerId, self_sale_enabled: enabled, pricelist_status: enabled ? 'approved' : undefined });
       this.syncCoffeePricingSelfSaleControls(farmerId);
-      this.showNotification(enabled ? 'Self-sale enabled for farmer.' : 'Self-sale disabled for farmer.', 'success');
+      this.renderCoffeePricingUnlockQueue();
+      this.showNotification(
+        enabled
+          ? 'Self-sale enabled — Records module unlocked for this farmer.'
+          : 'Self-sale disabled for farmer.',
+        'success'
+      );
     } catch (err) {
       this.showNotification(err.message || 'Could not update self-sale status.', 'error');
       this.initFarmerSelfSalePanel(farmerRow || { farmer_id: farmerId, self_sale_enabled: !enabled });
@@ -4310,6 +4468,7 @@ class DashboardApp {
         /* ignore quota errors */
       }
       this.syncCoffeePricingSelfSaleControls();
+      this.renderCoffeePricingUnlockQueue();
 
       this.updateStats();
       this.createCharts();
@@ -4329,6 +4488,8 @@ class DashboardApp {
         this.farmersData = this.data;
         this.filteredData = [...this.data];
         this.totalRecords = this.data.length;
+        this.syncCoffeePricingSelfSaleControls();
+        this.renderCoffeePricingUnlockQueue();
         this.updateStats();
         this.createCharts();
         this.updateTable();
@@ -7140,7 +7301,13 @@ class DashboardApp {
         if (!taskId || !id || taskId === 'ipophl-other' || taskId === 'unknown') return;
         if (!this.getOfficialIpophlTaskIds().includes(taskId)) return;
         if (!this.ipophlFiles[taskId]) this.ipophlFiles[taskId] = [];
-        if (!this.ipophlFiles[taskId].some((f) => f.id === id)) {
+        const existing = this.ipophlFiles[taskId].find((f) => f.id === id);
+        if (existing) {
+          existing.name = doc.filename || doc.original_filename || existing.name || 'file';
+          existing.ai_score = Number(doc.ai_score || 0);
+          existing.ai_status = doc.ai_status || existing.ai_status || '';
+          existing.upload_timestamp = doc.upload_timestamp || existing.upload_timestamp || '';
+        } else {
           this.ipophlFiles[taskId].push({
             id,
             name: doc.filename || doc.original_filename || 'file',
@@ -7193,23 +7360,105 @@ class DashboardApp {
     };
   }
 
+  isIpophlFileReady(fileOrDoc) {
+    const status = String(
+      fileOrDoc?.ai_status || fileOrDoc?.status || fileOrDoc?.aiStatus || ''
+    )
+      .trim()
+      .toLowerCase();
+    if (status === 'ready' || status === 'pass') return true;
+    if (
+      status === 'not ready' ||
+      status === 'not_ready' ||
+      status === 'fail' ||
+      status === 'failed'
+    ) {
+      return false;
+    }
+    // Pending / unreviewed uploads must not advance the GI process bar.
+    if (
+      !status ||
+      status === 'uploaded' ||
+      status === 'pending' ||
+      status === 'analyzed' ||
+      status === 'processing'
+    ) {
+      return false;
+    }
+    // Legacy rows that only store a percent
+    return Number(fileOrDoc?.ai_score || 0) >= 100;
+  }
+
+  /** Sync Ready / Not Ready from visible file cards into ipophlFiles. */
+  syncIpophlFileStatusesFromDom(service) {
+    const container = document.getElementById(`${service}-files`);
+    if (!container) return;
+    if (!this.ipophlFiles) this.ipophlFiles = {};
+    if (!this.ipophlFiles[service]) this.ipophlFiles[service] = [];
+
+    container.querySelectorAll('.file-item').forEach((card) => {
+      if (card.classList.contains('error') || card.classList.contains('pending')) return;
+      const status = String(card.dataset.aiStatus || '').trim();
+      if (!status) return;
+      const uuid = String(card.dataset.fileUuid || card.dataset.fileId || '').trim();
+      const name = String(card.querySelector('.file-name')?.textContent || '').trim();
+      let row = null;
+      if (uuid) {
+        row = this.ipophlFiles[service].find(
+          (f) => String(f.id || f.file_uuid || '') === uuid
+        );
+      }
+      if (!row && name) {
+        row = this.ipophlFiles[service].find((f) => String(f.name || '') === name);
+      }
+      if (row) {
+        row.ai_status = status;
+      } else if (uuid || name) {
+        this.ipophlFiles[service].push({
+          id: uuid || `${service}-${name}`,
+          name: name || uuid,
+          ai_status: status,
+        });
+      }
+    });
+  }
+
   isIpophlServiceComplete(service) {
-    const hasFiles = Boolean(this.ipophlFiles?.[service]?.length);
-    const hasLinks = Boolean(this.ipophlLinks?.[service]?.length);
-    return hasFiles || hasLinks;
+    this.syncIpophlFileStatusesFromDom(service);
+    const files = (this.ipophlFiles && this.ipophlFiles[service]) || [];
+    // Only AI Ready files advance the top-right progress bar.
+    if (files.some((f) => this.isIpophlFileReady(f))) return true;
+
+    const container = document.getElementById(`${service}-files`);
+    if (container) {
+      const cards = [...container.querySelectorAll('.file-item')].filter(
+        (card) => !card.classList.contains('error') && !card.classList.contains('pending')
+      );
+      if (cards.some((card) => this.isIpophlFileReady({ ai_status: card.dataset.aiStatus }))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** True when the group has an uploaded file or link (for phase navigation only). */
+  isIpophlServiceHasUpload(service) {
+    this.syncIpophlFileStatusesFromDom(service);
+    if ((this.ipophlFiles?.[service] || []).length > 0) return true;
+    if ((this.ipophlLinks?.[service] || []).length > 0) return true;
+    const container = document.getElementById(`${service}-files`);
+    return Boolean(
+      container?.querySelector(
+        '.file-item[data-file-uuid], .file-item.success:not(.pending):not(.uploading), .file-item:not(.error):not(.pending)'
+      )
+    );
   }
 
   computeIpophlDocumentAnalytics(docs) {
     const items = Array.isArray(docs) ? docs : [];
     const servicesByPhase = this.getIpophlServicesByPhase();
     const allServices = Object.values(servicesByPhase).flat();
-    const isReadyDoc = (d) => {
-      const status = String(d?.ai_status || '').trim().toLowerCase();
-      if (status === 'ready') return true;
-      if (status === 'not ready' || status === 'not_ready') return false;
-      // Legacy rows that still only store a percent
-      return Number(d?.ai_score || 0) >= 100;
-    };
+    const isReadyDoc = (d) => this.isIpophlFileReady(d);
     const scores = items.map((d) => Number(d.ai_score || 0)).filter((n) => !Number.isNaN(n));
     const avgScore = scores.length
       ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
@@ -7793,16 +8042,7 @@ class DashboardApp {
     }
   }
 
-  isIpophlServiceComplete(service) {
-    const hasFiles = Boolean(this.ipophlFiles?.[service]?.length);
-    const hasLinks = Boolean(this.ipophlLinks?.[service]?.length);
-    if (hasFiles || hasLinks) return true;
-
-    const container = document.getElementById(`${service}-files`);
-    return Boolean(
-      container?.querySelector('.file-item[data-file-uuid], .file-item.success:not(.pending):not(.uploading)')
-    );
-  }
+  // isIpophlServiceComplete is defined earlier (Ready AI only — Not Ready does not count).
 
   isIpophlPhaseComplete(phaseNum) {
     if (Number(phaseNum) === 4) {
@@ -7810,7 +8050,8 @@ class DashboardApp {
     }
     const services = this.getIpophlServicesByPhase()[phaseNum];
     if (!services?.length) return false;
-    return services.every((service) => this.isIpophlServiceComplete(service));
+    // Phase stepper unlocks when uploads exist; top progress bar still needs AI Ready.
+    return services.every((service) => this.isIpophlServiceHasUpload(service));
   }
 
   updateProgress(phaseNum) {
@@ -8438,11 +8679,7 @@ class DashboardApp {
 
   getIpophlCompletionSnapshot() {
     const allServices = this.getOfficialIpophlTaskIds();
-    const completedServices = allServices.filter((service) => {
-      const hasFiles = Boolean(this.ipophlFiles && this.ipophlFiles[service] && this.ipophlFiles[service].length > 0);
-      const hasLinks = Boolean(this.ipophlLinks && this.ipophlLinks[service] && this.ipophlLinks[service].length > 0);
-      return hasFiles || hasLinks;
-    });
+    const completedServices = allServices.filter((service) => this.isIpophlServiceComplete(service));
 
     const total = allServices.length;
     const completed = completedServices.length;
@@ -8452,8 +8689,45 @@ class DashboardApp {
   }
 
   getGiAiStatusDescriptor() {
-    const aiResult = this.randomForestGiResult;
+    const allServices = this.getOfficialIpophlTaskIds();
+    let readyGroups = 0;
+    let notReadyGroups = 0;
+    let pendingGroups = 0;
+    allServices.forEach((service) => {
+      this.syncIpophlFileStatusesFromDom(service);
+      const files = (this.ipophlFiles && this.ipophlFiles[service]) || [];
+      const container = document.getElementById(`${service}-files`);
+      const domStatuses = container
+        ? [...container.querySelectorAll('.file-item')]
+            .filter((c) => !c.classList.contains('error'))
+            .map((c) => String(c.dataset.aiStatus || '').trim())
+        : [];
+      const statuses = [
+        ...files.map((f) => String(f.ai_status || '').trim()),
+        ...domStatuses,
+      ].filter(Boolean);
+      if (!statuses.length && !files.length && !(container?.querySelector('.file-item'))) {
+        pendingGroups += 1;
+        return;
+      }
+      if (statuses.some((s) => this.isIpophlFileReady({ ai_status: s }))) {
+        readyGroups += 1;
+        return;
+      }
+      if (statuses.some((s) => /not\s*ready|fail/i.test(s))) {
+        notReadyGroups += 1;
+        return;
+      }
+      pendingGroups += 1;
+    });
 
+    if (readyGroups === allServices.length) {
+      return { label: 'AI pass', className: 'gi-status-pill--pass' };
+    }
+    if (notReadyGroups > 0) {
+      return { label: 'Needs revision', className: 'gi-status-pill--fail' };
+    }
+    const aiResult = this.randomForestGiResult;
     if (aiResult === true || aiResult?.status === 'pass') {
       return { label: 'AI pass', className: 'gi-status-pill--pass' };
     }
@@ -11415,7 +11689,9 @@ class DashboardApp {
       const prefix = this.isAdminMessage(m) ? 'You: ' : '';
       const preview = prefix + (m.body || '').substring(0, 60);
 
-      return `<li class="messaging-item${unreadClass}${activeClass}" data-phone="${esc(c.phone)}" data-msg-id="${m.id}">
+      const latestId = this.parseMessagingMessageId(m.id ?? m.message_id);
+      const idAttr = latestId ? ` data-msg-id="${latestId}"` : '';
+      return `<li class="messaging-item${unreadClass}${activeClass}" data-phone="${esc(c.phone)}"${idAttr}>
         ${this.buildMessagingAvatarHtml({ phone: c.phone, name: displayName, className: 'messaging-item__avatar' })}
         <div class="messaging-item__content">
           <div class="messaging-item__top">
@@ -11430,12 +11706,20 @@ class DashboardApp {
     this.hydrateMessagingAvatars(listEl);
   }
 
+  /** Positive numeric message id only — ignore local-* / NaN placeholders from optimistic sends. */
+  parseMessagingMessageId(raw) {
+    if (raw == null || raw === '') return null;
+    const s = String(raw).trim();
+    if (!/^\d+$/.test(s)) return null;
+    const n = Number(s);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
   /** Open a chat from the sidebar list (by phone + optional message id). */
   selectMessagingConversation(item) {
     if (!item) return;
     const phone = item.getAttribute('data-phone') || '';
-    const msgIdRaw = item.getAttribute('data-msg-id');
-    const msgId = msgIdRaw ? Number(msgIdRaw) : null;
+    let msgId = this.parseMessagingMessageId(item.getAttribute('data-msg-id'));
 
     this.messagingSelectedPhone = phone;
 
@@ -11446,14 +11730,17 @@ class DashboardApp {
     const conv = (this.messagingConversations || []).find(
       (c) => this.messagingPhoneTail(c.phone) === this.messagingPhoneTail(phone)
     );
+    if (!msgId && conv?.latest_message) {
+      msgId = this.parseMessagingMessageId(conv.latest_message.id ?? conv.latest_message.message_id);
+    }
     const contact = conv
-      ? { phone: conv.phone, name: conv.name }
-      : null;
+      ? { phone: conv.phone || phone, name: conv.name }
+      : phone
+        ? { phone, name: this.resolveFarmerName(phone, '') }
+        : null;
 
-    void this.openMessagingDetail(
-      Number.isFinite(msgId) && msgId > 0 ? msgId : null,
-      contact
-    );
+    // Always pass contact with phone so thread reload does not depend on a valid message id.
+    void this.openMessagingDetail(msgId, contact);
   }
 
   renderMessagingContacts() {
@@ -11726,8 +12013,10 @@ class DashboardApp {
     const tail = this.messagingPhoneTail(recipientPhone);
     if (!tail) return;
 
+    const savedId = this.parseMessagingMessageId(replyData.id ?? replyData.message_id);
     const saved = {
-      id: replyData.id || `local-${Date.now()}`,
+      id: savedId || null,
+      message_id: savedId || null,
       body: replyData.body,
       sender_name: replyData.sender_name || 'Administrator',
       sender_phone: replyData.sender_phone || '',
@@ -11735,6 +12024,7 @@ class DashboardApp {
       sender_type: 'admin',
       recipient_phone: recipientPhone,
       recipient_name: replyData.recipient_name || '',
+      recipient_role: 'farmer',
       created_at: replyData.created_at || new Date().toISOString(),
       is_read: true,
       category: 'farmers',
@@ -11871,6 +12161,8 @@ class DashboardApp {
       this.showNotification('Message sent!', 'success');
       this.patchMessagingAfterSend(recipientPhone, {
         ...replyData,
+        id: saved.id ?? saved.message_id,
+        message_id: saved.message_id ?? saved.id,
         recipient_name:
           (originalMessage &&
             (normalize(originalMessage.sender_phone) === target
@@ -12333,18 +12625,33 @@ class DashboardApp {
       }
       
       if (bodyEl) {
-        if (newContact && !id) {
-          bodyEl.innerHTML = '<div class="messaging-list-empty"><p>No messages yet. Send a message to start the conversation!</p></div>';
-        } else {
-          let thread = await this.fetchConversationThread(this.messagingSelectedPhone);
+        const phoneForThread =
+          this.messagingSelectedPhone || newContact?.phone || msg.recipient_phone || msg.sender_phone || '';
+        let thread = [];
+        if (phoneForThread) {
+          thread = await this.fetchConversationThread(phoneForThread);
           if (openSeq !== this._messagingOpenSeq) return;
           if (!thread.length) {
-            thread = this.buildConversationThreadForPhone(this.messagingSelectedPhone);
+            thread = this.buildConversationThreadForPhone(phoneForThread);
           }
+        }
+        if (!thread.length && msg.body) {
+          thread = this.mapMessagesToThread([msg]);
+        }
+        if (!thread.length) {
+          bodyEl.innerHTML =
+            '<div class="messaging-list-empty"><p>No messages yet. Send a message to start the conversation!</p></div>';
+          msg.conversation = [];
+        } else {
           thread.forEach((t) => {
             if (!this.isAdminMessage(t)) t.is_read = true;
           });
           msg.conversation = thread;
+          if (!this.parseMessagingMessageId(id) && thread[thread.length - 1]) {
+            this.messagingSelectedId = this.parseMessagingMessageId(
+              thread[thread.length - 1].id ?? thread[thread.length - 1].message_id
+            );
+          }
           bodyEl.innerHTML = this.renderConversation(msg);
           this.hydrateMessagingAvatars(bodyEl);
           this.scrollMessagingConversationToBottom(bodyEl);
@@ -12376,8 +12683,7 @@ class DashboardApp {
         }
       }
 
-      const isNewEmptyChat = !!(newContact && !id);
-      if (this.messagingSelectedPhone && !isNewEmptyChat) {
+      if (this.messagingSelectedPhone) {
         await this.markConversationRead(this.messagingSelectedPhone);
         if (openSeq !== this._messagingOpenSeq) return;
         this.renderMessagingList();
@@ -12436,10 +12742,13 @@ class DashboardApp {
         );
         if (matchItem) matchItem.classList.add('is-active');
       }
-      void this.openMessagingDetail(conv.latest_message.id, {
-        phone: conv.phone,
-        name: conv.name,
-      });
+      void this.openMessagingDetail(
+        this.parseMessagingMessageId(conv.latest_message?.id ?? conv.latest_message?.message_id),
+        {
+          phone: conv.phone,
+          name: conv.name,
+        }
+      );
     } else {
       // If no conversation exists, open the compose panel
       this.openMessagingCompose(phone);
@@ -12668,7 +12977,10 @@ class DashboardApp {
     );
 
     if (existingMsg) {
-      this.openMessagingDetail(existingMsg.id);
+      this.openMessagingDetail(
+        this.parseMessagingMessageId(existingMsg.id ?? existingMsg.message_id),
+        { phone, name }
+      );
     } else {
       // Open a "virtual" conversation for this new contact
       this.openMessagingDetail(null, { phone, name });

@@ -54,11 +54,19 @@ class IPOPHLAnalyzer {
             if (!window.dashboardApp.ipophlFiles[taskId]) {
                 window.dashboardApp.ipophlFiles[taskId] = [];
             }
-            // Avoid duplicates
-            if (!window.dashboardApp.ipophlFiles[taskId].some(f => f.id === (doc.file_uuid || doc.id))) {
+            const fileId = doc.file_uuid || doc.id;
+            const existing = window.dashboardApp.ipophlFiles[taskId].find(
+                (f) => f.id === fileId
+            );
+            if (existing) {
+                if (doc.ai_status != null) existing.ai_status = doc.ai_status;
+                if (doc.ai_score != null) existing.ai_score = Number(doc.ai_score || 0);
+            } else {
                 window.dashboardApp.ipophlFiles[taskId].push({
-                    id: doc.file_uuid || doc.id,
-                    name: doc.filename
+                    id: fileId,
+                    name: doc.filename,
+                    ai_status: doc.ai_status || '',
+                    ai_score: Number(doc.ai_score || 0),
                 });
             }
         } else if (action === 'remove') {
@@ -1198,6 +1206,9 @@ class IPOPHLAnalyzer {
                             (window.dashboardApp.ipophlFiles[taskId] || []).forEach((f) => {
                                 if (String(f.id || f.file_uuid || '') === String(uuid)) {
                                     f.ai_status = result.analysis?.status;
+                                    if (result.analysis?.score != null) {
+                                        f.ai_score = Number(result.analysis.score || 0);
+                                    }
                                 }
                             });
                         });
