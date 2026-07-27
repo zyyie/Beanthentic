@@ -448,15 +448,51 @@ def _mirror_farmer_gi_file_if_needed(filename: str) -> Path | None:
 
 def _gi_local_upload_dirs() -> list[Path]:
     admin_root = Path(__file__).resolve().parents[1]
-    sibling_app = admin_root.parent / "Beanthentic-App"
-    candidates = [
+    parent = admin_root.parent
+    documents = Path.home() / "Documents"
+    candidates: list[Path] = [
         GI_CONTRIB_UPLOAD_DIR,
         FARMER_GI_APP_UPLOAD_DIR,
         admin_root / "deploy" / "app_server" / "uploads" / "gi_contributions",
-        sibling_app / "uploads" / "gi_contributions",
-        sibling_app / "deploy" / "app_server" / "uploads" / "gi_contributions",
     ]
-    return candidates
+
+    def _add_app_tree(app_root: Path) -> None:
+        if not app_root.is_dir():
+            return
+        candidates.extend(
+            [
+                app_root / "uploads" / "gi_contributions",
+                app_root / "deploy" / "app_server" / "uploads" / "gi_contributions",
+                app_root
+                / "android-app"
+                / "app"
+                / "src"
+                / "main"
+                / "assets"
+                / "uploads"
+                / "gi_contributions",
+            ]
+        )
+
+    for base in (parent, documents):
+        if not base.is_dir():
+            continue
+        try:
+            for child in base.iterdir():
+                if child.is_dir() and child.name.lower().startswith("beanthentic-app"):
+                    _add_app_tree(child)
+        except OSError:
+            continue
+
+    seen: set[str] = set()
+    out: list[Path] = []
+    for folder in candidates:
+        key = str(folder)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(folder)
+    return out
 
 
 def _gi_db_source_urls_for_filename(filename: str) -> list[str]:
@@ -544,7 +580,10 @@ def _fetch_http_bytes(url: str, *, timeout: float = 8.0) -> bytes | None:
         import urllib.request
 
         req = urllib.request.Request(url, headers={"User-Agent": "Beanthentic-Admin/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        kwargs: dict = {"timeout": timeout}
+        if str(url).lower().startswith("https://"):
+            kwargs["context"] = beanthentic_env.https_ssl_context()
+        with urllib.request.urlopen(req, **kwargs) as resp:
             body = resp.read()
         if body and len(body) > 16:
             return body

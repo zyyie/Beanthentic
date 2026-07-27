@@ -1011,7 +1011,7 @@ class IPOPHLAnalyzer {
             .replace(/readiness score of\s*/gi, '')
             .replace(/keyword checklist score[^.<]*/gi, 'MoP theme review');
         return `<section class="ai-analysis-block ai-analysis-block--depth">
-            <h5 class="ai-analysis-block__title">In-depth MoP review</h5>
+            <h5 class="ai-analysis-block__title">In-depth AI review</h5>
             <div class="ai-analysis-depth">${cleaned}</div>
         </section>`;
     }

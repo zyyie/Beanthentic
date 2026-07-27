@@ -47,6 +47,39 @@ def load_dotenv(path: Path | str | None = None) -> None:
             continue
 
 
+def configure_python_ssl_certs() -> str | None:
+    """
+    Point Python/OpenSSL at certifi's CA bundle.
+
+    macOS python.org builds often ship without system root certs, which causes
+    ``SSL: CERTIFICATE_VERIFY_FAILED`` / ``unable to get local issuer certificate``
+    on Supabase HTTPS (urllib, httpx, requests, supabase-py).
+    """
+    try:
+        import certifi
+    except ImportError:
+        return None
+    ca_path = certifi.where()
+    if not ca_path or not Path(ca_path).is_file():
+        return None
+    # Prefer certifi over a broken default; do not override an explicit user path.
+    for key in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"):
+        existing = (os.environ.get(key) or "").strip()
+        if not existing or not Path(existing).is_file():
+            os.environ[key] = ca_path
+    return ca_path
+
+
+def https_ssl_context():
+    """SSLContext for urllib HTTPS (Supabase REST/Storage). Falls back to default."""
+    import ssl
+
+    ca = configure_python_ssl_certs()
+    if ca:
+        return ssl.create_default_context(cafile=ca)
+    return ssl.create_default_context()
+
+
 def _settings_root() -> dict:
     try:
         raw = json.loads((_BASE_DIR / "settings.json").read_text(encoding="utf-8"))
@@ -527,7 +560,7 @@ def _supabase_storage_upload_rest(
     for method in ("POST", "PUT"):
         try:
             req = urllib.request.Request(endpoint, data=file_bytes, headers=headers, method=method)
-            with urllib.request.urlopen(req, timeout=90) as resp:
+            with urllib.request.urlopen(req, timeout=90, context=https_ssl_context()) as resp:
                 if 200 <= int(resp.status) < 300:
                     return True
         except urllib.error.HTTPError as exc:
@@ -561,7 +594,7 @@ def download_from_supabase_storage(object_name: str) -> tuple[bytes, str] | None
     for endpoint in endpoints:
         try:
             req = urllib.request.Request(endpoint, headers=auth_headers, method="GET")
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=30, context=https_ssl_context()) as resp:
                 body = resp.read()
                 if body and len(body) > 32:
                     ctype = (resp.headers.get("Content-Type") or mime).split(";")[0].strip()
@@ -605,6 +638,10 @@ def upload_to_supabase_storage(
 
 # Load on import
 load_dotenv()
+try:
+    configure_python_ssl_certs()
+except Exception:
+    pass
 try:
     for _note in sync_settings_connection():
         print(f"[Beanthentic] {_note}")

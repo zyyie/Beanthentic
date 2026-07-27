@@ -1183,7 +1183,7 @@ class GIAnalyzer:
         missing = rule_result.get("missing_requirements") or []
         status = rule_result.get("status") or ("Ready" if score >= 100 else "Not Ready")
         p1 = (
-            f"<p>Qualitative MoP review for <strong>{doc_type}</strong>: "
+            f"<p>Qualitative AI review for <strong>{doc_type}</strong>: "
             f"classification <strong>{status}</strong>. "
             f"Strengths detected: {', '.join(detected[:8]) if detected else 'none yet'}.</p>"
         )

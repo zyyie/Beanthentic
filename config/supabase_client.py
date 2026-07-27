@@ -109,10 +109,11 @@ def supabase_rest_get(
     }
 
     last_err: BaseException | None = None
+    ssl_ctx = beanthentic_env.https_ssl_context()
     for attempt in range(3):
         try:
             req = Request(endpoint, headers=headers, method="GET")
-            with urlopen(req, timeout=timeout) as resp:
+            with urlopen(req, timeout=timeout, context=ssl_ctx) as resp:
                 raw = resp.read().decode("utf-8", errors="replace")
             data = json.loads(raw) if raw else []
             if isinstance(data, list):

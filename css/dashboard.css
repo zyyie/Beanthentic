@@ -4119,14 +4119,14 @@ body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.ac
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  border: 0.5px solid rgba(212, 177, 141, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   vertical-align: middle;
   white-space: nowrap;
   line-height: 1.3;
   position: sticky;
   z-index: 3;
-  overflow: visible;
-  text-overflow: unset;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
@@ -4141,19 +4141,19 @@ body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.ac
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
-/* Multi-row header positioning */
+/* Multi-row header positioning — keep in sync with farmer multi-row tables (36 / 68) */
 .data-table thead tr:nth-child(1) th {
   top: 0;
   z-index: 6;
 }
 
 .data-table thead tr:nth-child(2) th {
-  top: 38px;
+  top: 36px;
   z-index: 5;
 }
 
 .data-table thead tr:nth-child(3) th {
-  top: 72px;
+  top: 68px;
   z-index: 4;
 }
 
@@ -4176,6 +4176,8 @@ body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.ac
   font-size: 10px;
   letter-spacing: 0.045em;
   line-height: 1.25;
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
 #farmers-module .data-table td {
@@ -4197,12 +4199,25 @@ body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.ac
   padding-left: 6px; /* Reset padding to maintain centering */
 }
 
+/* Sticky offsets for multi-row headers (exact px must match farmer-trees-production-tables.css) */
+#farmers-module .data-table thead tr:nth-child(1) th {
+  top: 0;
+  z-index: 6;
+}
+
 #farmers-module .data-table thead tr:nth-child(2) th {
-  top: 28px;
+  top: 36px;
+  z-index: 5;
 }
 
 #farmers-module .data-table thead tr:nth-child(3) th {
-  top: 56px;
+  top: 68px;
+  z-index: 4;
+}
+
+#farmers-module .data-table thead th[rowspan] {
+  vertical-align: middle;
+  z-index: 8;
 }
 
 #farmers-module .data-table tbody td:first-child {
@@ -4491,34 +4506,7 @@ body.dashboard-page #client-report-module .data-table tr:has(.modern-dropdown.ac
 #farmerTableAffiliation.data-table th:nth-child(7) { width: 140px; } /* RSBSA Status */
 #farmerTableAffiliation.data-table th:nth-child(8) { width: 100px; } /* NCFRS */
 
-/* Farm Info: sub-column widths (second header row — cells are nth-child 1–5 in that tr) */
-#farmerTableFarm.data-table thead tr:nth-child(2) th:nth-child(1) { width: 100px; min-width: 100px; }
-#farmerTableFarm.data-table thead tr:nth-child(2) th:nth-child(2) { width: 90px; min-width: 90px; }
-#farmerTableFarm.data-table thead tr:nth-child(2) th:nth-child(3) { width: 90px; min-width: 90px; }
-#farmerTableFarm.data-table thead tr:nth-child(2) th:nth-child(4) { width: 100px; min-width: 100px; }
-#farmerTableFarm.data-table thead tr:nth-child(2) th:nth-child(5) { width: 80px; min-width: 80px; }
-#farmerTableFarm.data-table thead tr:first-child > th:nth-child(5) {
-  width: 220px;
-  min-width: 220px;
-  white-space: normal;
-  line-height: 1.2;
-  text-shadow: none;
-} /* Total Area */
-
-/* Farm Info: no white seam between “STATUS OF OWNERSHIP” and sub-headers */
-#farmerTableFarm.data-table thead tr:first-child > th[colspan="5"] {
-  vertical-align: bottom;
-  padding-bottom: 10.5px;
-  border-bottom: none;
-}
-
-#farmerTableFarm.data-table thead tr:nth-child(2) th {
-  vertical-align: top;
-  padding: 0 8px 6px;
-  border-top: none;
-  /* Stack under row 1 when sticky (compact header row ≈ 30px) */
-  top: 30px;
-}
+/* Farm Info multi-row header: widths/sticky/borders in farmer-trees-production-tables.css */
 
 /* Delete / confirm dialog (farmer table & future use) */
 .confirm-dialog {
@@ -5675,12 +5663,19 @@ body.dashboard-page #farmers-module .farmer-toolbar-tabs .view-toggle-btn:hover 
 /* Table header gradients that were brown */
 body.dashboard-page .data-table th {
   background: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-1-dark) 100%);
-  border-color: rgba(44, 122, 62, 0.28);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 body.dashboard-page .data-table thead tr:nth-child(2) th,
 body.dashboard-page .data-table thead tr:nth-child(3) th {
   background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent-1) 100%);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Multi-row farmer tables: rowspan identity cols stay full-height + centered */
+body.dashboard-page #farmers-module .data-table thead th[rowspan] {
+  vertical-align: middle;
+  z-index: 8;
 }
 
 /* Pagination active state */
@@ -8528,31 +8523,10 @@ body.dashboard-page #transactions-module .transactions-action-btn[disabled] {
     0 4px 16px rgba(15, 23, 42, 0.06);
 }
 
-/* Farmer's Contribution detail modal — see modules-enhancement.css (.fc-detail-*) */
+/* Farmer's Contribution detail modal — close button styled in modules-enhancement.css */
 
-.beanthentic-detail-dialog__close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  border: none;
-  border-radius: 10px;
-  background: #f3f4f6;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease;
-}
-
-.beanthentic-detail-dialog__close:hover {
-  background: #e5e7eb;
-  transform: translateY(-1px);
-}
-
-.beanthentic-detail-dialog__card h2 {
-  display: none; /* Replaced by gmail-subject */
+.beanthentic-detail-dialog__card h2.fc-detail-subject[hidden] {
+  display: none;
 }
 
 .beanthentic-sidebar-section:last-child {
