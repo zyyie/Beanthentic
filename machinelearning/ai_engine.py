@@ -638,37 +638,13 @@ class GIAnalyzer:
                     f"are present but phrased differently from training samples."
                 )
 
-        feature_names = self.document_feature_names or self.farmer_feature_names
-        explainer = self._get_explainer()
-        shap_pos: List[str] = []
-        shap_neg: List[str] = []
-        if explainer and feature_names:
-            try:
-                shap_values = explainer.shap_values(np.array([features]))
-                if isinstance(shap_values, list):
-                    instance_shap = shap_values[1][0]
-                else:
-                    instance_shap = (
-                        shap_values[0, :, 1] if len(shap_values.shape) == 3 else shap_values[0]
-                    )
-                feature_impact = []
-                for i, val in enumerate(instance_shap):
-                    if i < len(feature_names):
-                        name = feature_names[i]
-                        if name in ("text_length", "word_count"):
-                            continue
-                        feature_impact.append({"name": name, "impact": float(val)})
-                feature_impact.sort(key=lambda x: abs(x["impact"]), reverse=True)
-                shap_pos = [f["name"] for f in feature_impact if f["impact"] > 0.05][:3]
-                shap_neg = [f["name"] for f in feature_impact if f["impact"] < -0.05][:3]
-                for term in shap_pos:
-                    if term not in detected and term in mandatory + optional:
-                        irregularities.append(
-                            f"SHAP flagged <strong>{term}</strong> as supportive, but that term was "
-                            f"not matched by the strict task checklist for this upload zone."
-                        )
-            except Exception as exc:
-                logging.warning("SHAP value extraction failed: %s", exc)
+        shap_pos, shap_neg, _ = self._extract_shap_feature_impacts(features)
+        for term in shap_pos:
+            if term not in detected and term in mandatory + optional:
+                irregularities.append(
+                    f"SHAP flagged <strong>{term}</strong> as supportive, but that term was "
+                    f"not matched by the strict task checklist for this upload zone."
+                )
 
         p2 = "<p><strong>Gap analysis:</strong> "
         if missing:
@@ -706,6 +682,101 @@ class GIAnalyzer:
             )
 
         return p1 + p2 + p3
+
+    def _extract_shap_feature_impacts(
+        self, features: List
+    ) -> tuple[List[str], List[str], List[dict]]:
+        """Return (positive_terms, negative_terms, full_impact_rows) from TreeExplainer."""
+        feature_names = self.document_feature_names or self.farmer_feature_names
+        explainer = self._get_explainer()
+        if not explainer or not feature_names:
+            return [], [], []
+
+        try:
+            shap_values = explainer.shap_values(np.array([features]))
+            if isinstance(shap_values, list):
+                instance_shap = shap_values[1][0]
+            else:
+                instance_shap = (
+                    shap_values[0, :, 1] if len(shap_values.shape) == 3 else shap_values[0]
+                )
+            feature_impact: List[dict] = []
+            for i, val in enumerate(instance_shap):
+                if i >= len(feature_names):
+                    break
+                name = feature_names[i]
+                if name in ("text_length", "word_count"):
+                    continue
+                feature_impact.append({"name": name, "impact": float(val)})
+            feature_impact.sort(key=lambda x: abs(x["impact"]), reverse=True)
+            shap_pos = [f["name"] for f in feature_impact if f["impact"] > 0.05][:5]
+            shap_neg = [f["name"] for f in feature_impact if f["impact"] < -0.05][:5]
+            return shap_pos, shap_neg, feature_impact[:8]
+        except Exception as exc:
+            logging.warning("SHAP value extraction failed: %s", exc)
+            return [], [], []
+
+    def _build_rf_shap_appendix(
+        self,
+        features: List,
+        rf_score: int,
+        mop_status: str,
+        task_id: str | None = None,
+    ) -> str:
+        """Append RF probability + SHAP term impacts for capstone validation (advisory)."""
+        doc_type = task_id.replace("-", " ").title() if task_id else "Document"
+        rf_ready = int(rf_score) >= 75
+        mop_ready = str(mop_status).lower() == "ready"
+        agrees = rf_ready == mop_ready
+
+        shap_pos, shap_neg, impacts = self._extract_shap_feature_impacts(features)
+        agreement = (
+            "<strong>aligned</strong> — MoP review and Random Forest agree."
+            if agrees
+            else "<strong>divergent</strong> — treat MoP Ready/Not Ready as final; "
+            "review RF signals below."
+        )
+
+        parts = [
+            f"<p><strong>Random Forest validation ({doc_type}):</strong> "
+            f"model confidence <strong>{int(rf_score)}%</strong> "
+            f"({'Ready' if rf_ready else 'Not Ready'} at 75% threshold). "
+            f"MoP classification: <strong>{mop_status}</strong> — {agreement}</p>"
+        ]
+
+        if impacts:
+            rows = ", ".join(
+                f"{row['name']} ({row['impact']:+.3f})" for row in impacts[:6]
+            )
+            parts.append(
+                f"<p><strong>SHAP feature influence (top terms):</strong> {rows}. "
+                "Positive values push toward Ready; negative values push toward Not Ready.</p>"
+            )
+        elif shap_pos or shap_neg:
+            detail = []
+            if shap_pos:
+                detail.append(f"supportive: {', '.join(shap_pos)}")
+            if shap_neg:
+                detail.append(f"against Ready: {', '.join(shap_neg)}")
+            parts.append(
+                f"<p><strong>SHAP feature influence:</strong> {'; '.join(detail)}.</p>"
+            )
+
+        if not agrees:
+            if mop_ready and not rf_ready:
+                parts.append(
+                    "<p>The MoP themes are satisfied, but the statistical model is cautious — "
+                    "consider adding more explicit Kapeng Barako / Lipa terminology to strengthen "
+                    "ML agreement.</p>"
+                )
+            else:
+                parts.append(
+                    "<p>The Random Forest may reflect GI vocabulary in the text, but MoP critical "
+                    "themes are still missing or the document targets the wrong product — follow "
+                    "the gap analysis above.</p>"
+                )
+
+        return "".join(parts)
 
     @staticmethod
     def _compliance_status_label(score: int) -> str:
@@ -1158,6 +1229,18 @@ class GIAnalyzer:
         if not shap:
             shap = self._keyword_shap_fallback(rule_result, merged_score, task_id)
 
+        rf_agreement = None
+        if rf_score is not None and text:
+            features = self._extract_features(text)
+            appendix = self._build_rf_shap_appendix(
+                features, int(rf_score), status, task_id
+            )
+            if appendix and "Random Forest validation" not in shap:
+                shap = shap + appendix
+            rf_ready = int(rf_score) >= 75
+            mop_ready = str(status).lower() == "ready"
+            rf_agreement = rf_ready == mop_ready
+
         return self.normalize_analysis_payload({
             "success": True,
             "readiness_score": merged_score,
@@ -1170,6 +1253,7 @@ class GIAnalyzer:
             "ml_score": ml_score,
             "rule_score": rule_score,
             "rf_score": rf_score,
+            "rf_agreement": rf_agreement,
             "score_breakdown": rule_result.get("score_breakdown"),
             "keyword_score": None,
             "section_score": None,

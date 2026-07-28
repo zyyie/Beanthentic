@@ -34,3 +34,8 @@ data/otp_codes.json
 data/admin_notifications_feed.json
 data/profile_photos/
 instance/
+
+# Jupyter / temp artifacts
+.ipynb_checkpoints/
+_tmp_compiled.docx
+*.bak
