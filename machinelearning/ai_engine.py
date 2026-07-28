@@ -8,10 +8,18 @@ rule-based and machine learning approaches.
 
 import logging
 import re
+import sys
 import uuid
 import json
 from pathlib import Path
 from typing import Dict, List, Tuple
+
+# Support imports whether loaded as `machinelearning.ai_engine` or `ai_engine`
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_ML_PACKAGE_DIR = Path(__file__).resolve().parent
+for _path in (_PROJECT_ROOT, _ML_PACKAGE_DIR):
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
 
 # Text extraction libraries
 try:
@@ -52,7 +60,7 @@ except ImportError:
 class GIAnalyzer:
     """AI Engine for IPOPHL GI Registration and Farmer Readiness Analysis"""
 
-    def __init__(self, uploads_dir: str | None = None):
+    def __init__(self, uploads_dir: str | None = None, *, auto_train: bool = True):
         self.ml_dir = Path(__file__).resolve().parent
         self.uploads_dir = Path(uploads_dir) if uploads_dir else (self.ml_dir / "uploads")
         self.uploads_dir.mkdir(parents=True, exist_ok=True)
@@ -395,9 +403,11 @@ class GIAnalyzer:
             ],
         }
 
-        if ML_AVAILABLE:
+        if ML_AVAILABLE and auto_train:
             self._initialize_models()
             self._ensure_document_model()
+        elif ML_AVAILABLE:
+            self._initialize_models()
 
     def _model_paths(self) -> list[Path]:
         names = ("gi_farmer_model.joblib", "gi_model.joblib")
@@ -439,8 +449,31 @@ class GIAnalyzer:
                 logging.warning("Failed to load document ML model: %s", e)
                 self.document_model = None
 
+    def _ensure_official_mop_baseline(self) -> None:
+        """Ensure official Part 1 / Part 2 / Control MoP CSV + training JSON exist."""
+        try:
+            try:
+                from machinelearning.official_mop_dataset import (
+                    DEFAULT_CSV_PATH,
+                    DEFAULT_JSON_PATH,
+                    build_official_mop_dataset,
+                )
+            except ImportError:
+                from official_mop_dataset import (  # type: ignore[no-redef]
+                    DEFAULT_CSV_PATH,
+                    DEFAULT_JSON_PATH,
+                    build_official_mop_dataset,
+                )
+
+            if not DEFAULT_CSV_PATH.exists() or not DEFAULT_JSON_PATH.exists():
+                build_official_mop_dataset(self.ml_dir.parent)
+                logging.info("Built official MoP dataset (Part 1, Part 2, Control & Traceability)")
+        except Exception as exc:
+            logging.warning("Could not build official MoP baseline dataset: %s", exc)
+
     def _ensure_document_model(self) -> None:
-        """Train document classifier from bundled samples if missing."""
+        """Train document classifier from official MoP files if missing."""
+        self._ensure_official_mop_baseline()
         doc_path = self.ml_dir / "gi_document_model.joblib"
         if doc_path.exists() or self.document_model is not None:
             return
@@ -452,15 +485,21 @@ class GIAnalyzer:
             if not script.exists():
                 return
             proc = subprocess.run(
-                [sys.executable, str(script), "--train-documents"],
+                [
+                    sys.executable,
+                    str(script),
+                    "--train-documents",
+                    "--data-dir",
+                    str(self.ml_dir / "training_data"),
+                ],
                 capture_output=True,
                 text=True,
-                cwd=str(self.ml_dir),
+                cwd=str(self.ml_dir.parent),
                 timeout=300,
             )
             if proc.returncode == 0:
                 self._initialize_models()
-                logging.info("Auto-trained document ML model from IPOPHL sample dataset")
+                logging.info("Auto-trained document RF from official MoP dataset (n1–n7)")
             else:
                 logging.warning(
                     "Document model auto-train failed: %s",
@@ -568,7 +607,7 @@ class GIAnalyzer:
             "farmer_model_loaded": self.farmer_model is not None,
             "document_model_loaded": self.document_model is not None,
             "document_analysis_default": (
-                "ml_hybrid" if self.document_model else "rule_based"
+                "official_mop_rf_hybrid" if self.document_model else "official_mop_qualitative"
             ),
             "farmer_training": farmer_meta,
             "document_training": document_meta,
@@ -1030,6 +1069,9 @@ class GIAnalyzer:
             text = self.extract_text_from_file(file_path)
             task_id = self._resolve_task_id_from_text(text, task_id)
 
+            # Default IPOPHL pipeline: official MoP qualitative review + RF/SHAP validation
+            self._ensure_document_model()
+
             # Determine which checklist to use
             checklist = self.gi_checklist
             if task_id in self.task_checklists:
@@ -1049,6 +1091,7 @@ class GIAnalyzer:
                     merged["task_id"] = task_id
                 return merged
             payload = self.normalize_analysis_payload(rule_result)
+            payload["analysis_method"] = "official_mop_qualitative"
             if task_id:
                 payload["task_id"] = task_id
             return payload
@@ -1248,13 +1291,20 @@ class GIAnalyzer:
             "detected_features": detected,
             "missing_requirements": missing,
             "text_length": rule_result.get("text_length") or ml_result.get("text_length") or 0,
-            "analysis_method": "mop_reference_qualitative",
+            "analysis_method": "official_mop_rf_hybrid",
             "shap_analysis": shap,
             "ml_score": ml_score,
             "rule_score": rule_score,
             "rf_score": rf_score,
             "rf_agreement": rf_agreement,
-            "score_breakdown": rule_result.get("score_breakdown"),
+            "score_breakdown": {
+                **(rule_result.get("score_breakdown") or {}),
+                "rf_validation": {
+                    "rf_score": rf_score,
+                    "rf_agreement": rf_agreement,
+                    "training_source": "ipophl_official_mop_dataset.csv",
+                },
+            },
             "keyword_score": None,
             "section_score": None,
             "ip_pillar_assessment": rule_result.get("ip_pillar_assessment"),
@@ -1371,5 +1421,5 @@ class GIAnalyzer:
         """Get URL for file preview"""
         return f"/api/file-preview/{Path(file_path).name}"
 
-# Global instance
-gi_analyzer = GIAnalyzer()
+# Global instance (lazy train — avoids racing dataset build on import)
+gi_analyzer = GIAnalyzer(auto_train=False)

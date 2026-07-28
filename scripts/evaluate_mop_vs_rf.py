@@ -8,7 +8,7 @@ Use this to report "validation accuracy" for your capstone:
 
 Usage:
     python scripts/evaluate_mop_vs_rf.py
-    python scripts/evaluate_mop_vs_rf.py --csv machinelearning/training_data/ipophl_files_dataset.csv
+    python scripts/evaluate_mop_vs_rf.py --csv machinelearning/training_data/ipophl_official_mop_dataset.csv
 """
 
 from __future__ import annotations

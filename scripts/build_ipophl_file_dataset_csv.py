@@ -25,7 +25,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 ML_DIR = ROOT / "machinelearning"
 STORE_PATH = ROOT / "data" / "ipophl_documents.json"
-DEFAULT_OUT = ML_DIR / "training_data" / "ipophl_files_dataset.csv"
+DEFAULT_OUT = ML_DIR / "training_data" / "ipophl_official_mop_dataset.csv"
 
 sys.path.insert(0, str(ML_DIR))
 sys.path.insert(0, str(ROOT))
@@ -203,6 +203,11 @@ def main() -> None:
         description="Export real IPOPHL files to a numbered CSV dataset (n1, n2, ...)."
     )
     parser.add_argument(
+        "--official-only",
+        action="store_true",
+        help="Build only from Part 1, Part 2, and Control & Traceability MoP files (recommended).",
+    )
+    parser.add_argument(
         "--source",
         action="append",
         default=[],
@@ -231,6 +236,15 @@ def main() -> None:
         help="Sample ID prefix (n1, n2, ...).",
     )
     args = parser.parse_args()
+
+    if args.official_only:
+        from machinelearning.official_mop_dataset import build_official_mop_dataset
+
+        result = build_official_mop_dataset(ROOT, csv_path=Path(args.output), augment=False)
+        print(f"\nWrote {result['csv_rows']} official MoP rows -> {result['csv_path']}")
+        print(f"  Ready:     {result.get('ready', 0)}")
+        print(f"  Not Ready: {result.get('not_ready', 0)}")
+        return
 
     if args.source:
         sources = [ROOT / s if not Path(s).is_absolute() else Path(s) for s in args.source]

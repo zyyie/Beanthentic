@@ -50,8 +50,8 @@ class GIDocumentTrainer:
         self.data_dir.mkdir(exist_ok=True)
         self.models_dir.mkdir(exist_ok=True)
 
-        # Initialize analyzer for feature extraction
-        self.analyzer = GIAnalyzer(str(self.models_dir))
+        # Initialize analyzer for feature extraction (no nested auto-train during training)
+        self.analyzer = GIAnalyzer(str(self.models_dir), auto_train=False)
 
         # Training data paths
         self.raw_data_path = self.data_dir / "gi_documents_raw.json"
@@ -680,6 +680,8 @@ def main():
             "sample_count": len(dataset),
             "ready_count": sum(1 for d in dataset if d.get("label") == "Ready"),
             "not_ready_count": sum(1 for d in dataset if d.get("label") != "Ready"),
+            "training_source": "ipophl_official_mop_dataset.csv",
+            "analysis_method": "official_mop_rf_hybrid",
         }
         with open(trainer.models_dir / "document_training_results.json", "w", encoding="utf-8") as f:
             json.dump(training_results, f, indent=2)

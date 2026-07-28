@@ -413,6 +413,30 @@ def _pad_to_target(rows: list[dict], analyzer: GIAnalyzer, target: int) -> list[
 
 
 def build_dataset(target: int = 200) -> list[dict]:
+    """Build training data — official MoP files (n1–n7) are the default baseline."""
+    try:
+        from machinelearning.official_mop_dataset import (
+            DEFAULT_JSON_PATH,
+            build_official_mop_dataset,
+        )
+
+        official = build_official_mop_dataset(ROOT, augment=True)
+        with open(DEFAULT_JSON_PATH, encoding="utf-8") as f:
+            rows = json.load(f)
+        print(
+            f"Official MoP baseline: {official['csv_rows']} CSV rows, "
+            f"{official['training_rows']} training rows"
+        )
+        if rows:
+            DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with open(DATA_PATH, "w", encoding="utf-8") as f:
+                json.dump(rows, f, indent=2, ensure_ascii=False)
+            ready = sum(1 for r in rows if r.get("label") == "Ready")
+            print(f"Wrote {len(rows)} documents to {DATA_PATH} (Ready: {ready}, Not Ready: {len(rows) - ready})")
+            return rows
+    except Exception as exc:
+        print(f"Official MoP build failed, falling back to extended generator: {exc}")
+
     analyzer = GIAnalyzer(str(UPLOADS_DIR))
     rows: list[dict] = []
     rows.extend(load_legacy_samples())
@@ -439,8 +463,14 @@ def train_model() -> dict:
     import subprocess
 
     proc = subprocess.run(
-        [sys.executable, str(ML_DIR / "train_ai_model.py"), "--train-documents"],
-        cwd=str(ML_DIR),
+        [
+            sys.executable,
+            str(ML_DIR / "train_ai_model.py"),
+            "--train-documents",
+            "--data-dir",
+            str(ML_DIR / "training_data"),
+        ],
+        cwd=str(ROOT),
         capture_output=True,
         text=True,
     )
@@ -496,6 +526,12 @@ def main() -> None:
     parser.add_argument("--target", type=int, default=200, help="Target number of training documents (default: 200)")
     args = parser.parse_args()
 
+    if args.reanalyze and not args.train:
+        analyzer = GIAnalyzer(str(UPLOADS_DIR), auto_train=False)
+        count = reanalyze_store(analyzer)
+        print(f"Re-analyzed {count} stored document(s)")
+        return
+
     build_dataset(target=max(10, args.target))
 
     if args.train:
@@ -506,7 +542,7 @@ def main() -> None:
         )
 
     if args.reanalyze:
-        analyzer = GIAnalyzer(str(UPLOADS_DIR))
+        analyzer = GIAnalyzer(str(UPLOADS_DIR), auto_train=False)
         count = reanalyze_store(analyzer)
         print(f"Re-analyzed {count} stored document(s)")
 

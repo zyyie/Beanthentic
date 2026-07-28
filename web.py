@@ -436,9 +436,8 @@ def _log_ipophl_ml_readiness() -> None:
         status = gi_analyzer.ml_status()
         if not status.get("document_model_loaded"):
             app.logger.warning(
-                "IPOPHL document ML model not loaded. Install deps and train: "
-                "pip install -r config/requirements.txt && "
-                "cd machinelearning && python train_ai_model.py --full-pipeline"
+                "IPOPHL document ML model not loaded. Build official MoP dataset and train: "
+                "python scripts/build_official_mop_dataset.py --train"
             )
         else:
             app.logger.info(
