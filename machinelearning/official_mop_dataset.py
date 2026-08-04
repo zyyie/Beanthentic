@@ -24,7 +24,8 @@ OFFICIAL_MOP_SPECS: list[dict[str, str]] = [
         "part": "Part 1 — Justification",
         "label": "Introduction & Reputation",
         "relative_path": (
-            "PART 1 - Justification for the Request for Protection-20260724T153341Z-1-001"
+            "reference/mop"
+            "/PART 1 - Justification for the Request for Protection-20260724T153341Z-1-001"
             "/PART 1 - Justification for the Request for Protection"
             "/Introduction & Reputation.docx"
         ),
@@ -35,7 +36,8 @@ OFFICIAL_MOP_SPECS: list[dict[str, str]] = [
         "part": "Part 1 — Justification",
         "label": "History of Kapeng Barako",
         "relative_path": (
-            "PART 1 - Justification for the Request for Protection-20260724T153341Z-1-001"
+            "reference/mop"
+            "/PART 1 - Justification for the Request for Protection-20260724T153341Z-1-001"
             "/PART 1 - Justification for the Request for Protection"
             "/History of Kapeng Barako.docx"
         ),
@@ -46,7 +48,8 @@ OFFICIAL_MOP_SPECS: list[dict[str, str]] = [
         "part": "Part 1 — Justification",
         "label": "Physical Link to the Territory",
         "relative_path": (
-            "PART 1 - Justification for the Request for Protection-20260724T153341Z-1-001"
+            "reference/mop"
+            "/PART 1 - Justification for the Request for Protection-20260724T153341Z-1-001"
             "/PART 1 - Justification for the Request for Protection"
             "/Physical link to the territory.docx"
         ),
@@ -57,7 +60,8 @@ OFFICIAL_MOP_SPECS: list[dict[str, str]] = [
         "part": "Part 2 — Technical",
         "label": "TECHNICAL — General Description",
         "relative_path": (
-            "PART 2 - Technical Part-20260724T153344Z-1-001"
+            "reference/mop"
+            "/PART 2 - Technical Part-20260724T153344Z-1-001"
             "/PART 2 - Technical Part"
             "/TECHNICAL - General Description.docx"
         ),
@@ -68,7 +72,8 @@ OFFICIAL_MOP_SPECS: list[dict[str, str]] = [
         "part": "Part 2 — Technical",
         "label": "TECHNICAL — Specific Description",
         "relative_path": (
-            "PART 2 - Technical Part-20260724T153344Z-1-001"
+            "reference/mop"
+            "/PART 2 - Technical Part-20260724T153344Z-1-001"
             "/PART 2 - Technical Part"
             "/TECHNICAL - Specific Description of the Production.docx"
         ),
@@ -79,7 +84,8 @@ OFFICIAL_MOP_SPECS: list[dict[str, str]] = [
         "part": "Part 2 — Technical",
         "label": "TECHNICAL — The Production Process",
         "relative_path": (
-            "PART 2 - Technical Part-20260724T153344Z-1-001"
+            "reference/mop"
+            "/PART 2 - Technical Part-20260724T153344Z-1-001"
             "/PART 2 - Technical Part"
             "/TECHNICAL - The Production Process.docx"
         ),
@@ -89,7 +95,7 @@ OFFICIAL_MOP_SPECS: list[dict[str, str]] = [
         "task_id": "phase3-control",
         "part": "Control & Traceability",
         "label": "Control & Traceability & Labelling",
-        "relative_path": "CONTROL & TRACEABILITY & LABELLING.docx",
+        "relative_path": "reference/mop/CONTROL & TRACEABILITY & LABELLING.docx",
     },
 ]
 

@@ -9,6 +9,9 @@ class IPOPHLAnalyzer {
         this.currentFile = null;
         this.currentAnalysis = null;
         this.isAnalyzing = false;
+        this.modalIsMinimized = false;
+        this.isResizingModal = false;
+        this.modalResizeState = null;
         /** @type {Record<string, { file: File, key: string }[]>} */
         this.pendingByTask = {};
         this.init();
@@ -243,7 +246,10 @@ class IPOPHLAnalyzer {
             modal.removeAttribute('hidden');
             modal.setAttribute('aria-hidden', 'false');
             modal.classList.add('active');
+            modal.classList.remove('is-minimized');
             document.body.classList.add('modal-open');
+            this.modalIsMinimized = false;
+            this.syncModalWindowState();
             
             // Set file name
             const nameEl = document.getElementById('previewFileName');
@@ -258,6 +264,37 @@ class IPOPHLAnalyzer {
     }
 
     attachEventListeners() {
+        const minimizeBtn = document.getElementById('filePreviewMinimizeBtn');
+        if (minimizeBtn) {
+            minimizeBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleMinimizeFilePreview();
+            });
+        }
+
+        const minimizedBar = document.getElementById('filePreviewMinimizedBar');
+        if (minimizedBar) {
+            minimizedBar.addEventListener('click', () => {
+                this.restoreFilePreview();
+            });
+        }
+
+        const resizeHandle = document.getElementById('filePreviewResizeHandle');
+        if (resizeHandle) {
+            resizeHandle.addEventListener('pointerdown', (e) => {
+                this.startModalResize(e);
+            });
+        }
+
+        document.addEventListener('pointermove', (e) => {
+            this.handleModalResize(e);
+        });
+
+        document.addEventListener('pointerup', () => {
+            this.stopModalResize();
+        });
+
         // Modal close handlers
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('modal') || e.target.classList.contains('modal-close')) {
@@ -271,6 +308,76 @@ class IPOPHLAnalyzer {
                 this.closeFilePreview();
             }
         });
+    }
+
+    syncModalWindowState() {
+        const modal = document.getElementById('filePreviewModal');
+        const bar = document.getElementById('filePreviewMinimizedBar');
+        if (!modal) return;
+        modal.classList.toggle('is-minimized', this.modalIsMinimized);
+        if (bar) {
+            bar.classList.toggle('hidden', !this.modalIsMinimized);
+        }
+    }
+
+    toggleMinimizeFilePreview() {
+        this.modalIsMinimized = !this.modalIsMinimized;
+        this.syncModalWindowState();
+    }
+
+    restoreFilePreview() {
+        this.modalIsMinimized = false;
+        this.syncModalWindowState();
+    }
+
+    startModalResize(event) {
+        if (window.innerWidth <= 768) return;
+        const modalContent = document.querySelector('#filePreviewModal .modal-content.large');
+        if (!modalContent) return;
+        event.preventDefault();
+        this.restoreFilePreview();
+        this.isResizingModal = true;
+        this.modalResizeState = {
+            startX: event.clientX,
+            startY: event.clientY,
+            startWidth: modalContent.offsetWidth,
+            startHeight: modalContent.offsetHeight,
+        };
+        try {
+            event.target.setPointerCapture?.(event.pointerId);
+        } catch (_err) {
+            /* ignore */
+        }
+        document.body.style.userSelect = 'none';
+    }
+
+    handleModalResize(event) {
+        if (!this.isResizingModal || !this.modalResizeState) return;
+        const modal = document.getElementById('filePreviewModal');
+        if (!modal) return;
+
+        const minWidth = 860;
+        const minHeight = 520;
+        const maxWidth = Math.min(window.innerWidth - 32, 1600);
+        const maxHeight = window.innerHeight - 32;
+        const nextWidth = Math.max(
+            minWidth,
+            Math.min(maxWidth, this.modalResizeState.startWidth + (event.clientX - this.modalResizeState.startX))
+        );
+        const nextHeight = Math.max(
+            minHeight,
+            Math.min(maxHeight, this.modalResizeState.startHeight + (event.clientY - this.modalResizeState.startY))
+        );
+
+        modal.style.setProperty('--file-preview-width', `${nextWidth}px`);
+        modal.style.setProperty('--file-preview-height', `${nextHeight}px`);
+    }
+
+    stopModalResize() {
+        if (!this.isResizingModal) return;
+        this.isResizingModal = false;
+        this.modalResizeState = null;
+        document.body.style.userSelect = '';
     }
 
     setupFileUploadHandlers() {
@@ -829,7 +936,9 @@ class IPOPHLAnalyzer {
         const container = document.getElementById('requirementAnalysisContent');
         const typing = document.getElementById('aiChatTyping');
         if (container) {
-            container.querySelectorAll('.ai-analysis-block, .ai-pillar-grid, .ai-doc-insights').forEach((el) => el.remove());
+            container.querySelectorAll(
+                '.ai-analysis-block, .ai-pillar-grid, .ai-doc-insights, .ai-review-shell'
+            ).forEach((el) => el.remove());
         }
         if (typing) typing.hidden = false;
     }
@@ -872,82 +981,167 @@ class IPOPHLAnalyzer {
         if (!pillars.length) return '';
         const cards = pillars.map((pillar) => {
             const status = pillar.status || 'not_addressed';
-            const narrative = pillar.narrative || this.buildPillarParagraph(pillar);
-            const evidence = Array.isArray(pillar.evidence) ? pillar.evidence : [];
-            const evidenceHtml = evidence.length
-                ? `<blockquote class="ai-evidence">${evidence.map((e) =>
-                    this.escapeHtml(e)
-                ).join('</blockquote><blockquote class="ai-evidence">')}</blockquote>`
+            const met = Array.isArray(pillar.met) ? pillar.met.slice(0, 4) : [];
+            const gaps = Array.isArray(pillar.gaps) ? pillar.gaps.slice(0, 4) : [];
+            const scope = pillar.scope
+                ? `<p class="ai-pillar-card__scope">${this.escapeHtml(pillar.scope)}</p>`
                 : '';
-            return `<article class="ai-pillar-card">
+            return `<article class="ai-pillar-card ai-pillar-card--${status}">
                 <div class="ai-pillar-card__head">
                     <span class="ai-pillar-card__title">${this.escapeHtml(pillar.label || pillar.id || 'Pillar')}</span>
                     <span class="ai-pillar-chip ai-pillar-chip--${status}">${this.pillarStatusLabel(status)}</span>
                 </div>
-                <p class="ai-pillar-card__body">${this.formatPlainText(narrative)}</p>
-                ${evidenceHtml}
-                ${this.renderPillarTags(pillar.met, 'met')}
-                ${this.renderPillarTags(pillar.gaps, 'gap')}
+                ${scope}
+                ${this.renderPillarTags(met, 'met')}
+                ${this.renderPillarTags(gaps, 'gap')}
             </article>`;
         }).join('');
         return `<div class="ai-pillar-grid">${cards}</div>`;
     }
 
-    renderDocumentInsights(analysis, assessment) {
-        const insights = assessment?.document_insights;
-        if (!insights) return '';
-
+    getReviewMeta(analysis, assessment) {
+        const insights = assessment?.document_insights || {};
         const breakdown = analysis.score_breakdown || {};
-        const sections = breakdown.sections || [];
-        const sectionRows = sections.length
-            ? sections.map((s) => {
-                const cov = String(s.coverage || (s.found ? 'well_covered' : 'missing')).replace(/_/g, ' ');
-                const cls = s.coverage === 'well_covered' || s.found
-                    ? 'ai-insight-ok'
-                    : (s.coverage === 'partial' ? 'ai-insight-partial' : 'ai-insight-gap');
-                return `<li class="${cls}">${this.escapeHtml(s.label || 'Theme')} — ${this.escapeHtml(cov)}</li>`;
-            }).join('')
-            : '';
-
-        const detected = (insights.detected_features || []).slice(0, 8);
-        const missing = (insights.missing_requirements || []).slice(0, 8);
-        const ref = insights.reference_source
-            ? `<p class="ai-doc-insights__ref">${this.escapeHtml(insights.reference_source)}</p>`
-            : '';
-
-        return `<div class="ai-doc-insights">
-            <h5 class="ai-doc-insights__title">Document profile</h5>
-            ${ref}
-            <dl class="ai-doc-insights__meta">
-                <div><dt>Type</dt><dd>${this.escapeHtml(insights.document_type || 'GI document')}</dd></div>
-                <div><dt>Content</dt><dd>${Number(insights.word_count || 0).toLocaleString()} words extracted</dd></div>
-                <div><dt>MoP themes</dt><dd>${insights.checklist_met || 0} of ${insights.checklist_total || 0} well covered</dd></div>
-            </dl>
-            ${detected.length ? `<p class="ai-doc-insights__label">Strengths in this file</p>${this.renderPillarTags(detected, 'met')}` : ''}
-            ${missing.length ? `<p class="ai-doc-insights__label">Themes still thin or missing</p>${this.renderPillarTags(missing, 'gap')}` : ''}
-            ${sectionRows ? `<p class="ai-doc-insights__label">MoP theme coverage</p><ul class="ai-section-list">${sectionRows}</ul>` : ''}
-        </div>`;
+        const ready = String(analysis.status || '').trim().toLowerCase() === 'ready';
+        const wordCount = Number(
+            insights.word_count
+            || breakdown.word_count
+            || analysis.word_count
+            || Math.round((Number(analysis.text_length) || 0) / 5)
+            || 0
+        );
+        const themesMet = Number(
+            insights.checklist_met
+            ?? breakdown.sections_found
+            ?? 0
+        );
+        const themesTotal = Number(
+            insights.checklist_total
+            ?? breakdown.sections_total
+            ?? (Array.isArray(breakdown.sections) ? breakdown.sections.length : 0)
+            ?? 0
+        );
+        const docType = String(
+            insights.document_type
+            || (analysis.task_id || '').replace(/-/g, ' ')
+            || 'GI document'
+        ).trim();
+        const method = String(analysis.analysis_method || breakdown.analysis_mode || 'MoP review')
+            .replace(/_/g, ' ');
+        return {
+            ready,
+            statusLabel: ready ? 'Ready' : 'Not Ready',
+            wordCount,
+            themesMet,
+            themesTotal,
+            docType: docType.replace(/\b\w/g, (c) => c.toUpperCase()),
+            method,
+            rfScore: analysis.rf_score != null ? Number(analysis.rf_score) : null,
+            rfAgreement: analysis.rf_agreement,
+            strengths: (insights.detected_features || analysis.detected_features || []).slice(0, 8),
+            missing: (insights.missing_requirements || analysis.missing_requirements || []).slice(0, 8),
+            sections: Array.isArray(breakdown.sections) ? breakdown.sections : [],
+            reference: insights.reference_source || breakdown.reference_source || '',
+        };
     }
 
-    buildExecutiveSummary(analysis, assessment) {
-        if (assessment?.executive_summary) {
-            return assessment.executive_summary;
-        }
-        const ready = String(analysis.status || '').trim().toLowerCase() === 'ready';
+    buildShortVerdict(analysis, assessment, meta) {
+        const ready = meta.ready;
         const pillars = assessment?.pillars || [];
-        const partial = pillars.filter((p) => p.status === 'partial').map((p) => p.label);
-        const gaps = pillars.filter((p) => p.status === 'not_addressed').map((p) => p.label);
-        let focus = '';
-        if (partial.length || gaps.length) {
-            focus = ` Priority revision areas: ${[...partial, ...gaps].slice(0, 3).join(', ')}.`;
+        const focus = [
+            ...pillars.filter((p) => p.status === 'partial').map((p) => p.label),
+            ...pillars.filter((p) => p.status === 'not_addressed').map((p) => p.label),
+        ].slice(0, 3);
+
+        if (ready) {
+            return (
+                `This <strong>${this.escapeHtml(meta.docType)}</strong> upload covers the critical ` +
+                `Kapeng Barako MoP themes for its filing zone.` +
+                (focus.length
+                    ? ` Still watch: <strong>${this.escapeHtml(focus.join(', '))}</strong>.`
+                    : ' Companion uploads should still cover any Part I–IV topics not expected in this file alone.')
+            );
         }
         return (
-            `This review evaluates the submitted document against the Batangas Kapeng Barako ` +
-            `Manual of Specifications basis (Part I Justification, Part II Technical & production, ` +
-            `Part III–IV Control, Traceability & Labelling). ` +
-            `Overall classification: ${ready ? 'Ready' : 'Not Ready'}.${focus} ` +
-            `Findings are drawn from text extracted from this upload — not a keyword percentage score.`
+            `This <strong>${this.escapeHtml(meta.docType)}</strong> upload is <strong>Not Ready</strong>. ` +
+            (focus.length
+                ? `Priority gaps: <strong>${this.escapeHtml(focus.join(', '))}</strong>.`
+                : (meta.missing.length
+                    ? `Missing or thin themes: <strong>${this.escapeHtml(meta.missing.slice(0, 3).join(', '))}</strong>.`
+                    : 'Critical MoP themes are still missing or only thinly addressed.'))
         );
+    }
+
+    renderHighlightStrip(meta) {
+        const statusCls = meta.ready ? 'ai-metric--ready' : 'ai-metric--not-ready';
+        const themeText = meta.themesTotal
+            ? `${meta.themesMet} of ${meta.themesTotal}`
+            : '—';
+        const rfText = meta.rfScore != null
+            ? `${meta.rfScore}${meta.rfAgreement == null ? '' : (meta.rfAgreement ? ' · agree' : ' · differ')}`
+            : '—';
+
+        return `<section class="ai-highlight-strip" aria-label="Key review metrics">
+            <div class="ai-metric ${statusCls}">
+                <span class="ai-metric__label">Result</span>
+                <span class="ai-metric__value">${this.escapeHtml(meta.statusLabel)}</span>
+            </div>
+            <div class="ai-metric">
+                <span class="ai-metric__label">Document</span>
+                <span class="ai-metric__value">${this.escapeHtml(meta.docType)}</span>
+            </div>
+            <div class="ai-metric">
+                <span class="ai-metric__label">Words</span>
+                <span class="ai-metric__value">${meta.wordCount.toLocaleString()}</span>
+            </div>
+            <div class="ai-metric">
+                <span class="ai-metric__label">MoP themes</span>
+                <span class="ai-metric__value">${this.escapeHtml(themeText)}</span>
+            </div>
+            <div class="ai-metric">
+                <span class="ai-metric__label">RF check</span>
+                <span class="ai-metric__value">${this.escapeHtml(rfText)}</span>
+            </div>
+        </section>`;
+    }
+
+    renderThemeCoverage(sections) {
+        if (!sections.length) return '';
+        const chips = sections.map((s) => {
+            const cov = String(s.coverage || (s.found ? 'well_covered' : 'missing'));
+            const cls = cov === 'well_covered' || s.found
+                ? 'ai-theme-chip--ok'
+                : (cov === 'partial' ? 'ai-theme-chip--partial' : 'ai-theme-chip--gap');
+            const label = cov.replace(/_/g, ' ');
+            return `<li class="ai-theme-chip ${cls}">
+                <span class="ai-theme-chip__name">${this.escapeHtml(s.label || 'Theme')}</span>
+                <span class="ai-theme-chip__state">${this.escapeHtml(label)}</span>
+            </li>`;
+        }).join('');
+        return `<section class="ai-analysis-block">
+            <h5 class="ai-analysis-block__title">MoP theme coverage</h5>
+            <ul class="ai-theme-chip-list">${chips}</ul>
+        </section>`;
+    }
+
+    renderFindingsBlocks(meta) {
+        const strengthBlock = meta.strengths.length
+            ? `<div class="ai-findings-col ai-findings-col--ok">
+                <h6><i class="fa-solid fa-circle-check"></i> Strengths</h6>
+                ${this.renderPillarTags(meta.strengths, 'met')}
+               </div>`
+            : '';
+        const gapBlock = meta.missing.length
+            ? `<div class="ai-findings-col ai-findings-col--gap">
+                <h6><i class="fa-solid fa-triangle-exclamation"></i> Gaps to fix</h6>
+                ${this.renderPillarTags(meta.missing, 'gap')}
+               </div>`
+            : '';
+        if (!strengthBlock && !gapBlock) return '';
+        return `<section class="ai-analysis-block">
+            <h5 class="ai-analysis-block__title">Key findings</h5>
+            <div class="ai-findings-grid">${strengthBlock}${gapBlock}</div>
+        </section>`;
     }
 
     buildRecommendations(analysis, assessment, gaps) {
@@ -978,42 +1172,52 @@ class IPOPHLAnalyzer {
         const assessment = analysis.ip_pillar_assessment || null;
         const pillars = Array.isArray(assessment?.pillars) ? assessment.pillars : [];
         const gaps = this.collectRequirementGaps(analysis);
-        const summary = this.buildExecutiveSummary(analysis, assessment);
+        const meta = this.getReviewMeta(analysis, assessment);
         const recommendations = this.buildRecommendations(analysis, assessment, gaps);
-        const docInsights = this.renderDocumentInsights(analysis, assessment);
-        const deepHtml = this.renderInDepthReview(analysis);
 
         this.showChatTyping(false);
 
-        const intro = `<section class="ai-analysis-block">
-            <h5 class="ai-analysis-block__title">Overview</h5>
-            <p class="ai-analysis-block__text">${this.formatPlainText(summary)}</p>
-        </section>`;
+        const findings = this.renderFindingsBlocks(meta);
+        const themes = this.renderThemeCoverage(meta.sections);
+        const pillarBlock = pillars.length
+            ? `<section class="ai-analysis-block">
+                <h5 class="ai-analysis-block__title">IP pillars</h5>
+                ${this.renderPillarCards(pillars)}
+               </section>`
+            : '';
 
-        const pillarBlock = pillars.length ? this.renderPillarCards(pillars) : '';
-
-        const recBlock = `<section class="ai-analysis-block">
-            <h5 class="ai-analysis-block__title">What the admin can improve</h5>
-            <ul class="ai-rec-list">${recommendations.map((r) =>
+        const recBlock = `<section class="ai-analysis-block ai-rec-block">
+            <h5 class="ai-analysis-block__title">What to improve</h5>
+            <ol class="ai-rec-list ai-rec-list--numbered">${recommendations.map((r) =>
                 `<li>${this.formatPlainText(r)}</li>`
-            ).join('')}</ul>
+            ).join('')}</ol>
         </section>`;
 
-        container.innerHTML = `${intro}${deepHtml}${docInsights}${pillarBlock}${recBlock}`;
+        const depth = this.renderInDepthReview(analysis);
+
+        container.innerHTML = `<div class="ai-review-shell">
+            ${this.renderHighlightStrip(meta)}
+            ${findings}
+            ${themes}
+            ${pillarBlock}
+            ${recBlock}
+            ${depth}
+        </div>`;
     }
 
     renderInDepthReview(analysis) {
         const raw = String(analysis.shap_analysis || '').trim();
         if (!raw) return '';
-        // Strip leftover percentage mentions from older stored analyses
         const cleaned = raw
             .replace(/\b\d{1,3}\s*%/g, '')
             .replace(/readiness score of\s*/gi, '')
             .replace(/keyword checklist score[^.<]*/gi, 'MoP theme review');
-        return `<section class="ai-analysis-block ai-analysis-block--depth">
-            <h5 class="ai-analysis-block__title">In-depth AI review</h5>
+        return `<details class="ai-analysis-block ai-analysis-block--depth">
+            <summary class="ai-analysis-block__title ai-depth-summary">
+                Full AI narrative <span class="ai-depth-hint">tap to expand</span>
+            </summary>
             <div class="ai-analysis-depth">${cleaned}</div>
-        </section>`;
+        </details>`;
     }
 
     displayAnalysisResults(analysis) {
@@ -1237,9 +1441,13 @@ class IPOPHLAnalyzer {
         const modal = document.getElementById('filePreviewModal');
         if (modal) {
             modal.classList.remove('active');
+            modal.classList.remove('is-minimized');
             modal.setAttribute('hidden', '');
             modal.setAttribute('aria-hidden', 'true');
         }
+        this.modalIsMinimized = false;
+        this.stopModalResize();
+        this.syncModalWindowState();
         document.body.classList.remove('modal-open');
 
         const frame = document.getElementById('filePreviewFrame');

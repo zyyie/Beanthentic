@@ -109,6 +109,8 @@ def register_pricing_routes(app):
                 "ok": True,
                 "farmer_id": farmer_id,
                 "self_sale_enabled": enabled,
+                "farmer_status": "active" if enabled else None,
+                "pricelist_status": "approved" if enabled else None,
                 "records_module_enabled": bool(enabled),
                 "records_unlocked": bool(enabled),
             })
@@ -189,27 +191,50 @@ def register_pricing_routes(app):
         if not ok_fid:
             return jsonify({"ok": False, "error": fid_err}), 400
         enabled = get_farmer_self_sale(farmer_id)
-        # Active + self-sale => Records unlocked for this account.
         farmer_status = "pending"
+        consolidation_preference = None
+        pricelist_status = None
         try:
             fr = (
                 get_client()
                 .table("farmers")
-                .select("status")
+                .select("status, self_sale_enabled")
                 .eq("farmer_id", farmer_id)
                 .limit(1)
                 .execute()
             )
             if fr.data:
                 farmer_status = str((fr.data[0] or {}).get("status") or "pending")
+                enabled = bool((fr.data[0] or {}).get("self_sale_enabled"))
+            prod = (
+                get_client()
+                .table("production_information")
+                .select("consolidation_preference, pricelist_status")
+                .eq("farmer_id", farmer_id)
+                .order("production_info_id", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if prod.data:
+                consolidation_preference = (prod.data[0] or {}).get("consolidation_preference")
+                pricelist_status = str((prod.data[0] or {}).get("pricelist_status") or "").strip().lower() or None
         except Exception:
             pass
-        records_unlocked = bool(enabled) and farmer_status.strip().lower() == "active"
+
+        status_l = farmer_status.strip().lower()
+        pref_l = str(consolidation_preference or "").strip().lower()
+        sell_path = pref_l in {"sell_produce", "drop_off_and_sell"}
+        # Records unlocks when: self-sale enabled, OR account active and (not sell-path OR pricelist approved).
+        records_unlocked = bool(enabled) or (
+            status_l == "active" and (not sell_path or pricelist_status in {None, "", "approved"})
+        )
         return jsonify({
             "ok": True,
             "farmer_id": farmer_id,
             "self_sale_enabled": enabled,
             "farmer_status": farmer_status,
+            "consolidation_preference": consolidation_preference,
+            "pricelist_status": pricelist_status,
             "records_module_enabled": records_unlocked,
             "records_unlocked": records_unlocked,
         })

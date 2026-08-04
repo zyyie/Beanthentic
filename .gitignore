@@ -39,3 +39,5 @@ instance/
 .ipynb_checkpoints/
 _tmp_compiled.docx
 *.bak
+output.txt
+test.py

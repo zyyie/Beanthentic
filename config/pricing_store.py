@@ -478,14 +478,24 @@ def deactivate_pricelist(price_id: int) -> bool:
 
 
 def set_farmer_self_sale(farmer_id: int, enabled: bool) -> bool:
+    """Enable/disable self-sale and unlock Records when enabled.
+
+    The mobile Records module unlocks when farmer_status is active and (for sell
+    paths) pricelist_status is not pending. Enabling self-sale therefore:
+    - sets farmers.self_sale_enabled
+    - sets farmers.status = active (activation)
+    - sets production_information.pricelist_status = approved
+    """
     client = get_client()
+    farmer_payload: dict[str, Any] = {"self_sale_enabled": bool(enabled)}
+    if enabled:
+        farmer_payload["status"] = "active"
     resp = (
         client.table("farmers")
-        .update({"self_sale_enabled": bool(enabled)})
+        .update(farmer_payload)
         .eq("farmer_id", farmer_id)
         .execute()
     )
-    # Enabling self-sale unlocks the app Records module (clears pending pricelist gate).
     if enabled:
         try:
             unlock = (
@@ -512,30 +522,35 @@ def set_farmer_self_sale(farmer_id: int, enabled: bool) -> bool:
             "host": str(settings.get("app_db_host") or "").strip(),
             "port": int(settings.get("app_db_port") or 3306),
             "user": settings.get("app_db_user") or "root",
-            "password": settings.get("app_db_password") or "",
+            "password": settings.get("app_db_password") or settings.get("app_db_pass") or "",
             "database": settings.get("app_db_name") or "beanthentic_app",
             "charset": "utf8mb4",
         }
-        if params["host"]:
-            conn = connect_app_db(params)
-            try:
-                ensure_pricing_schema(conn)
-                with conn.cursor() as cur:
+        # Always try connect_app_db — PostgreSQL/Supabase ignores host and uses the shared DB.
+        conn = connect_app_db(params if params["host"] else {})
+        try:
+            ensure_pricing_schema(conn)
+            with conn.cursor() as cur:
+                if enabled:
+                    cur.execute(
+                        "UPDATE farmers SET self_sale_enabled = %s, status = %s WHERE farmer_id = %s",
+                        (True if beanthentic_env.is_postgresql() else 1, "active", farmer_id),
+                    )
+                    try:
+                        cur.execute(
+                            "UPDATE production_information SET pricelist_status = %s WHERE farmer_id = %s",
+                            ("approved", farmer_id),
+                        )
+                    except Exception:
+                        pass
+                else:
                     cur.execute(
                         "UPDATE farmers SET self_sale_enabled = %s WHERE farmer_id = %s",
-                        (1 if enabled else 0, farmer_id),
+                        (False if beanthentic_env.is_postgresql() else 0, farmer_id),
                     )
-                    if enabled:
-                        try:
-                            cur.execute(
-                                "UPDATE production_information SET pricelist_status = %s WHERE farmer_id = %s",
-                                ("approved", farmer_id),
-                            )
-                        except Exception:
-                            pass
-                conn.commit()
-            finally:
-                conn.close()
+            conn.commit()
+        finally:
+            conn.close()
     except Exception as exc:
         print(f"[Beanthentic] app DB self-sale mirror skipped: {exc}")
 
@@ -557,12 +572,147 @@ def get_farmer_self_sale(farmer_id: int) -> bool:
     return bool(rows[0].get("self_sale_enabled"))
 
 
+_SELL_PATH_PREFS = frozenset({"sell_produce", "drop_off_and_sell"})
+
+
+def sync_registration_price_applications(*, farmer_id: int | None = None) -> int:
+    """Create pending price applications from registration sell prices.
+
+    Farmers who choose Sell produce / Drop-off & Sell enter prices during farm
+    registration (stored on production_bean_classifications). Those become
+    pending rows in farmer_price_application for admin review.
+    """
+    if not is_configured():
+        return 0
+    client = get_client()
+    prod_q = (
+        client.table("production_information")
+        .select("production_info_id, farmer_id, consolidation_preference, pricelist_status")
+        .order("production_info_id", desc=True)
+        .limit(500)
+    )
+    if farmer_id and farmer_id > 0:
+        prod_q = prod_q.eq("farmer_id", farmer_id)
+    try:
+        prod_rows = [r for r in (prod_q.execute().data or []) if isinstance(r, dict)]
+    except Exception as exc:
+        print(f"[Beanthentic] sync registration prices skipped (production_information): {exc}")
+        return 0
+
+    created = 0
+    seen_farmers: set[int] = set()
+    for prod in prod_rows:
+        fid = int(prod.get("farmer_id") or 0)
+        if fid < 1 or fid in seen_farmers:
+            continue
+        pref = str(prod.get("consolidation_preference") or "").strip().lower()
+        if pref not in _SELL_PATH_PREFS:
+            continue
+        seen_farmers.add(fid)
+        prod_id = int(prod.get("production_info_id") or 0)
+        if prod_id < 1:
+            continue
+        try:
+            class_rows = (
+                client.table("production_bean_classifications")
+                .select("variety, bean_type, classification, quantity, price, sell_qty")
+                .eq("production_info_id", prod_id)
+                .execute()
+                .data
+                or []
+            )
+        except Exception as exc:
+            print(f"[Beanthentic] sync registration prices skipped (classifications): {exc}")
+            continue
+
+        existing_resp = (
+            client.table("farmer_price_application")
+            .select("variety, bean_type, classification, quantity_kg, requested_price_per_kg")
+            .eq("farmer_id", fid)
+            .limit(500)
+            .execute()
+        )
+        existing = [a for a in (existing_resp.data or []) if isinstance(a, dict)]
+        existing_keys = {
+            (
+                str(a.get("variety") or "").lower(),
+                str(a.get("bean_type") or "").lower(),
+                str(a.get("classification") or "").lower(),
+                round(float(a.get("quantity_kg") or 0), 3),
+                round(float(a.get("requested_price_per_kg") or 0), 2)
+                if a.get("requested_price_per_kg") is not None
+                else None,
+            )
+            for a in existing
+        }
+
+        for row in class_rows:
+            if not isinstance(row, dict):
+                continue
+            variety = str(row.get("variety") or "").strip().lower()
+            bean_type = str(row.get("bean_type") or "").strip().lower()
+            classification = _normalize_classification(row.get("classification"))
+            sell_qty = float(row.get("sell_qty") or 0)
+            qty = sell_qty if sell_qty > 0 else float(row.get("quantity") or 0)
+            if pref == "drop_off_and_sell" and sell_qty <= 0:
+                continue
+            if qty <= 0 or row.get("price") is None:
+                continue
+            try:
+                requested = float(row.get("price"))
+            except (TypeError, ValueError):
+                continue
+            if requested <= 0 or variety not in VALID_VARIETIES:
+                continue
+            if bean_type not in VALID_BEAN_TYPES:
+                aliases = {
+                    "green_coffee_beans": "gcb",
+                    "green": "gcb",
+                    "roast": "roasted",
+                    "roasted_beans": "roasted",
+                }
+                bean_type = aliases.get(bean_type, bean_type)
+            if bean_type not in VALID_BEAN_TYPES:
+                continue
+
+            key = (variety, bean_type, classification, round(qty, 3), round(requested, 2))
+            if key in existing_keys:
+                continue
+
+            reference = _lookup_reference_price(variety, bean_type, classification)
+            payload = {
+                "farmer_id": fid,
+                "variety": variety,
+                "bean_type": bean_type,
+                "classification": classification,
+                "quantity_kg": qty,
+                "sale_channel": pref,
+                "requested_price_per_kg": requested,
+                "reference_price_per_kg": reference,
+                "status": "pending",
+                "farmer_notes": "Submitted during farm registration (self-selling option).",
+                "submitted_at": _utc_now_iso(),
+            }
+            try:
+                client.table("farmer_price_application").insert(payload).execute()
+                existing_keys.add(key)
+                created += 1
+            except Exception as exc:
+                print(f"[Beanthentic] could not insert registration price application: {exc}")
+    return created
+
+
 def list_price_applications(
     *,
     farmer_id: int | None = None,
     status: str | None = None,
     limit: int = 200,
 ) -> list[dict]:
+    try:
+        sync_registration_price_applications(farmer_id=farmer_id)
+    except Exception as exc:
+        print(f"[Beanthentic] registration price sync skipped: {exc}")
+
     client = get_client()
     q = (
         client.table("farmer_price_application")
@@ -584,9 +734,8 @@ def submit_price_application(data: dict) -> dict:
     farmer_id = int(_pick(data, "farmer_id", "farmer_no", "id") or 0)
     if farmer_id < 1:
         raise ValueError("farmer_id is required.")
-    if not get_farmer_self_sale(farmer_id):
-        raise ValueError("Self-sale is not enabled for this farmer. Contact the admin.")
-
+    # Allow registration-time / sell-path submissions even before the admin toggle,
+    # as long as the farmer exists. Self-sale unlock is separate (Records access).
     variety = _normalize_variety(_pick(data, "variety", "coffee_variety"))
     bean_type = _normalize_bean_type(_pick(data, "bean_type", "type", "coffee_type"))
     classification = _normalize_classification(_pick(data, "classification", "bean_classification", "class"))
@@ -640,7 +789,17 @@ def review_price_application(application_id: int, *, status: str, admin_notes: s
     rows = resp.data or []
     if not rows:
         return None
-    return _row_to_application(rows[0] if isinstance(rows[0], dict) else payload)
+    saved = _row_to_application(rows[0] if isinstance(rows[0], dict) else payload)
+
+    # Approving an applied price unlocks Records for that farmer (same as enabling self-sale).
+    if st == "approved":
+        fid = int(saved.get("farmer_id") or 0)
+        if fid > 0:
+            try:
+                set_farmer_self_sale(fid, True)
+            except Exception as exc:
+                print(f"[Beanthentic] unlock after price approval failed: {exc}")
+    return saved
 
 
 def classification_options() -> dict[str, list[str]]:

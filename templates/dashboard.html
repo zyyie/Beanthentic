@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="css/dashboard.css">
   <link rel="stylesheet" href="css/farmer-trees-production-tables.css">
   <link rel="stylesheet" href="css/responsive.css">
-  <link rel="stylesheet" href="css/ipophl-analyzer.css">
+  <link rel="stylesheet" href="css/ipophl-analyzer.css?v={{ static_cache_bust }}">
   <link rel="stylesheet" href="css/account-module.css">
   <link rel="stylesheet" href="css/farmer-profile.css">
   <link rel="stylesheet" href="css/messaging-module.css">
@@ -1134,15 +1134,15 @@
                 <article class="maps-panel maps-panel--overview">
                   <h2>Geographic Overview</h2>
                   <div class="overview-stat">
-                    <strong>80</strong>
+                    <strong>0</strong>
                     <span>Barangays Covered</span>
                   </div>
                   <div class="overview-stat">
-                    <strong>3,140ha</strong>
+                    <strong>0ha</strong>
                     <span>Total Farm Area</span>
                   </div>
                   <div class="overview-stat overview-stat--accent">
-                    <strong>2.5ha</strong>
+                    <strong>0ha</strong>
                     <span>Average Farm Size</span>
                   </div>
                 </article>
@@ -1150,11 +1150,7 @@
                 <article class="maps-panel">
                   <h2>Barangay Indications</h2>
                   <ul class="top-barangays-list">
-                    <li><span><em class="dot dot--high"></em>Bulacnin</span><strong>187</strong></li>
-                    <li><span><em class="dot dot--medium"></em>Tibig</span><strong>164</strong></li>
-                    <li><span><em class="dot dot--low"></em>Mataas na Lupa</span><strong>152</strong></li>
-                    <li><span><em class="dot dot--very-low"></em>Dagatan</span><strong>143</strong></li>
-                    <li><span><em class="dot dot--muted"></em>Antipolo</span><strong>128</strong></li>
+                    <li><span>No barangays with registered farmers</span><strong>0</strong></li>
                   </ul>
                 </article>
 
@@ -2726,9 +2722,14 @@
     <div class="modal-content large">
       <div class="modal-header">
         <h3><i class="fa-solid fa-file-alt"></i> Document Preview &amp; AI Analysis</h3>
-        <button type="button" class="modal-close" onclick="closeFilePreview()">
-          <i class="fa-solid fa-times"></i>
-        </button>
+        <div class="modal-window-actions">
+          <button type="button" class="modal-window-btn" id="filePreviewMinimizeBtn" title="Minimize">
+            <i class="fa-solid fa-window-minimize"></i>
+          </button>
+          <button type="button" class="modal-close" onclick="closeFilePreview()" title="Close">
+            <i class="fa-solid fa-times"></i>
+          </button>
+        </div>
       </div>
       <div class="modal-body">
         <div class="file-preview-layout">
@@ -2780,7 +2781,12 @@
           </div>
         </div>
       </div>
+      <button type="button" class="modal-resize-handle" id="filePreviewResizeHandle" aria-label="Resize modal"></button>
     </div>
+    <button type="button" class="modal-minimized-bar hidden" id="filePreviewMinimizedBar">
+      <span><i class="fa-solid fa-file-lines"></i> Document Preview &amp; AI Analysis</span>
+      <span class="modal-minimized-bar__hint">Restore</span>
+    </button>
   </div>
 
   <!-- Custom Confirmation Dialog (Moved to absolute bottom for fixed positioning) -->

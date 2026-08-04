@@ -221,20 +221,14 @@ class DashboardApp {
   }
 
   mergeAdminNotificationFeed(apiRows) {
+    // Server durable feed is authoritative; do not keep stale registration
+    // cards from localStorage after a wipe or dismiss-all on the API side.
     const apiItems = (apiRows || []).map((row, i) => this.mapAdminNotificationToFeedItem(row, i));
-    const preserved = (this.notificationsFeed || []).filter((n) =>
-      this.isRegistrationNotificationId(n.id)
-    );
-    const byId = new Map();
-    for (const n of [...apiItems, ...preserved]) {
-      if (n?.id) byId.set(n.id, n);
-    }
-    const merged = [...byId.values()].sort((a, b) => {
+    return apiItems.sort((a, b) => {
       const ta = Date.parse(a.meta || '') || 0;
       const tb = Date.parse(b.meta || '') || 0;
       return tb - ta;
     });
-    return merged;
   }
 
   hydrateNotificationsFeed() {
@@ -344,6 +338,13 @@ class DashboardApp {
       const merged = this.mergeAdminNotificationFeed(adminItems);
       this.notificationsFeed = this.applyReadStateToItems(merged);
       this.persistNotificationsFeedCache();
+      if (!merged.length) {
+        try {
+          localStorage.removeItem(NOTIFICATIONS_FEED_STORAGE_KEY);
+        } catch {
+          /* ignore */
+        }
+      }
       this.renderNotificationsList();
       this.updateNotificationBadges();
 
@@ -2404,7 +2405,7 @@ class DashboardApp {
 
   isSellPathPreference(pref) {
     const p = String(pref || '').toLowerCase();
-    return p === 'sell_produce' || p === 'drop_off_and_sell' || p === 'all_to_consolidator';
+    return p === 'sell_produce' || p === 'drop_off_and_sell';
   }
 
   formatConsolidationPreference(pref) {
@@ -2422,11 +2423,11 @@ class DashboardApp {
     const pls = this.pricelistStatusOf(row);
     const selfSale = this.isSelfSaleEnabledRow(row);
     const active = !status || status === 'active';
-    if (!active) {
-      return { unlocked: false, reason: 'inactive', label: 'Frozen (account inactive)', pref, pls, selfSale };
-    }
     if (selfSale) {
       return { unlocked: true, reason: '', label: 'Unlocked (self-sale)', pref, pls: pls || 'approved', selfSale };
+    }
+    if (!active) {
+      return { unlocked: false, reason: 'inactive', label: 'Frozen (account inactive)', pref, pls, selfSale };
     }
     if (this.isSellPathPreference(pref) && pls === 'pending') {
       return { unlocked: false, reason: 'pricelist', label: 'Frozen (awaiting self-sale / pricelist)', pref, pls, selfSale };
@@ -2760,6 +2761,7 @@ class DashboardApp {
     tbody.innerHTML = items.map((item) => {
       const appId = Number(item.application_id || 0);
       const status = String(item.status || 'pending').toLowerCase();
+      const notes = [item.farmer_notes, item.admin_notes].filter(Boolean).join(' · ');
       const actions = status === 'pending'
         ? `<div class="pricing-action-group">
             <button type="button" class="btn btn-secondary btn-sm" data-app-approve="${appId}">Approve</button>
@@ -2767,9 +2769,12 @@ class DashboardApp {
           </div>`
         : '—';
       return `<tr>
-        <td>${this.escapeHtml(this.farmerNameById(item.farmer_id))}</td>
+        <td>
+          <div>${this.escapeHtml(this.farmerNameById(item.farmer_id))}</div>
+          ${notes ? `<small style="display:block;color:#64748b;margin-top:0.2rem;">${this.escapeHtml(notes)}</small>` : ''}
+        </td>
         <td>${this.escapeHtml(this.formatPricingLabel(item.variety))}</td>
-        <td>${this.escapeHtml(String(item.bean_type || '').toUpperCase())}</td>
+        <td>${this.escapeHtml(String(item.bean_type || '').toUpperCase())}${item.classification ? ` · ${this.escapeHtml(this.formatPricingLabel(item.classification))}` : ''}</td>
         <td>${Number(item.quantity_kg || 0).toLocaleString()}</td>
         <td>${item.requested_price_per_kg != null ? this.formatPhpAmount(item.requested_price_per_kg) : '—'}</td>
         <td>${item.reference_price_per_kg != null ? this.formatPhpAmount(item.reference_price_per_kg) : '—'}</td>
@@ -2781,9 +2786,11 @@ class DashboardApp {
 
   async reviewPriceApplication(applicationId, status) {
     if (applicationId < 1) return;
-    const note = status === 'rejected'
-      ? window.prompt('Optional note for the farmer (reason for rejection):', '') || ''
-      : '';
+    const notePrompt =
+      status === 'rejected'
+        ? 'Add a note for the farmer (reason for rejection / justification):'
+        : 'Optional admin note / justification for this approval:';
+    const note = window.prompt(notePrompt, '') || '';
     try {
       const res = await fetch(`/api/farmer-price-applications/${applicationId}/review`, {
         method: 'POST',
@@ -2793,10 +2800,21 @@ class DashboardApp {
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || 'Review failed.');
-      this.showNotification(`Application ${status}.`, 'success');
+      this.showNotification(
+        status === 'approved'
+          ? 'Application approved — self-sale / Records unlocked for this farmer.'
+          : `Application ${status}.`,
+        'success'
+      );
       await this.loadCoffeePricingApplications();
       if (this.currentFarmerNo) {
         await this.loadFarmerSelfSaleApplications(this.currentFarmerNo);
+      }
+      // Refresh farmer rows so unlock queue / self-sale toggles stay in sync.
+      try {
+        await this.loadExcelData();
+      } catch (_e) {
+        /* ignore */
       }
     } catch (err) {
       this.showNotification(err.message || 'Could not review application.', 'error');
@@ -2863,14 +2881,40 @@ class DashboardApp {
       if (!res.ok || !data.ok) throw new Error(data.error || 'Update failed.');
       if (farmerRow) {
         farmerRow.self_sale_enabled = !!enabled;
-        if (enabled) farmerRow.pricelist_status = 'approved';
+        if (enabled) {
+          farmerRow.pricelist_status = 'approved';
+          farmerRow.status = 'active';
+          farmerRow.STATUS = 'active';
+        }
       }
       const cached = (this.data || []).find((f) => this.farmerIdFromRow(f) === Number(farmerId));
       if (cached) {
         cached.self_sale_enabled = !!enabled;
-        if (enabled) cached.pricelist_status = 'approved';
+        if (enabled) {
+          cached.pricelist_status = 'approved';
+          cached.status = 'active';
+          cached.STATUS = 'active';
+        }
       }
-      this.initFarmerSelfSalePanel(farmerRow || { farmer_id: farmerId, self_sale_enabled: enabled, pricelist_status: enabled ? 'approved' : undefined });
+      if (Array.isArray(this.farmersData)) {
+        const cached2 = this.farmersData.find((f) => this.farmerIdFromRow(f) === Number(farmerId));
+        if (cached2) {
+          cached2.self_sale_enabled = !!enabled;
+          if (enabled) {
+            cached2.pricelist_status = 'approved';
+            cached2.status = 'active';
+            cached2.STATUS = 'active';
+          }
+        }
+      }
+      this.initFarmerSelfSalePanel(
+        farmerRow || {
+          farmer_id: farmerId,
+          self_sale_enabled: enabled,
+          pricelist_status: enabled ? 'approved' : undefined,
+          status: enabled ? 'active' : undefined,
+        }
+      );
       this.syncCoffeePricingSelfSaleControls(farmerId);
       this.renderCoffeePricingUnlockQueue();
       this.showNotification(
@@ -9980,7 +10024,8 @@ class DashboardApp {
 
   buildMapBarangayPoints(rows) {
     if (!Array.isArray(rows) || rows.length === 0) {
-      return this.buildMapBarangayPointsFromPdf();
+      // Do not fall back to static PDF survey pins — empty registrations = empty map.
+      return [];
     }
 
     const coordsByBarangay = this.getBarangayCoordinates();
