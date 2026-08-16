@@ -1,5 +1,4 @@
 -- Beanthentic dual-store tables (calendar notes, self-sale audit, admin notification state)
--- Apply via Supabase SQL editor or: supabase db push / migration apply
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
@@ -41,7 +40,6 @@ ALTER TABLE public.calendar_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.self_sale_unlock_audit ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.admin_notification_state ENABLE ROW LEVEL SECURITY;
 
--- Anon key used by Beanthentic admin/app; tighten policies for production as needed.
 DO $$
 BEGIN
   IF NOT EXISTS (
