@@ -138,7 +138,7 @@ def _partial_stub(task_id: str, label: str, snippet: str) -> str:
 
 
 def augment_for_rf_training(base_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Expand 7 official rows with balanced Not Ready examples for Random Forest."""
+    """Expand 7 official rows with balanced Not Ready examples for ensemble training."""
     out = list(base_rows)
     for row in base_rows:
         task_id = row["task_id"]

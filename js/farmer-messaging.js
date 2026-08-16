@@ -92,6 +92,66 @@ class FarmerMessagingApp {
     }
 
     this.loadFolder();
+    this._startInboxPolling();
+  }
+
+  _startInboxPolling() {
+    this._stopInboxPolling();
+    this._pollTick = () => {
+      if (document.hidden) return;
+      this.loadFolder();
+    };
+    this._pollId = window.setInterval(this._pollTick, 20000);
+    this._onVisibility = () => {
+      if (!document.hidden) this.loadFolder();
+    };
+    document.addEventListener('visibilitychange', this._onVisibility);
+    this._onUnload = () => this._stopInboxPolling();
+    window.addEventListener('beforeunload', this._onUnload);
+  }
+
+  _stopInboxPolling() {
+    if (this._pollId) {
+      clearInterval(this._pollId);
+      this._pollId = null;
+    }
+    if (this._onVisibility) {
+      document.removeEventListener('visibilitychange', this._onVisibility);
+      this._onVisibility = null;
+    }
+    if (this._onUnload) {
+      window.removeEventListener('beforeunload', this._onUnload);
+      this._onUnload = null;
+    }
+  }
+
+  confirmDelete(message) {
+    const modal = document.getElementById('farmerConfirmModal');
+    if (modal) {
+      return new Promise((resolve) => {
+        const msgEl = document.getElementById('farmerConfirmMessage');
+        const okBtn = document.getElementById('farmerConfirmOk');
+        const cancelBtn = document.getElementById('farmerConfirmCancel');
+        const backdrop = modal.querySelector('.farmer-confirm__backdrop');
+        if (msgEl) msgEl.textContent = message || 'Are you sure?';
+        modal.hidden = false;
+        modal.setAttribute('aria-hidden', 'false');
+        const cleanup = (result) => {
+          modal.hidden = true;
+          modal.setAttribute('aria-hidden', 'true');
+          okBtn?.removeEventListener('click', onOk);
+          cancelBtn?.removeEventListener('click', onCancel);
+          backdrop?.removeEventListener('click', onCancel);
+          resolve(result);
+        };
+        const onOk = () => cleanup(true);
+        const onCancel = () => cleanup(false);
+        okBtn?.addEventListener('click', onOk);
+        cancelBtn?.addEventListener('click', onCancel);
+        backdrop?.addEventListener('click', onCancel);
+      });
+    }
+    return Promise.resolve(window.confirm(message || 'Are you sure?'));
   }
 
   escapeHtml(str) {
@@ -467,10 +527,8 @@ class FarmerMessagingApp {
   }
 
   async deleteMessage(id) {
-    const confirmed = await window.dashboardApp.showConfirmDialog(
-      'Are you sure you want to delete this message permanently?',
-      'Delete Message',
-      'danger'
+    const confirmed = await this.confirmDelete(
+      'Are you sure you want to delete this message permanently?'
     );
     if (!confirmed) return;
     try {

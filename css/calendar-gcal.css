@@ -1,0 +1,539 @@
+/* Google Calendar–style monthly grid for Beanthentic overview */
+
+#overview-module .calendar-card.gcal-card.widget-card {
+  height: auto;
+  min-height: 640px;
+  padding: 0 !important;
+  overflow: visible;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+}
+
+#overview-module .charts-section > .calendar-card.gcal-card {
+  width: 100%;
+  max-width: 100%;
+}
+
+.calendar-follow-grid {
+  margin-top: 1.25rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  width: 100%;
+}
+
+.calendar-follow-grid .widget-card {
+  height: 420px;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Toolbar tabs */
+.gcal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  flex-wrap: wrap;
+  background: #fff;
+}
+
+.gcal-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.gcal-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: none;
+  background: transparent;
+  color: #5f6368;
+  font-size: 0.88rem;
+  font-weight: 500;
+  padding: 0.95rem 0.85rem;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
+}
+
+.gcal-tab i {
+  font-size: 0.9rem;
+}
+
+.gcal-tab:hover {
+  color: #202124;
+  background: #f8fafc;
+}
+
+.gcal-tab.active {
+  color: #202124;
+  font-weight: 700;
+  border-bottom-color: #166534;
+}
+
+.gcal-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0;
+  flex-wrap: wrap;
+}
+
+.gcal-filter,
+.gcal-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #5f6368;
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
+.gcal-filter select,
+.gcal-search input {
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+  font-size: 0.82rem;
+  color: #202124;
+  min-width: 0;
+}
+
+.gcal-search input {
+  width: 140px;
+}
+
+.gcal-filter select:focus,
+.gcal-search input:focus {
+  outline: none;
+  border-color: #86efac;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(22, 101, 52, 0.12);
+}
+
+/* Month bar */
+.gcal-monthbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.15rem 0.65rem;
+  background: #fff;
+}
+
+.gcal-month-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #202124;
+  letter-spacing: -0.02em;
+}
+
+.gcal-month-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.gcal-month-nav button {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #5f6368;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.gcal-month-nav button:hover {
+  background: #f1f3f4;
+  color: #202124;
+}
+
+.gcal-today-btn {
+  width: auto !important;
+  padding: 0 0.85rem !important;
+  border-radius: 999px !important;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #166534 !important;
+  border: 1px solid #d1d5db !important;
+}
+
+.gcal-today-btn:hover {
+  background: #ecfdf3 !important;
+}
+
+.gcal-stage {
+  position: relative;
+  padding: 0 0.75rem 0.85rem;
+  background: #fff;
+}
+
+/* Month grid */
+.gcal-card .calendar-widget {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: none;
+  padding: 0;
+  min-height: 520px;
+}
+
+.gcal-card .calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fafafa;
+}
+
+.gcal-card .calendar-weekday {
+  padding: 0.65rem 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #5f6368;
+  text-align: left;
+}
+
+.gcal-days.calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: minmax(96px, 1fr);
+  gap: 0;
+  align-content: stretch;
+  padding: 0;
+  min-height: 480px;
+}
+
+.gcal-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  min-height: 96px;
+  padding: 6px 6px 8px;
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: background 0.12s ease;
+}
+
+.gcal-day:nth-child(7n) {
+  border-right: none;
+}
+
+.gcal-day:hover {
+  background: #f8fafc;
+}
+
+.gcal-day.is-outside {
+  background: #fcfcfd;
+}
+
+.gcal-day.is-outside .gcal-day__num {
+  color: #9aa0a6;
+}
+
+.gcal-day.is-today .gcal-day__num {
+  background: #166534;
+  color: #fff;
+}
+
+.gcal-day.is-selected {
+  background: #f0fdf4;
+  box-shadow: inset 0 0 0 2px rgba(22, 101, 52, 0.28);
+}
+
+.gcal-day__num {
+  align-self: flex-end;
+  min-width: 1.55rem;
+  height: 1.55rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #202124;
+  line-height: 1;
+}
+
+.gcal-day__events {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.gcal-event {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 5px 7px;
+  border: 1px solid #eceff1;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.gcal-event:hover {
+  border-color: #cfe8d4;
+  box-shadow: 0 2px 8px rgba(22, 101, 52, 0.1);
+}
+
+.gcal-event__title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #202124;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gcal-event__icon {
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+}
+
+.gcal-event__icon--harvest { color: #16a34a; }
+.gcal-event__icon--delivery { color: #ca8a04; }
+.gcal-event__icon--meeting { color: #2563eb; }
+.gcal-event__icon--deadline { color: #dc2626; }
+.gcal-event__icon--other { color: #64748b; }
+
+.gcal-event__sub {
+  font-size: 0.66rem;
+  color: #80868b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-left: 19px;
+}
+
+.gcal-day__more {
+  border: none;
+  background: transparent;
+  color: #5f6368;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 4px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.gcal-day__more:hover {
+  color: #166534;
+}
+
+.gcal-day__add {
+  margin-top: auto;
+  opacity: 0;
+  border: none;
+  background: transparent;
+  color: #166534;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 4px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.gcal-day:hover .gcal-day__add,
+.gcal-day.is-selected .gcal-day__add {
+  opacity: 1;
+}
+
+/* List views */
+.gcal-list-view {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  min-height: 420px;
+  overflow: auto;
+}
+
+.gcal-activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.gcal-activity-item {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #eef2f6;
+  border-radius: 12px;
+  background: #fafbfc;
+  cursor: pointer;
+}
+
+.gcal-activity-item:hover {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.gcal-activity-date {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #166534;
+}
+
+.gcal-activity-title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #202124;
+}
+
+.gcal-activity-sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: #5f6368;
+}
+
+.gcal-activity-empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: #80868b;
+  font-size: 0.92rem;
+}
+
+/* Composer drawer */
+.gcal-composer {
+  position: absolute;
+  right: 1rem;
+  top: 4.5rem;
+  width: min(360px, calc(100% - 2rem));
+  z-index: 5;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+  padding: 1rem;
+  animation: btScaleIn 0.2s ease both;
+}
+
+.gcal-card {
+  position: relative;
+}
+
+.gcal-composer[hidden] {
+  display: none !important;
+}
+
+.gcal-composer__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.gcal-composer-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: #f1f3f4;
+  color: #5f6368;
+  cursor: pointer;
+}
+
+.gcal-composer-close:hover {
+  background: #e8eaed;
+  color: #202124;
+}
+
+.gcal-composer .calendar-notes-kicker {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.gcal-composer h4 {
+  margin: 0.15rem 0 0;
+  font-size: 1rem;
+  color: #202124;
+}
+
+.gcal-composer .calendar-note-form {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.calendar-note-delete-active {
+  border: none;
+  border-radius: 10px;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+@media (max-width: 900px) {
+  .gcal-day {
+    min-height: 78px;
+  }
+
+  .gcal-event__sub {
+    display: none;
+  }
+
+  .gcal-composer {
+    position: fixed;
+    inset: auto 12px 12px;
+    width: auto;
+    top: auto;
+  }
+
+  .gcal-activity-item {
+    grid-template-columns: 1fr;
+  }
+}

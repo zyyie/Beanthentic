@@ -734,21 +734,29 @@
 
 .messaging-reply-input-wrapper:focus-within {
   background: #fff;
-  border-color: #2c7a3e;
-  box-shadow: 0 0 0 4px rgba(44, 122, 62, 0.05);
+  border-color: #e5e7eb;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
 }
 
 .messaging-reply-input {
   flex: 1;
-  border: none;
+  border: none !important;
   background: transparent;
   padding: 10px 0;
   font-size: 15px;
   color: #1f2937;
-  outline: none;
+  outline: none !important;
+  box-shadow: none !important;
   resize: none;
   max-height: 120px;
   line-height: 1.4;
+}
+
+.messaging-reply-input:focus,
+.messaging-reply-input:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .messaging-reply-send {

@@ -24,7 +24,7 @@ TermMatcher = Callable[[str, str], bool]
 REFERENCE_THEMES: list[dict] = [
     {
         "id": "reputation_origin",
-        "part": "Part I — Justification",
+        "part": "Justification & reputation",
         "label": "Introduction, reputation & origin",
         "critical": True,
         "expectation": (
@@ -48,7 +48,7 @@ REFERENCE_THEMES: list[dict] = [
     },
     {
         "id": "history",
-        "part": "Part I — Justification",
+        "part": "Justification & reputation",
         "label": "History of Kapeng Barako",
         "critical": True,
         "expectation": (
@@ -70,7 +70,7 @@ REFERENCE_THEMES: list[dict] = [
     },
     {
         "id": "physical_link",
-        "part": "Part I — Justification",
+        "part": "Justification & reputation",
         "label": "Physical / causal link to the territory",
         "critical": True,
         "expectation": (
@@ -95,7 +95,7 @@ REFERENCE_THEMES: list[dict] = [
     },
     {
         "id": "morphology",
-        "part": "Part II — Technical (General Description)",
+        "part": "Technical description",
         "label": "Morphological characteristics",
         "critical": True,
         "expectation": (
@@ -119,7 +119,7 @@ REFERENCE_THEMES: list[dict] = [
     },
     {
         "id": "harvesting_index",
-        "part": "Part II — Technical (General Description)",
+        "part": "Technical description",
         "label": "Harvesting index",
         "critical": False,
         "expectation": (
@@ -138,7 +138,7 @@ REFERENCE_THEMES: list[dict] = [
     },
     {
         "id": "sensory",
-        "part": "Part II — Technical (General Description)",
+        "part": "Technical description",
         "label": "Sensory profile (taste / acidity / body)",
         "critical": True,
         "expectation": (
@@ -160,7 +160,7 @@ REFERENCE_THEMES: list[dict] = [
     },
     {
         "id": "genetic_profile",
-        "part": "Part II — Technical (General Description)",
+        "part": "Technical description",
         "label": "Genetic / authenticity profile",
         "critical": False,
         "expectation": (
@@ -180,7 +180,7 @@ REFERENCE_THEMES: list[dict] = [
     },
     {
         "id": "product_specification",
-        "part": "Part II — Technical (Specific Description)",
+        "part": "Product specification",
         "label": "Specific product description (roasted / ground)",
         "critical": True,
         "expectation": (
@@ -200,7 +200,7 @@ REFERENCE_THEMES: list[dict] = [
     },
     {
         "id": "production_process",
-        "part": "Part II — Technical (Production Process)",
+        "part": "Production process",
         "label": "Production process (farm to finished product)",
         "critical": True,
         "expectation": (
@@ -227,7 +227,7 @@ REFERENCE_THEMES: list[dict] = [
     },
     {
         "id": "internal_control",
-        "part": "Part III — Control & Traceability",
+        "part": "Control & traceability",
         "label": "Internal control (producer registration)",
         "critical": True,
         "expectation": (
@@ -246,7 +246,7 @@ REFERENCE_THEMES: list[dict] = [
     },
     {
         "id": "traceability_system",
-        "part": "Part III — Control & Traceability",
+        "part": "Control & traceability",
         "label": "Traceability & records",
         "critical": True,
         "expectation": (
@@ -268,7 +268,7 @@ REFERENCE_THEMES: list[dict] = [
     },
     {
         "id": "labelling_seal",
-        "part": "Labelling (outside Phase 3 upload)",
+        "part": "Labelling & seal",
         "label": "Labelling & distinctive seal",
         "critical": False,
         "expectation": (
@@ -493,22 +493,18 @@ def assess_kapeng_barako_product_focus(
     primary_hits = [h for h in primary_hits if not (h in seen_p or seen_p.add(h))]
 
     off_hits = _collect_hits(text_lower, OFF_PRODUCT_SIGNALS, matcher)
-    # Extra hard tokens for mango / Guimaras even if list matching misses punctuation.
-    for hard in ("guimaras", "mango", "mangoes", "tnalak", "t'nalak"):
-        if hard in text_lower and hard not in off_hits and hard.replace("'", "") not in [
-            x.replace("'", "") for x in off_hits
-        ]:
-            if hard == "mango" and "mango" not in " ".join(off_hits):
-                # Avoid double-count noise from "mangoes" already hit
-                if "mangoes" not in off_hits and "guimaras mango" not in off_hits:
-                    off_hits.append("mango")
-            elif hard != "mango":
-                off_hits.append(hard)
+    # Whole-word only — avoids Tagalog false positives (e.g. "mangolekta" ⊃ "mango").
+    for token in ("mango", "mangoes", "guimaras", "tnalak", "t'nalak"):
+        if not matcher(text_lower, token):
+            continue
+        if any(token.replace("'", "") in h.replace("'", "") for h in off_hits):
+            continue
+        off_hits.append(token)
 
     has_primary = len(primary_hits) > 0
     has_identity = len(identity_hits) > 0
     has_off_product = len(off_hits) > 0
-    off_count = _occurrence_count(text_lower, off_hits or ["guimaras", "mango", "tnalak"])
+    off_count = _occurrence_count(text_lower, off_hits)
     primary_count = _occurrence_count(text_lower, primary_hits or KAPENG_BARAKO_PRIMARY_SIGNALS)
 
     # Competing product is a hard reject unless Kapeng Barako is clearly primary.
@@ -524,17 +520,17 @@ def assess_kapeng_barako_product_focus(
 
     reason = ""
     if wrong_product:
+        cues = ", ".join(off_hits[:5]) or "another GI product"
         reason = (
-            "This document appears to describe another product "
-            f"({', '.join(off_hits[:5])}), not Kapeng Barako / Coffea liberica from Batangas. "
-            "The AI analysis only evaluates Geographical Indication readiness for Kapeng Barako. "
-            "A Guimaras mango, Tnalak, or other non-Barako filing cannot be graded Ready here."
+            f"I read this as a filing about {cues}, not about Kapeng Barako "
+            f"(Coffea liberica from Batangas). Please rewrite so the product, place, and reputation "
+            f"are clearly Kapeng Barako before this upload can be marked Ready."
         )
     elif missing_identity:
         reason = (
-            "No clear Kapeng Barako / Liberica / Batangas coffee product identity was found. "
-            "A document may follow a GI outline (history, territory, production, control) but "
-            "still be Not Ready unless it is specifically about Kapeng Barako."
+            "I could not find a clear Kapeng Barako / Liberica / Batangas coffee identity. "
+            "Even a strong GI outline stays Not Ready here until the document is specifically "
+            "about Kapeng Barako."
         )
 
     return {
@@ -680,8 +676,7 @@ def evaluate_against_reference(
         "shap_analysis": narrative,
         "product_focus": product_focus,
         "reference_source": (
-            "PART 1 Justification, PART 2 Technical Part, and Control & Traceability & Labelling "
-            "for Batangas Kapeng Barako"
+            "IPOPHL GI seal filing requirements for Batangas Kapeng Barako"
         ),
         "analysis_method": "mop_reference_qualitative",
     }
@@ -698,96 +693,85 @@ def _build_narrative(
     partial_labels: list[str],
     product_focus: dict | None = None,
 ) -> str:
+    """Structured reviewer notes — fuller coverage, short paragraphs."""
     ready = status == "Ready"
     product_focus = product_focus or {}
-    p1 = (
-        f"<p>This review evaluates the uploaded <strong>{doc_type}</strong> document against the "
-        f"Batangas Kapeng Barako Manual of Specifications drafting basis "
-        f"(Part I Justification, Part II Technical description and production process, and "
-        f"Part III–IV Control, Traceability, and Labelling). "
-        f"<strong>Scope:</strong> Kapeng Barako / Coffea liberica only — other GI products "
-        f"(for example Guimaras mangoes or Tnalak) are out of scope even if their document "
-        f"structure looks similar. "
-        f"About <strong>{word_count:,}</strong> words were extracted for review. "
-        f"Overall classification: <strong>{'Ready' if ready else 'Not Ready'}</strong> — "
-        f"{'the text substantively addresses the critical MoP themes expected for this filing zone'
-           if ready else
-           'critical MoP themes are still missing, only thinly addressed, or the document is not about Kapeng Barako'}.</p>"
+    parts: list[str] = []
+
+    well = [t for t in assessed if t["coverage"] == "well_covered"]
+    partial = [t for t in assessed if t["coverage"] == "partial"]
+    missing = [t for t in assessed if t["coverage"] == "missing"]
+
+    verdict = "Ready for this upload zone" if ready else "Not Ready for this upload zone"
+    parts.append(
+        f"<p><strong>Verdict:</strong> This <strong>{doc_type}</strong> is "
+        f"<strong>{verdict}</strong> against IPOPHL GI seal filing requirements "
+        f"for Batangas Kapeng Barako ({word_count} words reviewed).</p>"
     )
 
-    if product_focus.get("reason"):
-        p_product = (
-            f"<p><strong>Product focus check failed:</strong> {product_focus['reason']} "
-            f"{'Identity cues found: none.' if not product_focus.get('identity_hits') else ''}"
-            f"{(' Competing product cues: <strong>' + ', '.join(product_focus.get('off_product_hits') or []) + '</strong>.') if product_focus.get('off_product_hits') else ''}"
-            "</p>"
+    parts.append(
+        "<p><strong>Coverage snapshot:</strong> "
+        f"{len(well)} theme{'s' if len(well) != 1 else ''} well covered, "
+        f"{len(partial)} partial, "
+        f"{len(missing)} missing.</p>"
+    )
+
+    if product_focus.get("wrong_product") and product_focus.get("off_product_hits"):
+        off = ", ".join(product_focus["off_product_hits"][:4])
+        parts.append(
+            f"<p><strong>Product identity:</strong> {product_focus.get('reason', '')} "
+            f"Competing cues detected: <strong>{off}</strong>. "
+            "Rewrite so the document is clearly about Kapeng Barako (Coffea liberica), not another crop.</p>"
         )
-    elif product_focus.get("identity_hits"):
-        p_product = (
-            "<p><strong>Product focus check:</strong> Kapeng Barako / Liberica identity cues were "
-            f"detected ({', '.join(product_focus.get('identity_hits') or [])}). "
-            "The document is treated as a Kapeng Barako GI filing candidate.</p>"
+    elif product_focus.get("reason"):
+        parts.append(
+            f"<p><strong>Product identity:</strong> {product_focus['reason']}</p>"
         )
-    else:
-        p_product = ""
+
+    theme_notes: list[str] = []
+    for t in partial[:3]:
+        hits = ", ".join(t["evidence_signals"][:3]) or "no clear signals"
+        theme_notes.append(
+            f"<strong>{t['label']}</strong> — partial ({hits}). "
+            f"Expected: {t['expectation'][:140]}{'…' if len(t['expectation']) > 140 else ''}"
+        )
+    for t in missing[:3]:
+        theme_notes.append(
+            f"<strong>{t['label']}</strong> — missing. "
+            f"Add: {t['expectation'][:140]}{'…' if len(t['expectation']) > 140 else ''}"
+        )
+    if theme_notes:
+        parts.append(
+            "<p><strong>Theme notes:</strong></p><ul>"
+            + "".join(f"<li>{note}</li>" for note in theme_notes)
+            + "</ul>"
+        )
+
+    if ready:
+        parts.append(
+            "<p><strong>Next step:</strong> Keep companion uploads aligned — justification, "
+            "technical specs, control, and labelling should tell one consistent Kapeng Barako story.</p>"
+        )
+    elif not product_focus.get("wrong_product"):
+        focus_gaps = [
+            g for g in (missing_labels + partial_labels)
+            if "product focus" not in g.lower()
+        ]
+        if focus_gaps:
+            parts.append(
+                "<p><strong>Priority gaps:</strong> "
+                f"{', '.join(focus_gaps[:5])}"
+                f"{'…' if len(focus_gaps) > 5 else ''}.</p>"
+            )
 
     if strengths:
-        p2 = (
-            "<p><strong>What is already working:</strong> The document shows useful coverage of "
-            f"<strong>{', '.join(strengths[:6])}</strong>"
-            f"{'…' if len(strengths) > 6 else ''}. "
-            "These sections align with how an approved GI specification presents product identity, "
-            "territorial link, technical description, and/or control systems for Liberica Barako.</p>"
-        )
-    else:
-        p2 = (
-            "<p><strong>What is already working:</strong> Little substantive MoP content was detected. "
-            "The file may be a draft outline, an unrelated attachment, or text that could not be "
-            "extracted cleanly. Expand with concrete Kapeng Barako specifications drawn from the "
-            "Part I–IV reference package.</p>"
+        parts.append(
+            "<p><strong>Strengths to keep:</strong> "
+            f"{', '.join(strengths[:6])}"
+            f"{'…' if len(strengths) > 6 else ''}.</p>"
         )
 
-    gap_bits = []
-    if missing_labels:
-        gap_bits.append(
-            "fully missing: <strong>" + ", ".join(missing_labels[:5]) + "</strong>"
-            + ("…" if len(missing_labels) > 5 else "")
-        )
-    if partial_labels:
-        gap_bits.append(
-            "only partially developed: <strong>" + ", ".join(partial_labels[:5]) + "</strong>"
-            + ("…" if len(partial_labels) > 5 else "")
-        )
-    if gap_bits:
-        p3 = (
-            "<p><strong>Why it is not yet complete:</strong> "
-            + "; ".join(gap_bits)
-            + ". For GI examination, examiners look for a clear causal link to Batangas territory, "
-            "Liberica morphological and sensory identity, a reproducible production process, "
-            "BaCoFFed/PTWG control and traceability, and rules for the distinctive seal — "
-            "not just naming “Barako” or “Lipa”, and not filings for unrelated GI goods.</p>"
-        )
-    else:
-        p3 = (
-            "<p><strong>Completeness:</strong> Critical themes appear adequately developed for this "
-            "upload zone. Confirm companion documents still cover any Part I–IV topics not expected "
-            "in this single file.</p>"
-        )
-
-    detail_rows = []
-    for t in assessed:
-        cov = t["coverage"].replace("_", " ")
-        ev = ", ".join(t["evidence_signals"][:4]) if t["evidence_signals"] else "no clear signals"
-        detail_rows.append(
-            f"<li><strong>{t['label']}</strong> ({t['part']}) — {cov}. "
-            f"Expectation: {t['expectation']} Evidence cues found: {ev}.</li>"
-        )
-    p4 = (
-        "<p><strong>Theme-by-theme findings (MoP basis):</strong></p>"
-        f"<ul>{''.join(detail_rows)}</ul>"
-    )
-
-    return p1 + p_product + p2 + p3 + p4
+    return "".join(parts)
 
 
 def _build_improvements(
@@ -799,24 +783,35 @@ def _build_improvements(
     recs: list[str] = []
     product_focus = product_focus or {}
     if product_focus.get("reason"):
-        recs.append(product_focus["reason"])
-        recs.append(
-            "Replace or rewrite the document so it is specifically about Kapeng Barako "
-            "(Coffea liberica / Batangas–Lipa coffee), then re-run analysis."
-        )
+        off = product_focus.get("off_product_hits") or []
+        if product_focus.get("wrong_product") and off:
+            cue = f" ({', '.join(off[:3])})"
+            recs.append(
+                f"Rewrite the document so it is clearly about Kapeng Barako — not another product{cue}."
+            )
+        else:
+            recs.append(
+                "State Kapeng Barako / Liberica identity, Batangas or Lipa origin, and product reputation in the opening section."
+            )
+
+    # Missing themes first, then partial — each with a concrete expectation line.
     for t in assessed:
         if t["coverage"] == "well_covered":
             continue
-        verb = "Add" if t["coverage"] == "missing" else "Strengthen"
-        recs.append(f"{verb} «{t['label']}»: {t['expectation']}")
+        if len(recs) >= 10:
+            break
+        verb = "Add a section on" if t["coverage"] == "missing" else "Expand"
+        snippet = t["expectation"]
+        if len(snippet) > 120:
+            snippet = snippet[:117].rstrip() + "…"
+        recs.append(f"{verb} «{t['label']}»: {snippet}")
+
     if status == "Ready":
         recs.append(
-            "Cross-check companion uploads so Part I reputation/history/link, Part II technical/"
-            "process, and Part III–IV control/labelling remain consistent across the full package."
+            "Cross-check this upload against companion GI documents so terminology, geography, and process steps stay consistent."
         )
-    elif not product_focus.get("reason"):
+    elif not product_focus.get("reason") and len(recs) < 10:
         recs.append(
-            "Revise using the Kapeng Barako MoP drafting package (PART 1, PART 2, and "
-            "CONTROL & TRACEABILITY & LABELLING), then re-run analysis."
+            "After revising, re-upload and refresh the analysis to confirm all critical themes are well covered."
         )
-    return recs[:8]
+    return recs[:10]

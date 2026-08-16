@@ -11,7 +11,7 @@ from flask import jsonify, redirect, render_template, request, send_file, sessio
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from config.models import ActivityLogEntry
-from config.google_maps import get_google_maps_api_key, google_maps_key_is_production
+from config.stadia_maps import get_stadia_maps_api_key, stadia_maps_key_is_production
 from config.profile_photo import (
     migrate_profile_photo_key,
     profile_photo_file,
@@ -50,13 +50,13 @@ def register_dashboard_routes(app):
         users = load_users()
         user = users.get(phone, {})
         full_name = user.get("full_name") or session.get("user_name") or phone
-        google_maps_api_key = get_google_maps_api_key()
+        stadia_maps_api_key = get_stadia_maps_api_key()
         return render_template(
             "templates/dashboard.html",
             user_phone=phone,
             user_full_name=full_name,
-            google_maps_api_key=google_maps_api_key,
-            google_maps_key_is_production=google_maps_key_is_production(google_maps_api_key),
+            stadia_maps_api_key=stadia_maps_api_key,
+            stadia_maps_key_is_production=stadia_maps_key_is_production(stadia_maps_api_key),
             static_cache_bust=int(time.time()),
         )
 
@@ -218,6 +218,22 @@ def register_dashboard_routes(app):
             return jsonify({"ok": False, "error": "Missing notification id."}), 400
         ok = dismiss_admin_notification(nid)
         return jsonify({"ok": ok, "id": nid})
+
+    @app.route("/api/admin-notifications/mark-read", methods=["POST"])
+    def api_admin_notifications_mark_read():
+        if not is_authenticated():
+            return jsonify({"error": "Unauthorized"}), 401
+        from config.admin_notifications import mark_admin_notifications_read
+
+        payload = request.get_json(silent=True) or {}
+        all_items = bool(payload.get("all"))
+        ids = payload.get("ids") or payload.get("id")
+        if isinstance(ids, str):
+            ids = [ids]
+        if not isinstance(ids, list):
+            ids = []
+        ok = mark_admin_notifications_read(ids, all_items=all_items)
+        return jsonify({"ok": ok})
 
     @app.route("/settings/security", methods=["POST"])
     def settings_security():

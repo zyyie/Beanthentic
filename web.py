@@ -37,6 +37,8 @@ from api.messaging_api import register_messaging_routes
 from api.platform_api import register_platform_routes
 from api.ml_api import register_ml_routes
 from api.pricing_api import register_pricing_routes
+from api.system_check_api import register_system_check_routes
+from api.calendar_notes_api import register_calendar_notes_routes
 from routes.dashboard import register_dashboard_routes
 from routes.farmer_portal import register_farmer_portal_routes
 
@@ -211,10 +213,14 @@ if not database_url or not database_url.strip():
 
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_pre_ping": True,
-    "connect_args": {"connect_timeout": app_db_connect_timeout(8)},
-}
+_sqlalchemy_backend = beanthentic_env.sqlalchemy_backend()
+_engine_options: dict = {"pool_pre_ping": True}
+if _sqlalchemy_backend == "sqlite_local":
+    # SQLite rejects MySQL/Postgres connect_timeout kwargs
+    _engine_options["connect_args"] = {"check_same_thread": False}
+else:
+    _engine_options["connect_args"] = {"connect_timeout": app_db_connect_timeout(8)}
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = _engine_options
 
 # Initialize database
 db.init_app(app)
@@ -222,13 +228,21 @@ db.init_app(app)
 
 def _init_database_schema() -> None:
     """
-    Create missing SQLAlchemy tables on local MySQL only.
+    Create / migrate SQLAlchemy tables for the active backend.
 
-    Supabase/PostgreSQL uses the Beanthentic-App schema (farmers.farmer_id,
-    production_information, etc.). Running create_all() there tries to add
-    legacy admin models (production → farmers.id) and fails on every startup.
+    - sqlite_local: admin-only ORM tables while Supabase anon REST serves farmers.
+    - postgresql (BEANTHENTIC_DB_URL): migrate App schema columns only — do not
+      create_all() legacy models against the live Supabase schema.
+    - mysql: create_all for local admin DB.
     """
-    if beanthentic_env.is_postgresql():
+    backend = beanthentic_env.sqlalchemy_backend()
+    if backend == "sqlite_local":
+        db.create_all()
+        _ensure_admin_users_table()
+        return
+    if backend == "postgresql" or (
+        beanthentic_env.is_postgresql() and beanthentic_env.get_db_url()
+    ):
         _ensure_farmer_profile_photo_column()
         _ensure_production_detail_columns()
         _ensure_pricing_schema()
@@ -425,6 +439,8 @@ def api_messages_list_backup():
 register_platform_routes(app)
 register_ml_routes(app)
 register_pricing_routes(app)
+register_system_check_routes(app)
+register_calendar_notes_routes(app)
 register_farmer_portal_routes(app)
 
 
@@ -441,8 +457,7 @@ def _log_ipophl_ml_readiness() -> None:
             )
         else:
             app.logger.info(
-                "IPOPHL AI ready (farmer=%s, document=%s, mode=%s)",
-                status.get("farmer_model_loaded"),
+                "IPOPHL AI ready (document=%s, mode=%s)",
                 status.get("document_model_loaded"),
                 status.get("document_analysis_default"),
             )
@@ -500,12 +515,22 @@ def health():
         payload["supabase_error"] = sb_err
         payload["hint"] = "Set BEANTHENTIC_SUPABASE_URL and BEANTHENTIC_SUPABASE_ANON_KEY in .env"
 
+    payload["sqlalchemy_backend"] = beanthentic_env.sqlalchemy_backend()
     try:
         db.session.execute(text("SELECT 1"))
         payload["sqlalchemy"] = "connected"
+        if payload["sqlalchemy_backend"] == "sqlite_local":
+            payload["sqlalchemy_note"] = (
+                "Local SQLite admin tables. Set BEANTHENTIC_DB_URL for direct Supabase SQL."
+            )
     except Exception as e:
         payload["sqlalchemy"] = "disconnected"
         payload["sqlalchemy_error"] = safe_error_message(e, public="SQLAlchemy ping failed.")
+        if not beanthentic_env.get_db_url():
+            payload["hint_sqlalchemy"] = (
+                "Add BEANTHENTIC_DB_URL (or BEANTHENTIC_DB_TYPE=postgresql + host/user/pass) "
+                "in .env for direct Supabase SQLAlchemy."
+            )
 
     code = 200 if sb_ok else 503
     return jsonify(payload), code

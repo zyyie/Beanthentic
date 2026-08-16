@@ -116,14 +116,10 @@ class DashboardApp {
     this.farmerTableView = 'basic';
     this.mapVarietyFilter = 'all';
     this.mapSearchTerm = '';
-    this.googleMap = null;
-    this.googleMapMarkers = [];
-    this.googleMapsReady = false;
-    this.googleInfoWindow = null;
-    this.lipaBoundaryOverlay = null;
-    this.googleHeatmap = null;
     this.leafletMap = null;
+    this.leafletTileLayer = null;
     this.leafletMarkers = [];
+    this.leafletHeatLayers = [];
     this.leafletBoundary = null;
     this.mapLayers = {
       farmerLocations: true,
@@ -156,12 +152,11 @@ class DashboardApp {
     this.clientReportPageSize = 10;
     this.clientReportTotalPages = 1;
     this.misconductReportRows = [];
+    /** @type {Record<number, { unlocked_by?: string, unlocked_at?: string, enabled?: boolean }>} */
+    this.selfSaleUnlockAuditByFarmer = {};
+    this._pendingUnlockConfirmFarmerId = null;
 
-    // Coffee pricelist pagination (5 rows per page)
     this.coffeePricelistItems = [];
-    this.coffeePricelistCurrentPage = 1;
-    this.coffeePricelistPageSize = 5;
-    this.coffeePricelistTotalPages = 1;
     
     // Explicitly hide the receipt modal on startup
     this.closeReceipt();
@@ -185,7 +180,7 @@ class DashboardApp {
     return items.map((n) => ({
       ...n,
       detail: n.detail != null ? n.detail : '',
-      read: !!readById[n.id],
+      read: !!n.read || !!readById[n.id],
     }));
   }
 
@@ -574,24 +569,38 @@ class DashboardApp {
         if (fallback) fallback.style.display = 'none';
       }
     };
-    if (directUrl && (/^https?:\/\//i.test(directUrl) || /^data:image\//i.test(directUrl))) {
-      showPhoto(directUrl);
+    if (directUrl && (/^https?:\/\//i.test(directUrl) || /^data:image\//i.test(directUrl) || directUrl.startsWith('/'))) {
+      showPhoto(directUrl.startsWith('/') ? beanthenticApiUrl(directUrl) : directUrl);
       return;
     }
-    void fetch(apiUrl, { credentials: 'same-origin' })
-      .then((res) => {
-        if (!res.ok) throw new Error('photo');
-        return res.blob();
-      })
-      .then((blob) => {
-        if (!blob || !blob.size || !String(blob.type || '').startsWith('image/')) {
-          throw new Error('empty');
-        }
-        if (img._blobUrl) URL.revokeObjectURL(img._blobUrl);
-        img._blobUrl = URL.createObjectURL(blob);
-        showPhoto(img._blobUrl);
-      })
-      .catch(() => showPhoto(apiUrl));
+    const runFetch = () => {
+      void fetch(apiUrl, { credentials: 'same-origin' })
+        .then((res) => {
+          if (!res.ok) throw new Error('photo');
+          return res.blob();
+        })
+        .then((blob) => {
+          if (!blob || !blob.size || !String(blob.type || '').startsWith('image/')) {
+            throw new Error('empty');
+          }
+          if (img._blobUrl) URL.revokeObjectURL(img._blobUrl);
+          img._blobUrl = URL.createObjectURL(blob);
+          showPhoto(img._blobUrl);
+        })
+        .catch(() => showPhoto(apiUrl));
+    };
+    if (typeof IntersectionObserver === 'function') {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          observer.disconnect();
+          runFetch();
+        });
+      }, { rootMargin: '120px' });
+      observer.observe(container);
+      return;
+    }
+    runFetch();
   }
 
   buildMessagingAvatarHtml({ phone, name, className = 'messaging-item__avatar', farmerId = null, admin = false } = {}) {
@@ -768,6 +777,7 @@ class DashboardApp {
     }, 1200);
     if (this._adminNotificationsPoll) clearInterval(this._adminNotificationsPoll);
     this._adminNotificationsPoll = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       this.fetchAdminNotifications({ silent: true, showToastOnNewRegistration: true });
     }, ADMIN_NOTIFICATIONS_POLL_MS);
   }
@@ -791,6 +801,12 @@ class DashboardApp {
     n.read = true;
     this.persistNotificationReadState();
     this.renderNotificationsList();
+    void fetch(beanthenticApiUrl('/api/admin-notifications/mark-read'), {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    }).catch(() => {});
   }
 
   markAllNotificationsRead() {
@@ -804,6 +820,12 @@ class DashboardApp {
     if (!changed) return;
     this.persistNotificationReadState();
     this.renderNotificationsList();
+    void fetch(beanthenticApiUrl('/api/admin-notifications/mark-read'), {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ all: true }),
+    }).catch(() => {});
   }
 
   async deleteNotification(id) {
@@ -1383,7 +1405,7 @@ class DashboardApp {
     const fd = new FormData();
     fd.append('password', pwd);
     try {
-      const res = await fetch('/api/admin-account/deactivate', { method: 'POST', body: fd });
+      const res = await fetch(beanthenticApiUrl('/api/admin-account/deactivate'), { method: 'POST', body: fd });
       const result = await res.json();
       if (!res.ok || result.error) throw new Error(result.error || 'Could not deactivate account.');
       this.closeDeactivateAccountModal();
@@ -1567,8 +1589,12 @@ class DashboardApp {
     this.initMapLayerToggles();
     // Initialize Farmer Admin Actions Modal
     this.initFarmerActionModal();
+    this.initRecordsUnlockConfirmModal();
+    this.initClientReportActionModal();
     // Start global suspension timers
     this.startSuspensionTimers();
+    // Maps: reload pins from live farmer list
+    this.initMapsLiveRefresh();
 
     // Global click listener to close custom dropdowns
     document.addEventListener('click', (e) => {
@@ -1595,14 +1621,14 @@ class DashboardApp {
   updateNotificationsToolbarState() {
     const markAllBtn = document.getElementById('notificationsMarkAllReadBtn');
     if (!markAllBtn) return;
-    const anyUnread = (this.notificationsFeed || []).some((n) => !n.read && n.targetModule);
+    const anyUnread = (this.notificationsFeed || []).some((n) => !n.read);
     markAllBtn.disabled = !anyUnread;
   }
 
   updateHeaderNotificationBadge() {
     const badge = document.getElementById('headerNotificationBadge');
     if (!badge) return;
-    const unread = (this.notificationsFeed || []).filter((n) => !n.read && n.targetModule).length;
+    const unread = (this.notificationsFeed || []).filter((n) => !n.read).length;
     if (unread <= 0) {
       badge.classList.remove('is-visible');
       badge.textContent = '0';
@@ -1626,9 +1652,15 @@ class DashboardApp {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
 
-    const rows = (this.notificationsFeed || []).filter(n => n.targetModule);
+    const rows = this.notificationsFeed || [];
     if (!rows.length) {
-      list.innerHTML = '<li class="notifications-empty">No notifications yet.</li>';
+      list.innerHTML = window.BeanthenticUI
+        ? window.BeanthenticUI.emptyState({
+            icon: 'fa-bell',
+            title: 'No notifications yet',
+            hint: 'System alerts and farmer activity updates will show up here.',
+          })
+        : '<li class="notifications-empty">No notifications yet.</li>';
       this.updateNotificationsToolbarState();
       this.updateHeaderNotificationBadge();
       return;
@@ -1731,7 +1763,28 @@ class DashboardApp {
     return n < 0 ? 'Stock Out' : 'Stock In';
   }
 
+  populateTransactionsYearFilter() {
+    const select = document.getElementById('transactionsYearFilter');
+    if (!select) return;
+    const years = new Set();
+    const nowY = new Date().getFullYear();
+    years.add(nowY);
+    (this.transactionsRows || []).forEach((row) => {
+      const d = new Date(row.recorded_at || row.created_at || '');
+      if (!Number.isNaN(d.getTime())) years.add(d.getFullYear());
+    });
+    const current = select.value;
+    const sorted = [...years].sort((a, b) => b - a);
+    select.innerHTML =
+      '<option value="">All Years</option>' +
+      sorted.map((y) => `<option value="${y}">${y}</option>`).join('');
+    if (current && [...select.options].some((o) => o.value === current)) {
+      select.value = current;
+    }
+  }
+
   applyTransactionsFiltersAndRender() {
+    this.populateTransactionsYearFilter();
     const term = (this.transactionsSearchTerm || '').trim().toLowerCase();
     let rows = (this.transactionsRows || []).filter((row) => {
       // Variety Filter
@@ -1804,7 +1857,7 @@ class DashboardApp {
     const filterSelect = document.getElementById('transactionsFarmerFilter');
     if (!filterSelect) return;
     try {
-      const res = await fetch('/api/farmer-picker');
+      const res = await fetch(beanthenticApiUrl('/api/farmer-picker'));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const items = Array.isArray(data.items) ? data.items : [];
@@ -1886,10 +1939,10 @@ class DashboardApp {
 
     this.transactionsCurrentPage = 1; // Reset to page 1 on load
     await this.loadFarmerOptionsForTransactionsModule();
-    tbody.innerHTML = '<tr><td colspan="9" class="transactions-loading-cell">Loading...</td></tr>';
+    tbody.innerHTML = window.BeanthenticUI?.loadingRow(9) || '<tr><td colspan="9" class="transactions-loading-cell">Loading...</td></tr>';
 
     try {
-      const res = await fetch('/api/transactions-list?limit=500');
+      const res = await fetch(beanthenticApiUrl('/api/transactions-list?limit=2000'));
       const data = await res.json().catch(() => ({}));
       if (data && data.ok === false) {
         throw new Error(
@@ -1908,6 +1961,7 @@ class DashboardApp {
       }
       this.transactionsRows = data.items;
       this.transactionsDataSource = data.source || '';
+      this.populateTransactionsYearFilter();
       this.applyTransactionsFiltersAndRender();
     } catch (e) {
       console.warn('Transactions load failed:', e);
@@ -2286,72 +2340,7 @@ class DashboardApp {
       filter.addEventListener('change', () => this.loadCoffeePricingApplications());
     }
 
-    const addBtn = document.getElementById('coffeePricelistAddBtn');
-    if (addBtn) addBtn.remove();
-
-    const farmerSelect = document.getElementById('coffeePricingSelfSaleFarmerSelect');
-    const selfSaleToggle = document.getElementById('coffeePricingSelfSaleToggle');
-    if (farmerSelect) {
-      farmerSelect.addEventListener('change', () => {
-        this.syncCoffeePricingSelfSaleControls(Number(farmerSelect.value || 0));
-      });
-    }
-    if (selfSaleToggle) {
-      selfSaleToggle.addEventListener('change', async () => {
-        const fid = Number((farmerSelect && farmerSelect.value) || 0);
-        if (fid < 1) {
-          selfSaleToggle.checked = false;
-          return;
-        }
-        const farmerRow = (this.data || []).find((f) => this.farmerIdFromRow(f) === fid) || { farmer_id: fid };
-        await this.setFarmerSelfSale(fid, selfSaleToggle.checked, farmerRow);
-      });
-    }
-
-    const prevBtn = document.getElementById('coffeePricelistPrevBtn');
-    const nextBtn = document.getElementById('coffeePricelistNextBtn');
-    const pageInput = document.getElementById('coffeePricelistPageInput');
-    if (prevBtn) {
-      prevBtn.addEventListener('click', () => {
-        if (this.coffeePricelistCurrentPage > 1) {
-          this.coffeePricelistCurrentPage -= 1;
-          this.renderCoffeePricelistTable(this.coffeePricelistItems || []);
-        }
-      });
-    }
-    if (nextBtn) {
-      nextBtn.addEventListener('click', () => {
-        if (this.coffeePricelistCurrentPage < (this.coffeePricelistTotalPages || 1)) {
-          this.coffeePricelistCurrentPage += 1;
-          this.renderCoffeePricelistTable(this.coffeePricelistItems || []);
-        }
-      });
-    }
-    if (pageInput) {
-      pageInput.addEventListener('change', () => {
-        let val = parseInt(pageInput.value, 10);
-        if (!Number.isFinite(val) || val < 1) val = 1;
-        if (val > (this.coffeePricelistTotalPages || 1)) val = this.coffeePricelistTotalPages || 1;
-        this.coffeePricelistCurrentPage = val;
-        this.renderCoffeePricelistTable(this.coffeePricelistItems || []);
-      });
-    }
-
-    const pricelistBody = document.getElementById('coffeePricelistBody');
-    if (pricelistBody) {
-      pricelistBody.addEventListener('click', (e) => {
-        const editBtn = e.target.closest('[data-pricelist-edit]');
-        const saveBtn = e.target.closest('[data-pricelist-save]');
-        if (editBtn) {
-          const row = editBtn.closest('tr');
-          if (row) this.setPricelistRowEditing(row, true);
-        }
-        if (saveBtn) {
-          const row = saveBtn.closest('tr');
-          if (row) this.savePricelistRow(row);
-        }
-      });
-    }
+    this.initOfficialPricelistModal();
 
     const appsBody = document.getElementById('coffeePricingAppsBody');
     if (appsBody) {
@@ -2359,10 +2348,10 @@ class DashboardApp {
         const approveBtn = e.target.closest('[data-app-approve]');
         const rejectBtn = e.target.closest('[data-app-reject]');
         if (approveBtn) {
-          this.reviewPriceApplication(Number(approveBtn.dataset.appApprove || 0), 'approved');
+          this.reviewPriceApplication(Number(approveBtn.dataset.appApprove || 0), 'approved', approveBtn);
         }
         if (rejectBtn) {
-          this.reviewPriceApplication(Number(rejectBtn.dataset.appReject || 0), 'rejected');
+          this.reviewPriceApplication(Number(rejectBtn.dataset.appReject || 0), 'rejected', rejectBtn);
         }
       });
     }
@@ -2370,6 +2359,15 @@ class DashboardApp {
     const unlockBody = document.getElementById('coffeePricingUnlockBody');
     if (unlockBody) {
       unlockBody.addEventListener('click', async (e) => {
+        const viewBtn = e.target.closest('[data-view-farmer]');
+        if (viewBtn) {
+          const fid = Number(viewBtn.dataset.viewFarmer || 0);
+          if (fid > 0) {
+            this.switchModule('farmers-list');
+            this.openFarmerProfile(fid, 'profiles');
+          }
+          return;
+        }
         const unlockBtn = e.target.closest('[data-unlock-self-sale]');
         if (!unlockBtn) return;
         const fid = Number(unlockBtn.dataset.unlockSelfSale || 0);
@@ -2377,10 +2375,8 @@ class DashboardApp {
         const farmerRow = (this.data || []).find((f) => this.farmerIdFromRow(f) === fid) || { farmer_id: fid };
         await this.setFarmerSelfSale(fid, true, farmerRow);
         this.renderCoffeePricingUnlockQueue();
-        this.syncCoffeePricingSelfSaleControls(fid);
       });
     }
-    this.syncCoffeePricingSelfSaleControls();
     this.renderCoffeePricingUnlockQueue();
   }
 
@@ -2430,9 +2426,18 @@ class DashboardApp {
       return { unlocked: false, reason: 'inactive', label: 'Frozen (account inactive)', pref, pls, selfSale };
     }
     if (this.isSellPathPreference(pref) && pls === 'pending') {
-      return { unlocked: false, reason: 'pricelist', label: 'Frozen (awaiting self-sale / pricelist)', pref, pls, selfSale };
+      return { unlocked: false, reason: 'pricelist', label: 'Frozen (awaiting unlock)', pref, pls, selfSale };
     }
     return { unlocked: true, reason: '', label: 'Unlocked', pref, pls: pls || 'approved', selfSale };
+  }
+
+  farmerRecordsAccessHint(access) {
+    if (!access || access.unlocked) return 'Records are unlocked for this farmer.';
+    if (access.reason === 'inactive') return 'Account is inactive. Reactivate the farmer to unlock records.';
+    if (access.reason === 'pricelist') {
+      return 'Frozen until you enable self-sale or approve their pending price application.';
+    }
+    return access.label || 'Records are locked.';
   }
 
   farmerDisplayName(row) {
@@ -2464,7 +2469,10 @@ class DashboardApp {
     }
 
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="6">No farmers waiting for Records unlock.</td></tr>';
+      tbody.innerHTML =
+        '<tr><td colspan="6" class="coffee-pricing-empty-cell">' +
+        '<strong>All clear.</strong> Sell-path farmers (Sell or Drop-off &amp; Sell) appear here until you enable self-sale or approve their price application.' +
+        '</td></tr>';
       return;
     }
 
@@ -2475,17 +2483,28 @@ class DashboardApp {
         return `<tr data-farmer-id="${id}">
           <td>${this.escapeHtml(this.farmerDisplayName(row))}</td>
           <td>${this.escapeHtml(prefLabel)}</td>
-          <td>${this.escapeHtml(this.formatPricingLabel(pls))}</td>
+          <td>${this.escapeHtml(this.formatUnlockStatus(pls))}</td>
           <td>${access.selfSale ? 'On' : 'Off'}</td>
-          <td>${this.escapeHtml(access.label)}</td>
+          <td title="${this.escapeHtml(this.farmerRecordsAccessHint(access))}">${this.escapeHtml(access.label)}<span class="pricing-frozen-hint">${this.escapeHtml(this.farmerRecordsAccessHint(access))}</span></td>
           <td>
-            <button type="button" class="btn btn-primary btn-sm coffee-pricing-unlock-action" data-unlock-self-sale="${id}">
-              Enable self-sale
-            </button>
+            <div class="pricing-action-group">
+              <button type="button" class="btn btn-primary btn-sm coffee-pricing-unlock-action" data-unlock-self-sale="${id}">
+                Enable self-sale
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" data-view-farmer="${id}">View profile</button>
+            </div>
           </td>
         </tr>`;
       })
       .join('');
+  }
+
+  formatUnlockStatus(value) {
+    const v = String(value || '').trim().toLowerCase();
+    if (v === 'pending') return 'Pending unlock';
+    if (v === 'approved') return 'Approved';
+    if (!v) return '—';
+    return this.formatPricingLabel(v);
   }
 
   formatPhpAmount(value) {
@@ -2502,87 +2521,128 @@ class DashboardApp {
 
   async loadCoffeePricingData() {
     await Promise.all([this.loadCoffeePricelist(), this.loadCoffeePricingApplications()]);
-    this.syncCoffeePricingSelfSaleControls();
     this.renderCoffeePricingUnlockQueue();
   }
 
-  syncCoffeePricingSelfSaleControls(selectedFarmerId = null) {
-    const farmerSelect = document.getElementById('coffeePricingSelfSaleFarmerSelect');
-    const selfSaleToggle = document.getElementById('coffeePricingSelfSaleToggle');
-    const statusEl = document.getElementById('coffeePricingSelfSaleStatus');
-    const metaEl = document.getElementById('coffeePricingPreferenceMeta');
-    if (!farmerSelect || !selfSaleToggle || !statusEl) return;
+  formatUnlockAuditLine(audit) {
+    if (!audit || !audit.unlocked_at) return '';
+    const who = String(audit.unlocked_by || 'Admin').trim() || 'Admin';
+    let when = String(audit.unlocked_at);
+    try {
+      const d = new Date(audit.unlocked_at);
+      if (!Number.isNaN(d.getTime())) {
+        when = d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+      }
+    } catch {
+      /* keep raw */
+    }
+    const action = audit.enabled === false ? 'Last toggled off' : 'Unlocked';
+    return `${action} by ${who} · ${when}`;
+  }
 
-    const rows = Array.isArray(this.data) ? this.data : [];
-    const previous = Number(selectedFarmerId || farmerSelect.value || 0);
-    const options = rows
-      .map((row) => ({
-        id: this.farmerIdFromRow(row),
-        name: this.farmerDisplayName(row),
-        needsUnlock: !this.farmerRecordsAccessState(row).unlocked,
-      }))
-      .filter((item) => item.id > 0);
-
-    const seen = new Set();
-    const uniqueOptions = options.filter((item) => {
-      if (seen.has(item.id)) return false;
-      seen.add(item.id);
-      return true;
-    });
-
-    // Prefer farmers waiting for unlock near the top of the select list.
-    uniqueOptions.sort((a, b) => {
-      if (a.needsUnlock !== b.needsUnlock) return a.needsUnlock ? -1 : 1;
-      return String(a.name).localeCompare(String(b.name));
-    });
-
-    farmerSelect.innerHTML = `<option value="">Select farmer</option>${uniqueOptions
-      .map(
-        (item) =>
-          `<option value="${item.id}">${this.escapeHtml(item.name || `Farmer #${item.id}`)}${
-            item.needsUnlock ? ' · needs unlock' : ''
-          }</option>`
-      )
-      .join('')}`;
-
-    const targetId = uniqueOptions.some((o) => o.id === previous)
-      ? previous
-      : uniqueOptions.length
-        ? uniqueOptions[0].id
-        : 0;
-    farmerSelect.value = targetId ? String(targetId) : '';
-
-    const row = rows.find((f) => this.farmerIdFromRow(f) === Number(targetId));
-    const enabled = this.isSelfSaleEnabledRow(row);
-    const access = row ? this.farmerRecordsAccessState(row) : null;
-    selfSaleToggle.disabled = !targetId;
-    selfSaleToggle.checked = enabled;
-
-    if (!targetId) {
-      statusEl.textContent = 'No farmer records loaded yet.';
-      statusEl.classList.remove('is-enabled');
-      if (metaEl) metaEl.textContent = 'Delivery preference and Records status appear here after selecting a farmer.';
+  renderSelfSaleUnlockAuditLine(farmerId, elementId) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    const audit = this.selfSaleUnlockAuditByFarmer[Number(farmerId)];
+    const line = this.formatUnlockAuditLine(audit);
+    if (!line) {
+      el.hidden = true;
+      el.textContent = '';
       return;
     }
-    statusEl.textContent = enabled
-      ? 'Self-sale enabled — Records unlocked for direct selling.'
-      : access && !access.unlocked
-        ? 'Self-sale off — Records frozen until you enable self-sale.'
-        : 'Self-sale disabled for selected farmer.';
-    statusEl.classList.toggle('is-enabled', enabled);
-    if (metaEl && access) {
-      metaEl.textContent = `Delivery preference: ${this.formatConsolidationPreference(access.pref)} · Pricelist: ${
-        access.pls ? this.formatPricingLabel(access.pls) : '—'
-      } · Records: ${access.label}`;
+    el.hidden = false;
+    el.textContent = line;
+  }
+
+  rememberSelfSaleUnlockAudit(farmerId, audit) {
+    const fid = Number(farmerId);
+    if (!fid || !audit) return;
+    this.selfSaleUnlockAuditByFarmer[fid] = {
+      unlocked_by: audit.unlocked_by || audit.by || 'Admin',
+      unlocked_at: audit.unlocked_at || audit.at || new Date().toISOString(),
+      enabled: audit.enabled !== false,
+      pricelist_status: audit.pricelist_status || 'approved',
+      records_unlocked: audit.records_unlocked !== false,
+    };
+  }
+
+  initRecordsUnlockConfirmModal() {
+    const root = document.getElementById('recordsUnlockConfirmModal');
+    if (!root || root.dataset.bound) return;
+    root.dataset.bound = '1';
+    const closeBtn = document.getElementById('recordsUnlockConfirmClose');
+    const viewBtn = document.getElementById('recordsUnlockConfirmView');
+    const backdrop = root.querySelector('.confirm-dialog__backdrop');
+    const close = () => this.closeRecordsUnlockConfirmation();
+    if (closeBtn) closeBtn.addEventListener('click', close);
+    if (backdrop) backdrop.addEventListener('click', close);
+    if (viewBtn) {
+      viewBtn.addEventListener('click', () => {
+        const fid = this._pendingUnlockConfirmFarmerId;
+        this.closeRecordsUnlockConfirmation();
+        if (fid) {
+          this.switchModule('farmers-list');
+          this.openFarmerProfile(fid, 'profiles');
+        }
+      });
     }
+  }
+
+  closeRecordsUnlockConfirmation() {
+    const root = document.getElementById('recordsUnlockConfirmModal');
+    if (!root) return;
+    root.hidden = true;
+    root.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('confirm-dialog-active');
+    this._pendingUnlockConfirmFarmerId = null;
+  }
+
+  showRecordsUnlockConfirmation(farmerId, audit = null) {
+    const fid = Number(farmerId);
+    if (!fid) return;
+    if (audit) this.rememberSelfSaleUnlockAudit(fid, audit);
+    const row = (this.data || []).find((f) => this.farmerIdFromRow(f) === fid) || null;
+    const name = row ? this.farmerDisplayName(row) : `Farmer #${fid}`;
+    const access = row ? this.farmerRecordsAccessState(row) : null;
+    const stored = this.selfSaleUnlockAuditByFarmer[fid] || audit || {};
+
+    this._pendingUnlockConfirmFarmerId = fid;
+    this.switchModule('coffee-pricing');
+    this.renderCoffeePricingUnlockQueue();
+
+    const setText = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value || '—';
+    };
+    setText('recordsUnlockFarmerName', name);
+    setText('recordsUnlockStatus', 'Active');
+    setText('recordsUnlockPricelist', 'Approved');
+    setText('recordsUnlockSelfSale', 'On');
+    setText(
+      'recordsUnlockAuditLine',
+      this.formatUnlockAuditLine(stored) ||
+        `Unlocked by ${(window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.full_name) || 'Admin'} · just now`
+    );
+    const msg = document.getElementById('recordsUnlockConfirmMessage');
+    if (msg) {
+      msg.textContent = access
+        ? `Records access confirmed: ${access.label}. Unlock status is approved and self-sale is enabled.`
+        : 'Records access confirmed: status active and unlock approved.';
+    }
+
+    const root = document.getElementById('recordsUnlockConfirmModal');
+    if (!root) return;
+    root.hidden = false;
+    root.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('confirm-dialog-active');
   }
 
   async loadCoffeePricelist() {
     const tbody = document.getElementById('coffeePricelistBody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="6" class="transactions-loading-cell">Loading pricelist...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" class="transactions-loading-cell">Loading pricelist...</td></tr>';
     try {
-      const res = await fetch('/api/coffee-pricelist', { credentials: 'same-origin' });
+      const res = await fetch(beanthenticApiUrl('/api/coffee-pricelist'), { credentials: 'same-origin' });
       const data = await beanthenticParseJsonResponse(res);
       if (!res.ok || !data.ok) throw new Error(data.error || 'Could not load pricelist.');
       this.coffeePricelistOptions = data.options || {};
@@ -2590,37 +2650,12 @@ class DashboardApp {
       this.renderCoffeePricelistTable(this.coffeePricelistItems);
     } catch (err) {
       this.coffeePricelistItems = [];
-      this.updateCoffeePricelistPagination(0);
-      tbody.innerHTML = `<tr><td colspan="6" class="transactions-loading-cell">${this.escapeHtml(err.message || 'Load failed.')}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="3" class="transactions-loading-cell">${this.escapeHtml(err.message || 'Load failed.')}</td></tr>`;
     }
   }
 
-  updateCoffeePricelistPagination(totalItems) {
-    const pageSize = this.coffeePricelistPageSize || 5;
-    this.coffeePricelistTotalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-    if (this.coffeePricelistCurrentPage > this.coffeePricelistTotalPages) {
-      this.coffeePricelistCurrentPage = this.coffeePricelistTotalPages;
-    }
-    if (this.coffeePricelistCurrentPage < 1) this.coffeePricelistCurrentPage = 1;
-
-    const pageInput = document.getElementById('coffeePricelistPageInput');
-    const pageOf = document.getElementById('coffeePricelistPageOf');
-    const prevBtn = document.getElementById('coffeePricelistPrevBtn');
-    const nextBtn = document.getElementById('coffeePricelistNextBtn');
-    if (pageInput) {
-      pageInput.value = String(this.coffeePricelistCurrentPage);
-      pageInput.max = String(this.coffeePricelistTotalPages);
-    }
-    if (pageOf) pageOf.textContent = `of ${this.coffeePricelistTotalPages}`;
-    if (prevBtn) prevBtn.disabled = this.coffeePricelistCurrentPage <= 1;
-    if (nextBtn) nextBtn.disabled = this.coffeePricelistCurrentPage >= this.coffeePricelistTotalPages;
-  }
-
-  renderCoffeePricelistTable(items) {
-    const tbody = document.getElementById('coffeePricelistBody');
-    if (!tbody) return;
+  normalizeOfficialPricelistItems(items) {
     const allItems = Array.isArray(items) ? items : [];
-    // Official list: one active row per variety only (Liberica / Excelsa / Robusta).
     const byVariety = new Map();
     allItems.forEach((item) => {
       if (item && item.is_active === false) return;
@@ -2631,73 +2666,97 @@ class DashboardApp {
     const preferred = ['liberica', 'excelsa', 'robusta']
       .map((v) => byVariety.get(v))
       .filter(Boolean);
-    this.coffeePricelistItems = preferred.length ? preferred : allItems.filter((i) => i.is_active !== false);
-    const beanTypes = (this.coffeePricelistOptions && this.coffeePricelistOptions.bean_types) || ['gcb', 'roasted'];
-    const gcbClasses = (this.coffeePricelistOptions && this.coffeePricelistOptions.gcb) || [];
-    const roastedClasses = (this.coffeePricelistOptions && this.coffeePricelistOptions.roasted) || [];
+    return preferred.length ? preferred : allItems.filter((i) => i.is_active !== false);
+  }
 
-    this.updateCoffeePricelistPagination(this.coffeePricelistItems.length);
+  renderCoffeePricelistTable(items) {
+    const tbody = document.getElementById('coffeePricelistBody');
+    if (!tbody) return;
+    this.coffeePricelistItems = this.normalizeOfficialPricelistItems(items);
 
     if (!this.coffeePricelistItems.length) {
-      tbody.innerHTML = '<tr><td colspan="6">No official pricelist rows yet. Refresh after server seed.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="3">No official pricelist rows yet. Refresh after server seed.</td></tr>';
       return;
     }
 
-    const pageSize = this.coffeePricelistPageSize || 5;
-    const start = (this.coffeePricelistCurrentPage - 1) * pageSize;
-    const pageItems = this.coffeePricelistItems.slice(start, start + pageSize);
+    tbody.innerHTML = this.coffeePricelistItems
+      .map((item) => {
+        const price = Number(item.price_per_kg || 0);
+        const notes = String(item.notes || '').trim();
+        return `<tr>
+          <td>${this.escapeHtml(this.formatPricingLabel(item.variety))}</td>
+          <td><strong>${this.formatPhpAmount(price)}</strong> <span class="coffee-pricelist-gcb-tag">GCB</span></td>
+          <td>${notes ? this.escapeHtml(notes) : '<span class="coffee-pricelist-muted">—</span>'}</td>
+        </tr>`;
+      })
+      .join('');
+  }
 
-    tbody.innerHTML = pageItems.map((item) => {
-      const priceId = Number(item.price_id || 0);
-      const clsOptions = item.bean_type === 'roasted' ? roastedClasses : gcbClasses;
-      const clsSelect = [
-        '<option value="">Default</option>',
-        ...clsOptions.map((c) => `<option value="${this.escapeHtml(c)}"${c === item.classification ? ' selected' : ''}>${this.escapeHtml(this.formatPricingLabel(c))}</option>`),
-      ].join('');
-      return `<tr data-price-id="${priceId}" data-editing="0">
-        <td>
-          <span class="pricelist-locked-value">${this.escapeHtml(this.formatPricingLabel(item.variety))}</span>
-          <input type="hidden" data-field="variety" value="${this.escapeHtml(item.variety || '')}" />
-        </td>
-        <td>
-          <select class="pricelist-inline-input" data-field="bean_type" disabled>
-            ${beanTypes.map((t) => `<option value="${t}"${t === item.bean_type ? ' selected' : ''}>${this.escapeHtml(t.toUpperCase())}</option>`).join('')}
-          </select>
-        </td>
-        <td><select class="pricelist-inline-input" data-field="classification" disabled>${clsSelect}</select></td>
-        <td><input type="number" step="0.01" min="0" class="pricelist-inline-input" data-field="price_per_kg" value="${Number(item.price_per_kg || 0)}" disabled /></td>
-        <td><input type="text" class="pricelist-inline-input" data-field="notes" value="${this.escapeHtml(item.notes || '')}" disabled /></td>
-        <td>
-          <div class="pricing-action-group">
-            <button type="button" class="btn btn-secondary btn-sm" data-pricelist-edit>Edit</button>
-            <button type="button" class="btn btn-primary btn-sm" data-pricelist-save hidden>Save</button>
+  initOfficialPricelistModal() {
+    const editBtn = document.getElementById('coffeePricelistEditBtn');
+    const saveBtn = document.getElementById('officialPricelistSaveBtn');
+    const cancelBtn = document.getElementById('officialPricelistCancelBtn');
+    const root = document.getElementById('officialPricelistModal');
+    if (!root || root.dataset.bound) return;
+    root.dataset.bound = '1';
+    const backdrop = root.querySelector('.confirm-dialog__backdrop');
+    if (editBtn) editBtn.addEventListener('click', () => this.openOfficialPricelistModal());
+    if (saveBtn) saveBtn.addEventListener('click', () => this.saveOfficialPricelistModal());
+    if (cancelBtn) cancelBtn.addEventListener('click', () => this.closeOfficialPricelistModal());
+    if (backdrop) backdrop.addEventListener('click', () => this.closeOfficialPricelistModal());
+  }
+
+  openOfficialPricelistModal() {
+    const root = document.getElementById('officialPricelistModal');
+    const rowsEl = document.getElementById('officialPricelistFormRows');
+    if (!root || !rowsEl) return;
+    const items = this.normalizeOfficialPricelistItems(this.coffeePricelistItems || []);
+    if (!items.length) {
+      this.showNotification('Load the official pricelist first.', 'error');
+      return;
+    }
+    rowsEl.innerHTML = items
+      .map((item) => {
+        const priceId = Number(item.price_id || 0);
+        const variety = String(item.variety || '');
+        return `<div class="official-pricelist-row" data-price-id="${priceId}">
+          <input type="hidden" name="variety" value="${this.escapeHtml(variety)}" />
+          <input type="hidden" name="bean_type" value="${this.escapeHtml(item.bean_type || 'gcb')}" />
+          <input type="hidden" name="classification" value="${this.escapeHtml(item.classification || '')}" />
+          <label class="official-pricelist-row-label">${this.escapeHtml(this.formatPricingLabel(variety))}</label>
+          <div class="official-pricelist-row-fields">
+            <label>Price / kg (₱)
+              <input type="number" step="0.01" min="0" name="price_per_kg" value="${Number(item.price_per_kg || 0)}" required />
+            </label>
+            <label>Notes
+              <input type="text" name="notes" value="${this.escapeHtml(item.notes || '')}" placeholder="Optional admin note" />
+            </label>
           </div>
-        </td>
-      </tr>`;
-    }).join('');
+        </div>`;
+      })
+      .join('');
+    root.hidden = false;
+    root.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('confirm-dialog-active');
   }
 
-  setPricelistRowEditing(row, editing) {
-    if (!row) return;
-    row.dataset.editing = editing ? '1' : '0';
-    row.querySelectorAll('.pricelist-inline-input').forEach((el) => {
-      el.disabled = !editing;
-    });
-    const editBtn = row.querySelector('[data-pricelist-edit]');
-    const saveBtn = row.querySelector('[data-pricelist-save]');
-    if (editBtn) editBtn.hidden = !!editing;
-    if (saveBtn) saveBtn.hidden = !editing;
+  closeOfficialPricelistModal() {
+    const root = document.getElementById('officialPricelistModal');
+    if (!root) return;
+    root.hidden = true;
+    root.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('confirm-dialog-active');
   }
 
-  readPricelistRow(row) {
-    const read = (field) => {
-      const el = row.querySelector(`[data-field="${field}"]`);
+  readOfficialPricelistModalRow(rowEl) {
+    const read = (name) => {
+      const el = rowEl.querySelector(`[name="${name}"]`);
       return el ? el.value : '';
     };
     return {
-      price_id: Number(row.dataset.priceId || 0) || undefined,
+      price_id: Number(rowEl.dataset.priceId || 0) || undefined,
       variety: read('variety'),
-      bean_type: read('bean_type'),
+      bean_type: read('bean_type') || 'gcb',
       classification: read('classification'),
       price_per_kg: read('price_per_kg'),
       notes: read('notes'),
@@ -2705,29 +2764,39 @@ class DashboardApp {
     };
   }
 
-  async savePricelistRow(row) {
-    const payload = this.readPricelistRow(row);
+  async saveOfficialPricelistModal() {
+    const rowsEl = document.getElementById('officialPricelistFormRows');
+    if (!rowsEl) return;
+    const rowEls = Array.from(rowsEl.querySelectorAll('.official-pricelist-row'));
+    if (!rowEls.length) return;
+    const saveBtn = document.getElementById('officialPricelistSaveBtn');
+    if (saveBtn) saveBtn.disabled = true;
     try {
-      const res = await fetch('/api/coffee-pricelist', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await beanthenticParseJsonResponse(res);
-      if (!res.ok || !data.ok) throw new Error(data.error || 'Save failed.');
-      this.showNotification('Pricelist row saved.', 'success');
-      this.setPricelistRowEditing(row, false);
+      for (const rowEl of rowEls) {
+        const payload = this.readOfficialPricelistModalRow(rowEl);
+        const res = await fetch(beanthenticApiUrl('/api/coffee-pricelist'), {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await beanthenticParseJsonResponse(res);
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Save failed.');
+      }
+      this.showNotification('Official prices updated.', 'success');
+      this.closeOfficialPricelistModal();
       await this.loadCoffeePricelist();
     } catch (err) {
-      this.showNotification(err.message || 'Could not save pricelist row.', 'error');
+      this.showNotification(err.message || 'Could not save official prices.', 'error');
+    } finally {
+      if (saveBtn) saveBtn.disabled = false;
     }
   }
 
   async loadCoffeePricingApplications() {
     const tbody = document.getElementById('coffeePricingAppsBody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="8" class="transactions-loading-cell">Loading applications...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="transactions-loading-cell">Loading applications...</td></tr>';
     const filter = document.getElementById('coffeePricingAppFilter');
     const status = filter ? String(filter.value || '') : 'pending';
     const qs = status ? `?status=${encodeURIComponent(status)}` : '';
@@ -2737,7 +2806,7 @@ class DashboardApp {
       if (!res.ok || !data.ok) throw new Error(data.error || 'Could not load applications.');
       this.renderCoffeePricingApplications(data.items || []);
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="8" class="transactions-loading-cell">${this.escapeHtml(err.message || 'Load failed.')}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="transactions-loading-cell">${this.escapeHtml(err.message || 'Load failed.')}</td></tr>`;
     }
   }
 
@@ -2755,42 +2824,76 @@ class DashboardApp {
     const tbody = document.getElementById('coffeePricingAppsBody');
     if (!tbody) return;
     if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="8">No price applications found.</td></tr>';
+      tbody.innerHTML = window.BeanthenticUI
+        ? window.BeanthenticUI.emptyTableRow(6, {
+            icon: 'fa-tags',
+            title: 'No price applications found',
+            hint: 'Farmer price requests will appear here once submitted.',
+          })
+        : '<tr><td colspan="6">No price applications found.</td></tr>';
       return;
     }
     tbody.innerHTML = items.map((item) => {
       const appId = Number(item.application_id || 0);
       const status = String(item.status || 'pending').toLowerCase();
       const notes = [item.farmer_notes, item.admin_notes].filter(Boolean).join(' · ');
+      const requested = item.requested_price_per_kg != null ? this.formatPhpAmount(item.requested_price_per_kg) : '—';
+      const reference = item.reference_price_per_kg != null ? this.formatPhpAmount(item.reference_price_per_kg) : '—';
+      const reqNum = Number(item.requested_price_per_kg);
+      const refNum = Number(item.reference_price_per_kg);
+      let deltaClass = '';
+      if (Number.isFinite(reqNum) && Number.isFinite(refNum) && refNum > 0) {
+        const pct = ((reqNum - refNum) / refNum) * 100;
+        deltaClass = pct > 5 ? 'is-above' : pct < -5 ? 'is-below' : 'is-near';
+      }
       const actions = status === 'pending'
-        ? `<div class="pricing-action-group">
-            <button type="button" class="btn btn-secondary btn-sm" data-app-approve="${appId}">Approve</button>
+        ? `<div class="pricing-action-group pricing-action-group--stack">
+            <button type="button" class="btn btn-primary btn-sm" data-app-approve="${appId}" title="Accept price, enable self-sale, and unlock Records">Approve price &amp; unlock Records</button>
             <button type="button" class="btn btn-secondary btn-sm" data-app-reject="${appId}">Reject</button>
           </div>`
         : '—';
       return `<tr>
         <td>
           <div>${this.escapeHtml(this.farmerNameById(item.farmer_id))}</div>
-          ${notes ? `<small style="display:block;color:#64748b;margin-top:0.2rem;">${this.escapeHtml(notes)}</small>` : ''}
+          ${notes ? `<small class="pricing-app-notes">${this.escapeHtml(notes)}</small>` : ''}
         </td>
         <td>${this.escapeHtml(this.formatPricingLabel(item.variety))}</td>
-        <td>${this.escapeHtml(String(item.bean_type || '').toUpperCase())}${item.classification ? ` · ${this.escapeHtml(this.formatPricingLabel(item.classification))}` : ''}</td>
         <td>${Number(item.quantity_kg || 0).toLocaleString()}</td>
-        <td>${item.requested_price_per_kg != null ? this.formatPhpAmount(item.requested_price_per_kg) : '—'}</td>
-        <td>${item.reference_price_per_kg != null ? this.formatPhpAmount(item.reference_price_per_kg) : '—'}</td>
+        <td>
+          <div class="pricing-app-compare ${deltaClass}">
+            <span><em>Requested</em> ${requested}</span>
+            <span><em>Official</em> ${reference}</span>
+          </div>
+        </td>
         <td><span class="pricing-status-badge ${this.escapeHtml(status)}">${this.escapeHtml(status)}</span></td>
         <td>${actions}</td>
       </tr>`;
     }).join('');
   }
 
-  async reviewPriceApplication(applicationId, status) {
+  async reviewPriceApplication(applicationId, status, triggerEl = null) {
     if (applicationId < 1) return;
+    const farmerLabel =
+      triggerEl && triggerEl.closest('tr')
+        ? triggerEl.closest('tr').querySelector('td')?.textContent?.trim().split('\n')[0]
+        : '';
+    if (status === 'approved') {
+      const ok = window.confirm(
+        farmerLabel
+          ? `Approve this price for ${farmerLabel}? This enables self-sale and unlocks Records.`
+          : 'Approve this price? This enables self-sale and unlocks Records.'
+      );
+      if (!ok) return;
+    }
     const notePrompt =
       status === 'rejected'
-        ? 'Add a note for the farmer (reason for rejection / justification):'
-        : 'Optional admin note / justification for this approval:';
+        ? 'Add a note for the farmer (reason for rejection):'
+        : 'Optional admin note for this approval:';
     const note = window.prompt(notePrompt, '') || '';
+    if (status === 'rejected' && !note.trim()) {
+      const proceed = window.confirm('Reject without a note? The farmer will not see a reason.');
+      if (!proceed) return;
+    }
     try {
       const res = await fetch(`/api/farmer-price-applications/${applicationId}/review`, {
         method: 'POST',
@@ -2816,62 +2919,63 @@ class DashboardApp {
       } catch (_e) {
         /* ignore */
       }
+      if (status === 'approved') {
+        const farmerId = Number(data.item?.farmer_id || data.unlock_audit?.farmer_id || 0);
+        if (farmerId > 0) {
+          this.showRecordsUnlockConfirmation(farmerId, data.unlock_audit || null);
+        }
+      }
     } catch (err) {
       this.showNotification(err.message || 'Could not review application.', 'error');
     }
   }
 
   initFarmerSelfSalePanel(farmer) {
-    const toggle = document.getElementById('farmerSelfSaleToggle');
     const statusEl = document.getElementById('farmerSelfSaleStatus');
     const prefEl = document.getElementById('farmerSelfSalePreference');
     const appsWrap = document.getElementById('farmerSelfSaleApplicationsWrap');
+    const manageBtn = document.getElementById('farmerSelfSaleManageBtn');
     const farmerId = this.farmerIdFromRow(farmer);
     const enabled = this.isSelfSaleEnabledRow(farmer);
     const access = this.farmerRecordsAccessState(farmer);
 
     if (prefEl) {
-      prefEl.textContent = `Delivery preference: ${this.formatConsolidationPreference(access.pref)} · Pricelist: ${
-        access.pls ? this.formatPricingLabel(access.pls) : '—'
+      prefEl.textContent = `Delivery preference: ${this.formatConsolidationPreference(access.pref)} · Unlock status: ${
+        access.pls ? this.formatUnlockStatus(access.pls) : '—'
       } · Records: ${access.label}`;
     }
 
-    if (toggle) {
-      toggle.checked = enabled;
-      const clone = toggle.cloneNode(true);
-      toggle.parentNode.replaceChild(clone, toggle);
-      clone.checked = enabled;
-      clone.addEventListener('change', async () => {
-        await this.setFarmerSelfSale(farmerId, clone.checked, farmer);
-      });
+    if (manageBtn && !manageBtn.dataset.bound) {
+      manageBtn.dataset.bound = '1';
+      manageBtn.addEventListener('click', () => this.switchModule('coffee-pricing'));
     }
 
     if (statusEl) {
       statusEl.textContent = enabled
-        ? 'Self-sale enabled — farmer can use Records and submit price applications for beans they sell directly.'
+        ? 'Self-sale enabled — Records unlocked. Price applications are managed in Coffee Pricing.'
         : access.reason === 'pricelist'
-          ? 'Self-sale is off — Records is frozen until you enable self-sale for this sell/drop-off account.'
+          ? 'Self-sale is off — Records frozen. Enable self-sale from Coffee Pricing → Records Unlock Queue, or approve a price application.'
           : 'Self-sale is disabled for this farmer.';
       statusEl.classList.toggle('is-enabled', enabled);
       statusEl.classList.toggle('is-locked', !enabled && access.reason === 'pricelist');
     }
+    this.renderSelfSaleUnlockAuditLine(farmerId, 'farmerSelfSaleAudit');
 
     if (appsWrap) {
-      appsWrap.hidden = !enabled;
+      appsWrap.hidden = false;
     }
 
-    if (enabled && farmerId) {
+    if (farmerId) {
       this.loadFarmerSelfSaleApplications(farmerId);
     } else if (appsWrap) {
       const body = document.getElementById('farmerSelfSaleAppsBody');
       if (body) body.innerHTML = '<tr><td colspan="7">No applications yet.</td></tr>';
     }
-    this.syncCoffeePricingSelfSaleControls(farmerId);
   }
 
   async setFarmerSelfSale(farmerId, enabled, farmerRow) {
     try {
-      const res = await fetch('/api/farmer-self-sale', {
+      const res = await fetch(beanthenticApiUrl('/api/farmer-self-sale'), {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
@@ -2879,6 +2983,7 @@ class DashboardApp {
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || 'Update failed.');
+      if (data.unlock_audit) this.rememberSelfSaleUnlockAudit(farmerId, data.unlock_audit);
       if (farmerRow) {
         farmerRow.self_sale_enabled = !!enabled;
         if (enabled) {
@@ -2915,7 +3020,6 @@ class DashboardApp {
           status: enabled ? 'active' : undefined,
         }
       );
-      this.syncCoffeePricingSelfSaleControls(farmerId);
       this.renderCoffeePricingUnlockQueue();
       this.showNotification(
         enabled
@@ -2923,6 +3027,24 @@ class DashboardApp {
           : 'Self-sale disabled for farmer.',
         'success'
       );
+      if (enabled) {
+        this.showRecordsUnlockConfirmation(farmerId, data.unlock_audit || null);
+        const phone = this.getValue(farmerRow || cached, ['PHONE', 'phone', 'PHONE NO.']);
+        if (phone) {
+          this.messagingApi('/api/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({
+              recipient_phone: phone,
+              category: 'pricing',
+              subject: 'Price records unlocked',
+              body: 'Your coffee records have been unlocked. You can now view the official pricelist and sell produce.',
+            }),
+          }).catch(() => {});
+        }
+      } else {
+        this.renderSelfSaleUnlockAuditLine(farmerId, 'farmerSelfSaleAudit');
+      }
     } catch (err) {
       this.showNotification(err.message || 'Could not update self-sale status.', 'error');
       this.initFarmerSelfSalePanel(farmerRow || { farmer_id: farmerId, self_sale_enabled: !enabled });
@@ -2932,9 +3054,9 @@ class DashboardApp {
   async loadFarmerSelfSaleApplications(farmerId) {
     const body = document.getElementById('farmerSelfSaleAppsBody');
     if (!body) return;
-    body.innerHTML = '<tr><td colspan="7">Loading...</td></tr>';
+    body.innerHTML = window.BeanthenticUI?.loadingRow(7) || '<tr><td colspan="7">Loading...</td></tr>';
     try {
-      const res = await fetch(`/api/farmer-price-applications?farmer_id=${encodeURIComponent(farmerId)}`, {
+      const res = await fetch(beanthenticApiUrl(`/api/farmer-price-applications?farmer_id=${encodeURIComponent(farmerId)}`), {
         credentials: 'same-origin',
       });
       const data = await res.json();
@@ -3000,10 +3122,10 @@ class DashboardApp {
   async loadMisconductReports() {
     const tbody = document.getElementById('clientReportTableBody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="5" class="transactions-loading-cell">Loading...</td></tr>';
+    tbody.innerHTML = window.BeanthenticUI?.loadingRow(7) || '<tr><td colspan="7" class="transactions-loading-cell">Loading...</td></tr>';
 
     try {
-      const res = await fetch('/api/client-reports-list?limit=1000', { credentials: 'same-origin' });
+      const res = await fetch(beanthenticApiUrl('/api/client-reports-list?limit=1000'), { credentials: 'same-origin' });
       const data = await res.json().catch(() => ({}));
       if (data && data.ok === false) {
         throw new Error(
@@ -3021,12 +3143,21 @@ class DashboardApp {
         throw new Error('Invalid response from server.');
       }
       this.misconductReportRows = data.items;
+      if (!Array.isArray(this.transactionsRows) || !this.transactionsRows.length) {
+        try {
+          const txnRes = await fetch(beanthenticApiUrl('/api/transactions-list?limit=2000'), { credentials: 'same-origin' });
+          const txnData = await txnRes.json().catch(() => ({}));
+          if (Array.isArray(txnData.items)) this.transactionsRows = txnData.items;
+        } catch (_e) {
+          /* optional for transaction deep-links */
+        }
+      }
       this.applyClientReportFiltersAndRender();
     } catch (e) {
       console.warn('Misconduct reports load failed:', e);
       const msg = this.escapeHtml(String(e.message || e));
       tbody.innerHTML =
-        '<tr><td colspan="5" class="transactions-error-cell">Could not load reports.<br>' +
+        '<tr><td colspan="7" class="transactions-error-cell">Could not load reports.<br>' +
         msg +
         '</td></tr>';
       this.misconductReportRows = [];
@@ -3064,7 +3195,13 @@ class DashboardApp {
     }
 
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="transactions-error-cell">No reports found.</td></tr>';
+      tbody.innerHTML = window.BeanthenticUI
+        ? window.BeanthenticUI.emptyTableRow(7, {
+            icon: 'fa-flag',
+            title: 'No reports found',
+            hint: 'Misconduct and client reports will list here when filed.',
+          })
+        : '<tr><td colspan="7" class="transactions-error-cell">No reports found.</td></tr>';
       this.updateClientReportCountLabel(0);
       this.renderClientReportPagination();
       return;
@@ -3100,54 +3237,191 @@ class DashboardApp {
     const farmerLabel = this.escapeHtml(r.farmer_name || '—');
     const statusValue = String(r.status || 'under review').toLowerCase();
     const statusClass = statusValue.replace(/\s+/g, '-');
+    const farmerRef = Number(r.farmer_id || r.farmer_no || 0);
+    const txnId = this.resolveClientReportTransactionId(r);
+    const profileBtn = farmerRef
+      ? `<button type="button" class="client-report-link-btn" data-client-report-link="farmer" data-farmer-ref="${farmerRef}">Profile</button>`
+      : `<button type="button" class="client-report-link-btn is-disabled" disabled title="No farmer linked">Profile</button>`;
+    const txnBtn = txnId
+      ? `<button type="button" class="client-report-link-btn" data-client-report-link="transaction" data-txn-id="${txnId}" data-farmer-ref="${farmerRef || ''}">Transaction</button>`
+      : `<button type="button" class="client-report-link-btn is-disabled" disabled title="No related transaction">Transaction</button>`;
 
-    return `<tr>
+    return `<tr data-report-id="${Number(r.id) || 0}">
       <td>${this.escapeHtml(dateStr)}</td>
       <td>${this.escapeHtml(timeStr)}</td>
       <td>${farmerLabel}</td>
       <td>${this.escapeHtml(r.allegation || '')}</td>
+      <td><span class="client-report-status-pill is-${this.escapeHtml(statusClass)}">${this.escapeHtml(this.clientReportStatusLabel(statusValue))}</span></td>
+      <td><div class="client-report-links">${profileBtn}${txnBtn}</div></td>
       <td>
         <div class="report-action-container">
-          <button class="take-action-btn" onclick="dashboardApp.openReportActionModal(${r.id})">
-            Take Action
+          <button class="take-action-btn" type="button" data-client-report-action="${Number(r.id) || 0}">
+            Update status
           </button>
         </div>
       </td>
     </tr>`;
   }
 
-  async updateMisconductStatus(reportId, newStatus) {
+  resolveClientReportTransactionId(report) {
+    const direct = Number(report?.customer_transaction_id || report?.transaction_id || 0);
+    if (direct > 0) return direct;
+    const farmerId = Number(report?.farmer_id || report?.farmer_no || 0);
+    if (!farmerId) return 0;
+    const rows = Array.isArray(this.transactionsRows) ? this.transactionsRows : [];
+    const match = rows.find((txn) => Number(txn.farmer_id || txn.farmer_no || 0) === farmerId);
+    return Number(match?.id || match?.customer_transaction_id || 0) || 0;
+  }
+
+  async updateMisconductStatus(reportId, newStatus, resolutionNote = '') {
     try {
       const res = await fetch(`/api/misconduct-reports/${reportId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        credentials: 'same-origin',
+        body: JSON.stringify({ status: newStatus, resolution_note: resolutionNote }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `HTTP ${res.status}`);
       }
       this.showNotification(`Report #${reportId} updated to ${newStatus}`, 'success');
       await this.loadMisconductReports();
     } catch (e) {
       console.warn('Status update failed:', e);
-      this.showNotification('Could not update status.', 'error');
-      await this.loadMisconductReports(); // Refresh to revert UI
+      this.showNotification(e.message || 'Could not update status.', 'error');
+      await this.loadMisconductReports();
     }
   }
 
-  openReportActionModal(reportId) {
-    const report = (this.misconductReportRows || []).find(r => r.id === reportId);
-    if (!report) return;
+  initClientReportActionModal() {
+    const root = document.getElementById('clientReportActionModal');
+    if (!root || root.dataset.bound) return;
+    root.dataset.bound = '1';
+    const cancelBtn = document.getElementById('clientReportActionCancel');
+    const saveBtn = document.getElementById('clientReportActionSave');
+    const statusSelect = document.getElementById('clientReportStatusSelect');
+    const noteInput = document.getElementById('clientReportResolutionNote');
+    const requiredMark = document.getElementById('clientReportNoteRequiredMark');
+    const backdrop = root.querySelector('.confirm-dialog__backdrop');
 
-    if (report.farmer_no) {
-      // First switch to the farmers list module
-      this.switchModule('farmers-list');
-      // Then open the specific farmer's profile
-      this.openFarmerProfile(report.farmer_no, 'client-report');
-      this.showNotification(`Reviewing report for ${report.farmer_name}`, 'info');
-    } else {
+    const syncNoteRequirement = () => {
+      const status = String(statusSelect?.value || '').toLowerCase();
+      const needsNote = ['closed', 'resolved', 'dismissed'].includes(status);
+      if (requiredMark) requiredMark.hidden = !needsNote;
+      if (noteInput) noteInput.required = needsNote;
+    };
+
+    if (statusSelect) statusSelect.addEventListener('change', syncNoteRequirement);
+    if (cancelBtn) cancelBtn.addEventListener('click', () => this.closeClientReportActionModal());
+    if (backdrop) backdrop.addEventListener('click', () => this.closeClientReportActionModal());
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        const reportId = Number(root.dataset.reportId || 0);
+        const status = String(statusSelect?.value || '').trim();
+        const note = String(noteInput?.value || '').trim();
+        if (!reportId || !status) return;
+        if (['closed', 'resolved', 'dismissed'].includes(status.toLowerCase()) && !note) {
+          this.showNotification('Add a resolution note before closing this report.', 'error');
+          noteInput?.focus();
+          return;
+        }
+        saveBtn.disabled = true;
+        try {
+          await this.updateMisconductStatus(reportId, status, note);
+          this.closeClientReportActionModal();
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+    }
+
+    const table = document.getElementById('clientReportTable');
+    if (table && !table.dataset.reportLinksBound) {
+      table.dataset.reportLinksBound = '1';
+      table.addEventListener('click', (e) => {
+        const actionBtn = e.target.closest('[data-client-report-action]');
+        if (actionBtn) {
+          this.openReportActionModal(Number(actionBtn.dataset.clientReportAction || 0));
+          return;
+        }
+        const linkBtn = e.target.closest('[data-client-report-link]');
+        if (!linkBtn || linkBtn.disabled) return;
+        const kind = linkBtn.dataset.clientReportLink;
+        if (kind === 'farmer') {
+          this.openClientReportFarmerProfile(Number(linkBtn.dataset.farmerRef || 0));
+        } else if (kind === 'transaction') {
+          this.openClientReportTransaction(
+            Number(linkBtn.dataset.txnId || 0),
+            Number(linkBtn.dataset.farmerRef || 0)
+          );
+        }
+      });
+    }
+    syncNoteRequirement();
+  }
+
+  closeClientReportActionModal() {
+    const root = document.getElementById('clientReportActionModal');
+    if (!root) return;
+    root.hidden = true;
+    root.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('confirm-dialog-active');
+    delete root.dataset.reportId;
+  }
+
+  openReportActionModal(reportId) {
+    const report = (this.misconductReportRows || []).find((r) => Number(r.id) === Number(reportId));
+    if (!report) return;
+    const root = document.getElementById('clientReportActionModal');
+    const statusSelect = document.getElementById('clientReportStatusSelect');
+    const noteInput = document.getElementById('clientReportResolutionNote');
+    const subtitle = document.getElementById('clientReportActionSubtitle');
+    if (!root || !statusSelect) {
+      // Fallback: open farmer profile if modal markup is missing.
+      this.openClientReportFarmerProfile(Number(report.farmer_id || report.farmer_no || 0));
+      return;
+    }
+    root.dataset.reportId = String(reportId);
+    const current = String(report.status || 'under review').toLowerCase();
+    const options = [...statusSelect.options].map((o) => o.value);
+    statusSelect.value = options.includes(current) ? current : 'under review';
+    if (noteInput) noteInput.value = report.resolution_note || '';
+    if (subtitle) {
+      subtitle.textContent = `Report #${reportId} · ${report.farmer_name || 'Farmer'} — a resolution note is required for Closed / Resolved / Dismissed.`;
+    }
+    statusSelect.dispatchEvent(new Event('change'));
+    root.hidden = false;
+    root.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('confirm-dialog-active');
+  }
+
+  openClientReportFarmerProfile(farmerRef) {
+    const ref = Number(farmerRef);
+    if (!ref) {
       this.showNotification('Farmer record not found for this report.', 'error');
+      return;
+    }
+    this.switchModule('farmers-list');
+    this.openFarmerProfile(ref, 'client-report');
+  }
+
+  async openClientReportTransaction(txnId, farmerRef = 0) {
+    const id = Number(txnId);
+    this.switchModule('transactions');
+    if (!Array.isArray(this.transactionsRows) || !this.transactionsRows.length) {
+      await this.loadTransactionsPage();
+    }
+    if (farmerRef) {
+      this.transactionsFarmerFilterId = Number(farmerRef);
+      const filterSelect = document.getElementById('transactionsFarmerFilter');
+      if (filterSelect) filterSelect.value = String(farmerRef);
+      this.applyTransactionsFiltersAndRender();
+    }
+    if (id > 0) {
+      this.openReceipt(id);
+    } else {
+      this.showNotification('No related transaction for this report.', 'info');
     }
   }
 
@@ -3156,7 +3430,8 @@ class DashboardApp {
     if (v === 'blocked') return 'Blocked';
     if (v === 'resolved') return 'Resolved';
     if (v === 'dismissed') return 'Dismissed';
-    return 'Open';
+    if (v === 'closed') return 'Closed';
+    return 'Under review';
   }
 
   updateClientReportCountLabel(count) {
@@ -3187,8 +3462,9 @@ class DashboardApp {
     // Header icon buttons
     const messagingBtn = document.getElementById('messagingBtn');
     if (messagingBtn) {
-      messagingBtn.addEventListener('click', () => {
+      messagingBtn.addEventListener('click', async () => {
         this.switchModule('messaging');
+        await this.openLatestUnreadMessageThread();
       });
     }
 
@@ -3898,14 +4174,19 @@ class DashboardApp {
       'account': 'Account',
       'messaging': 'Messaging'
     };
-    currentModule.textContent = moduleNames[moduleName] || 'Overview';
+    if (currentModule) {
+      currentModule.textContent = moduleNames[moduleName] || 'Overview';
+      currentModule.classList.remove('is-updating');
+      void currentModule.offsetWidth;
+      currentModule.classList.add('is-updating');
+    }
 
     // Load account data when switching to account module
     if (moduleName === 'account') {
       this.loadAccountData();
     }
 
-    // Switch modules
+    // Switch modules with a brief enter animation
     const modules = document.querySelectorAll('.module');
     modules.forEach(module => {
       module.classList.add('hidden');
@@ -3914,10 +4195,18 @@ class DashboardApp {
     const targetModule = document.getElementById(`${resolvedModuleName}-module`);
     if (targetModule) {
       targetModule.classList.remove('hidden');
+      targetModule.classList.remove('is-entering');
+      void targetModule.offsetWidth;
+      targetModule.classList.add('is-entering');
+      window.setTimeout(() => targetModule.classList.remove('is-entering'), 360);
+    }
+
+    const moduleContent = document.querySelector('.module-content');
+    if (moduleContent) {
+      moduleContent.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     // Scroll behavior: lock page scroll for Farmers and Messaging (inner panes scroll)
-    const moduleContent = document.querySelector('.module-content');
     if (moduleContent) {
       moduleContent.classList.toggle(
         'lock-scroll',
@@ -4153,12 +4442,12 @@ class DashboardApp {
     };
 
     const resolvedTab = fragments[tab] ? tab : 'security';
-    const url = fragments[resolvedTab];
+    const url = beanthenticApiUrl(fragments[resolvedTab]);
 
     if (titleEl) titleEl.textContent = titleMap[resolvedTab] || 'Account Security';
     if (pageTitleEl) pageTitleEl.textContent = titleMap[resolvedTab] || 'Settings';
 
-    container.innerHTML = 'Loading...';
+    container.innerHTML = window.BeanthenticUI?.loadingPanel('Loading settings') || 'Loading...';
     try {
       const res = await fetch(url);
       if (!res.ok) {
@@ -4181,9 +4470,11 @@ class DashboardApp {
       const q = item.querySelector('.faq-question');
       const a = item.querySelector('.faq-answer');
       if (!q || !a) return;
+      q.setAttribute('aria-expanded', item.classList.contains('active') ? 'true' : 'false');
       q.addEventListener('click', () => {
         item.classList.toggle('active');
         a.classList.toggle('active');
+        q.setAttribute('aria-expanded', item.classList.contains('active') ? 'true' : 'false');
       });
     });
 
@@ -4192,6 +4483,27 @@ class DashboardApp {
     const actionFilter = containerEl.querySelector('#activityActionFilter');
     const tbody = containerEl.querySelector('#activityTableBody');
     if (tbody) {
+      try {
+        const res = await fetch(beanthenticApiUrl('/api/activity-feed'), { credentials: 'same-origin' });
+        const data = await res.json().catch(() => ({}));
+        const items = Array.isArray(data.items) ? data.items : [];
+        if (items.length) {
+          tbody.innerHTML = items
+            .map((entry) => {
+              const ts = this.escapeHtml(this.formatNotificationMeta(entry.timestamp) || entry.timestamp || '—');
+              const action = this.escapeHtml(entry.action || '—');
+              const details = this.escapeHtml(entry.details || '');
+              const ip = this.escapeHtml(entry.ip_address || '—');
+              return `<tr><td>${ts}</td><td>${action}</td><td>${details}</td><td>${ip}</td></tr>`;
+            })
+            .join('');
+        } else {
+          tbody.innerHTML = '<tr><td colspan="4">No activity recorded yet.</td></tr>';
+        }
+      } catch (_) {
+        tbody.innerHTML = '<tr><td colspan="4">Could not load activity log.</td></tr>';
+      }
+
       const rows = Array.from(tbody.querySelectorAll('tr'));
 
       const getRowActionText = (row) => {
@@ -4254,6 +4566,7 @@ class DashboardApp {
           const nameEl = document.querySelector('.user-name');
           if (nameEl) nameEl.textContent = fullName;
           if (window.__BEANTHENTIC_USER__) window.__BEANTHENTIC_USER__.full_name = fullName;
+          this.updateAdminGreeting(fullName);
           this.showNotification(result.success || 'Profile updated.', 'success');
         } catch {
           this.showNotification('Could not update profile.', 'error');
@@ -4458,7 +4771,7 @@ class DashboardApp {
 
       // Always fetch from DB-backed API so Flask-Admin changes
       // are immediately reflected on the website.
-      const response = await fetch('/api/farmer-data');
+      const response = await fetch(beanthenticApiUrl('/api/farmer-data'));
       console.log('API response status:', response.status);
       let apiData;
       try {
@@ -4491,7 +4804,6 @@ class DashboardApp {
             .map((row) => this.applyOwnershipFlags(row))
         : [];
       this.farmersData = this.data;
-
       if (this.data.length === 0) {
         this.showNotification(
           'No completed farmer registrations yet. Records appear here only after a farmer finishes the full app registration.',
@@ -4511,7 +4823,6 @@ class DashboardApp {
       } catch (_) {
         /* ignore quota errors */
       }
-      this.syncCoffeePricingSelfSaleControls();
       this.renderCoffeePricingUnlockQueue();
 
       this.updateStats();
@@ -4532,7 +4843,6 @@ class DashboardApp {
         this.farmersData = this.data;
         this.filteredData = [...this.data];
         this.totalRecords = this.data.length;
-        this.syncCoffeePricingSelfSaleControls();
         this.renderCoffeePricingUnlockQueue();
         this.updateStats();
         this.createCharts();
@@ -4545,12 +4855,16 @@ class DashboardApp {
         return;
       }
 
-      // 2. If no backup, fallback to sample data for demo purposes
-      console.log('API and Backup unavailable. Falling back to sample data...');
-      this.loadSampleData();
+      console.log('API and Backup unavailable. Showing empty farmer list.');
+      this.data = [];
+      this.farmersData = [];
+      this.filteredData = [];
+      this.totalRecords = 0;
       this.showNotification(
-        'App connection failed. Showing sample farmer records. Set app_server_base to http://<XAMPP-PC-IP>:8080 and restart python web.py.',
-        'brown'
+        error && error.message
+          ? `Could not load farmer records (${error.message}). Demo data is disabled.`
+          : 'Could not load farmer records. Check the app database connection.',
+        'error'
       );
       
       this.updateStats();
@@ -4733,6 +5047,7 @@ class DashboardApp {
       if (needsRefresh) {
         this.renderFarmersListCards();
         this.renderTableBody();
+        this.refreshMapFromLiveFarmers({ silent: true, reloadFarmers: false });
         if (this.currentFarmerNo) {
           const idx = this.farmerIndexById(this.currentFarmerNo);
           if (idx !== -1) this.updateProfileStatusButtons(this.data[idx].is_blocked);
@@ -4758,7 +5073,13 @@ class DashboardApp {
 
     if (!pageData.length) {
       if (this.data.length === 0) {
-        grid.innerHTML = `
+        grid.innerHTML = window.BeanthenticUI
+          ? `<div style="grid-column: 1 / -1;">${window.BeanthenticUI.emptyState({
+              icon: 'fa-people-group',
+              title: 'No completed registrations yet',
+              hint: 'Farmers appear here only after they finish the full registration in the mobile app.',
+            })}</div>`
+          : `
           <div class="placeholder-content" style="grid-column: 1 / -1; padding: 4rem 2rem;">
             <div class="placeholder-icon"><i class="fa-solid fa-people-group"></i></div>
             <h3>No completed registrations yet</h3>
@@ -4767,47 +5088,20 @@ class DashboardApp {
         `;
         return;
       }
-      grid.innerHTML = Array.from({ length: 6 }, (_, idx) => {
-        const n = idx + 1;
-        return `<article class="farmer-card" aria-label="Placeholder farmer card ${n}">
-  <div class="farmer-card__header">
-    <div class="farmer-card__status-badge">Active</div>
-    <div class="farmer-card__menu-dots"><i class="fa-solid fa-ellipsis"></i></div>
-  </div>
-  <div class="farmer-card__media">
-    <div class="farmer-card__avatar-circle">
-      <i class="fa-solid fa-user" style="font-size: 2rem; color: #cbd5e1;"></i>
-    </div>
-  </div>
-  <div class="farmer-card__identity">
-    <h3 class="farmer-card__name">Name</h3>
-  </div>
-  <div class="farmer-card__inner-box" style="background: #ffffff; border: 1px solid #f1f5f9;">
-    <div class="farmer-card__detail-row">
-      <i class="fa-solid fa-hashtag"></i>
-      <span>#${n}</span>
-    </div>
-    <div class="farmer-card__detail-row">
-      <i class="fa-solid fa-cake-candles"></i>
-      <span>Month/Date/Year</span>
-    </div>
-    <div class="farmer-card__detail-row">
-      <i class="fa-solid fa-location-dot"></i>
-      <span>Barangay, Municipality, Province</span>
-    </div>
-    <div class="farmer-card__detail-row">
-      <i class="fa-solid fa-phone"></i>
-      <span class="farmer-card__pill" style="background: #f8fafc; border: 1px solid #e2e8f0; color: #475569;">+63 900 XXXX XXXX</span>
-    </div>
-  </div>
-  <div class="farmer-card__footer">
-    <button type="button" class="view-details-btn" data-action="open-farmer-placeholder-profile" data-farmer-no="${n}">
-      View details <i class="fa-solid fa-chevron-right"></i>
-    </button>
-  </div>
-</article>`;
-      }).join('');
-      return;
+        grid.innerHTML = window.BeanthenticUI
+          ? `<div style="grid-column: 1 / -1;">${window.BeanthenticUI.emptyState({
+              icon: 'fa-magnifying-glass',
+              title: 'No matching farmers',
+              hint: 'Try a different name, barangay, or phone number.',
+            })}</div>`
+          : `
+          <div class="placeholder-content" style="grid-column: 1 / -1; padding: 4rem 2rem;">
+            <div class="placeholder-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+            <h3>No matching farmers</h3>
+            <p>Try a different name, barangay, or phone number.</p>
+          </div>
+        `;
+        return;
     }
 
     const formatNo = (row) => this.farmerDisplaySeqNo(row, this.data);
@@ -4827,9 +5121,11 @@ class DashboardApp {
         
         return `<article class="farmer-card" aria-label="${esc(fullName)}">
   <div class="farmer-card__header">
-    <div class="farmer-card__status-badge ${isBlocked ? 'is-blocked' : ''}">
-      ${isBlocked ? 'Suspended' : 'Active'}
-      ${isBlocked && row.suspended_until ? `<span class="suspension-countdown" data-until="${row.suspended_until}" data-farmer-id="${esc(farmerId)}">${this.getSuspensionCountdown(row.suspended_until)}</span>` : ''}
+    <div class="farmer-card__header-badges">
+      <div class="farmer-card__status-badge ${isBlocked ? 'is-blocked' : ''}">
+        ${isBlocked ? 'Suspended' : 'Active'}
+        ${isBlocked && row.suspended_until ? `<span class="suspension-countdown" data-until="${row.suspended_until}" data-farmer-id="${esc(farmerId)}">${this.getSuspensionCountdown(row.suspended_until)}</span>` : ''}
+      </div>
     </div>
     <div class="profile-actions-dropdown">
       <button type="button" class="profile-actions-toggle card-menu-toggle" aria-label="More actions">
@@ -5121,7 +5417,7 @@ class DashboardApp {
     
     try {
       const response = await fetch(
-        `/api/transactions-list?farmer_id=${encodeURIComponent(farmerId)}&limit=100`
+        beanthenticApiUrl(`/api/transactions-list?farmer_id=${encodeURIComponent(farmerId)}&limit=100`)
       );
       const data = await response.json().catch(() => ({}));
       if (data && data.ok === false) {
@@ -5422,7 +5718,13 @@ class DashboardApp {
                 : this.farmerTableView === 'farm'
                   ? 9
                   : 5;
-      tableBody.innerHTML = `<tr><td colspan="${colSpan}" class="no-data">No data available.</td></tr>`;
+      tableBody.innerHTML = window.BeanthenticUI
+        ? window.BeanthenticUI.emptyTableRow(colSpan, {
+            icon: 'fa-table',
+            title: 'No data available',
+            hint: 'Try adjusting filters or wait for new farmer records to sync.',
+          })
+        : `<tr><td colspan="${colSpan}" class="no-data">No data available.</td></tr>`;
       return;
     }
 
@@ -5697,7 +5999,7 @@ class DashboardApp {
   }
 
   async postFarmerAccountAction(farmerId, action, reason, days) {
-    const res = await fetch('/api/farmer-account-action', {
+    const res = await fetch(beanthenticApiUrl('/api/farmer-account-action'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
@@ -5761,6 +6063,7 @@ class DashboardApp {
       }
       this.renderFarmersListCards();
       this.renderTableBody();
+      this.refreshMapFromLiveFarmers({ silent: true, reloadFarmers: false });
     } catch (err) {
       console.error('Failed to suspend farmer:', err);
       this.showNotification(err.message || 'Could not suspend farmer.', 'error');
@@ -5786,6 +6089,7 @@ class DashboardApp {
       }
       this.renderFarmersListCards();
       this.renderTableBody();
+      this.refreshMapFromLiveFarmers({ silent: true, reloadFarmers: false });
     } catch (err) {
       console.error('Failed to unsuspend farmer:', err);
       this.showNotification(err.message || 'Could not unsuspend farmer.', 'error');
@@ -6900,8 +7204,6 @@ class DashboardApp {
 
   createCharts() {
     if (!window.Chart) return;
-    this.createTreeDistributionChart();
-    this.createProductionChart();
     this.updateRegistrationChart();
   }
 
@@ -6923,7 +7225,7 @@ class DashboardApp {
 
     (Array.isArray(rows) ? rows : []).forEach((row) => {
       if (!this.isFarmerRegistrationComplete(row)) return;
-      const raw = row.registered_at || row.created_at;
+      const raw = row.registered_at || row.created_at || row.updated_at || row.date_registered;
       if (!raw) return;
       const parsed = new Date(raw);
       if (Number.isNaN(parsed.getTime())) return;
@@ -7518,16 +7820,12 @@ class DashboardApp {
       const groupFileDocs = (this.ipophlFiles?.[service] || []).map((f) => ({
         ai_score: Number(f.ai_score || 0),
         ai_status: f.ai_status,
+        status: f.ai_status,
       }));
       const source = groupDocs.length ? groupDocs : groupFileDocs;
-      const anyReady = source.some((d) => isReadyDoc(d));
-      const best = anyReady
-        ? 100
-        : source.length
-          ? Math.max(...source.map((d) => Number(d.ai_score || 0)))
-          : this.isIpophlServiceComplete(service)
-            ? 50
-            : 0;
+      const anyReady = source.some((d) => isReadyDoc(d)) || this.isIpophlServiceComplete(service);
+      // MoP Ready is authoritative — no keyword % scores in Analytics.
+      const best = anyReady ? 100 : source.length ? 0 : 0;
       const phaseNum = Object.keys(servicesByPhase).find((p) =>
         servicesByPhase[p].includes(service)
       );
@@ -7535,7 +7833,8 @@ class DashboardApp {
         service,
         label: this.getIpophlGroupLabel(service),
         score: best,
-        complete: this.isIpophlServiceComplete(service),
+        mopReady: anyReady,
+        complete: anyReady,
         phase: Number(phaseNum || 0),
         passed: anyReady,
         failed: source.length > 0 && !anyReady,
@@ -7544,22 +7843,23 @@ class DashboardApp {
 
     const phaseStats = [1, 2, 3, 4].map((phase) => {
       const services = servicesByPhase[phase] || [];
-      const completed = phase === 4
+      const mopReadyGroups = phase === 4
         ? (this._ipophlCompiledOnce ? 1 : 0)
         : services.filter((s) => this.isIpophlServiceComplete(s)).length;
-      const pending = phase === 4
-        ? (this._ipophlCompiledOnce ? 0 : 1)
-        : services.length - completed;
+      const totalGroups = phase === 4 ? 1 : services.length;
+      const pending = Math.max(0, totalGroups - mopReadyGroups);
       const phaseDocs = items.filter((d) => String(d.ipophl_phase || '').includes(String(phase)) || services.includes(String(d.task_id || '')));
       const pass = phaseDocs.filter((d) => isReadyDoc(d)).length;
-      const fail = phaseDocs.filter((d) => String(d.ai_status || '').trim() && !isReadyDoc(d)).length;
+      const fail = phaseDocs.filter((d) => String(d.ai_status || d.status || '').trim() && !isReadyDoc(d)).length;
+      const mopReadyPct = totalGroups > 0 ? Math.round((mopReadyGroups / totalGroups) * 100) : 0;
       return {
         phase,
-        completed,
+        completed: mopReadyGroups,
         pending,
         pass,
         fail,
-        totalGroups: phase === 4 ? 1 : services.length,
+        totalGroups,
+        mopReadyPct,
       };
     });
 
@@ -7601,27 +7901,6 @@ class DashboardApp {
       timelineLabels,
       timelineValues,
     };
-  }
-
-  async fetchMlStatusForAnalytics() {
-    try {
-      const res = await fetch(beanthenticApiUrl('/api/ml/status'), { credentials: 'same-origin' });
-      const data = await beanthenticParseJsonResponse(res).catch(() => ({}));
-      if (!res.ok || !data.success) return null;
-      return data;
-    } catch {
-      return null;
-    }
-  }
-
-  formatMlStatusLabel(status) {
-    if (!status) return 'Unavailable';
-    const farmer = !!status.farmer_model_loaded;
-    const doc = !!status.document_model_loaded;
-    if (farmer && doc) return 'Active · Farmer + Doc';
-    if (farmer) return 'Active · Farmer';
-    if (doc) return 'Active · Document';
-    return 'Not trained';
   }
 
   isFarmerGiEligibleByRules(farmer) {
@@ -7682,8 +7961,12 @@ class DashboardApp {
     if (!window.Chart) return;
 
     const docs = await this.fetchIpophlDocumentItems();
+    const fromMonth = document.getElementById('analyticsFromMonth')?.value || '';
+    const filteredDocs = fromMonth
+      ? docs.filter((d) => String(d.upload_timestamp || d.created_at || '').slice(0, 7) >= fromMonth)
+      : docs;
     const metrics = await this.computeGiAnalyticsAsync();
-    const ipophl = this.computeIpophlDocumentAnalytics(docs);
+    const ipophl = this.computeIpophlDocumentAnalytics(filteredDocs);
     const ipophlSnapshot = this.getIpophlCompletionSnapshot();
 
     this.setText('analyticsDocsPassed', String(ipophl.passedFiles));
@@ -7694,94 +7977,62 @@ class DashboardApp {
         : 'Ready documents'
     );
     this.setText('ipophlProgressRate', `${ipophlSnapshot.percentage}%`);
-    this.setText('ipophlProgressSub', `${ipophlSnapshot.completed} of ${ipophlSnapshot.total} groups`);
+    this.setText(
+      'ipophlProgressSub',
+      `${ipophlSnapshot.completed} of ${ipophlSnapshot.total} groups Ready`
+    );
 
     this.renderIpophlPhaseCompletionChart(ipophl);
     this.renderIpophlUploadTimelineChart(ipophl);
     this.renderTopBarangaysChart(metrics);
     this.renderGiGrowthTrendChart(metrics);
     this.renderGiReadinessGaugeChart(metrics);
+    this.bindAnalyticsToolbar(docs);
+  }
+
+  bindAnalyticsToolbar(docs) {
+    const fromEl = document.getElementById('analyticsFromMonth');
+    const exportBtn = document.getElementById('analyticsExportBtn');
+    if (fromEl && !fromEl.dataset.bound) {
+      fromEl.dataset.bound = '1';
+      fromEl.addEventListener('change', () => this.renderAnalyticsModule());
+    }
+    if (exportBtn && !exportBtn.dataset.bound) {
+      exportBtn.dataset.bound = '1';
+      exportBtn.addEventListener('click', () => this.exportAnalyticsCharts());
+    }
+  }
+
+  exportAnalyticsCharts() {
+    const ids = [
+      'ipophlPhaseCompletionChart',
+      'ipophlUploadTimelineChart',
+      'topBarangaysChart',
+      'giGrowthTrendChart',
+      'giReadinessGaugeChart',
+    ];
+    ids.forEach((id) => {
+      const canvas = document.getElementById(id);
+      if (!canvas || typeof canvas.toDataURL !== 'function') return;
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = `${id}.png`;
+      a.click();
+    });
+    this.showNotification('Chart images downloaded.', 'success');
   }
 
   async computeGiAnalyticsAsync() {
+    // Rule-based farmer eligibility only — AI analysis is document/MoP focused.
     const base = this.computeGiAnalytics();
     const rows = Array.isArray(this.data) ? this.data : [];
-    if (!rows.length) {
-      return {
-        ...base,
-        mlEnabled: false,
-        predictions: [],
-        readinessBuckets: [0, 0, 0, 0],
-        farmersNeedingSupport: 0,
-      };
-    }
-
-    try {
-      const res = await fetch(beanthenticApiUrl('/api/ml/farmer-readiness'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ farmers: rows }),
-      });
-      const data = await beanthenticParseJsonResponse(res);
-      if (!res.ok || !data.success || !Array.isArray(data.predictions)) {
-        return {
-          ...base,
-          mlEnabled: false,
-          predictions: [],
-          readinessBuckets: this.buildFarmerReadinessBuckets([]),
-          farmersNeedingSupport: this.countFarmersNeedingGiSupport(rows, []),
-        };
-      }
-
-      let eligible = 0;
-      const eligibilityByIndex = data.predictions.map((p) => {
-        const ready = !!p.gi_ready;
-        if (ready) eligible += 1;
-        return ready;
-      });
-      const notEligible = rows.length - eligible;
-
-      const trendWindow = 6;
-      const bucketSize = Math.max(1, Math.ceil(rows.length / trendWindow));
-      const trendLabels = [];
-      const trendValues = [];
-      const now = new Date();
-      let cumulativeReady = 0;
-      for (let i = 0; i < rows.length; i++) {
-        if (eligibilityByIndex[i]) cumulativeReady += 1;
-        const bucketEnd = i === rows.length - 1 || (i + 1) % bucketSize === 0;
-        if (bucketEnd) {
-          const step = trendValues.length;
-          const d = new Date(now.getFullYear(), now.getMonth() - (trendWindow - 1 - step), 1);
-          trendLabels.push(d.toLocaleString(undefined, { month: 'short', year: '2-digit' }));
-          trendValues.push(cumulativeReady);
-        }
-      }
-
-      return {
-        ...base,
-        eligible,
-        notEligible,
-        eligibilityByIndex,
-        trendLabels,
-        trendValues,
-        mlEnabled: true,
-        analysisMethod: data.analysis_method || 'ml_farmer',
-        predictions: data.predictions,
-        readinessBuckets: this.buildFarmerReadinessBuckets(data.predictions),
-        farmersNeedingSupport: this.countFarmersNeedingGiSupport(rows, data.predictions),
-      };
-    } catch (err) {
-      console.warn('ML analytics fallback to rules:', err);
-      return {
-        ...base,
-        mlEnabled: false,
-        predictions: [],
-        readinessBuckets: this.buildFarmerReadinessBuckets([]),
-        farmersNeedingSupport: this.countFarmersNeedingGiSupport(rows, []),
-      };
-    }
+    return {
+      ...base,
+      mlEnabled: false,
+      predictions: [],
+      readinessBuckets: this.buildFarmerReadinessBuckets([]),
+      farmersNeedingSupport: this.countFarmersNeedingGiSupport(rows, []),
+    };
   }
 
   async renderIpophlModule() {
@@ -7796,11 +8047,37 @@ class DashboardApp {
     this.initializeFileUpload();
     this.initializeLinkInputs();
     this.initializeProgressSteps();
+    this.captureIpophlUploadZoneLabels();
     
     // Load and display submission status
     this.loadSubmissionStatus();
     this.updateSubmissionStatus();
     this.updateGiProcessIndicator();
+    this.refreshIpophlMlBanner();
+  }
+
+  async refreshIpophlMlBanner() {
+    const banner = document.getElementById('ipophlMlBanner');
+    if (!banner) return;
+    try {
+      const res = await fetch(beanthenticApiUrl('/api/ml/status'), { credentials: 'same-origin' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) {
+        banner.hidden = false;
+        banner.textContent = 'AI status unavailable. Document review will use rules only.';
+        return;
+      }
+      if (data.document_model_loaded) {
+        banner.hidden = true;
+        banner.textContent = '';
+        return;
+      }
+      banner.hidden = false;
+      banner.textContent = 'Document AI model is not loaded. Review still runs on GI filing rules; retrain if needed.';
+    } catch (_) {
+      banner.hidden = false;
+      banner.textContent = 'Could not reach the AI status endpoint.';
+    }
   }
 
   initializePhaseNavigation() {
@@ -7916,9 +8193,17 @@ class DashboardApp {
         return;
       }
       if (res.status === 404) {
-        throw new Error(
-          'Compile API not found. Restart python web.py, then hard-refresh (Ctrl+F5).'
-        );
+        try {
+          const check = await fetch(beanthenticApiUrl('/api/admin/system-check'), { credentials: 'same-origin' });
+          const health = await check.json().catch(() => ({}));
+          const hint = health && health.ok === false
+            ? (health.error || 'System check reported a problem.')
+            : 'Route missing — restart python web.py, then hard-refresh (Ctrl+F5).';
+          throw new Error(`Compile API not found. ${hint}`);
+        } catch (healthErr) {
+          if (String(healthErr.message || '').startsWith('Compile API')) throw healthErr;
+          throw new Error('Compile API not found. Restart python web.py, then hard-refresh (Ctrl+F5).');
+        }
       }
       const data = await beanthenticParseJsonResponse(res).catch(() => ({}));
       if (!res.ok || data.ok === false) {
@@ -8289,6 +8574,18 @@ class DashboardApp {
   }
 
   async completeRegistration() {
+    if (!this.areAllRequiredIpophlDocsMopReady()) {
+      const missing = (this.getIpophlCompletionSnapshot().missing || [])
+        .map((s) => this.getIpophlGroupLabel(s))
+        .join(', ');
+      this.showIpophlNotification(
+        missing
+          ? `Complete Registration is blocked until Ready for: ${missing}.`
+          : 'Complete Registration is blocked until all required phase docs are Ready.'
+      );
+      this.syncCompleteRegistrationButtonState();
+      return;
+    }
     if (typeof window.publishIpophlToGiUpdates === 'function') {
       return window.publishIpophlToGiUpdates();
     }
@@ -8686,11 +8983,16 @@ class DashboardApp {
     if (fileItem) {
       fileItem.remove();
     }
-    
+
     if (this.ipophlFiles && this.ipophlFiles[service]) {
       this.ipophlFiles[service] = this.ipophlFiles[service].filter(f => f.id !== fileId);
     }
 
+    if (service?.startsWith('phase')) {
+      this.resetIpophlUploadZone(service);
+    } else {
+      this.syncIpophlUploadZoneCompactState();
+    }
     this.updateGiProcessIndicator();
   }
 
@@ -8730,6 +9032,44 @@ class DashboardApp {
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
     return { total, completed, percentage, missing: allServices.filter((s) => !completedServices.includes(s)) };
+  }
+
+  /** True when every required phase document group has at least one MoP Ready file. */
+  areAllRequiredIpophlDocsMopReady() {
+    const snapshot = this.getIpophlCompletionSnapshot();
+    return snapshot.total > 0 && snapshot.completed === snapshot.total;
+  }
+
+  syncCompleteRegistrationButtonState() {
+    const completeBtn = document.querySelector('#ipophl-module .complete-btn');
+    if (!completeBtn) return;
+    if (!completeBtn.dataset.defaultLabel) {
+      completeBtn.dataset.defaultLabel = completeBtn.textContent.trim() || 'Complete Registration';
+    }
+    const ready = this.areAllRequiredIpophlDocsMopReady();
+    const missing = this.getIpophlCompletionSnapshot().missing || [];
+    if (!ready) {
+      completeBtn.disabled = true;
+      completeBtn.classList.add('is-blocked-mop');
+      completeBtn.title =
+        missing.length
+          ? `Blocked until Ready for: ${missing.map((s) => this.getIpophlGroupLabel(s)).join(', ')}`
+          : 'Blocked until all required phase docs are Ready.';
+      completeBtn.setAttribute(
+        'aria-label',
+        'Complete registration blocked until all required phase docs are Ready'
+      );
+    } else {
+      completeBtn.disabled = false;
+      completeBtn.classList.remove('is-blocked-mop', 'is-completed', 'is-loading');
+      completeBtn.removeAttribute('aria-busy');
+      completeBtn.title = 'Publish MoP-ready package to GI Updates';
+      completeBtn.setAttribute(
+        'aria-label',
+        'Complete registration and publish to GI Updates'
+      );
+      completeBtn.textContent = completeBtn.dataset.defaultLabel;
+    }
   }
 
   getGiAiStatusDescriptor() {
@@ -8808,10 +9148,54 @@ class DashboardApp {
     aiStatusEl.classList.remove('gi-status-pill--pending', 'gi-status-pill--pass', 'gi-status-pill--fail');
     aiStatusEl.classList.add(aiStatus.className);
 
+    this.syncCompleteRegistrationButtonState();
     this.updateProgress(this.currentPhase || 1);
   }
 
+  captureIpophlUploadZoneLabels() {
+    document.querySelectorAll('#ipophl-module .file-upload-zone[data-service]').forEach((zone) => {
+      if (zone.dataset.uploadLabel) return;
+      const label = zone.querySelector(':scope > p');
+      const text = label?.textContent?.trim() || '';
+      if (text && text !== 'Add more files') {
+        zone.dataset.uploadLabel = text;
+      }
+    });
+  }
+
+  applyIpophlUploadZoneState(zone, hasFiles) {
+    if (!zone) return;
+    zone.classList.toggle('has-files', hasFiles);
+    zone.setAttribute('aria-label', hasFiles ? 'Add more files' : 'Upload document');
+    const icon = zone.querySelector(':scope > i');
+    if (icon) {
+      icon.className = hasFiles ? 'fa-solid fa-plus' : 'fa-solid fa-cloud-upload-alt';
+    }
+    const label = zone.querySelector(':scope > p');
+    if (!label) return;
+    label.hidden = false;
+    const uploadLabel = zone.dataset.uploadLabel || label.dataset.defaultUploadText || '';
+    if (hasFiles) {
+      label.textContent = 'Add more files';
+    } else if (uploadLabel) {
+      label.textContent = uploadLabel;
+    }
+  }
+
+  resetIpophlUploadZone(service) {
+    if (!service) return;
+    this.captureIpophlUploadZoneLabels();
+    const zone = document.querySelector(`#ipophl-module .file-upload-zone[data-service="${service}"]`);
+    const listEl = document.getElementById(`${service}-files`);
+    if (!zone) return;
+    const listedCount = listEl
+      ? listEl.querySelectorAll('.file-item:not(.error)').length
+      : 0;
+    this.applyIpophlUploadZoneState(zone, listedCount > 0);
+  }
+
   syncIpophlUploadZoneCompactState() {
+    this.captureIpophlUploadZoneLabels();
     const zones = document.querySelectorAll('#ipophl-module .file-upload-zone[data-service]');
     zones.forEach((zone) => {
       const service = zone.dataset.service;
@@ -8820,24 +9204,7 @@ class DashboardApp {
       const listedCount = listEl
         ? listEl.querySelectorAll('.file-item:not(.error)').length
         : 0;
-      const storedCount = (this.ipophlFiles?.[service] || []).length;
-      const hasFiles = listedCount > 0 || storedCount > 0;
-      zone.classList.toggle('has-files', hasFiles);
-      zone.setAttribute('aria-label', hasFiles ? 'Add more files' : 'Upload document');
-      const icon = zone.querySelector(':scope > i');
-      if (icon) {
-        icon.className = hasFiles ? 'fa-solid fa-plus' : 'fa-solid fa-cloud-upload-alt';
-      }
-      const label = zone.querySelector(':scope > p');
-      if (label) {
-        label.hidden = false;
-        if (hasFiles) {
-          label.dataset.defaultUploadText = label.dataset.defaultUploadText || label.textContent;
-          label.textContent = 'Add more files';
-        } else if (label.dataset.defaultUploadText) {
-          label.textContent = label.dataset.defaultUploadText;
-        }
-      }
+      this.applyIpophlUploadZoneState(zone, listedCount > 0);
     });
   }
 
@@ -9102,16 +9469,16 @@ class DashboardApp {
     this.charts.ipophlPhaseCompletionChart = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: stats.map((s) => `Phase ${s.phase}`),
+        labels: stats.map((s) => `Phase ${s.phase} (${s.mopReadyPct || 0}%)`),
         datasets: [
           {
-            label: 'Completed groups',
+            label: 'Ready groups',
             data: stats.map((s) => s.completed),
             backgroundColor: 'rgba(62, 166, 66, 0.82)',
             stack: 'groups',
           },
           {
-            label: 'Pending groups',
+            label: 'Not Ready / pending',
             data: stats.map((s) => s.pending),
             backgroundColor: 'rgba(230, 233, 237, 1)',
             stack: 'groups',
@@ -9144,10 +9511,10 @@ class DashboardApp {
         labels,
         datasets: [
           {
-            label: 'AI readiness %',
+            label: 'Ready %',
             data: values,
             backgroundColor: values.map((v) =>
-              v >= 70 ? 'rgba(62, 166, 66, 0.82)' : v >= 40 ? 'rgba(245, 158, 11, 0.82)' : 'rgba(239, 68, 68, 0.75)'
+              v >= 100 ? 'rgba(62, 166, 66, 0.82)' : 'rgba(239, 68, 68, 0.75)'
             ),
             borderWidth: 0,
           },
@@ -9394,9 +9761,71 @@ class DashboardApp {
     });
   }
 
-  onGoogleMapsReady() {
-    this.googleMapsReady = true;
-    this.renderMapsModule();
+  updateMapLayers() {
+    if (!this.leafletMap || !window.L) return;
+    (this.leafletMarkers || []).forEach((marker) => {
+      if (this.mapLayers.farmerLocations) {
+        if (!this.leafletMap.hasLayer(marker)) marker.addTo(this.leafletMap);
+      } else if (this.leafletMap.hasLayer(marker)) {
+        this.leafletMap.removeLayer(marker);
+      }
+    });
+    if (this.leafletBoundary) {
+      if (this.mapLayers.farmBoundaries) {
+        if (!this.leafletMap.hasLayer(this.leafletBoundary)) this.leafletBoundary.addTo(this.leafletMap);
+      } else if (this.leafletMap.hasLayer(this.leafletBoundary)) {
+        this.leafletMap.removeLayer(this.leafletBoundary);
+      }
+    }
+    (this.leafletHeatLayers || []).forEach((layer) => {
+      if (!this.leafletMap) return;
+      if (this.mapLayers.densityHeatmap) {
+        if (!this.leafletMap.hasLayer(layer)) layer.addTo(this.leafletMap);
+      } else if (this.leafletMap.hasLayer(layer)) {
+        this.leafletMap.removeLayer(layer);
+      }
+    });
+  }
+
+  isLocalMapHost() {
+    const host = String(window.location.hostname || '').toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1';
+  }
+
+  getStadiaTileLayerConfig() {
+    const key = String(window.__STADIA_MAPS_API_KEY__ || '').trim();
+    const style = this.mapLayers.roadNetwork ? 'outdoors' : 'alidade_smooth';
+    const base = `https://tiles.stadiamaps.com/tiles/${style}/{z}/{x}/{y}{r}.png`;
+    const url = key ? `${base}?api_key=${encodeURIComponent(key)}` : base;
+    return {
+      url,
+      useStadia: !!key || this.isLocalMapHost(),
+      options: {
+        maxZoom: 20,
+        attribution:
+          '&copy; <a href="https://stadiamaps.com/" target="_blank" rel="noopener">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+      },
+    };
+  }
+
+  getOsmTileLayerConfig() {
+    return {
+      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      options: {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors',
+      },
+    };
+  }
+
+  applyLeafletBaseTiles() {
+    if (!this.leafletMap || !window.L) return;
+    const stadia = this.getStadiaTileLayerConfig();
+    const next = stadia.useStadia ? stadia : this.getOsmTileLayerConfig();
+    if (this.leafletTileLayer) {
+      this.leafletMap.removeLayer(this.leafletTileLayer);
+    }
+    this.leafletTileLayer = window.L.tileLayer(next.url, next.options).addTo(this.leafletMap);
   }
 
   initMapLayerToggles() {
@@ -9408,6 +9837,9 @@ class DashboardApp {
       if (!layerKey || !(layerKey in this.mapLayers)) return;
       this.mapLayers[layerKey] = !this.mapLayers[layerKey];
       this.syncMapLayerToggleUi();
+      if (layerKey === 'roadNetwork' && this.leafletMap) {
+        this.applyLeafletBaseTiles();
+      }
       this.updateMapLayers();
     };
 
@@ -9426,6 +9858,16 @@ class DashboardApp {
     });
 
     this.syncMapLayerToggleUi();
+    const zoomIn = document.getElementById('mapsZoomInBtn');
+    const zoomOut = document.getElementById('mapsZoomOutBtn');
+    if (zoomIn && !zoomIn.dataset.bound) {
+      zoomIn.dataset.bound = '1';
+      zoomIn.addEventListener('click', () => this.leafletMap && this.leafletMap.zoomIn());
+    }
+    if (zoomOut && !zoomOut.dataset.bound) {
+      zoomOut.dataset.bound = '1';
+      zoomOut.addEventListener('click', () => this.leafletMap && this.leafletMap.zoomOut());
+    }
   }
 
   syncMapLayerToggleUi() {
@@ -9442,82 +9884,6 @@ class DashboardApp {
       if (toggle) toggle.classList.toggle('is-on', on);
       if (row) row.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
-  }
-
-  updateMapLayers() {
-    if (this.leafletMap && window.L) {
-      (this.leafletMarkers || []).forEach((marker) => {
-        if (this.mapLayers.farmerLocations) {
-          if (!this.leafletMap.hasLayer(marker)) marker.addTo(this.leafletMap);
-        } else if (this.leafletMap.hasLayer(marker)) {
-          this.leafletMap.removeLayer(marker);
-        }
-      });
-      if (this.leafletBoundary) {
-        if (this.mapLayers.farmBoundaries) {
-          if (!this.leafletMap.hasLayer(this.leafletBoundary)) this.leafletBoundary.addTo(this.leafletMap);
-        } else if (this.leafletMap.hasLayer(this.leafletBoundary)) {
-          this.leafletMap.removeLayer(this.leafletBoundary);
-        }
-      }
-      return;
-    }
-
-    if (!this.googleMap || !window.google?.maps) return;
-
-    // 1. Farmer Locations
-    this.googleMapMarkers.forEach((m) => m.setMap(this.mapLayers.farmerLocations ? this.googleMap : null));
-
-    // 2. Farm Boundaries
-    if (this.lipaBoundaryOverlay) {
-      this.lipaBoundaryOverlay.setMap(this.mapLayers.farmBoundaries ? this.googleMap : null);
-    }
-
-    // 3. Density Heatmap
-    if (this.mapLayers.densityHeatmap) {
-      this.showDensityHeatmap();
-    } else if (this.googleHeatmap) {
-      this.googleHeatmap.setMap(null);
-    }
-
-    // 4. Road Network
-    this.googleMap.setOptions({
-      styles: this.mapLayers.roadNetwork
-        ? []
-        : [{ featureType: 'road', elementType: 'all', stylers: [{ visibility: 'off' }] }],
-    });
-  }
-
-  showDensityHeatmap() {
-    if (!window.google?.maps?.visualization) {
-      console.warn('Google Maps Visualization library not loaded.');
-      return;
-    }
-
-    const rows = this.getFilteredMapRows();
-    const heatmapData = rows
-      .map((row) => {
-        const raw = this.getValue(row, ['ADDRESS (BARANGAY)', 'BARANGAY', 'barangay', 'address']);
-        const canonical = this.getCanonicalLipaBarangay(raw);
-        if (!canonical) return null;
-        const coords = this.getBarangayCoordinates()[canonical];
-        return coords ? new window.google.maps.LatLng(coords.lat, coords.lng) : null;
-      })
-      .filter(Boolean);
-
-    const heatmapMap = this.mapLayers.densityHeatmap ? this.googleMap : null;
-    if (!this.googleHeatmap) {
-      this.googleHeatmap = new window.google.maps.visualization.HeatmapLayer({
-        data: heatmapData,
-        map: heatmapMap,
-        radius: 30,
-        dissipating: true,
-        opacity: 0.65,
-      });
-    } else {
-      this.googleHeatmap.setData(heatmapData);
-      this.googleHeatmap.setMap(heatmapMap);
-    }
   }
 
   getLipaCityCenter() {
@@ -9702,16 +10068,24 @@ class DashboardApp {
     return 'Liberica';
   }
 
-  openPlaceInGoogleMaps(lat, lng, barangay) {
+  openPlaceInExternalMaps(lat, lng, barangay) {
     const latN = Number(lat);
     const lngN = Number(lng);
     const name = String(barangay || '').trim().replace(/^barangay\s+/i, '');
+    if (Number.isFinite(latN) && Number.isFinite(lngN)) {
+      window.open(
+        `https://www.openstreetmap.org/?mlat=${latN}&mlon=${lngN}#map=15/${latN}/${lngN}`,
+        '_blank',
+        'noopener,noreferrer'
+      );
+      return;
+    }
     const query = name
       ? `Barangay ${name}, Lipa City, Batangas, Philippines`
       : `${latN},${lngN}`;
-    if (!name && (!Number.isFinite(latN) || !Number.isFinite(lngN))) return;
+    if (!query.trim()) return;
     window.open(
-      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`,
+      `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`,
       '_blank',
       'noopener,noreferrer'
     );
@@ -9923,22 +10297,34 @@ class DashboardApp {
       });
   }
 
-  drawLipaCityBoundary() {
-    if (!this.googleMap || !window.google?.maps) return;
-    if (this.lipaBoundaryOverlay) {
-      this.lipaBoundaryOverlay.setMap(this.mapLayers.farmBoundaries ? this.googleMap : null);
-      return;
-    }
-    this.lipaBoundaryOverlay = new window.google.maps.Rectangle({
-      bounds: this.getLipaCityBounds(),
-      strokeColor: '#047857',
-      strokeOpacity: 1.0,
-      strokeWeight: 2,
-      fillColor: 'transparent',
-      fillOpacity: 0,
-      clickable: false,
-      map: this.mapLayers.farmBoundaries ? this.googleMap : null,
+  ensureLeafletMap() {
+    if (this.leafletMap || !window.L) return;
+    const canvas = document.getElementById('mapsLeafletCanvas');
+    if (!canvas) return;
+    const center = this.getLipaCityCenter();
+    this.leafletMap = window.L.map(canvas, {
+      center: [center.lat, center.lng],
+      zoom: 12,
+      minZoom: 10,
+      maxZoom: 17,
     });
+    this.applyLeafletBaseTiles();
+    const bounds = this.getLipaCityBounds();
+    this.leafletBoundary = window.L.rectangle(
+      [
+        [bounds.south, bounds.west],
+        [bounds.north, bounds.east],
+      ],
+      {
+        color: '#047857',
+        weight: 2,
+        fillOpacity: 0,
+        interactive: false,
+      }
+    );
+    if (this.mapLayers.farmBoundaries) {
+      this.leafletBoundary.addTo(this.leafletMap);
+    }
   }
 
   isVarietyMatch(row, variety) {
@@ -9970,6 +10356,8 @@ class DashboardApp {
 
   getFilteredMapRows() {
     return (this.data || []).filter((row) => {
+      const isBlocked = row.is_blocked === true || row.is_blocked === 'true';
+      if (isBlocked) return false;
       const rawBarangay = this.getValue(row, ['ADDRESS (BARANGAY)', 'BARANGAY', 'barangay', 'address']);
       const canonical = this.getCanonicalLipaBarangay(rawBarangay);
       if (!canonical) return false;
@@ -10045,8 +10433,14 @@ class DashboardApp {
       const raw = this.getValue(row, ['ADDRESS (BARANGAY)', 'BARANGAY', 'barangay', 'address']) || 'Unknown';
       const canonical = this.getCanonicalLipaBarangay(raw);
       if (!canonical) return;
-      const coords = coordsByBarangay[canonical] || toFallbackCoordinate(canonical);
-      const current = pointsMap.get(canonical) || {
+      const gpsLat = Number(this.getValue(row, ['lat', 'latitude', 'gps_lat', 'farm_lat', 'LAT']));
+      const gpsLng = Number(this.getValue(row, ['lng', 'lon', 'longitude', 'gps_lng', 'farm_lng', 'LNG']));
+      const hasGps = Number.isFinite(gpsLat) && Number.isFinite(gpsLng) && Math.abs(gpsLat) > 1 && Math.abs(gpsLng) > 1;
+      const coords = hasGps
+        ? { lat: gpsLat, lng: gpsLng }
+        : (coordsByBarangay[canonical] || toFallbackCoordinate(canonical));
+      const pointKey = hasGps ? `gps:${this.farmerIdFromRow(row) || `${gpsLat},${gpsLng}`}` : canonical;
+      const current = pointsMap.get(pointKey) || {
         barangay: this.formatBarangayLabel(canonical),
         canonical,
         lat: coords.lat,
@@ -10056,6 +10450,7 @@ class DashboardApp {
         areaHa: 0,
         productionKg: { liberica: 0, excelsa: 0, robusta: 0 },
         varietyFarmers: { liberica: 0, excelsa: 0, robusta: 0 },
+        isGps: hasGps,
       };
       current.count += 1;
       current.totalFarmers = current.count;
@@ -10071,7 +10466,7 @@ class DashboardApp {
       if (libKg > 0 || this.isVarietyMatch(row, 'liberica')) current.varietyFarmers.liberica += 1;
       if (robKg > 0 || this.isVarietyMatch(row, 'robusta')) current.varietyFarmers.robusta += 1;
       if (excKg > 0 || this.isVarietyMatch(row, 'excelsa')) current.varietyFarmers.excelsa += 1;
-      pointsMap.set(canonical, current);
+      pointsMap.set(pointKey, current);
     });
 
     return Array.from(pointsMap.values()).map((point) => ({
@@ -10197,87 +10592,6 @@ class DashboardApp {
     return '#b0895f';
   }
 
-  getBarangayPinIcon(point) {
-    const opacity = point.count > 0 ? 1 : 0.72;
-    const label = String(point.count || '');
-    const labelSvg = label
-      ? `<text x="22" y="25" text-anchor="middle" font-size="11" font-weight="700" fill="#047857" font-family="Arial,sans-serif">${label}</text>`
-      : '';
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="44" height="64" viewBox="0 0 44 64">
-        <path d="M22 2C11.5 2 3 10.5 3 21c0 14 19 41 19 41s19-27 19-41C41 10.5 32.5 2 22 2z" fill="#047857" stroke="#065f46" stroke-width="2"/>
-        <circle cx="22" cy="21" r="9.5" fill="#ffffff"/>
-        ${labelSvg}
-      </svg>
-    `.trim();
-    const encoded = encodeURIComponent(svg);
-    return {
-      url: `data:image/svg+xml;charset=UTF-8,${encoded}`,
-      scaledSize: new window.google.maps.Size(32, 46),
-      anchor: new window.google.maps.Point(16, 45),
-      labelOrigin: new window.google.maps.Point(16, 20),
-      opacity,
-    };
-  }
-
-  ensureGoogleMap() {
-    if (this.googleMap || !window.google?.maps) return;
-    const canvas = document.getElementById('mapsGoogleCanvas');
-    if (!canvas) return;
-    this.googleMap = new window.google.maps.Map(canvas, {
-      center: this.getLipaCityCenter(),
-      zoom: 12,
-      minZoom: 6,
-      maxZoom: 18,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
-      styles: this.mapLayers.roadNetwork
-        ? []
-        : [{ featureType: 'road', elementType: 'all', stylers: [{ visibility: 'off' }] }],
-    });
-    this.googleInfoWindow = new window.google.maps.InfoWindow({ maxWidth: 300 });
-    this.drawLipaCityBoundary();
-  }
-
-  clearMapMarkers() {
-    this.googleMapMarkers.forEach((marker) => marker.setMap(null));
-    this.googleMapMarkers = [];
-  }
-
-  ensureLeafletMap() {
-    if (this.leafletMap || !window.L) return;
-    const canvas = document.getElementById('mapsGoogleCanvas');
-    if (!canvas) return;
-    const center = this.getLipaCityCenter();
-    this.leafletMap = window.L.map(canvas, {
-      center: [center.lat, center.lng],
-      zoom: 12,
-      minZoom: 10,
-      maxZoom: 17,
-    });
-    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
-      maxZoom: 19,
-    }).addTo(this.leafletMap);
-    const bounds = this.getLipaCityBounds();
-    this.leafletBoundary = window.L.rectangle(
-      [
-        [bounds.south, bounds.west],
-        [bounds.north, bounds.east],
-      ],
-      {
-        color: '#047857',
-        weight: 2,
-        fillOpacity: 0,
-        interactive: false,
-      }
-    );
-    if (this.mapLayers.farmBoundaries) {
-      this.leafletBoundary.addTo(this.leafletMap);
-    }
-  }
-
   clearLeafletMarkers() {
     if (!this.leafletMap) return;
     (this.leafletMarkers || []).forEach((marker) => {
@@ -10288,6 +10602,14 @@ class DashboardApp {
       }
     });
     this.leafletMarkers = [];
+    (this.leafletHeatLayers || []).forEach((layer) => {
+      try {
+        this.leafletMap.removeLayer(layer);
+      } catch (_) {
+        /* ignore */
+      }
+    });
+    this.leafletHeatLayers = [];
   }
 
   getLeafletPinIcon() {
@@ -10320,13 +10642,23 @@ class DashboardApp {
       marker.bindPopup(this.buildMapInfoWindowHtml(point), { maxWidth: 320 });
       marker.on('click', () => {
         this.updateMapCoordPill(point.lat, point.lng);
-        this.openPlaceInGoogleMaps(point.lat, point.lng, point.barangay);
+        this.openPlaceInExternalMaps(point.lat, point.lng, point.barangay);
       });
       if (this.mapLayers.farmerLocations) {
         marker.addTo(this.leafletMap);
       }
       this.leafletMarkers.push(marker);
       latLngs.push([point.lat, point.lng]);
+      const heat = window.L.circleMarker([point.lat, point.lng], {
+        radius: Math.min(28, 8 + Number(point.count || 1) * 4),
+        color: '#166534',
+        weight: 1,
+        fillColor: '#22c55e',
+        fillOpacity: Math.min(0.55, 0.18 + Number(point.count || 1) * 0.08),
+      });
+      heat.bindPopup(this.buildMapInfoWindowHtml(point), { maxWidth: 320 });
+      if (this.mapLayers.densityHeatmap) heat.addTo(this.leafletMap);
+      this.leafletHeatLayers.push(heat);
     });
 
     if (latLngs.length > 1) {
@@ -10346,55 +10678,9 @@ class DashboardApp {
     }, 120);
   }
 
-  renderGoogleMapMarkers(points) {
-    if (!this.googleMap || !window.google?.maps) return;
-    this.clearMapMarkers();
-    const fitBounds = new window.google.maps.LatLngBounds();
-
-    points.forEach((point) => {
-      const pinIcon = this.getBarangayPinIcon(point);
-      const marker = new window.google.maps.Marker({
-        position: { lat: point.lat, lng: point.lng },
-        map: this.mapLayers.farmerLocations ? this.googleMap : null,
-        title: `${point.barangay} (${point.count} farmer${Number(point.count) === 1 ? '' : 's'})`,
-        icon: {
-          url: pinIcon.url,
-          scaledSize: pinIcon.scaledSize,
-          anchor: pinIcon.anchor,
-          labelOrigin: pinIcon.labelOrigin,
-        },
-        opacity: pinIcon.opacity,
-        // No label (number) on pin
-      });
-      marker.addListener('click', () => {
-        this.updateMapCoordPill(point.lat, point.lng);
-        if (this.googleInfoWindow) {
-          this.googleInfoWindow.setContent(this.buildMapInfoWindowHtml(point));
-          this.googleInfoWindow.open(this.googleMap, marker);
-        }
-        this.openPlaceInGoogleMaps(point.lat, point.lng, point.barangay);
-      });
-      this.googleMapMarkers.push(marker);
-      fitBounds.extend(marker.getPosition());
-    });
-
-    if (points.length > 1) this.googleMap.fitBounds(fitBounds, 70);
-    else if (points.length === 1) {
-      this.googleMap.setCenter({ lat: points[0].lat, lng: points[0].lng });
-      this.googleMap.setZoom(13);
-    } else {
-      this.googleMap.setCenter(this.getLipaCityCenter());
-      this.googleMap.setZoom(12);
-    }
-  }
-
-
   renderMapsModule() {
-    const fallback = document.getElementById('mapsGoogleFallback');
-    const canvas = document.getElementById('mapsGoogleCanvas');
-    const embed = document.getElementById('mapsGoogleEmbed');
-    const hasKey = !!(window.__GOOGLE_MAPS_API_KEY__ || '').trim();
-    const ready = this.googleMapsReady || !!window.__BEANTHENTIC_GOOGLE_MAPS_READY__;
+    const fallback = document.getElementById('mapsLeafletFallback');
+    const canvas = document.getElementById('mapsLeafletCanvas');
     const rows = this.getFilteredMapRows();
     const aggregated = this.buildMapBarangayPoints(rows);
     const points = this.applyMapVarietyFilter(aggregated);
@@ -10403,46 +10689,37 @@ class DashboardApp {
     this.updateMapCoordPill(this.getLipaCityCenter().lat, this.getLipaCityCenter().lng);
     if (!canvas) return;
 
-    if (embed) embed.classList.add('is-hidden');
     canvas.classList.remove('is-hidden');
 
-    const useGoogle = hasKey && ready && !!window.google?.maps;
-    if (useGoogle) {
-      if (fallback) fallback.hidden = true;
-      this.ensureGoogleMap();
-      if (this.googleMap && window.google?.maps?.event) {
-        window.google.maps.event.trigger(this.googleMap, 'resize');
+    if (!window.L) {
+      if (fallback) {
+        fallback.hidden = false;
+        fallback.textContent = 'Map library failed to load. Check your network connection and refresh.';
       }
-      this.renderGoogleMapMarkers(points);
-      this.syncMapLayerToggleUi();
-      this.updateMapLayers();
       return;
     }
+
+    this.ensureLeafletMap();
+    if (this.leafletMap) {
+      try {
+        this.leafletMap.invalidateSize();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    this.renderLeafletMarkers(points);
+    this.syncMapLayerToggleUi();
+    this.updateMapLayers();
 
     if (fallback) {
-      fallback.hidden = false;
-      fallback.textContent = hasKey
-        ? 'Loading Google Maps… Farmer pins will appear at each registered barangay.'
-        : `${points.length} farmer pin(s) on OpenStreetMap. Add maps.google_api_key in settings.json for Google Maps.`;
-    }
-
-    if (window.L) {
-      this.ensureLeafletMap();
-      this.renderLeafletMarkers(points);
-      if (fallback) {
-        fallback.hidden = points.length > 0;
-        if (!points.length) {
-          fallback.textContent =
-            'No farmer pins yet. Complete farmer registrations with a Lipa City barangay, then refresh.';
-        }
+      if (!points.length) {
+        fallback.hidden = false;
+        fallback.textContent =
+          'No farmer pins yet. Complete farmer registrations with a Lipa City barangay, then refresh.';
+      } else {
+        fallback.hidden = true;
       }
-      this.syncMapLayerToggleUi();
-      this.updateMapLayers();
-      return;
     }
-
-    if (embed) embed.classList.remove('is-hidden');
-    canvas.classList.add('is-hidden');
   }
 
   getRegisterDocuments() {
@@ -10460,11 +10737,7 @@ class DashboardApp {
     });
 
     if (docs.length > 0) return docs.slice(0, 12);
-
-    return [
-      { id: 'placeholder-logo', name: 'Logo', service: 'Brand Assets', file: null, placeholder: true },
-      { id: 'placeholder-cert', name: 'Certification', service: 'GI Certificate', file: null, placeholder: true },
-    ];
+    return [];
   }
 
   renderRegisterModule() {
@@ -10497,19 +10770,28 @@ class DashboardApp {
   }
 
   showNotification(message, type = 'success', options = {}) {
-    const { placement = 'center' } = options;
+    const { placement = 'center', duration = 3200 } = options;
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
     if (placement === 'right') {
       notification.classList.add('notification--right');
     }
+    notification.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    notification.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
     notification.textContent = message;
 
     document.body.appendChild(notification);
-    
-    setTimeout(() => {
-      notification.remove();
-    }, 3000);
+
+    const dismiss = () => {
+      if (!notification.isConnected) return;
+      notification.classList.add('is-dismissed');
+      const remove = () => notification.remove();
+      notification.addEventListener('animationend', remove, { once: true });
+      setTimeout(remove, 400);
+    };
+
+    notification.addEventListener('click', dismiss);
+    setTimeout(dismiss, duration);
   }
 
   // New dashboard functionality
@@ -10720,10 +11002,10 @@ class DashboardApp {
   }
 
   initNewDashboardFeatures() {
-    this.initThemeToggle();
-    this.initGlobalSearch();
+    this.updateAdminGreeting(
+      (window.__BEANTHENTIC_USER__ && window.__BEANTHENTIC_USER__.full_name) || ''
+    );
     this.updateNotificationBadges();
-    this.initLastUpdatedTime();
     this.initCalendarWidget();
     this.initRegistrationChart();
   }
@@ -10737,17 +11019,234 @@ class DashboardApp {
     const daysEl = document.getElementById('calendarDays');
     const prevBtn = document.getElementById('prevMonth');
     const nextBtn = document.getElementById('nextMonth');
+    const todayBtn = document.getElementById('calendarTodayBtn');
+    const composer = document.getElementById('calendarNotesPanel');
+    const notesDateLabel = document.getElementById('calendarNotesDateLabel');
+    const form = document.getElementById('calendarNoteForm');
+    const titleInput = document.getElementById('calendarNoteTitle');
+    const bodyInput = document.getElementById('calendarNoteBody');
+    const noteIdInput = document.getElementById('calendarNoteId');
+    const cancelBtn = document.getElementById('calendarNoteCancelBtn');
+    const deleteBtn = document.getElementById('calendarNoteDeleteBtn');
+    const saveBtn = document.getElementById('calendarNoteSaveBtn');
+    const closeBtn = document.getElementById('calendarComposerClose');
+    const filterEl = document.getElementById('calendarFilterCategory');
+    const sortEl = document.getElementById('calendarSortOrder');
+    const searchEl = document.getElementById('calendarSearchInput');
+    const scheduleList = document.getElementById('calendarScheduleList');
+    const activitiesList = document.getElementById('calendarActivitiesList');
+    const monthPanel = document.querySelector('[data-gcal-panel="month"]');
+    const schedulePanel = document.querySelector('[data-gcal-panel="schedule"]');
+    const activitiesPanel = document.querySelector('[data-gcal-panel="activities"]');
+    const tabs = document.querySelectorAll('.gcal-tab[data-gcal-view]');
     if (!daysEl) return;
 
+    const CAT_ICONS = {
+      harvest: 'fa-seedling',
+      delivery: 'fa-truck',
+      meeting: 'fa-users',
+      deadline: 'fa-flag',
+      other: 'fa-note-sticky',
+    };
+    const MAX_EVENTS_PER_CELL = 2;
     const today = new Date();
-    let viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
-    let selectedDay = null;
+    today.setHours(0, 0, 0, 0);
+    const todayKey = this._calendarDateKey(today);
 
-    const render = () => {
+    let viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    let selectedKey = todayKey;
+    let notesByDate = {};
+    let selectedCategory = 'harvest';
+    let activeView = 'month';
+    let filterCategory = 'all';
+    let sortOrder = 'date-asc';
+    let searchQuery = '';
+    let allNotesLoaded = false;
+
+    const categoryChips = document.querySelectorAll('#calendarNotesPanel .calendar-cat-chip');
+
+    const setCategory = (category) => {
+      selectedCategory = category || 'harvest';
+      categoryChips.forEach((c) => {
+        c.classList.toggle('active', c.dataset.category === selectedCategory);
+      });
+    };
+
+    const openComposer = () => {
+      if (composer) composer.hidden = false;
+    };
+
+    const closeComposer = () => {
+      if (composer) composer.hidden = true;
+      resetForm();
+    };
+
+    const resetForm = () => {
+      if (noteIdInput) noteIdInput.value = '';
+      if (titleInput) titleInput.value = '';
+      if (bodyInput) bodyInput.value = '';
+      setCategory('harvest');
+      if (cancelBtn) cancelBtn.hidden = true;
+      if (deleteBtn) deleteBtn.hidden = true;
+      if (saveBtn) {
+        saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save note';
+      }
+    };
+
+    const updateComposerLabel = () => {
+      if (!notesDateLabel) return;
+      const labelDate = this._calendarParseKey(selectedKey);
+      notesDateLabel.textContent = labelDate
+        ? labelDate.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+          })
+        : 'Select a date';
+    };
+
+    const fillForm = (note) => {
+      if (!note) return;
+      if (noteIdInput) noteIdInput.value = note.id || '';
+      if (titleInput) titleInput.value = note.title || '';
+      if (bodyInput) bodyInput.value = note.body || '';
+      setCategory(note.category || 'other');
+      if (cancelBtn) cancelBtn.hidden = false;
+      if (deleteBtn) deleteBtn.hidden = false;
+      if (saveBtn) {
+        saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Update note';
+      }
+    };
+
+    const notePassesFilters = (note) => {
+      const cat = String(note.category || 'other').toLowerCase();
+      if (filterCategory !== 'all' && cat !== filterCategory) return false;
+      if (!searchQuery) return true;
+      const hay = `${note.title || ''} ${note.body || ''} ${cat}`.toLowerCase();
+      return hay.includes(searchQuery);
+    };
+
+    const filteredNotesForDate = (key) => {
+      const notes = Array.isArray(notesByDate[key]) ? notesByDate[key] : [];
+      return notes.filter(notePassesFilters);
+    };
+
+    const flattenNotes = () => {
+      const rows = [];
+      Object.keys(notesByDate).forEach((dateKey) => {
+        (notesByDate[dateKey] || []).forEach((note) => {
+          if (!notePassesFilters(note)) return;
+          rows.push({ ...note, date: dateKey });
+        });
+      });
+      rows.sort((a, b) => {
+        if (sortOrder === 'title') {
+          return String(a.title || '').localeCompare(String(b.title || ''));
+        }
+        const cmp = String(a.date).localeCompare(String(b.date));
+        if (cmp !== 0) return sortOrder === 'date-desc' ? -cmp : cmp;
+        return String(a.title || '').localeCompare(String(b.title || ''));
+      });
+      return rows;
+    };
+
+    const catIcon = (cat) => CAT_ICONS[cat] || CAT_ICONS.other;
+
+    const dayNumLabel = (cellDate, inMonth) => {
+      const d = cellDate.getDate();
+      if (d === 1 || !inMonth) {
+        return cellDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+      return String(d);
+    };
+
+    const openNoteEditor = (dateKey, note) => {
+      selectedKey = dateKey;
+      resetForm();
+      if (note) fillForm(note);
+      updateComposerLabel();
+      openComposer();
+      renderMonth();
+      titleInput?.focus();
+    };
+
+    const openNewNote = (dateKey) => {
+      selectedKey = dateKey;
+      resetForm();
+      updateComposerLabel();
+      openComposer();
+      renderMonth();
+      titleInput?.focus();
+    };
+
+    const renderActivityList = (listEl, rows, emptyText) => {
+      if (!listEl) return;
+      if (!rows.length) {
+        listEl.innerHTML = `<li class="gcal-activity-empty">${this.escapeHtml(emptyText)}</li>`;
+        return;
+      }
+      listEl.innerHTML = rows
+        .map((note) => {
+          const cat = this.escapeHtml(note.category || 'other');
+          const title = this.escapeHtml(note.title || 'Untitled note');
+          const body = this.escapeHtml(note.body || '');
+          const dateLabel = this._calendarParseKey(note.date)?.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+          }) || note.date;
+          const icon = catIcon(note.category || 'other');
+          return `<li class="gcal-activity-item" data-date="${this.escapeHtml(note.date)}" data-id="${this.escapeHtml(note.id || '')}">
+            <span class="gcal-activity-date">${this.escapeHtml(dateLabel || '')}</span>
+            <div>
+              <p class="gcal-activity-title"><i class="fa-solid ${icon} gcal-event__icon gcal-event__icon--${cat}" aria-hidden="true"></i> ${title}</p>
+              ${body ? `<p class="gcal-activity-sub">${body}</p>` : ''}
+            </div>
+            <span class="calendar-note-cat calendar-note-cat--${cat}">${cat}</span>
+          </li>`;
+        })
+        .join('');
+
+      listEl.querySelectorAll('.gcal-activity-item').forEach((item) => {
+        item.addEventListener('click', () => {
+          const dateKey = item.dataset.date;
+          const id = item.dataset.id;
+          const note = (notesByDate[dateKey] || []).find((n) => String(n.id) === String(id));
+          if (!dateKey) return;
+          const parsed = this._calendarParseKey(dateKey);
+          if (parsed) {
+            viewDate = new Date(parsed.getFullYear(), parsed.getMonth(), 1);
+          }
+          setView('month');
+          openNoteEditor(dateKey, note || null);
+          loadNotes();
+        });
+      });
+    };
+
+    const renderLists = () => {
+      const all = flattenNotes();
+      const upcoming = all.filter((n) => String(n.date) >= todayKey);
+      const scheduleRows = all.filter((n) => {
+        const thin = !String(n.body || '').trim();
+        const isDeadline = String(n.category || '') === 'deadline';
+        return thin || (isDeadline && String(n.date) >= todayKey);
+      });
+      renderActivityList(
+        scheduleList,
+        scheduleRows.length ? scheduleRows : upcoming,
+        'Nothing to schedule. Add harvest or delivery notes from the monthly calendar.'
+      );
+      renderActivityList(activitiesList, all, 'No activities yet. Click a day on the monthly calendar to add a note.');
+    };
+
+    const renderMonth = () => {
       const year = viewDate.getFullYear();
       const month = viewDate.getMonth();
-      const firstDay = new Date(year, month, 1).getDay();
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const firstOfMonth = new Date(year, month, 1);
+      const startOffset = firstOfMonth.getDay();
+      const gridStart = new Date(year, month, 1 - startOffset);
 
       if (monthEl) {
         monthEl.textContent = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -10755,76 +11254,322 @@ class DashboardApp {
 
       daysEl.innerHTML = '';
 
-      for (let i = 0; i < firstDay; i++) {
-        daysEl.insertAdjacentHTML('beforeend', '<div class="calendar-day empty" aria-hidden="true"></div>');
-      }
-
-      for (let d = 1; d <= daysInMonth; d++) {
-        const cellDate = new Date(year, month, d);
-        const dow = cellDate.getDay();
-        const isToday =
-          today.getDate() === d && today.getMonth() === month && today.getFullYear() === year;
-        const isWeekend = dow === 0 || dow === 6;
-        const isSelected = selectedDay === d;
-        const classes = ['calendar-day'];
-        if (isToday) classes.push('today');
-        if (isWeekend) classes.push('weekend');
-        if (isSelected) classes.push('selected');
+      for (let i = 0; i < 42; i++) {
+        const cellDate = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+        const key = this._calendarDateKey(cellDate);
+        const inMonth = cellDate.getMonth() === month;
+        const isToday = key === todayKey;
+        const isSelected = selectedKey === key;
+        const dayNotes = filteredNotesForDate(key);
+        const visible = dayNotes.slice(0, MAX_EVENTS_PER_CELL);
+        const moreCount = dayNotes.length - visible.length;
 
         const cell = document.createElement('div');
-        cell.className = classes.join(' ');
-        cell.textContent = String(d);
+        cell.className = 'gcal-day';
         cell.setAttribute('role', 'gridcell');
-        if (isToday) cell.setAttribute('aria-current', 'date');
-        cell.addEventListener('click', () => {
-          selectedDay = d;
-          render();
+        cell.dataset.date = key;
+        if (!inMonth) cell.classList.add('is-outside');
+        if (isToday) {
+          cell.classList.add('is-today');
+          cell.setAttribute('aria-current', 'date');
+        }
+        if (isSelected) cell.classList.add('is-selected');
+
+        const num = document.createElement('span');
+        num.className = 'gcal-day__num';
+        num.textContent = dayNumLabel(cellDate, inMonth);
+        cell.appendChild(num);
+
+        const eventsWrap = document.createElement('div');
+        eventsWrap.className = 'gcal-day__events';
+
+        visible.forEach((note) => {
+          const cat = note.category || 'other';
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'gcal-event';
+          btn.dataset.id = note.id || '';
+          btn.innerHTML = `<span class="gcal-event__title"><i class="fa-solid ${catIcon(cat)} gcal-event__icon gcal-event__icon--${this.escapeHtml(cat)}" aria-hidden="true"></i><span>${this.escapeHtml(note.title || 'Untitled')}</span></span>${
+            note.body
+              ? `<span class="gcal-event__sub">${this.escapeHtml(note.body)}</span>`
+              : ''
+          }`;
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openNoteEditor(key, note);
+          });
+          eventsWrap.appendChild(btn);
         });
+        cell.appendChild(eventsWrap);
+
+        if (moreCount > 0) {
+          const more = document.createElement('button');
+          more.type = 'button';
+          more.className = 'gcal-day__more';
+          more.textContent = `+${moreCount} more`;
+          more.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openNewNote(key);
+            const firstHidden = dayNotes[MAX_EVENTS_PER_CELL];
+            if (firstHidden) fillForm(firstHidden);
+          });
+          cell.appendChild(more);
+        }
+
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'gcal-day__add';
+        addBtn.textContent = '+ Add';
+        addBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openNewNote(key);
+        });
+        cell.appendChild(addBtn);
+
+        cell.addEventListener('click', () => {
+          if (!inMonth) {
+            viewDate = new Date(cellDate.getFullYear(), cellDate.getMonth(), 1);
+            selectedKey = key;
+            loadNotes().then(() => openNewNote(key));
+            return;
+          }
+          openNewNote(key);
+        });
+
         daysEl.appendChild(cell);
       }
     };
 
+    const render = () => {
+      renderMonth();
+      renderLists();
+      updateComposerLabel();
+    };
+
+    const setView = (view) => {
+      activeView = view || 'month';
+      tabs.forEach((tab) => {
+        const on = tab.dataset.gcalView === activeView;
+        tab.classList.toggle('active', on);
+        tab.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      if (monthPanel) monthPanel.hidden = activeView !== 'month';
+      if (schedulePanel) schedulePanel.hidden = activeView !== 'schedule';
+      if (activitiesPanel) activitiesPanel.hidden = activeView !== 'activities';
+      if (activeView !== 'month') closeComposer();
+      renderLists();
+    };
+
+    const loadNotes = async ({ all = false } = {}) => {
+      try {
+        const month = `${viewDate.getFullYear()}-${String(viewDate.getMonth() + 1).padStart(2, '0')}`;
+        const url =
+          all || !allNotesLoaded
+            ? '/api/calendar-notes'
+            : `/api/calendar-notes?month=${encodeURIComponent(month)}`;
+        const res = await fetch(url, { credentials: 'same-origin' });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+          if (all || !allNotesLoaded) {
+            notesByDate = { ...(data.notes_by_date || {}) };
+            allNotesLoaded = true;
+          } else {
+            notesByDate = { ...notesByDate, ...(data.notes_by_date || {}) };
+          }
+        }
+      } catch (_) {
+        /* keep cache */
+      }
+      render();
+    };
+
+    const deleteActiveNote = async () => {
+      const id = noteIdInput?.value;
+      if (!id || !selectedKey) return;
+      const ok = window.confirm('Delete this calendar note?');
+      if (!ok) return;
+      try {
+        const res = await fetch(
+          `/api/calendar-notes/${encodeURIComponent(selectedKey)}/${encodeURIComponent(id)}`,
+          { method: 'DELETE', credentials: 'same-origin' }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Could not delete note.');
+        notesByDate[selectedKey] = Array.isArray(data.notes) ? data.notes : [];
+        if (!notesByDate[selectedKey].length) delete notesByDate[selectedKey];
+        closeComposer();
+        render();
+        this.showNotification('Note deleted.', 'success');
+      } catch (err) {
+        this.showNotification(err.message || 'Could not delete note.', 'error');
+      }
+    };
+
+    categoryChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        selectedCategory = chip.dataset.category || 'other';
+        categoryChips.forEach((c) => c.classList.toggle('active', c === chip));
+      });
+    });
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', async () => {
+        const view = tab.dataset.gcalView || 'month';
+        if (view !== 'month' && !allNotesLoaded) await loadNotes({ all: true });
+        setView(view);
+      });
+    });
+
+    if (filterEl) {
+      filterEl.addEventListener('change', () => {
+        filterCategory = filterEl.value || 'all';
+        render();
+      });
+    }
+    if (sortEl) {
+      sortEl.addEventListener('change', () => {
+        sortOrder = sortEl.value || 'date-asc';
+        renderLists();
+      });
+    }
+    if (searchEl) {
+      searchEl.addEventListener('input', () => {
+        searchQuery = String(searchEl.value || '').trim().toLowerCase();
+        render();
+      });
+    }
+
     if (prevBtn) {
       prevBtn.onclick = () => {
         viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
-        selectedDay = null;
-        render();
+        loadNotes();
       };
     }
     if (nextBtn) {
       nextBtn.onclick = () => {
         viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
-        selectedDay = null;
-        render();
+        loadNotes();
+      };
+    }
+    if (todayBtn) {
+      todayBtn.onclick = () => {
+        viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        selectedKey = todayKey;
+        setView('month');
+        resetForm();
+        updateComposerLabel();
+        loadNotes();
       };
     }
 
-    render();
+    if (cancelBtn) cancelBtn.addEventListener('click', () => resetForm());
+    if (closeBtn) closeBtn.addEventListener('click', () => closeComposer());
+    if (deleteBtn) deleteBtn.addEventListener('click', () => deleteActiveNote());
+
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!selectedKey) {
+          this.showNotification('Select a date first.', 'error');
+          return;
+        }
+        const payload = {
+          id: noteIdInput?.value || undefined,
+          title: titleInput?.value || '',
+          body: bodyInput?.value || '',
+          category: selectedCategory,
+        };
+        if (saveBtn) {
+          saveBtn.disabled = true;
+          saveBtn.classList.add('is-loading');
+        }
+        try {
+          const res = await fetch(`/api/calendar-notes/${encodeURIComponent(selectedKey)}`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.ok) throw new Error(data.error || 'Could not save note.');
+          notesByDate[selectedKey] = Array.isArray(data.notes) ? data.notes : [];
+          closeComposer();
+          render();
+          this.showNotification('Note saved.', 'success');
+        } catch (err) {
+          this.showNotification(err.message || 'Could not save note.', 'error');
+        } finally {
+          if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.classList.remove('is-loading');
+          }
+        }
+      });
+    }
+
+    setView('month');
+    loadNotes({ all: true });
+  }
+
+  _calendarDateKey(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  _calendarParseKey(key) {
+    const parts = String(key || '').split('-').map(Number);
+    if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return null;
+    return new Date(parts[0], parts[1] - 1, parts[2]);
   }
 
   initThemeToggle() {
     const themeToggle = document.getElementById('themeToggle');
     if (!themeToggle) return;
 
-    // Check for saved theme preference
-    const savedTheme = localStorage.getItem('beanthentic-theme') || 'light';
+    const savedTheme = localStorage.getItem('beanthentic-theme')
+      || document.documentElement.getAttribute('data-theme')
+      || 'light';
     this.applyTheme(savedTheme);
 
     themeToggle.addEventListener('click', () => {
-      const currentTheme = document.body.getAttribute('data-theme') || 'light';
-      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-      
+      const currentTheme = document.body.getAttribute('data-theme')
+        || document.documentElement.getAttribute('data-theme')
+        || 'light';
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
       this.applyTheme(newTheme);
-      localStorage.setItem('beanthentic-theme', newTheme);
+      try {
+        localStorage.setItem('beanthentic-theme', newTheme);
+      } catch (e) { /* ignore */ }
     });
   }
 
   applyTheme(theme) {
-    document.body.setAttribute('data-theme', theme);
-    const themeIcon = document.querySelector('#themeToggle .action-icon');
+    const next = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    document.body.setAttribute('data-theme', next);
+
+    const themeToggle = document.getElementById('themeToggle');
+    const themeIcon = themeToggle && themeToggle.querySelector('.action-icon');
     if (themeIcon) {
-      themeIcon.className = theme === 'dark' ? 'action-icon fa-solid fa-sun' : 'action-icon fa-solid fa-moon';
+      themeIcon.className = next === 'dark'
+        ? 'action-icon fa-solid fa-sun'
+        : 'action-icon fa-solid fa-moon';
     }
+    if (themeToggle) {
+      const label = next === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+      themeToggle.setAttribute('aria-label', label);
+      themeToggle.setAttribute('title', label);
+    }
+  }
+
+  updateAdminGreeting(fullName) {
+    const el = document.getElementById('adminGreeting');
+    if (!el) return;
+    const raw = String(fullName || '').trim();
+    const first = raw ? raw.split(/\s+/)[0] : 'Admin';
+    el.textContent = `Good day, ${first}!`;
   }
 
   initGlobalSearch() {
@@ -10902,15 +11647,62 @@ class DashboardApp {
   }
 
   handleSearchSubmit(query) {
-    // Handle search submission (navigate to results page)
-    console.log('Search submitted:', query);
+    const q = String(query || '').trim();
+    if (!q) return;
+    this.switchModule('farmers-list');
+    const listSearch = document.getElementById('farmersListSearch');
+    if (listSearch) {
+      listSearch.value = q;
+      listSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    }
   }
 
   refreshOverviewData() {
-    // Refresh dashboard data
-    this.loadDashboardData();
+    this.loadExcelData();
     this.updateLastUpdatedTime();
     this.showNotification('Dashboard data refreshed', 'success');
+  }
+
+  initMapsLiveRefresh() {
+    const btn = document.getElementById('mapsRefreshLiveFarmersBtn');
+    if (!btn || btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => this.refreshMapFromLiveFarmers({ silent: false, reloadFarmers: true }));
+  }
+
+  async refreshMapFromLiveFarmers({ silent = false, reloadFarmers = true } = {}) {
+    const btn = document.getElementById('mapsRefreshLiveFarmersBtn');
+    if (btn) {
+      if (!btn.dataset.originalHtml) btn.dataset.originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML =
+        '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i><span>Refreshing…</span>';
+    }
+    try {
+      if (reloadFarmers) {
+        await this.loadExcelData();
+      }
+      this.renderMapsModule();
+      if (!silent) {
+        const pins = this.getFilteredMapRows().length;
+        this.showNotification(
+          `Map refreshed from live farmers (${pins} active pin${pins === 1 ? '' : 's'}).`,
+          'success'
+        );
+      }
+    } catch (err) {
+      console.error('Map live refresh failed:', err);
+      if (!silent) {
+        this.showNotification(err.message || 'Could not refresh map from live farmers.', 'error');
+      }
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        if (btn.dataset.originalHtml) {
+          btn.innerHTML = btn.dataset.originalHtml;
+        }
+      }
+    }
   }
 
   updateNotificationBadges() {
@@ -11036,6 +11828,7 @@ class DashboardApp {
       window.__BEANTHENTIC_USER__.full_name = fullName;
       window.__BEANTHENTIC_USER__.phone = phone === '—' ? '' : phone;
     }
+    this.updateAdminGreeting(fullName);
   }
 
   openEditProfileModal() {
@@ -11622,7 +12415,7 @@ class DashboardApp {
 
     try {
       // Unified Messenger view: Fetch all messages for the current admin
-      let url = `/api/messages?folder=all&limit=500`;
+      let url = `/api/messages?folder=${encodeURIComponent(this.messagingFolder || 'inbox')}&limit=500`;
       if (this.messagingSearchTerm) url += `&search=${encodeURIComponent(this.messagingSearchTerm)}`;
 
       const res = await this.messagingApi(url);
@@ -11708,7 +12501,13 @@ class DashboardApp {
     if (!listEl) return;
 
     if (!this.messagingConversations || !this.messagingConversations.length) {
-      listEl.innerHTML = `<li class="messaging-list-empty">
+      listEl.innerHTML = window.BeanthenticUI
+        ? `<li>${window.BeanthenticUI.emptyState({
+            icon: 'fa-comment-slash',
+            title: 'No conversations yet',
+            hint: 'Start a new chat by searching for a farmer.',
+          })}</li>`
+        : `<li class="messaging-list-empty">
         <i class="fa-solid fa-comment-slash"></i>
         <p>No conversations yet. Start a new chat by searching for a farmer!</p>
       </li>`;
@@ -12684,8 +13483,13 @@ class DashboardApp {
           thread = this.mapMessagesToThread([msg]);
         }
         if (!thread.length) {
-          bodyEl.innerHTML =
-            '<div class="messaging-list-empty"><p>No messages yet. Send a message to start the conversation!</p></div>';
+          bodyEl.innerHTML = window.BeanthenticUI
+            ? window.BeanthenticUI.emptyState({
+                icon: 'fa-comments',
+                title: 'No messages yet',
+                hint: 'Send a message to start the conversation.',
+              })
+            : '<div class="messaging-list-empty"><p>No messages yet. Send a message to start the conversation!</p></div>';
           msg.conversation = [];
         } else {
           thread.forEach((t) => {
@@ -12748,6 +13552,9 @@ class DashboardApp {
     } finally {
       if (openSeq === this._messagingOpenSeq) {
         this._messagingDetailBusy = false;
+        this.startMessagingConversationPoll();
+      }
+      if (typeof this.hideMessagingConversationLoading === 'function') {
         this.hideMessagingConversationLoading();
       }
     }
@@ -12756,6 +13563,22 @@ class DashboardApp {
   /**
    * Navigate to messaging module and open a specific farmer's conversation
    */
+  async openLatestUnreadMessageThread() {
+    try {
+      await this.loadMessagingFolder();
+    } catch (err) {
+      console.warn('Could not load messaging folder for unread deep-link:', err);
+      return false;
+    }
+    const conversations = Array.isArray(this.messagingConversations)
+      ? this.messagingConversations
+      : [];
+    const unread = conversations.find((c) => Number(c.unread_count || 0) > 0);
+    if (!unread?.phone) return false;
+    await this.goToFarmerMessage(unread.phone);
+    return true;
+  }
+
   async goToFarmerMessage(phone) {
     if (!phone) return;
 
@@ -12782,6 +13605,7 @@ class DashboardApp {
       const listEl = document.getElementById('messagingList');
       if (listEl) {
         const tail = this.messagingPhoneTail(conv.phone);
+        listEl.querySelectorAll('.messaging-item').forEach((el) => el.classList.remove('is-active'));
         const matchItem = [...listEl.querySelectorAll('.messaging-item')].find(
           (el) => this.messagingPhoneTail(el.getAttribute('data-phone') || '') === tail
         );
@@ -12802,11 +13626,28 @@ class DashboardApp {
 
   closeMessagingDetail() {
     this.messagingSelectedId = null;
+    this.stopMessagingConversationPoll();
     const main = document.getElementById('messagingMain');
     const detail = document.getElementById('messagingDetail');
     if (main) main.classList.remove('has-detail');
     if (detail) detail.classList.remove('is-visible');
     document.querySelectorAll('.messaging-item').forEach(el => el.classList.remove('is-active'));
+  }
+
+  startMessagingConversationPoll() {
+    this.stopMessagingConversationPoll();
+    this._messagingPoll = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      if (!this.messagingSelectedPhone && !this.messagingSelectedId) return;
+      this.loadMessagingFolder();
+    }, 20000);
+  }
+
+  stopMessagingConversationPoll() {
+    if (this._messagingPoll) {
+      clearInterval(this._messagingPoll);
+      this._messagingPoll = null;
+    }
   }
 
   async toggleMessagingArchive(id) {
@@ -13370,7 +14211,7 @@ class DashboardApp {
   }
 
   async patchGiContribution(id, fields) {
-    const res = await fetch(`/api/gi-contributions/${id}`, {
+    const res = await fetch(beanthenticApiUrl(`/api/gi-contributions/${id}`), {
       method: 'PATCH',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
@@ -13384,7 +14225,7 @@ class DashboardApp {
   }
 
   async deleteGiContribution(id) {
-    const res = await fetch(`/api/gi-contributions/${id}`, {
+    const res = await fetch(beanthenticApiUrl(`/api/gi-contributions/${id}`), {
       method: 'DELETE',
       credentials: 'same-origin',
     });
@@ -13396,7 +14237,7 @@ class DashboardApp {
   }
 
   bindBeanthenticEvents() {
-    // Tab navigation
+    // Tab / folder navigation
     const tabs = document.querySelectorAll('.contributions-tab');
     tabs.forEach((tab) => {
       tab.addEventListener('click', (e) => {
@@ -13407,6 +14248,20 @@ class DashboardApp {
         }
       });
     });
+
+    // Gmail-style search
+    const searchInput = document.getElementById('contributionsSearchInput');
+    if (searchInput && !searchInput.dataset.bound) {
+      searchInput.dataset.bound = '1';
+      let searchTimer = null;
+      searchInput.addEventListener('input', () => {
+        window.clearTimeout(searchTimer);
+        searchTimer = window.setTimeout(() => {
+          this.searchTerm = String(searchInput.value || '').trim().toLowerCase();
+          this.renderContributions();
+        }, 160);
+      });
+    }
 
     // Toolbar buttons
     const selectAllCheckbox = document.getElementById('beanthenticSelectAll');
@@ -13569,7 +14424,9 @@ class DashboardApp {
     }
 
     if (this.contributionsLoading) {
-      container.innerHTML = `
+      container.innerHTML = window.BeanthenticUI
+        ? `<div class="beanthentic-contribution-empty">${window.BeanthenticUI.loadingPanel('Loading mail')}</div>`
+        : `
         <div class="beanthentic-contribution-empty" role="status" aria-live="polite">
           <h3>Loading contributions…</h3>
         </div>
@@ -13578,7 +14435,7 @@ class DashboardApp {
     }
 
     if (filtered.length === 0) {
-      let extra = '<p>When farmers send GI updates from the mobile app, they will appear here.</p>';
+      let errorHtml = '';
       if (this.contributionsLoadError) {
         const safeMsg = this.escapeHtml(
           this.formatAppLoadError(this.contributionsLoadError, 'Could not load contributions.')
@@ -13592,37 +14449,62 @@ class DashboardApp {
         const hintText = supabaseHint
           ? 'Check <code>BEANTHENTIC_SUPABASE_URL</code> and <code>BEANTHENTIC_SUPABASE_ANON_KEY</code> in <code>.env</code>, then restart <code>web.py</code>.'
           : 'Check <code>app_db_host</code>, <code>app_db_pass</code>, and <code>app_server_base</code> in <code>settings.json</code> or open <a href="/connection-settings">Connection Settings</a>.';
-        extra =
+        errorHtml =
           `<p style="color:#b91c1c;line-height:1.5;">${safeMsg}</p>` +
           `<p style="color:#64748b;font-size:0.9rem;margin-top:0.5rem;">${hintText}</p>`;
       }
-      container.innerHTML = `
+
+      const emptyHint = this.searchTerm
+        ? 'No messages matched your search.'
+        : 'When farmers send GI updates from the mobile app, they will appear here.';
+
+      if (errorHtml) {
+        container.innerHTML = `
         <div class="beanthentic-contribution-empty" role="status" aria-live="polite">
-          <h3>No contributions found</h3>
-          ${extra}
+          <div class="bt-empty__icon" style="margin-bottom:8px;"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></div>
+          <h3>Couldn’t load mail</h3>
+          ${errorHtml}
         </div>
       `;
+      } else if (window.BeanthenticUI) {
+        container.innerHTML = `<div class="beanthentic-contribution-empty">${window.BeanthenticUI.emptyState({
+          icon: this.searchTerm ? 'fa-magnifying-glass' : 'fa-inbox',
+          title: this.searchTerm ? 'No results' : 'Your inbox is empty',
+          hint: emptyHint,
+        })}</div>`;
+      } else {
+        container.innerHTML = `
+        <div class="beanthentic-contribution-empty" role="status" aria-live="polite">
+          <h3>${this.searchTerm ? 'No results' : 'Your inbox is empty'}</h3>
+          <p>${emptyHint}</p>
+        </div>
+      `;
+      }
       return;
     }
 
-    container.innerHTML = filtered.map(contribution => `
-      <div class="beanthentic-contribution-item ${contribution.unread ? 'unread' : 'is-read'}" data-id="${contribution.id}">
+    const esc = (s) => this.escapeHtml(s);
+    container.innerHTML = filtered.map((contribution) => {
+      const selected = this.selectedContributions.has(contribution.id);
+      return `
+      <div class="beanthentic-contribution-item ${contribution.unread ? 'unread' : 'is-read'}${selected ? ' is-selected' : ''}" data-id="${contribution.id}" role="listitem">
         <div class="beanthentic-contribution-left">
           <div class="beanthentic-contribution-checkbox">
-            <input type="checkbox" ${this.selectedContributions.has(contribution.id) ? 'checked' : ''}>
+            <input type="checkbox" ${selected ? 'checked' : ''} aria-label="Select contribution">
           </div>
-          <div class="beanthentic-contribution-star ${contribution.starred ? 'starred' : ''}">
+          <div class="beanthentic-contribution-star ${contribution.starred ? 'starred' : ''}" title="${contribution.starred ? 'Unstar' : 'Star'}">
             <i class="${contribution.starred ? 'fa-solid' : 'fa-regular'} fa-star"></i>
           </div>
-          <div class="beanthentic-contribution-farmer">${contribution.fromAdmin ? '<i class="fa-solid fa-paper-plane" aria-hidden="true"></i> ' : ''}${contribution.farmer}</div>
+          <div class="beanthentic-contribution-farmer">${contribution.fromAdmin ? '<i class="fa-solid fa-paper-plane" aria-hidden="true"></i> ' : ''}${esc(contribution.farmer)}</div>
         </div>
         <div class="beanthentic-contribution-subject">
-          <span class="beanthentic-contribution-subject-text">${contribution.subject}</span>
-          <span class="beanthentic-contribution-preview-inline">${contribution.preview}</span>
+          <span class="beanthentic-contribution-subject-text">${esc(contribution.subject)}</span>
+          <span class="beanthentic-contribution-preview-inline">${esc(contribution.preview)}</span>
         </div>
-        <div class="beanthentic-contribution-date">${contribution.date}</div>
+        <div class="beanthentic-contribution-date">${esc(contribution.date)}</div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     // Re-bind events after rendering
     this.bindContributionItemEvents();
@@ -13944,38 +14826,6 @@ class DashboardApp {
     }
   }
 
-  showNotification(message, type = 'info') {
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.className = `beanthentic-notification beanthentic-notification--${type}`;
-    notification.textContent = message;
-    notification.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      padding: 12px 20px;
-      background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : type === 'warning' ? '#ff9800' : '#2196F3'};
-      color: white;
-      border-radius: 4px;
-      z-index: 9999;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      font-size: 14px;
-      transition: opacity 0.3s ease;
-    `;
-    
-    document.body.appendChild(notification);
-    
-    // Auto remove after 3 seconds
-    setTimeout(() => {
-      notification.style.opacity = '0';
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
-        }
-      }, 300);
-    }, 3000);
-  }
-
   // Custom Confirmation Dialog System
   showConfirmDialog(message, title = 'Delete Document') {
     return new Promise((resolve) => {
@@ -14031,9 +14881,6 @@ class DashboardApp {
 // Initialize dashboard when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   window.dashboardApp = new DashboardApp();
-  if (window.__BEANTHENTIC_GOOGLE_MAPS_READY__ && typeof window.dashboardApp.onGoogleMapsReady === 'function') {
-    window.dashboardApp.onGoogleMapsReady();
-  }
 });
 
 // Export for potential module usage

@@ -395,8 +395,8 @@ def _pillar_narrative(pillar: dict) -> str:
                 f"Examiners at the Bureau of Trademarks expect these to appear in structured, auditable form."
             )
         parts.append(
-            f"Add dedicated sections covering {scope_plain}. Cross-reference the Manual of Specifications, "
-            f"supporting annexes, and any labels or process descriptions that belong to this pillar."
+            f"Add dedicated sections covering {scope_plain}. Cross-reference supporting "
+            f"annexes, labels, and process descriptions that belong to this pillar."
         )
         return " ".join(parts)
 
@@ -428,7 +428,7 @@ def _build_recommendations(pillars: list[dict], *, document_ready: bool) -> list
             )
         elif pillar.get("id") == "copyright":
             recs.append(
-                f"Copyright pillar: Expand authored documentation — complete Manual of Specifications sections, "
+                f"Copyright pillar: Expand authored documentation — complete specification sections, "
                 f"causal link narrative, stakeholder consultation records, and any cover letters or transmittals. "
                 f"Address: {_format_list(gaps, 5)}."
             )

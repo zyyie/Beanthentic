@@ -276,6 +276,40 @@ def mysql_params() -> dict:
     }
 
 
+def local_sqlite_admin_path() -> Path:
+    """
+    Local SQLite file for SQLAlchemy admin tables when pooler URI is unset.
+
+    Prefer a non-OneDrive path under LOCALAPPDATA so create_all()/writes are not
+    stalled by cloud file locks on the project folder.
+    """
+    local_root = os.environ.get("LOCALAPPDATA") or os.environ.get("TEMP") or str(_BASE_DIR / "data")
+    data_dir = Path(local_root) / "Beanthentic"
+    try:
+        data_dir.mkdir(parents=True, exist_ok=True)
+        return data_dir / "admin_sqlalchemy.db"
+    except OSError:
+        fallback = _BASE_DIR / "data"
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback / "admin_sqlalchemy.db"
+
+
+def sqlalchemy_backend() -> str:
+    """
+    Which engine SQLAlchemy will use:
+      postgresql | mysql | sqlite_local
+    """
+    url = get_db_url().lower()
+    if url.startswith("postgresql://") or url.startswith("postgres://"):
+        return "postgresql"
+    if url.startswith("mysql://") or url.startswith("mysql+pymysql://"):
+        return "mysql"
+    if uses_supabase_anon():
+        # Anon REST handles farmers/pricing; keep a working local engine for admin models.
+        return "sqlite_local"
+    return "mysql"
+
+
 def sqlalchemy_database_url() -> str:
     url = get_db_url()
     if url:
@@ -290,12 +324,16 @@ def sqlalchemy_database_url() -> str:
             except ImportError:
                 url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
         return url
-    # Prefer MySQL/local admin DB when pooler URI is not set (REST anon can still work).
-    if uses_supabase_anon() and not get_db_url():
+    # Prefer local SQLite for admin ORM tables when Supabase anon REST is the primary path.
+    # Direct Supabase SQL still requires BEANTHENTIC_DB_URL / BEANTHENTIC_DB_PASS.
+    if uses_supabase_anon():
+        sqlite_path = local_sqlite_admin_path()
         print(
-            "[Beanthentic] WARNING: Supabase anon is set but BEANTHENTIC_DB_URL is missing; "
-            "falling back to MySQL for SQLAlchemy admin tables."
+            "[Beanthentic] Supabase anon is set but BEANTHENTIC_DB_URL is missing; "
+            f"using local SQLite for SQLAlchemy admin tables ({sqlite_path.name}). "
+            "Set BEANTHENTIC_DB_URL for direct Supabase PostgreSQL."
         )
+        return f"sqlite:///{sqlite_path.as_posix()}"
     p = mysql_params()
     user = quote(p["user"], safe="")
     password = quote(p["password"], safe="")

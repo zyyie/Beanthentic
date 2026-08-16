@@ -63,47 +63,24 @@ class App {
   }
 
   showNotificationMessage(message) {
-    // Create a simple toast notification
-    const toast = document.createElement('div');
-    toast.className = 'notification-toast';
-    toast.textContent = message;
-    toast.style.cssText = `
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      right: auto;
-      transform: translate(-50%, -20px);
-      background: linear-gradient(135deg, #8b4a2b, #5a2e1c);
-      color: white;
-      padding: 1rem 1.5rem;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(139, 74, 43, 0.3);
-      z-index: 10000;
-      font-weight: 600;
-      max-width: min(520px, calc(100vw - 2rem));
-      text-align: center;
-      opacity: 0;
-      transition: opacity 0.3s ease, transform 0.3s ease;
-    `;
-    
-    document.body.appendChild(toast);
-    
-    // Animate in
-    setTimeout(() => {
-      toast.style.opacity = '1';
-      toast.style.transform = 'translate(-50%, 0)';
-    }, 10);
-    
-    // Remove after 3 seconds
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transform = 'translate(-50%, -20px)';
-      setTimeout(() => {
-        if (toast.parentNode) {
-          toast.parentNode.removeChild(toast);
-        }
-      }, 300);
-    }, 3000);
+    if (window.dashboardApp && typeof window.dashboardApp.showNotification === 'function') {
+      window.dashboardApp.showNotification(message, 'info');
+      return;
+    }
+    const notification = document.createElement('div');
+    notification.className = 'notification notification-info';
+    notification.setAttribute('role', 'status');
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    const dismiss = () => {
+      if (!notification.isConnected) return;
+      notification.classList.add('is-dismissed');
+      const remove = () => notification.remove();
+      notification.addEventListener('animationend', remove, { once: true });
+      setTimeout(remove, 400);
+    };
+    notification.addEventListener('click', dismiss);
+    setTimeout(dismiss, 3200);
   }
 
   checkPageLoad() {

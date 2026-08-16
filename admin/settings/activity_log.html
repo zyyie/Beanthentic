@@ -1,10 +1,19 @@
 <div class="settings-card">
   <h3>Activity Log</h3>
   <p style="margin-top: -0.25rem; color: #6c757d; font-size: 0.95rem;">
-    Search and filter admin actions (login times and specific data changes).
+    Live admin actions (login, settings, and data changes).
   </p>
 
   <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: end; margin-bottom: 0.6rem;">
+    <label style="display: grid; gap: 0.35rem; flex: 1; min-width: 200px;">
+      <span style="font-weight: 900; color: #6c757d; font-size: 0.9rem;">Search</span>
+      <input
+        id="activitySearch"
+        type="search"
+        placeholder="Date, action, details, IP…"
+        style="padding: 0.55rem 0.7rem; border-radius: 10px; border: 1px solid #d1d5db; background: #ffffff;"
+      />
+    </label>
     <label style="display: grid; gap: 0.35rem;">
       <span style="font-weight: 900; color: #6c757d; font-size: 0.9rem;">Action Filter</span>
       <select
@@ -12,10 +21,11 @@
         style="padding: 0.55rem 0.7rem; border-radius: 10px; border: 1px solid #d1d5db; min-width: 240px; background: #ffffff;"
       >
         <option value="all" selected>All actions</option>
-        <option value="admin login">Admin Login</option>
-        <option value="security change">Security Change</option>
-        <option value="data update">Data Update</option>
-        <option value="admin logout">Admin Logout</option>
+        <option value="login">Login</option>
+        <option value="logout">Logout</option>
+        <option value="password">Password</option>
+        <option value="calendar">Calendar</option>
+        <option value="other">Other</option>
       </select>
     </label>
   </div>
@@ -26,30 +36,13 @@
         <th>Date &amp; Time</th>
         <th>Action</th>
         <th>Details</th>
+        <th>IP</th>
       </tr>
     </thead>
     <tbody id="activityTableBody">
       <tr>
-        <td>2026-03-25 10:22</td>
-        <td>Admin Login</td>
-        <td>Successful login</td>
-      </tr>
-      <tr>
-        <td>2026-03-25 12:04</td>
-        <td>Security Change</td>
-        <td>Enabled 2FA (UI sample)</td>
-      </tr>
-      <tr>
-        <td>2026-03-25 14:18</td>
-        <td>Data Update</td>
-        <td>Edited farmer record remarks</td>
-      </tr>
-      <tr>
-        <td>2026-03-26 09:05</td>
-        <td>Admin Logout</td>
-        <td>Session ended</td>
+        <td colspan="4">Loading activity…</td>
       </tr>
     </tbody>
   </table>
 </div>
-

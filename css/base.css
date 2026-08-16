@@ -23,12 +23,31 @@
   --accent-2-dark: #2f855a;
   --accent-ring: rgba(44, 122, 62, 0.22);
   --accent-ink: #1a3a1f;
+  /* Motion design tokens */
+  --motion-duration-instant: 120ms;
+  --motion-duration-fast: 200ms;
+  --motion-duration-normal: 320ms;
+  --motion-duration-slow: 480ms;
+  --motion-duration-slower: 640ms;
+  --motion-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --motion-ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+  --motion-ease-spring: cubic-bezier(0.34, 1.25, 0.64, 1);
+  --motion-ease-in-out-soft: cubic-bezier(0.45, 0, 0.55, 1);
 }
 
 html {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 body {
@@ -147,7 +166,10 @@ section {
   color: #fff;
   cursor: pointer;
   box-shadow: 0 8px 18px rgba(21, 128, 61, 0.28);
-  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, filter 0.15s ease-out;
+  transition:
+    transform var(--motion-duration-fast) var(--motion-ease-emphasized),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-standard),
+    filter var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .btn-primary:hover {

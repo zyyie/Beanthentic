@@ -26,12 +26,15 @@
   <link rel="stylesheet" href="css/farmer-profile.css">
   <link rel="stylesheet" href="css/messaging-module.css">
   <link rel="stylesheet" href="css/modules-enhancement.css">
+  <link rel="stylesheet" href="css/calendar-gcal.css?v={{ static_cache_bust }}">
+  <link rel="stylesheet" href="css/motion.css?v={{ static_cache_bust }}">
+  <link rel="stylesheet" href="css/site-polish.css?v={{ static_cache_bust }}">
   <!-- Icon library -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   
   <!-- Chart.js for data visualization -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Leaflet map (farmer pins when Google Maps API key is not configured) -->
+  <!-- Leaflet + Stadia Maps (farmer pins on Lipa City map) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
@@ -252,10 +255,8 @@
             </div>
           </div>
           
-          <div class="header-center">
-          </div>
-          
           <div class="header-right">
+            <p class="header-admin-greeting" id="adminGreeting">Good day, {% set _admin_name = (user_full_name or '')|trim %}{{ (_admin_name.split()[0] if _admin_name else 'Admin') }}!</p>
             <div class="header-icon-actions">
               <button class="icon-action-btn" id="messagingBtn" type="button" aria-label="Messages" title="Messages">
                 <i class="fa-solid fa-message"></i>
@@ -322,21 +323,62 @@
               </div>
             </section>
 
-            <!-- Charts Section (Now Calendar & Todo) -->
+            <!-- Charts Section (Calendar + Registration) -->
             <section class="charts-section">
-              <div class="charts-grid">
-                <div class="chart-card widget-card calendar-card">
-                  <div class="widget-header calendar-widget-header">
-                    <h3>Calendar</h3>
-                    <div class="calendar-controls">
-                      <span id="calendarMonth" class="calendar-month-pill">May 2026</span>
-                      <div class="calendar-nav" role="group" aria-label="Change month">
-                        <button type="button" id="prevMonth" aria-label="Previous month"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
-                        <button type="button" id="nextMonth" aria-label="Next month"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
-                      </div>
-                    </div>
+              <div class="chart-card widget-card calendar-card gcal-card">
+                <div class="gcal-toolbar">
+                  <div class="gcal-tabs" role="tablist" aria-label="Calendar views">
+                    <button type="button" class="gcal-tab active" data-gcal-view="month" role="tab" aria-selected="true">
+                      <i class="fa-regular fa-calendar" aria-hidden="true"></i>
+                      Monthly calendar
+                    </button>
+                    <button type="button" class="gcal-tab" data-gcal-view="schedule" role="tab" aria-selected="false">
+                      <i class="fa-solid fa-calendar-plus" aria-hidden="true"></i>
+                      Need to schedule
+                    </button>
+                    <button type="button" class="gcal-tab" data-gcal-view="activities" role="tab" aria-selected="false">
+                      <i class="fa-solid fa-users" aria-hidden="true"></i>
+                      All activities
+                    </button>
                   </div>
-                  <div class="calendar-widget" id="calendarWidget">
+                  <div class="gcal-toolbar-actions">
+                    <label class="gcal-filter">
+                      <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                      <select id="calendarFilterCategory" aria-label="Filter by category">
+                        <option value="all">Filter</option>
+                        <option value="harvest">Harvest</option>
+                        <option value="delivery">Delivery</option>
+                        <option value="meeting">Meeting</option>
+                        <option value="deadline">Deadline</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </label>
+                    <label class="gcal-filter">
+                      <i class="fa-solid fa-arrow-down-short-wide" aria-hidden="true"></i>
+                      <select id="calendarSortOrder" aria-label="Sort notes">
+                        <option value="date-asc">Date ↑</option>
+                        <option value="date-desc">Date ↓</option>
+                        <option value="title">Title</option>
+                      </select>
+                    </label>
+                    <label class="gcal-search">
+                      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                      <input type="search" id="calendarSearchInput" placeholder="Search" aria-label="Search notes">
+                    </label>
+                  </div>
+                </div>
+
+                <div class="gcal-monthbar">
+                  <h3 id="calendarMonth" class="gcal-month-title">August 2026</h3>
+                  <div class="gcal-month-nav" role="group" aria-label="Change month">
+                    <button type="button" id="prevMonth" aria-label="Previous month"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+                    <button type="button" class="gcal-today-btn" id="calendarTodayBtn">Today</button>
+                    <button type="button" id="nextMonth" aria-label="Next month"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                  </div>
+                </div>
+
+                <div class="gcal-stage">
+                  <div class="calendar-widget gcal-month-view" id="calendarWidget" data-gcal-panel="month">
                     <div class="calendar-weekdays" aria-hidden="true">
                       <span class="calendar-weekday">Sun</span>
                       <span class="calendar-weekday">Mon</span>
@@ -346,11 +388,62 @@
                       <span class="calendar-weekday">Fri</span>
                       <span class="calendar-weekday">Sat</span>
                     </div>
-                    <div class="calendar-days" id="calendarDays" role="grid" aria-label="Calendar days">
+                    <div class="calendar-days gcal-days" id="calendarDays" role="grid" aria-label="Monthly calendar">
                       <!-- Populated by dashboard.js -->
                     </div>
                   </div>
+
+                  <div class="gcal-list-view" id="calendarScheduleView" data-gcal-panel="schedule" hidden>
+                    <ul class="gcal-activity-list" id="calendarScheduleList"></ul>
+                  </div>
+                  <div class="gcal-list-view" id="calendarActivitiesView" data-gcal-panel="activities" hidden>
+                    <ul class="gcal-activity-list" id="calendarActivitiesList"></ul>
+                  </div>
                 </div>
+
+                <!-- Composer drawer -->
+                <div class="gcal-composer" id="calendarNotesPanel" hidden>
+                  <div class="gcal-composer__head">
+                    <div>
+                      <p class="calendar-notes-kicker">Note</p>
+                      <h4 id="calendarNotesDateLabel">Select a date</h4>
+                    </div>
+                    <button type="button" class="gcal-composer-close" id="calendarComposerClose" aria-label="Close note form">
+                      <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  <form class="calendar-note-form" id="calendarNoteForm">
+                    <input type="hidden" id="calendarNoteId" value="">
+                    <label class="calendar-note-field">
+                      <span>Title</span>
+                      <input type="text" id="calendarNoteTitle" maxlength="120" placeholder="e.g. Harvest start — Lipa" required>
+                    </label>
+                    <label class="calendar-note-field">
+                      <span>Details / location</span>
+                      <textarea id="calendarNoteBody" rows="3" maxlength="4000" placeholder="Barangay, volume target, contact…"></textarea>
+                    </label>
+                    <div class="calendar-note-categories" role="group" aria-label="Note category">
+                      <button type="button" class="calendar-cat-chip active" data-category="harvest">Harvest</button>
+                      <button type="button" class="calendar-cat-chip" data-category="delivery">Delivery</button>
+                      <button type="button" class="calendar-cat-chip" data-category="meeting">Meeting</button>
+                      <button type="button" class="calendar-cat-chip" data-category="deadline">Deadline</button>
+                      <button type="button" class="calendar-cat-chip" data-category="other">Other</button>
+                    </div>
+                    <div class="calendar-note-actions">
+                      <button type="submit" class="calendar-note-save" id="calendarNoteSaveBtn">
+                        <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+                        Save note
+                      </button>
+                      <button type="button" class="calendar-note-cancel" id="calendarNoteCancelBtn" hidden>Cancel edit</button>
+                      <button type="button" class="calendar-note-delete-active" id="calendarNoteDeleteBtn" hidden>Delete</button>
+                    </div>
+                  </form>
+                  <ul class="calendar-notes-list" id="calendarNotesList" hidden></ul>
+                  <span class="calendar-notes-count" id="calendarNotesCount" hidden>0 notes</span>
+                </div>
+              </div>
+
+              <div class="charts-grid calendar-follow-grid">
                 <div class="chart-card widget-card">
                   <div class="widget-header">
                     <h3>Farmer Registration Volume</h3>
@@ -773,18 +866,18 @@
                         <div class="farmer-self-sale-panel" id="farmerSelfSalePanel">
                           <div class="farmer-self-sale-header">
                             <div>
-                              <h4 class="farmer-self-sale-title">Self-Sale (Direct Selling)</h4>
-                              <p class="farmer-self-sale-desc">Tied to the farmer’s app delivery preference. Enabling Self-sale unlocks the Records module for sell / drop-off &amp; sell accounts.</p>
+                              <h4 class="farmer-self-sale-title">Records &amp; Self-Sale Status</h4>
+                              <p class="farmer-self-sale-desc">Read-only summary. Enable self-sale and unlock Records from <strong>Coffee Pricing → Records Unlock Queue</strong>, or by approving a price application.</p>
                             </div>
-                            <label class="self-sale-toggle" title="Enable farmer self-sale">
-                              <input type="checkbox" id="farmerSelfSaleToggle" />
-                              <span class="self-sale-toggle-slider"></span>
-                            </label>
                           </div>
                           <p class="farmer-self-sale-pref" id="farmerSelfSalePreference">Delivery preference: —</p>
                           <p class="farmer-self-sale-status" id="farmerSelfSaleStatus">Self-sale is disabled for this farmer.</p>
-                          <div class="farmer-self-sale-applications" id="farmerSelfSaleApplicationsWrap" hidden>
-                            <h5>Price Applications</h5>
+                          <p class="farmer-self-sale-audit" id="farmerSelfSaleAudit" hidden></p>
+                          <button type="button" class="btn btn-secondary btn-sm farmer-self-sale-manage-btn" id="farmerSelfSaleManageBtn">
+                            Open Coffee Pricing
+                          </button>
+                          <div class="farmer-self-sale-applications" id="farmerSelfSaleApplicationsWrap">
+                            <h5>Price Applications (read-only)</h5>
                             <div class="table-wrapper">
                               <table class="data-table farmer-self-sale-apps-table" id="farmerSelfSaleAppsTable">
                                 <thead>
@@ -1094,11 +1187,17 @@
                   <i class="fa-solid fa-magnifying-glass"></i>
                   <input id="mapsSearchInput" type="search" placeholder="Search barangay.." autocomplete="off" />
                 </label>
-                <div class="maps-toolbar__variety" role="tablist" aria-label="Coffee variety filter">
-                  <button type="button" class="maps-variety-btn is-active" role="tab" aria-selected="true">All</button>
-                  <button type="button" class="maps-variety-btn" role="tab" aria-selected="false">Liberica</button>
-                  <button type="button" class="maps-variety-btn" role="tab" aria-selected="false">Robusta</button>
-                  <button type="button" class="maps-variety-btn" role="tab" aria-selected="false">Excelsa</button>
+                <div class="maps-toolbar__actions">
+                  <div class="maps-toolbar__variety" role="tablist" aria-label="Coffee variety filter">
+                    <button type="button" class="maps-variety-btn is-active" role="tab" aria-selected="true">All</button>
+                    <button type="button" class="maps-variety-btn" role="tab" aria-selected="false">Liberica</button>
+                    <button type="button" class="maps-variety-btn" role="tab" aria-selected="false">Robusta</button>
+                    <button type="button" class="maps-variety-btn" role="tab" aria-selected="false">Excelsa</button>
+                  </div>
+                  <button type="button" class="btn btn-secondary maps-refresh-live-btn" id="mapsRefreshLiveFarmersBtn">
+                    <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+                    <span>Refresh map from live farmers</span>
+                  </button>
                 </div>
               </div>
             </section>
@@ -1106,24 +1205,15 @@
             <section class="maps-stage-card" aria-label="Lipa City map" style="min-height: 760px;">
               <header class="maps-stage-card__header">
                 <h2>Lipa City Coffee Farms</h2>
-                <div class="maps-stage-card__tools" aria-hidden="true">
-                  <button type="button"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
-                  <button type="button"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                <div class="maps-stage-card__tools">
+                  <button type="button" id="mapsZoomInBtn" aria-label="Zoom in"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                  <button type="button" id="mapsZoomOutBtn" aria-label="Zoom out"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
                 </div>
               </header>
               <div class="maps-stage-card__body" style="min-height: 680px; height: 72vh; max-height: 900px;">
                 <span id="mapsCoordPill" class="maps-coord-pill">13.941100° N, 121.164800° E</span>
-                <div id="mapsGoogleCanvas" class="maps-google-canvas" role="img" aria-label="Lipa City coffee farms map" style="position:absolute; inset:0; width:100%; height:100%;"></div>
-                <iframe
-                  id="mapsGoogleEmbed"
-                  class="maps-google-canvas is-hidden"
-                  title="Lipa City, Batangas map"
-                  loading="lazy"
-                  referrerpolicy="no-referrer-when-downgrade"
-                  src="https://www.google.com/maps?q=Lipa+City,+Batangas&z=12&output=embed"
-                  style="position:absolute; inset:0; width:100%; height:100%; border:0;"
-                ></iframe>
-                <p id="mapsGoogleFallback" class="maps-google-fallback" hidden>
+                <div id="mapsLeafletCanvas" class="maps-leaflet-canvas" role="img" aria-label="Lipa City coffee farms map" style="position:absolute; inset:0; width:100%; height:100%;"></div>
+                <p id="mapsLeafletFallback" class="maps-leaflet-fallback" hidden>
                   Loading map… Farmer pins appear at each registered barangay in Lipa City.
                 </p>
               </div>
@@ -1218,9 +1308,6 @@
                   <div class="txn-select-wrapper">
                     <select id="transactionsYearFilter" class="txn-select">
                       <option value="">All Years</option>
-                      <option value="2026">2026</option>
-                      <option value="2025">2025</option>
-                      <option value="2024">2024</option>
                     </select>
                   </div>
                   <div class="txn-select-wrapper">
@@ -1272,81 +1359,115 @@
 
           <!-- Farmer's Contribution Module -->
           <div class="module hidden" id="register-module" data-module="register">
-            <div class="contributions-card">
-              <!-- Tab Bar -->
-              <div class="contributions-tabs-bar">
-                <div class="contributions-tabs-left">
-                  <!-- Kept empty to align tabs to the right -->
+            <div class="contributions-card gm-shell">
+              <header class="gm-topbar">
+                <div class="gm-topbar__brand">
+                  <h2 class="contributions-module-title">Package &amp; send</h2>
+                  <p class="contributions-module-sub">Review farmer contributions, then package and send. Uploads stay in IPOPHL — Analytics only monitors progress.</p>
                 </div>
-                <div class="contributions-tabs">
-                  <button class="contributions-tab active" data-filter="all">
-                    <i class="fa-solid fa-inbox"></i> Inbox <span class="tab-badge" id="inboxCountBadge">4</span>
-                  </button>
-                  <button class="contributions-tab" data-filter="starred">
-                    <i class="fa-solid fa-star"></i> Starred <span class="tab-badge" id="starredCountBadge">1</span>
-                  </button>
-                  <button class="contributions-tab" data-filter="approved">
-                    <i class="fa-solid fa-circle-check"></i> Approved <span class="tab-badge" id="approvedCountBadge">2</span>
-                  </button>
-                  <button class="contributions-tab" data-filter="archived">
-                    <i class="fa-solid fa-box-archive"></i> Archived
-                  </button>
-                  <div class="tab-separator"></div>
-                  <button class="contributions-tab" data-filter="documents">
-                    <i class="fa-solid fa-file-lines"></i> Documents
-                  </button>
-                  <button class="contributions-tab" data-filter="images">
-                    <i class="fa-solid fa-image"></i> Images
-                  </button>
-                </div>
-              </div>
+                <label class="gm-search" for="contributionsSearchInput">
+                  <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                  <input
+                    type="search"
+                    id="contributionsSearchInput"
+                    placeholder="Search mail"
+                    autocomplete="off"
+                    aria-label="Search contributions"
+                  />
+                </label>
+              </header>
 
-              <!-- Toolbar -->
-              <div class="contributions-toolbar">
-                <div class="contributions-toolbar-left">
-                  <input type="checkbox" class="contributions-select-all" id="beanthenticSelectAll">
-                  <button class="beanthentic-toolbar-btn" title="Refresh">
-                    <i class="fa-solid fa-rotate"></i>
+              <div class="gm-body">
+                <aside class="gm-nav" id="beanthenticSidebar" aria-label="Contribution folders">
+                  <button type="button" class="contributions-tab gm-nav-item active" data-filter="all">
+                    <i class="fa-solid fa-inbox" aria-hidden="true"></i>
+                    <span>Inbox</span>
+                    <span class="tab-badge" id="inboxCountBadge">0</span>
                   </button>
-                  <button class="beanthentic-toolbar-btn" title="Archive">
-                    <i class="fa-solid fa-box-archive"></i>
+                  <button type="button" class="contributions-tab gm-nav-item" data-filter="starred">
+                    <i class="fa-solid fa-star" aria-hidden="true"></i>
+                    <span>Starred</span>
+                    <span class="tab-badge" id="starredCountBadge">0</span>
                   </button>
-                  <button class="beanthentic-toolbar-btn" title="Mark as Reviewed">
-                    <i class="fa-solid fa-envelope"></i>
+                  <button type="button" class="contributions-tab gm-nav-item" data-filter="approved">
+                    <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                    <span>Approved</span>
+                    <span class="tab-badge" id="approvedCountBadge">0</span>
                   </button>
-                </div>
-                <div class="contributions-toolbar-right">
-                  <span class="contributions-pagination-label" id="contributionsPaginationLabel">1-4 of 4</span>
-                  <div class="contributions-pagination-btns">
-                    <button class="contributions-page-btn" id="contributionsPrevBtn" disabled>
-                      <i class="fa-solid fa-chevron-left"></i>
-                    </button>
-                    <button class="contributions-page-btn" id="contributionsNextBtn" disabled>
-                      <i class="fa-solid fa-chevron-right"></i>
-                    </button>
+                  <button type="button" class="contributions-tab gm-nav-item" data-filter="archived">
+                    <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
+                    <span>Archived</span>
+                  </button>
+
+                  <p class="gm-nav-label">Categories</p>
+                  <button type="button" class="contributions-tab gm-nav-item" data-filter="documents">
+                    <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
+                    <span>Documents</span>
+                  </button>
+                  <button type="button" class="contributions-tab gm-nav-item" data-filter="images">
+                    <i class="fa-solid fa-image" aria-hidden="true"></i>
+                    <span>Images</span>
+                  </button>
+                </aside>
+
+                <section class="gm-main" aria-label="Contribution inbox">
+                  <div class="contributions-toolbar">
+                    <div class="contributions-toolbar-left">
+                      <input type="checkbox" class="contributions-select-all" id="beanthenticSelectAll" title="Select all" aria-label="Select all">
+                      <button type="button" class="beanthentic-toolbar-btn" title="Refresh" aria-label="Refresh">
+                        <i class="fa-solid fa-rotate"></i>
+                      </button>
+                      <button type="button" class="beanthentic-toolbar-btn" title="Archive" aria-label="Archive selected">
+                        <i class="fa-solid fa-box-archive"></i>
+                      </button>
+                      <button type="button" class="beanthentic-toolbar-btn" title="Mark as Reviewed" aria-label="Mark as reviewed">
+                        <i class="fa-solid fa-envelope-open"></i>
+                      </button>
+                    </div>
+                    <div class="contributions-toolbar-right">
+                      <span class="contributions-pagination-label" id="contributionsPaginationLabel">0-0 of 0</span>
+                      <div class="contributions-pagination-btns">
+                        <button type="button" class="contributions-page-btn" id="contributionsPrevBtn" disabled aria-label="Previous page">
+                          <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <button type="button" class="contributions-page-btn" id="contributionsNextBtn" disabled aria-label="Next page">
+                          <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              <!-- Main Content -->
-              <div class="contributions-list" id="beanthenticContributionList">
-                <!-- Populated dynamically by dashboard.js -->
+                  <div class="contributions-list" id="beanthenticContributionList" role="list">
+                    <!-- Populated dynamically by dashboard.js -->
+                  </div>
+                </section>
               </div>
             </div>
           </div>
 
           <!-- Analytics Module -->
           <div class="module hidden" id="analytics-module" data-module="analytics">
+            <p class="analytics-module-intro">Monitor GI / IPOPHL progress from uploaded documents. Farmer gauges below use registration rules, not the document AI model. Uploads live in the IPOPHL module.</p>
+            <div class="analytics-toolbar" style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;margin:0 0 1rem;">
+              <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;color:#475569;">
+                Timeline from
+                <input type="month" id="analyticsFromMonth" />
+              </label>
+              <button type="button" class="btn btn-secondary" id="analyticsExportBtn">
+                <i class="fa-solid fa-download" aria-hidden="true"></i>
+                Export charts
+              </button>
+            </div>
             <section class="analytics-summary-grid" aria-label="Analytics summary">
               <article class="analytics-kpi-card">
-                <h3>Documents Passed AI Review</h3>
+                <h3>Documents Ready</h3>
                 <p class="analytics-kpi-value" id="analyticsDocsPassed">0</p>
-                <p class="analytics-kpi-sub" id="analyticsDocsPassedSub">Score ≥ 70%</p>
+                <p class="analytics-kpi-sub" id="analyticsDocsPassedSub">Ready status</p>
               </article>
               <article class="analytics-kpi-card">
-                <h3>IPOPHL Progress</h3>
+                <h3>IPOPHL Phase Completion</h3>
                 <p class="analytics-kpi-value" id="ipophlProgressRate">0%</p>
-                <p class="analytics-kpi-sub" id="ipophlProgressSub">0 of 7 groups</p>
+                <p class="analytics-kpi-sub" id="ipophlProgressSub">0 of 7 groups Ready</p>
               </article>
             </section>
 
@@ -1377,7 +1498,7 @@
                   </div>
                 </div>
                 <div class="chart-card">
-                  <h3>GI Readiness Gauge (Farmers)</h3>
+                  <h3>GI Eligibility Gauge (Rules)</h3>
                   <div class="chart-container">
                     <canvas id="giReadinessGaugeChart"></canvas>
                   </div>
@@ -1395,6 +1516,14 @@
                   <div class="search-container client-report-search" style="flex: 1; position: relative;">
                     <input id="clientReportSearchInput" type="text" placeholder="Search reports..." style="width: 100%; height: 40px; padding: 0 16px 0 40px; border-radius: 10px; border: 1px solid #e2e8f0; background: #f8fafc; font-size: 0.9rem;" />
                   </div>
+                  <select id="clientReportStatusFilter" aria-label="Filter by status" style="height: 40px; padding: 0 0.85rem; border-radius: 10px; border: 1px solid #e2e8f0; background: #f8fafc; font-size: 0.9rem;">
+                    <option value="">All statuses</option>
+                    <option value="open">Open</option>
+                    <option value="under review">Under review</option>
+                    <option value="blocked">Blocked</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="dismissed">Dismissed</option>
+                  </select>
                   <button type="button" class="action-btn client-report-refresh" id="clientReportRefreshBtn" style="height: 40px; padding: 0 1.25rem; border-radius: 10px; border: none; background: #2c7a3e; color: #ffffff; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap;">
                     <i class="fa-solid fa-rotate" aria-hidden="true"></i>
                     Refresh
@@ -1411,6 +1540,8 @@
                         <th>Time</th>
                         <th>Farmer</th>
                         <th>Allegation</th>
+                        <th>Status</th>
+                        <th>Links</th>
                         <th>Action</th>
                       </tr>
                     </thead>
@@ -1439,19 +1570,12 @@
               <div class="table-header coffee-pricing-header">
                 <div>
                   <h2 style="margin: 0;">Coffee Bean Pricing</h2>
-                  <p class="coffee-pricing-subtitle">Official drop-off prices, delivery-preference unlocks, and farmer self-sale price applications.</p>
-                  <div class="coffee-pricing-self-sale-bar" id="coffeePricingSelfSaleBar">
-                    <label for="coffeePricingSelfSaleFarmerSelect" class="coffee-pricing-self-sale-label">Self-sale / Records unlock</label>
-                    <select id="coffeePricingSelfSaleFarmerSelect" class="coffee-pricing-self-sale-select">
-                      <option value="">Select farmer</option>
-                    </select>
-                    <label class="self-sale-toggle coffee-pricing-self-sale-toggle" title="Enable farmer self-sale">
-                      <input type="checkbox" id="coffeePricingSelfSaleToggle" />
-                      <span class="self-sale-toggle-slider"></span>
-                    </label>
-                    <span id="coffeePricingSelfSaleStatus" class="coffee-pricing-self-sale-status">Select a farmer to manage self-sale (unlocks Records in their app).</span>
-                  </div>
-                  <p id="coffeePricingPreferenceMeta" class="coffee-pricing-preference-meta">Delivery preference and Records status appear here after selecting a farmer.</p>
+                  <p class="coffee-pricing-subtitle">Official drop-off reference prices, Records unlock queue, and farmer price applications.</p>
+                  <p class="coffee-pricing-rules">
+                    <strong>Unlock hub:</strong> Use the Records Unlock Queue below to enable self-sale.
+                    <strong>Auto-unlock:</strong> Approving a price application also enables self-sale and unlocks Records.
+                    Farmer profiles show status only — manage unlocks here.
+                  </p>
                 </div>
                 <button type="button" class="action-btn" id="coffeePricingRefreshBtn">
                   <i class="fa-solid fa-rotate" aria-hidden="true"></i>
@@ -1464,16 +1588,20 @@
                   <h3>Records Unlock Queue</h3>
                   <span class="coffee-pricing-queue-count" id="coffeePricingUnlockCount">0 waiting</span>
                 </div>
-                <p class="coffee-pricing-queue-hint">Farmers who chose Sell or Drop-off &amp; Sell stay frozen in Records until Self-sale is enabled (or their pricelist is approved).</p>
+                <p class="coffee-pricing-queue-hint">
+                  Farmers who chose <em>Sell</em> or <em>Drop-off &amp; Sell</em> stay frozen in Records until you enable self-sale here
+                  or approve their price application (auto-unlock).
+                  When the queue is empty, everyone who needed unlock is already cleared.
+                </p>
                 <div class="table-wrapper">
                   <table class="data-table" id="coffeePricingUnlockTable">
                     <thead>
                       <tr>
                         <th>Farmer</th>
                         <th>Delivery preference</th>
-                        <th>Pricelist</th>
+                        <th>Unlock status</th>
                         <th>Self-sale</th>
-                        <th>Records</th>
+                        <th>Records status</th>
                         <th>Action</th>
                       </tr>
                     </thead>
@@ -1488,44 +1616,30 @@
                 <div class="coffee-pricing-card">
                   <div class="coffee-pricing-card-head">
                     <h3>Official Pricelist</h3>
+                    <button type="button" class="btn btn-secondary btn-sm" id="coffeePricelistEditBtn">
+                      <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Edit official prices
+                    </button>
                   </div>
+                  <p class="coffee-pricing-card-hint">Reference GCB drop-off prices (₱/kg) shown to farmers — not the same as price applications below.</p>
                   <div class="table-wrapper">
                     <table class="data-table" id="coffeePricelistTable">
                       <thead>
                         <tr>
                           <th>Variety</th>
-                          <th>Bean type</th>
-                          <th>Classification</th>
-                          <th>Price / kg</th>
+                          <th>Official price / kg (GCB)</th>
                           <th>Notes</th>
-                          <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody id="coffeePricelistBody">
-                        <tr><td colspan="6" class="transactions-loading-cell">Loading pricelist...</td></tr>
+                        <tr><td colspan="3" class="transactions-loading-cell">Loading pricelist...</td></tr>
                       </tbody>
                     </table>
-                  </div>
-                  <div class="pricing-pagination" id="coffeePricelistPagination">
-                    <span class="pricing-page-label">Page</span>
-                    <div class="pricing-page-input-wrapper">
-                      <input type="number" value="1" min="1" id="coffeePricelistPageInput" aria-label="Pricelist page number">
-                    </div>
-                    <span class="pricing-page-of" id="coffeePricelistPageOf">of 1</span>
-                    <div class="pricing-page-controls">
-                      <button type="button" class="pricing-page-btn" id="coffeePricelistPrevBtn" title="Previous page" aria-label="Previous page">
-                        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
-                      </button>
-                      <button type="button" class="pricing-page-btn" id="coffeePricelistNextBtn" title="Next page" aria-label="Next page">
-                        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
-                      </button>
-                    </div>
                   </div>
                 </div>
 
                 <div class="coffee-pricing-card">
                   <div class="coffee-pricing-card-head">
-                    <h3>Pending Price Applications</h3>
+                    <h3>Price Applications</h3>
                     <select id="coffeePricingAppFilter" class="coffee-pricing-filter">
                       <option value="pending">Pending</option>
                       <option value="">All statuses</option>
@@ -1533,22 +1647,21 @@
                       <option value="rejected">Rejected</option>
                     </select>
                   </div>
+                  <p class="coffee-pricing-card-hint">Farmers request selling prices. Approve to accept the price <strong>and</strong> unlock Records; reject to keep Records frozen.</p>
                   <div class="table-wrapper">
                     <table class="data-table" id="coffeePricingAppsTable">
                       <thead>
                         <tr>
                           <th>Farmer</th>
                           <th>Variety</th>
-                          <th>Type</th>
                           <th>Qty (kg)</th>
-                          <th>Requested</th>
-                          <th>Reference</th>
+                          <th>Requested vs official</th>
                           <th>Status</th>
                           <th>Action</th>
                         </tr>
                       </thead>
                       <tbody id="coffeePricingAppsBody">
-                        <tr><td colspan="8" class="transactions-loading-cell">Loading applications...</td></tr>
+                        <tr><td colspan="6" class="transactions-loading-cell">Loading applications...</td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -1563,7 +1676,7 @@
               <div class="ipophl-header-layout">
                 <div class="ipophl-header-copy">
                   <h1>IPOPHL GI Registration</h1>
-                  <p>Geographical Indication Registration Process for Lipa City Products</p>
+                    <p id="ipophlMlBanner" class="ipophl-ml-banner" hidden></p>
                 </div>
 
                 <aside class="gi-status-card" aria-label="GI process analysis status">
@@ -1854,6 +1967,11 @@
                       <i class="fa-solid fa-magnifying-glass"></i>
                       <input type="search" id="messagingSearchInput" placeholder="Search Messenger" autocomplete="off" />
                     </div>
+                    <div class="messaging-folder-strip" id="messagingFolders" role="tablist" aria-label="Message folders">
+                      <button type="button" class="messaging-folder-item is-active" data-folder="inbox">Inbox</button>
+                      <button type="button" class="messaging-folder-item" data-folder="sent">Sent</button>
+                      <button type="button" class="messaging-folder-item" data-folder="archived">Archived</button>
+                    </div>
                   </div>
                   <ul class="messaging-list" id="messagingList">
                     <li class="messaging-loading">
@@ -1931,7 +2049,7 @@
                         <i class="fa-solid fa-xmark"></i>
                       </button>
                     </div>
-                    <div class="messaging-compose-body">
+                    <form id="messagingComposeForm" class="messaging-compose-body">
                       <div class="messaging-compose-field messaging-recipient-container">
                         <label for="msgComposeRecipientInput">Search for a farmer:</label>
                         <div class="messaging-recipient-input-wrapper">
@@ -1940,12 +2058,31 @@
                           <div class="messaging-contact-dropdown" id="messagingContactDropdown">
                             <div class="messaging-contact-dropdown__header">Your contacts</div>
                             <div class="messaging-contact-dropdown__list" id="messagingContactDropdownList">
-                              <!-- Contacts populated here -->
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
+                      <div class="messaging-compose-field">
+                        <label for="msgComposeCategory">Category</label>
+                        <select id="msgComposeCategory">
+                          <option value="general">General</option>
+                          <option value="harvest">Harvest</option>
+                          <option value="pricing">Pricing</option>
+                          <option value="support">Support</option>
+                        </select>
+                      </div>
+                      <div class="messaging-compose-field">
+                        <label for="msgComposeBody">Message</label>
+                        <textarea id="msgComposeBody" rows="4" placeholder="Type your message…" required></textarea>
+                      </div>
+                      <div class="messaging-compose-footer">
+                        <button type="button" class="messaging-compose-cancel" id="messagingComposeCancel">Cancel</button>
+                        <button type="submit" class="messaging-compose-send" id="messagingComposeSend">
+                          <i class="fa-solid fa-paper-plane"></i>
+                          <span>Send Message</span>
+                        </button>
+                      </div>
+                    </form>
                   </div>
                 </div>
               </div>
@@ -1998,7 +2135,7 @@
                   </div>
                 </div>
                 <div class="profile-title-section">
-                  <h2 id="accountHeroName">Loading...</h2>
+                  <h2 id="accountHeroName"><span class="bt-skeleton bt-skeleton--title" aria-hidden="true">&nbsp;</span></h2>
                   <p class="profile-role">Admin</p>
                 </div>
               </div>
@@ -2028,7 +2165,7 @@
                       </span>
                       <div class="personal-info-field__content">
                         <span class="personal-info-field__label">First name</span>
-                        <span class="personal-info-field__value" id="accountFirstName">Loading...</span>
+                        <span class="personal-info-field__value" id="accountFirstName"><span class="bt-skeleton bt-skeleton--text" aria-hidden="true">&nbsp;</span></span>
                       </div>
                     </div>
                     <div class="personal-info-field">
@@ -2037,7 +2174,7 @@
                       </span>
                       <div class="personal-info-field__content">
                         <span class="personal-info-field__label">Last name</span>
-                        <span class="personal-info-field__value" id="accountLastName">Loading...</span>
+                        <span class="personal-info-field__value" id="accountLastName"><span class="bt-skeleton bt-skeleton--text" aria-hidden="true">&nbsp;</span></span>
                       </div>
                     </div>
                     <div class="personal-info-field">
@@ -2046,7 +2183,7 @@
                       </span>
                       <div class="personal-info-field__content">
                         <span class="personal-info-field__label">Phone number</span>
-                        <span class="personal-info-field__value" id="accountPhone">Loading...</span>
+                        <span class="personal-info-field__value" id="accountPhone"><span class="bt-skeleton bt-skeleton--text" aria-hidden="true">&nbsp;</span></span>
                       </div>
                     </div>
                   </div>
@@ -2583,26 +2720,20 @@
   <script>
     window.__BEANTHENTIC_API_BASE__ = {{ request.script_root|tojson }};
     window.__BEANTHENTIC_USER__ = { phone: "{{ user_phone }}", full_name: "{{ user_full_name }}" };
-    window.__GOOGLE_MAPS_API_KEY__ = {{ google_maps_api_key|tojson }};
+    window.__STADIA_MAPS_API_KEY__ = {{ stadia_maps_api_key|tojson }};
+    window.__STADIA_MAPS_KEY_IS_PRODUCTION__ = {{ stadia_maps_key_is_production|tojson }};
   </script>
-  <script>
-    window.initBeanthenticGoogleMaps = function initBeanthenticGoogleMaps() {
-      if (window.dashboardApp && typeof window.dashboardApp.onGoogleMapsReady === 'function') {
-        window.dashboardApp.onGoogleMapsReady();
-      }
-      window.__BEANTHENTIC_GOOGLE_MAPS_READY__ = true;
-    };
-  </script>
-  {% if google_maps_api_key %}
-  <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=visualization&callback=initBeanthenticGoogleMaps"></script>
-  {% endif %}
   <!-- JavaScript Files -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://unpkg.com/docx-preview@0.3.4/dist/docx-preview.min.js"></script>
   <script src="js/main.js"></script>
+  <script src="js/site-polish.js?v={{ static_cache_bust }}"></script>
+  <script src="js/modules/dialogs.js?v={{ static_cache_bust }}"></script>
   <script src="js/navigation.js"></script>
   <script src="js/beanthentic_datetime.js?v=20260524-msgshort"></script>
   <script src="js/ipophl-complete-gi.js?v={{ static_cache_bust }}"></script>
   <script src="js/dashboard.js?v={{ static_cache_bust }}"></script>
+  <script src="js/modules/dashboard-enhancements.js?v={{ static_cache_bust }}"></script>
   <script src="js/ipophl-analyzer.js?v={{ static_cache_bust }}"></script>
   
   <!-- Delete Confirmation Modal -->
@@ -2723,8 +2854,8 @@
       <div class="modal-header">
         <h3><i class="fa-solid fa-file-alt"></i> Document Preview &amp; AI Analysis</h3>
         <div class="modal-window-actions">
-          <button type="button" class="modal-window-btn" id="filePreviewMinimizeBtn" title="Minimize">
-            <i class="fa-solid fa-window-minimize"></i>
+          <button type="button" class="modal-window-btn" id="filePreviewMinimizeBtn" title="Minimize preview" aria-label="Minimize preview">
+            <i class="fa-solid fa-window-minimize" aria-hidden="true"></i>
           </button>
           <button type="button" class="modal-close" onclick="closeFilePreview()" title="Close">
             <i class="fa-solid fa-times"></i>
@@ -2737,7 +2868,7 @@
             <div class="preview-header">
               <h4 id="previewFileName">Document Preview</h4>
               <div class="preview-controls">
-                <button type="button" class="btn btn-sm btn-secondary" onclick="refreshAnalysis()" id="refreshBtn">
+                <button type="button" class="btn btn-sm btn-secondary" onclick="refreshAnalysis()" id="ipophlRefreshBtn">
                   <i class="fa-solid fa-sync-alt"></i> Refresh Analysis
                 </button>
               </div>
@@ -2750,7 +2881,10 @@
             </div>
             <div class="preview-container">
               <iframe id="filePreviewFrame" src="" class="preview-frame" title="Document preview"></iframe>
-              <div id="wordPreviewArea" class="word-preview-area hidden"></div>
+              <div id="wordPreviewArea" class="word-preview-area hidden">
+                <div id="wordPreviewStyles" class="word-preview-styles" aria-hidden="true"></div>
+                <div id="wordPreviewViewport" class="word-preview-viewport"></div>
+              </div>
               <div id="previewLoading" class="loading-spinner hidden">
                 <i class="fa-solid fa-spinner fa-spin"></i> Loading document...
               </div>
@@ -2759,20 +2893,20 @@
           <div class="analysis-section">
             <div class="analysis-header">
               <div class="analysis-header__title">
-                <h4><i class="fa-solid fa-file-lines"></i> Beanthentic AI Reviewer</h4>
-                <span class="analysis-header__subtitle">Automated IPOPHL document review</span>
+                <h4><i class="fa-solid fa-clipboard-check"></i> Document Feedback</h4>
+                <span class="analysis-header__subtitle">Beanthentic AI · GI document review</span>
               </div>
               <div class="analysis-status">
                 <span class="status-badge" id="analysisStatusBadge">Analyzing...</span>
               </div>
             </div>
             <div class="analysis-scroll-area">
-              <div class="analysis-results ai-chat-results" id="analysisResults">
+              <div class="analysis-results ai-chat-results" id="analysisResults" aria-live="polite">
                 <div id="requirementAnalysisContent" class="ai-chat-thread">
                   <div class="ai-chat-typing" id="aiChatTyping" hidden>
                     <div class="ai-typing-panel">
                       <span class="ai-typing-dots"><span></span><span></span><span></span></span>
-                      <span class="ai-typing-label">Reviewing document…</span>
+                      <span class="ai-typing-label">Preparing feedback…</span>
                     </div>
                   </div>
                 </div>
@@ -2781,15 +2915,115 @@
           </div>
         </div>
       </div>
-      <button type="button" class="modal-resize-handle" id="filePreviewResizeHandle" aria-label="Resize modal"></button>
+      <div class="modal-resize-edges" aria-hidden="true">
+        <span class="modal-resize-edge modal-resize-edge--n" data-resize="n"></span>
+        <span class="modal-resize-edge modal-resize-edge--s" data-resize="s"></span>
+        <span class="modal-resize-edge modal-resize-edge--e" data-resize="e"></span>
+        <span class="modal-resize-edge modal-resize-edge--w" data-resize="w"></span>
+        <span class="modal-resize-edge modal-resize-edge--ne" data-resize="ne"></span>
+        <span class="modal-resize-edge modal-resize-edge--nw" data-resize="nw"></span>
+        <span class="modal-resize-edge modal-resize-edge--se" data-resize="se"></span>
+        <span class="modal-resize-edge modal-resize-edge--sw" data-resize="sw"></span>
+      </div>
     </div>
-    <button type="button" class="modal-minimized-bar hidden" id="filePreviewMinimizedBar">
-      <span><i class="fa-solid fa-file-lines"></i> Document Preview &amp; AI Analysis</span>
-      <span class="modal-minimized-bar__hint">Restore</span>
+    <button
+      type="button"
+      class="modal-minimized-bar hidden"
+      id="filePreviewMinimizedBar"
+      aria-label="Expand document preview and AI analysis"
+      title="Expand preview"
+    >
+      <span class="modal-minimized-bar__label">
+        <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
+        <span>Document Preview &amp; AI Analysis</span>
+      </span>
+      <span class="modal-minimized-bar__action" aria-hidden="true">
+        <i class="fa-solid fa-window-maximize"></i>
+        <span>Expand</span>
+      </span>
     </button>
   </div>
 
   <!-- Custom Confirmation Dialog (Moved to absolute bottom for fixed positioning) -->
+  <div id="recordsUnlockConfirmModal" class="confirm-dialog" hidden aria-hidden="true">
+    <div class="confirm-dialog__backdrop" tabindex="-1"></div>
+    <div class="confirm-dialog__card" role="dialog" aria-modal="true" aria-labelledby="recordsUnlockConfirmTitle">
+      <div class="confirm-dialog__icon-wrap" aria-hidden="true">
+        <i class="fa-solid fa-unlock"></i>
+      </div>
+      <h2 id="recordsUnlockConfirmTitle" class="confirm-dialog__title">Records unlocked</h2>
+      <p id="recordsUnlockConfirmMessage" class="confirm-dialog__message">
+        This farmer can use Records again.
+      </p>
+      <ul class="records-unlock-confirm-list" id="recordsUnlockConfirmList">
+        <li><span>Farmer</span><strong id="recordsUnlockFarmerName">—</strong></li>
+        <li><span>Account status</span><strong id="recordsUnlockStatus">Active</strong></li>
+        <li><span>Unlock status</span><strong id="recordsUnlockPricelist">Approved</strong></li>
+        <li><span>Self-sale</span><strong id="recordsUnlockSelfSale">On</strong></li>
+        <li><span>Audit</span><strong id="recordsUnlockAuditLine">—</strong></li>
+      </ul>
+      <div class="confirm-dialog__actions">
+        <button type="button" class="confirm-dialog__btn confirm-dialog__btn--secondary" id="recordsUnlockConfirmClose">
+          Close
+        </button>
+        <button type="button" class="confirm-dialog__btn confirm-dialog__btn--primary" id="recordsUnlockConfirmView">
+          View farmer
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="officialPricelistModal" class="confirm-dialog" hidden aria-hidden="true">
+    <div class="confirm-dialog__backdrop" tabindex="-1"></div>
+    <div class="confirm-dialog__card confirm-dialog__card--wide" role="dialog" aria-modal="true" aria-labelledby="officialPricelistModalTitle">
+      <h2 id="officialPricelistModalTitle" class="confirm-dialog__title">Edit official GCB prices</h2>
+      <p class="confirm-dialog__message">Set reference drop-off prices (₱/kg) for each variety. Farmers see these as the official baseline.</p>
+      <form id="officialPricelistForm" class="official-pricelist-form">
+        <div id="officialPricelistFormRows"></div>
+      </form>
+      <div class="confirm-dialog__actions">
+        <button type="button" class="confirm-dialog__btn confirm-dialog__btn--secondary" id="officialPricelistCancelBtn">Cancel</button>
+        <button type="button" class="confirm-dialog__btn confirm-dialog__btn--primary" id="officialPricelistSaveBtn">Save all prices</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="clientReportActionModal" class="confirm-dialog" hidden aria-hidden="true">
+    <div class="confirm-dialog__backdrop" tabindex="-1"></div>
+    <div class="confirm-dialog__card" role="dialog" aria-modal="true" aria-labelledby="clientReportActionTitle">
+      <div class="confirm-dialog__icon-wrap" aria-hidden="true">
+        <i class="fa-solid fa-flag"></i>
+      </div>
+      <h2 id="clientReportActionTitle" class="confirm-dialog__title">Update report</h2>
+      <p id="clientReportActionSubtitle" class="confirm-dialog__message">Set status and add a resolution note when closing.</p>
+      <label class="confirm-dialog__password-label" for="clientReportStatusSelect">Status</label>
+      <select id="clientReportStatusSelect" class="confirm-dialog__password-input">
+        <option value="under review">Under review</option>
+        <option value="blocked">Blocked</option>
+        <option value="resolved">Resolved</option>
+        <option value="dismissed">Dismissed</option>
+        <option value="closed">Closed</option>
+      </select>
+      <label class="confirm-dialog__password-label" for="clientReportResolutionNote">
+        Resolution note <span id="clientReportNoteRequiredMark" hidden>(required for closed)</span>
+      </label>
+      <textarea
+        id="clientReportResolutionNote"
+        class="confirm-dialog__password-input client-report-resolution-note"
+        rows="4"
+        placeholder="Describe how this report was resolved…"
+      ></textarea>
+      <div class="confirm-dialog__actions">
+        <button type="button" class="confirm-dialog__btn confirm-dialog__btn--secondary" id="clientReportActionCancel">
+          Cancel
+        </button>
+        <button type="button" class="confirm-dialog__btn confirm-dialog__btn--primary" id="clientReportActionSave">
+          Save status
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div id="beanthenticConfirmDialog" class="beanthentic-confirm-dialog" hidden>
     <div class="beanthentic-confirm-modal">
       <div class="beanthentic-confirm-icon-circle" id="beanthenticConfirmIcon">

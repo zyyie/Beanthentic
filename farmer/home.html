@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Beanthentic | Farmer Home</title>
+
+    <link rel="stylesheet" href="../css/base.css" />
+    <link rel="stylesheet" href="../css/motion.css" />
+    <link rel="stylesheet" href="../css/layout.css" />
+    <link rel="stylesheet" href="../css/components.css" />
+    <link rel="stylesheet" href="../css/responsive.css" />
+    <link rel="stylesheet" href="../css/farmer-messaging.css" />
+    <link rel="stylesheet" href="../css/site-polish.css" />
+
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+      integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+  </head>
+
+  <body class="farmer-messaging-page farmer-home-page">
+    <header class="farmer-messaging-header">
+      <div class="farmer-messaging-header__brand">
+        <img src="../assets/images/logo.png" alt="Beanthentic" class="farmer-messaging-header__logo" />
+        <div>
+          <div class="farmer-messaging-header__title">Home</div>
+          <div class="farmer-messaging-header__sub">
+            Logged in as <strong>{{ farmer_name }}</strong> (+63{{ farmer_phone }})
+          </div>
+        </div>
+      </div>
+      <nav class="farmer-portal-nav" aria-label="Farmer portal">
+        <a class="farmer-portal-nav__link is-active" href="{{ url_for('farmer_home') }}">Home</a>
+        <a class="farmer-portal-nav__link" href="{{ url_for('farmer_messages') }}">Messages</a>
+        <a class="farmer-messaging-header__logout" href="{{ url_for('farmer_logout') }}">Logout</a>
+      </nav>
+    </header>
+
+    <main class="farmer-messaging-main farmer-home-main">
+      <section class="module-header farmer-home-greeting">
+        <h1>Welcome, {{ farmer_name or 'Farmer' }}</h1>
+        <p>Your portal overview for messages, records unlock, and official prices.</p>
+      </section>
+
+      <div class="farmer-home-grid">
+        <a class="farmer-home-card" href="{{ url_for('farmer_messages') }}" id="farmerUnreadCard">
+          <div class="farmer-home-card__icon"><i class="fa-solid fa-envelope"></i></div>
+          <div>
+            <h2>Messages</h2>
+            <p id="farmerUnreadSummary">Loading unread count…</p>
+          </div>
+        </a>
+
+        <div class="farmer-home-card" id="farmerUnlockCard">
+          <div class="farmer-home-card__icon"><i class="fa-solid fa-unlock-keyhole"></i></div>
+          <div>
+            <h2>Self-sale / Records</h2>
+            <p id="farmerUnlockSummary">Loading unlock status…</p>
+          </div>
+        </div>
+
+        <div class="farmer-home-card" id="farmerPriceCard">
+          <div class="farmer-home-card__icon"><i class="fa-solid fa-tags"></i></div>
+          <div>
+            <h2>Official pricelist</h2>
+            <p id="farmerPriceSummary">Loading prices…</p>
+            <ul class="farmer-home-price-list" id="farmerPriceList"></ul>
+          </div>
+        </div>
+
+        <a class="farmer-home-card" href="{{ url_for('farmer_messages') }}">
+          <div class="farmer-home-card__icon"><i class="fa-solid fa-seedling"></i></div>
+          <div>
+            <h2>GI Updates</h2>
+            <p>Check Messages for GI updates from admin.</p>
+          </div>
+        </a>
+      </div>
+    </main>
+
+    <script>
+      window.__BEANTHENTIC_USER__ = { phone: "{{ farmer_phone }}", full_name: "{{ farmer_name }}" };
+    </script>
+    <script src="../js/farmer-home.js"></script>
+  </body>
+</html>

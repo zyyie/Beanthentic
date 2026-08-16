@@ -33,18 +33,7 @@ class UIController {
   }
 
   setupInteractions() {
-    // Button interactions
-    document.querySelectorAll('.btn-primary').forEach(button => {
-      button.addEventListener('mouseenter', () => {
-        button.style.transform = 'translateY(-1px)';
-      });
-      
-      button.addEventListener('mouseleave', () => {
-        button.style.transform = 'translateY(0)';
-      });
-    });
-
-    // Add ripple effect to buttons
+    // Ripple effect on primary buttons (hover handled via CSS)
     document.querySelectorAll('.btn-primary').forEach(button => {
       button.addEventListener('click', function(e) {
         const ripple = document.createElement('span');
@@ -52,17 +41,15 @@ class UIController {
         const size = Math.max(rect.width, rect.height);
         const x = e.clientX - rect.left - size / 2;
         const y = e.clientY - rect.top - size / 2;
-        
+
         ripple.style.width = ripple.style.height = size + 'px';
         ripple.style.left = x + 'px';
         ripple.style.top = y + 'px';
         ripple.classList.add('ripple');
-        
+
         this.appendChild(ripple);
-        
-        setTimeout(() => {
-          ripple.remove();
-        }, 600);
+
+        ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
       });
     });
   }
@@ -131,19 +118,18 @@ class UIController {
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
     notification.textContent = message;
-    
+
     document.body.appendChild(notification);
-    
-    setTimeout(() => {
-      notification.classList.add('show');
-    }, 100);
-    
-    setTimeout(() => {
-      notification.classList.remove('show');
-      setTimeout(() => {
-        notification.remove();
-      }, 300);
-    }, 3000);
+
+    const dismiss = () => {
+      if (!notification.isConnected) return;
+      notification.classList.add('is-dismissed');
+      const remove = () => notification.remove();
+      notification.addEventListener('animationend', remove, { once: true });
+      setTimeout(remove, 400);
+    };
+
+    setTimeout(dismiss, 3200);
   }
 }
 

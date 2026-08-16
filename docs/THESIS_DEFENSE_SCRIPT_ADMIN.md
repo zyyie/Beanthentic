@@ -59,8 +59,8 @@
 |-----------|----------------|
 | Centralize farmer records | Farmer's Record + Farmer's Profile |
 | Support IPOPHL GI workflow | IPOPHL module (5 phases, 13 document groups) |
-| Automate document screening | Machine Learning document analyzer |
-| Predict farmer GI readiness | Machine Learning farmer classifier |
+| Automate document screening | Machine Learning document analyzer (MoP + ensemble) |
+| Monitor GI document progress | Analytics (MoP Ready / phase completion) |
 | Enable farmer–admin communication | Messaging module |
 | Monitor platform health | Analytics + Notifications |
 
@@ -201,7 +201,7 @@
 
 **Features:**
 
-- Google Maps (or Leaflet fallback if no API key).  
+- Stadia Maps via Leaflet (free tier on localhost; API key or domain auth for production).  
 - Pins colored or filtered by variety: Liberica, Robusta, Excelsa, or All.  
 - Barangay search.  
 - Side panel with geographic statistics.
@@ -361,7 +361,7 @@
 | GI-Ready Farmer Growth Trend | Cumulative GI-ready farmers over time |
 | GI Readiness Gauge | % of farmers classified as GI-ready |
 
-**GI readiness source:** Machine Learning batch predictions from `/api/ml/farmer-readiness` when models are loaded; otherwise rule-based fallback (500+ trees, RSBSA registered, NCFRS ID present).
+**GI readiness source:** Rule-based eligibility (500+ trees, RSBSA registered, NCFRS ID present). AI analysis is focused on GI documents (MoP + document ensemble), not farmer-profile ML.
 
 ---
 
@@ -423,12 +423,12 @@
 
 **IPOPHL registration involves many documents. Each document must contain specific legal and technical terms — for example “Manual of Specifications,” “Geographical Indication,” “Official Receipt.”**
 
-**Manually checking every page is slow and error-prone. Similarly, not every farmer may be ready for GI membership yet — they need enough trees, proper RSBSA registration, and farm records.**
+**Manually checking every page is slow and error-prone.**
 
-**We built two AI assistants:**
+**We built a GI document AI assistant:**
 
-1. **Document AI** — “Does this PDF look like a complete GI document?”  
-2. **Farmer AI** — “Based on farm profile data, is this farmer likely GI-ready?”
+1. **MoP qualitative review** — authoritative Ready / Not Ready from official Manual of Specifications themes.  
+2. **Document ensemble (advisory)** — soft-voting bagging + boosting score that agrees or disagrees with MoP.
 
 ---
 
@@ -438,12 +438,11 @@
 
 - “This document mentions Manual of Specifications — good.”  
 - “I don’t see Official Receipt — incomplete.”  
-- “This farmer has 800 bearing trees and RSBSA — likely ready.”
 
 **Our system automates that checklist in two ways:**
 
-- **Rules** — explicit keyword lists per IPOPHL phase (transparent, easy to audit).  
-- **Machine Learning** — a statistical model trained on labeled examples (finds patterns humans might miss).
+- **Rules / MoP themes** — explicit coverage per IPOPHL phase (transparent, easy to audit).  
+- **Machine Learning** — a document ensemble trained on labeled MoP samples (advisory layer).
 
 **We combine both for documents — hybrid scoring — so the system is neither a black box nor purely manual.**
 
@@ -752,64 +751,9 @@ SHAP on top of this forest explains **which flags moved** a specific uploaded fi
 
 ---
 
-### 6.4 Farmer GI Readiness AI — step by step
+### 6.4 Farmer profile eligibility (rules only — not ML)
 
-**Goal:** Predict whether a farmer profile looks GI-ready based on farm and compliance attributes.
-
-**Training data:**
-
-- **1,000 synthetic farmer records** in `beanthentic_synthetic_dataset_1000.csv`.  
-- **Label:** `gi_ready` = 1 (ready) or 0 (not ready).  
-- **24 input features**, including:
-  - Barangay, elevation, soil pH, rainfall, temperature  
-  - Coffee species (Liberica, Robusta, Excelsa)  
-  - Ownership type, RSBSA registration  
-  - Bearing and non-bearing tree counts  
-  - Annual yield, moisture content, defect count  
-  - Compliance flags (selective picking, farm records, cooperative membership, geographic/traditional/quality linkage)
-
-**Algorithm: Random Forest Classifier**
-
-**Plain explanation:** A Random Forest builds many decision trees, each asking yes/no questions like “Are bearing trees > 500?” and “Is RSBSA registered?” Each tree votes; the majority vote is the prediction.
-
-**Why Random Forest for this thesis?**
-
-- Handles **mixed data** (numbers + categories) without heavy preprocessing.  
-- **Resistant to overfitting** when tuned properly.  
-- Provides **feature importance** — we can tell panelists which factors matter most.  
-- **Interpretable** with SHAP — important for government adoption.
-
-**Training procedure (`train_ai_model.py`):**
-
-1. One-hot encode categorical columns (barangay, species, etc.).  
-2. Split 80% train / 20% test, stratified by label.  
-3. **GridSearchCV** — tries hyperparameter combinations with **5-fold cross-validation**.  
-4. Save best model to `gi_farmer_model.joblib`.
-
-**Reported results (June 2026 training run):**
-
-| Metric | Value |
-|--------|-------|
-| Test accuracy | **82%** |
-| 5-fold CV mean | **82.7%** (± 1.4%) |
-| Best hyperparameters | 200 trees, max depth 12, min_samples_split 5 |
-
-**Top predictive features:**
-
-1. Coffee species (Liberica)  
-2. Defect count per 300g  
-3. Soil pH  
-4. Annual rainfall  
-5. Years in farming  
-
-**At runtime:**
-
-1. Dashboard sends farmer rows to `POST /api/ml/farmer-readiness`.  
-2. `farmer_features.py` maps dashboard columns to ML schema.  
-3. Model outputs `readiness_score` (0–100) and `gi_ready` boolean.  
-4. **Threshold: ≥ 75% = Ready.**
-
-**Honest limitation for panel:** Some environmental fields use estimated defaults when not collected in registration. Future work: collect elevation and soil data in the mobile app for higher accuracy.
+**Farmer GI eligibility in Analytics uses transparent rules** (for example 500+ trees, RSBSA registered, NCFRS present). There is **no farmer tabular ML model** in the product; AI focuses on GI document analysis.
 
 ---
 
@@ -817,29 +761,27 @@ SHAP on top of this forest explains **which flags moved** a specific uploaded fi
 
 | Endpoint | Who can call | Purpose |
 |----------|--------------|---------|
-| `GET /api/ml/status` | Logged-in user | Check if models are loaded |
-| `POST /api/ml/farmer-readiness` | Logged-in user | Predict GI readiness (single or batch) |
-| `POST /api/ml/train` | Admin only | Retrain models (`train_ai_model.py --full-pipeline`) |
+| `GET /api/ml/status` | Logged-in user | Check if document model is loaded |
+| `POST /api/ml/train` | Admin only | Retrain document ensemble (`train_ai_model.py --train-documents`) |
 
-**Document dataset builder:** `scripts/build_document_training_data.py` — rebuilds `gi_documents_raw.json`, trains `gi_document_model.joblib`, optionally re-scores `data/ipophl_documents.json`.
+**Document dataset builder:** `scripts/build_document_training_data.py` — rebuilds document samples, trains `gi_document_model.joblib`, optionally re-scores `data/ipophl_documents.json`.
 
 **Core engine file:** `machinelearning/ai_engine.py` — class `GIAnalyzer`.
 
 **Libraries used:** scikit-learn, pandas, numpy, joblib, SHAP, PyMuPDF, python-docx, pytesseract, Pillow.
 
-**Not used:** TensorFlow, PyTorch, OpenCV deep learning — our problem is structured data and text keywords, not image classification. OCR handles scanned documents without a neural network.
+**Not used:** TensorFlow, PyTorch, OpenCV deep learning — our problem is structured document text and MoP themes, not image classification. OCR handles scanned documents without a neural network.
 
 ---
 
 ### 6.6 How ML appears in the demo
 
-`[DEMO — IPOPHL upload showing score + SHAP text]`
+`[DEMO — IPOPHL upload showing MoP status + ensemble chip]`
 
 1. Upload a PDF to any IPOPHL task slot.  
-2. Show AI score badge (e.g., 78% Ready).  
-3. Open analysis modal — detected terms, missing terms, SHAP explanation.  
-4. Switch to Analytics — show “Documents Passed AI Review” KPI and GI Readiness gauge.  
-5. Optional: Farmer's Profile — mention ML readiness badge if enabled.
+2. Show MoP Ready / Not Ready (authoritative) and ensemble advisory chip.  
+3. Open analysis modal — feedback narrative, missing themes.  
+4. Switch to Analytics — show “Documents MoP Ready” KPI and IPOPHL phase completion.
 
 ---
 
@@ -870,7 +812,7 @@ SHAP on top of this forest explains **which flags moved** a specific uploaded fi
 **We validated the admin site through:**
 
 - Functional testing of each module (farmer load, message send, GI upload, export).  
-- ML evaluation metrics — farmer model **82%** test accuracy; document model **91.5%** CV mean on 84-sample dataset (confusion matrix, classification report in `document_training_results.json`).  
+- ML evaluation metrics — document ensemble metrics in `document_training_results.json` (confusion matrix, classification report); MoP qualitative review for production Ready / Not Ready.  
 - LAN integration testing with mobile app on same Wi‑Fi.  
 - Error handling when app server or database is unreachable (graceful error messages, connection settings page).
 
@@ -882,16 +824,13 @@ SHAP on top of this forest explains **which flags moved** a specific uploaded fi
 
 **Limitations we acknowledge openly:**
 
-1. Farmer ML trained on **synthetic data** — real-world accuracy will improve with labeled Lipa farmer datasets.  
-2. Document ML trained on **84 curated + generated samples** (91.5% CV) — still needs **real approved/rejected IPOPHL PDFs** from LGU for production-grade validation; keyword rules remain authoritative when all mandatory terms are present.  
-3. Some farmer environmental features use **defaults** until mobile app collects them.  
-4. ML readiness and policy rules (500 trees + RSBSA + NCFRS) may **disagree** — admin should use both as guidance, not sole authority.  
-5. OCR quality on **poor scans** can reduce keyword detection — administrators should re-upload clearer scans when scores seem unexpectedly low.
+1. Document ML trained on a **small curated MoP sample set** — needs **real approved/rejected IPOPHL PDFs** from LGU for production-grade validation; MoP qualitative review remains authoritative for Ready / Not Ready.  
+2. OCR quality on **poor scans** can reduce analysis quality — administrators should re-upload clearer scans when results seem unexpectedly low.  
+3. Farmer eligibility charts use **transparent rules** (trees / RSBSA / NCFRS), not ML — they are operational metrics only.
 
 **Future work:**
 
 - Collect **50–100 real training labels** from IPOPHL outcomes (approved vs deficiency notices).  
-- Add elevation/soil sensors or LGU GIS integration.  
 - Deploy admin + app to cloud (Render, Supabase) for production.  
 - Push notifications for new messages and GI submissions.
 
@@ -901,7 +840,7 @@ SHAP on top of this forest explains **which flags moved** a specific uploaded fi
 
 `[SLIDE 10 — Summary + Thank you]`
 
-**In summary, the Beanthentic Admin Web Application is the command center of our ecosystem. It centralizes farmer records, digitizes the IPOPHL GI registration workflow, applies machine learning to document and farmer readiness screening, and connects administrators with farmers through messaging and GI updates.**
+**In summary, the Beanthentic Admin Web Application is the command center of our ecosystem. It centralizes farmer records, digitizes the IPOPHL GI registration workflow, applies machine learning to GI document screening (MoP + ensemble), and connects administrators with farmers through messaging and GI updates.**
 
 **It is built on Flask, JavaScript, Supabase, and scikit-learn — technologies chosen for maintainability, explainability, and suitability for government and academic use.**
 

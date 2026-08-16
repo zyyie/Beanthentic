@@ -66,6 +66,56 @@ def _latest_by_farmer(table: str, year_col: str, farmer_ids: list[int]) -> dict[
     return best
 
 
+def _first_coord(*sources: dict | None, keys: tuple[str, ...]) -> float | None:
+    for src in sources:
+        if not isinstance(src, dict):
+            continue
+        for key in keys:
+            if key not in src or src.get(key) is None or src.get(key) == "":
+                continue
+            try:
+                val = float(src.get(key))
+            except (TypeError, ValueError):
+                continue
+            if abs(val) > 0.000001:
+                return val
+    return None
+
+
+def _apply_farm_gps(row: dict, farmer: dict | None, farm: dict | None) -> dict:
+    """Map farm GPS columns into latitude/longitude and lat/lng for dashboard pins."""
+    lat_keys = (
+        "latitude",
+        "lat",
+        "gps_lat",
+        "gps_latitude",
+        "farm_lat",
+        "farm_latitude",
+    )
+    lng_keys = (
+        "longitude",
+        "lng",
+        "lon",
+        "gps_lng",
+        "gps_longitude",
+        "farm_lng",
+        "farm_longitude",
+    )
+    lat = _first_coord(farm, farmer, keys=lat_keys)
+    lng = _first_coord(farm, farmer, keys=lng_keys)
+    if lat is not None:
+        row["latitude"] = lat
+        row["lat"] = lat
+        row["gps_lat"] = lat
+        row["farm_lat"] = lat
+    if lng is not None:
+        row["longitude"] = lng
+        row["lng"] = lng
+        row["gps_lng"] = lng
+        row["farm_lng"] = lng
+    return row
+
+
 def _merge_farmer_row(
     farmer: dict,
     user: dict | None,
@@ -176,6 +226,7 @@ def _merge_farmer_row(
         if flag in fi:
             row[flag] = fi.get(flag)
 
+    _apply_farm_gps(row, farmer, fi)
     return expand_production_detail_into_row(row)
 
 

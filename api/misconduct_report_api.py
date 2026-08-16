@@ -10,7 +10,15 @@ from api.client_reports_api import load_admin_client_reports, update_report_stat
 from config.app_connection import load_error_payload
 from config.utils import get_current_user_phone, is_authenticated, log_activity
 
-ALLOWED_STATUSES = {"under review", "blocked", "resolved", "dismissed", "open", "under_review"}
+ALLOWED_STATUSES = {
+    "under review",
+    "blocked",
+    "resolved",
+    "dismissed",
+    "open",
+    "under_review",
+    "closed",
+}
 
 
 def _clean_text(value, limit=None):
@@ -57,15 +65,17 @@ def register_misconduct_report_routes(app):
 
         payload = request.get_json(silent=True) or {}
         status = _clean_text(payload.get("status"), 30).lower()
+        note = _clean_text(payload.get("resolution_note") or payload.get("note"), 2000)
         if not status:
             return jsonify({"error": "status is required"}), 400
         try:
-            item = update_report_status(report_id, status)
+            item = update_report_status(report_id, status, resolution_note=note)
             user_phone = get_current_user_phone() or ""
             log_activity(
                 user_phone,
                 "MISCONDUCT_REPORT_UPDATE",
-                f"Report #{report_id} status -> {item.get('status')}",
+                f"Report #{report_id} status -> {item.get('status')}"
+                + (f" · note: {note[:120]}" if note else ""),
                 request.remote_addr,
             )
             return jsonify({"success": True, "item": item})

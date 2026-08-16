@@ -359,7 +359,7 @@
     border-radius: 20px;
     padding: 24px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    animation: modalSlideUp 0.3s ease-out;
+  animation: btDialogIn var(--motion-duration-normal) var(--motion-ease-emphasized) both;
     max-height: 90vh;
     overflow: visible; /* Changed to visible to allow close button to pop out */
 }
@@ -735,6 +735,32 @@
     margin-bottom: 0;
 }
 
+#overview-module .calendar-card.widget-card:not(.gcal-card) {
+    height: auto;
+    min-height: 560px;
+}
+
+#overview-module .charts-grid.calendar-follow-grid {
+    grid-template-columns: 1fr;
+    width: 100%;
+}
+
+#overview-module .charts-grid.calendar-follow-grid .chart-card {
+    width: 100%;
+    max-width: 100%;
+}
+
+#overview-module .charts-grid:not(.calendar-follow-grid) {
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+    align-items: stretch;
+}
+
+@media (max-width: 1100px) {
+    #overview-module .charts-grid:not(.calendar-follow-grid) {
+        grid-template-columns: 1fr;
+    }
+}
+
 .registration-chart-wrap {
     flex: 1;
     position: relative;
@@ -773,6 +799,36 @@
     display: flex;
     align-items: center;
     gap: 0.65rem;
+}
+
+.calendar-today-btn {
+    border: 1px solid rgba(34, 197, 94, 0.28);
+    background: #ffffff;
+    color: #166534;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.calendar-today-btn:hover {
+    background: #ecfdf3;
+}
+
+.calendar-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(240px, 0.95fr);
+    gap: 1rem;
+    flex: 1;
+    min-height: 0;
+}
+
+@media (max-width: 900px) {
+    .calendar-layout {
+        grid-template-columns: 1fr;
+    }
 }
 
 .calendar-month-pill,
@@ -873,12 +929,16 @@
     aspect-ratio: 1;
     max-height: 2.75rem;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 2px;
     font-size: 0.82rem;
     font-weight: 600;
     color: #334155;
-    border-radius: 50%;
+    border-radius: 12px;
+    border: none;
+    background: transparent;
     cursor: pointer;
     transition:
         background 0.18s ease,
@@ -886,7 +946,33 @@
         transform 0.15s ease,
         box-shadow 0.18s ease;
     user-select: none;
+    padding: 0;
+    font: inherit;
 }
+
+.calendar-day__num {
+    line-height: 1;
+}
+
+.calendar-day__dots {
+    display: flex;
+    gap: 2px;
+    height: 5px;
+    align-items: center;
+}
+
+.calendar-day__dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #94a3b8;
+}
+
+.calendar-day__dot--harvest { background: #16a34a; }
+.calendar-day__dot--delivery { background: #ca8a04; }
+.calendar-day__dot--meeting { background: #2563eb; }
+.calendar-day__dot--deadline { background: #dc2626; }
+.calendar-day__dot--other { background: #64748b; }
 
 .calendar-day.weekend:not(.today):not(.selected) {
     color: #64748b;
@@ -895,7 +981,7 @@
 .calendar-day:hover:not(.empty):not(.today) {
     background: rgba(22, 101, 52, 0.1);
     color: #166534;
-    transform: scale(1.06);
+    transform: scale(1.04);
 }
 
 .calendar-day.today {
@@ -905,16 +991,263 @@
     box-shadow: 0 6px 18px rgba(22, 101, 52, 0.32);
 }
 
+.calendar-day.today .calendar-day__dot {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
 .calendar-day.selected:not(.today) {
     background: #dcfce7;
     color: #15803d;
     box-shadow: inset 0 0 0 2px rgba(34, 197, 94, 0.55);
 }
 
+.calendar-day.has-notes:not(.today):not(.selected) {
+    background: rgba(236, 253, 245, 0.75);
+}
+
 .calendar-day.empty {
     cursor: default;
     visibility: hidden;
     pointer-events: none;
+}
+
+/* Calendar notes panel */
+.calendar-notes-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid rgba(22, 101, 52, 0.1);
+    border-radius: 16px;
+    background: #ffffff;
+    padding: 0.85rem 0.9rem;
+    overflow: hidden;
+}
+
+.calendar-notes-panel__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.calendar-notes-kicker {
+    margin: 0;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+.calendar-notes-panel__head h4 {
+    margin: 0.15rem 0 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.calendar-notes-count {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #166534;
+    background: #ecfdf3;
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    border-radius: 999px;
+    padding: 0.25rem 0.55rem;
+    white-space: nowrap;
+}
+
+.calendar-note-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #eef2f6;
+}
+
+.calendar-note-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #64748b;
+}
+
+.calendar-note-field input,
+.calendar-note-field textarea {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0.55rem 0.7rem;
+    font: inherit;
+    font-size: 0.86rem;
+    font-weight: 500;
+    color: #0f172a;
+    background: #f8fafc;
+    resize: vertical;
+}
+
+.calendar-note-field input:focus,
+.calendar-note-field textarea:focus {
+    outline: none;
+    border-color: #86efac;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
+}
+
+.calendar-note-categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.calendar-cat-chip {
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #475569;
+    border-radius: 999px;
+    padding: 0.28rem 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.calendar-cat-chip.active {
+    background: #dcfce7;
+    border-color: #86efac;
+    color: #166534;
+}
+
+.calendar-note-actions {
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.calendar-note-save,
+.calendar-note-cancel {
+    border: none;
+    border-radius: 10px;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.calendar-note-save {
+    background: linear-gradient(135deg, #2c7a3e, #166534);
+    color: #ffffff;
+}
+
+.calendar-note-save:hover {
+    filter: brightness(1.05);
+}
+
+.calendar-note-save:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.calendar-note-cancel {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.calendar-notes-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.calendar-notes-empty {
+    color: #94a3b8;
+    font-size: 0.84rem;
+    line-height: 1.45;
+    padding: 0.75rem 0.25rem;
+}
+
+.calendar-note-item {
+    border: 1px solid #eef2f6;
+    border-radius: 12px;
+    padding: 0.65rem 0.7rem;
+    background: #fafbfc;
+}
+
+.calendar-note-item__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+
+.calendar-note-cat {
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.calendar-note-cat--harvest { background: #dcfce7; color: #166534; }
+.calendar-note-cat--delivery { background: #fef9c3; color: #854d0e; }
+.calendar-note-cat--meeting { background: #dbeafe; color: #1d4ed8; }
+.calendar-note-cat--deadline { background: #fee2e2; color: #b91c1c; }
+.calendar-note-cat--other { background: #e2e8f0; color: #475569; }
+
+.calendar-note-item__actions {
+    display: flex;
+    gap: 0.2rem;
+}
+
+.calendar-note-edit,
+.calendar-note-delete {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.calendar-note-edit:hover {
+    background: #ecfdf3;
+    color: #166534;
+}
+
+.calendar-note-delete:hover {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.calendar-note-item__title {
+    display: block;
+    font-size: 0.88rem;
+    color: #0f172a;
+    margin-bottom: 0.2rem;
+}
+
+.calendar-note-item__body {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: #64748b;
+    white-space: pre-wrap;
 }
 
 /* Todo Widget */
@@ -1119,18 +1452,9 @@
 }
 
 #register-module .beanthentic-sidebar {
-    width: 100%;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    padding: 4px 10px; /* Reduced vertical and horizontal padding */
-    gap: 8px;
-    overflow-x: auto;
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid #f1f5f9;
-    border-radius: 0;
-    margin-bottom: 0;
+    /* Replaced by .gm-nav Gmail layout */
+    width: auto;
+    display: contents;
 }
 
 #register-module .beanthentic-main {
@@ -1210,65 +1534,35 @@
     display: none;
 }
 
-/* Farmer's Contribution Tab System */
+/* Farmer's Contribution Tab System — Gmail nav handled in dashboard.css .gm-nav */
 .contributions-tabs-container {
-    display: flex;
-    align-items: center;
-    padding: 8px 16px;
-    gap: 4px;
-    border-bottom: 1px solid #f1f5f9;
+    display: none;
 }
 
 .contributions-tab {
+    /* base kept for non-gm contexts; gm-nav overrides in dashboard.css */
     display: flex;
     align-items: center;
-    padding: 8px 16px;
-    border-radius: 20px;
+    gap: 8px;
     border: none;
     background: transparent;
-    color: #444746;
+    cursor: pointer;
+    color: #3c4043;
     font-size: 0.9rem;
     font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    gap: 8px;
-    white-space: nowrap;
-}
-
-.contributions-tab:hover {
-    background: #f1f3f4;
-}
-
-.contributions-tab.active {
-    background: #c2e7ff;
-    color: #001d35;
-}
-
-.contributions-tab i {
-    font-size: 1rem;
-    color: inherit;
 }
 
 .tab-badge {
-    font-size: 0.75rem;
-    font-weight: 500;
-    background: #e1e3e1;
-    color: #444746;
-    padding: 1px 6px;
-    border-radius: 10px;
-    margin-left: 4px;
-}
-
-.contributions-tab.active .tab-badge {
-    background: #001d35;
-    color: #ffffff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: #e8eaed;
+    color: #3c4043;
+    padding: 2px 7px;
+    border-radius: 999px;
 }
 
 .tab-separator {
-    width: 1px;
-    height: 24px;
-    background: #dadce0;
-    margin: 0 12px;
+    display: none;
 }
 
 /* Toolbar Spacing */
@@ -1276,72 +1570,40 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 16px;
+    padding: 6px 12px;
     background: #ffffff;
 }
 
 .contributions-toolbar-left {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 2px;
 }
 
 .contributions-select-all {
     width: 18px;
     height: 18px;
-    margin-right: 8px;
+    margin: 0 10px 0 8px;
     cursor: pointer;
     accent-color: #2d6a4f;
 }
 
 #register-module .beanthentic-contribution-item {
-    background: #ffffff;
-    padding: 8px 16px; /* Gmail-style tighter padding */
-    border-bottom: 1px solid #f1f5f9; /* Border bottom instead of margin */
-    transition: all 0.1s ease;
-    display: flex;
-    align-items: center;
-    gap: 0;
-    cursor: pointer;
-    position: relative;
-    border-radius: 0;
-    margin-bottom: 0;
-    border-left: none;
-    border-right: none;
-    border-top: none;
+    /* Gmail density handled in dashboard.css .gm-shell rules */
 }
 
 #register-module .beanthentic-contribution-item:hover {
-    box-shadow: inset 1px 0 0 #dadce0, inset -1px 0 0 #dadce0, 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
-    z-index: 1;
+    /* handled in dashboard.css */
 }
 
 #register-module .beanthentic-contribution-item.unread {
     background: #ffffff;
 }
 
-/* Unread: red dot (same cue as Messages module) */
-#register-module .beanthentic-contribution-item.unread::before {
-    display: none;
-}
-
+/* Unread cue is bold text (Gmail-style), not red dots */
+#register-module .beanthentic-contribution-item.unread::before,
 #register-module .beanthentic-contribution-item.unread::after {
-    content: '';
-    position: absolute;
-    right: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 10px;
-    height: 10px;
-    background: #e53e3e;
-    border-radius: 50%;
-    border: 2px solid #ffffff;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-    pointer-events: none;
-}
-
-#register-module .beanthentic-contribution-item.unread {
-    padding-right: 36px;
+    display: none !important;
 }
 
 #register-module .beanthentic-contribution-left {
@@ -2060,43 +2322,276 @@ body.beanthentic-dialog-open {
     font-size: 0.92rem;
 }
 
-#coffee-pricing-module .coffee-pricing-self-sale-bar {
-    margin-top: 0.75rem;
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    flex-wrap: wrap;
+#coffee-pricing-module .coffee-pricing-rules {
+    margin: 0.55rem 0 0;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: #475569;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
 }
 
-#coffee-pricing-module .coffee-pricing-self-sale-label {
-    font-size: 0.8rem;
-    font-weight: 700;
+#coffee-pricing-module .coffee-pricing-rules strong {
     color: #334155;
 }
 
-#coffee-pricing-module .coffee-pricing-self-sale-select {
-    min-width: 220px;
-    height: 36px;
-    border-radius: 8px;
-    border: 1px solid #dbeafe;
-    background: #ffffff;
-    padding: 0 0.65rem;
+#coffee-pricing-module .coffee-pricing-card-hint {
+    margin: 0 0 0.65rem;
+    font-size: 0.8rem;
+    color: #64748b;
+    line-height: 1.4;
 }
 
-#coffee-pricing-module .coffee-pricing-self-sale-status {
+#coffee-pricing-module .coffee-pricing-empty-cell {
+    padding: 1rem 0.75rem;
+    color: #64748b;
+    line-height: 1.45;
+}
+
+#coffee-pricing-module .coffee-pricelist-gcb-tag {
+    display: inline-block;
+    margin-left: 0.35rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #334155;
+    background: #e2e8f0;
+}
+
+#coffee-pricing-module .coffee-pricelist-muted {
+    color: #94a3b8;
+}
+
+#coffee-pricing-module #coffeePricelistTable th,
+#coffee-pricing-module #coffeePricelistTable td,
+#coffee-pricing-module #coffeePricelistTable td:nth-child(2),
+#coffee-pricing-module #coffeePricelistTable td:nth-child(3) {
+    text-align: center !important;
+    vertical-align: middle;
+    padding-left: 12px;
+    padding-right: 12px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+}
+
+#coffee-pricing-module #coffeePricelistTable .coffee-pricelist-gcb-tag {
+    margin-left: 0.35rem;
+}
+
+#coffee-pricing-module .coffee-pricing-card .table-wrapper {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    outline: none;
+    box-shadow: none;
+}
+
+#coffee-pricing-module #coffeePricelistTable {
+    width: 100%;
+    border-collapse: collapse;
+    outline: none;
+}
+
+#coffee-pricing-module #coffeePricelistTable thead th {
+    border-right: none;
+    box-shadow: none;
+}
+
+#coffee-pricing-module #coffeePricelistTable thead th:last-child,
+#coffee-pricing-module #coffeePricelistTable tbody td:last-child {
+    border-right: none !important;
+    box-shadow: none !important;
+}
+
+#coffee-pricing-module #coffeePricelistTable tbody td {
+    border-color: #e2e8f0;
+}
+
+.pricing-app-compare {
+    display: grid;
+    gap: 0.25rem;
     font-size: 0.82rem;
-    color: #475569;
 }
 
-#coffee-pricing-module .coffee-pricing-self-sale-status.is-enabled {
+.pricing-app-compare em {
+    display: inline-block;
+    min-width: 4.5rem;
+    font-style: normal;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.pricing-app-compare.is-above span:first-child {
+    color: #9a3412;
+    font-weight: 700;
+}
+
+.pricing-app-compare.is-below span:first-child {
     color: #166534;
     font-weight: 700;
 }
 
-#coffee-pricing-module .coffee-pricing-preference-meta {
-    margin: 0.45rem 0 0;
-    font-size: 0.8rem;
+.pricing-app-notes {
+    display: block;
     color: #64748b;
+    margin-top: 0.2rem;
+    font-size: 0.78rem;
+}
+
+.pricing-action-group--stack {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+}
+
+.confirm-dialog__card--wide {
+    max-width: 32rem;
+    width: calc(100% - 2rem);
+}
+
+.official-pricelist-form {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0.75rem 0 1rem;
+    text-align: left;
+}
+
+.official-pricelist-row {
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+}
+
+.official-pricelist-row-label {
+    display: block;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 0.45rem;
+}
+
+.official-pricelist-row-fields {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.official-pricelist-row-fields label {
+    display: grid;
+    gap: 0.2rem;
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+.official-pricelist-row-fields input {
+    height: 34px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 0 0.55rem;
+    font-size: 0.86rem;
+    color: #0f172a;
+}
+
+.farmer-self-sale-manage-btn {
+    margin-top: 0.65rem;
+}
+
+.records-unlock-confirm-list {
+    list-style: none;
+    margin: 0.75rem 0 1.25rem;
+    padding: 0;
+    display: grid;
+    gap: 0.45rem;
+    text-align: left;
+}
+
+.records-unlock-confirm-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.45rem 0.65rem;
+    border-radius: 8px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    font-size: 0.86rem;
+}
+
+.records-unlock-confirm-list span {
+    color: #64748b;
+}
+
+.records-unlock-confirm-list strong {
+    color: #0f172a;
+    font-weight: 700;
+}
+
+.client-report-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.client-report-link-btn {
+    border: 1px solid rgba(44, 122, 62, 0.28);
+    background: #fff;
+    color: #2c7a3e;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.28rem 0.55rem;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.client-report-link-btn:hover {
+    background: rgba(44, 122, 62, 0.08);
+}
+
+.client-report-link-btn:disabled,
+.client-report-link-btn.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.client-report-status-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: #e2e8f0;
+    color: #334155;
+    text-transform: capitalize;
+}
+
+.client-report-status-pill.is-closed,
+.client-report-status-pill.is-resolved,
+.client-report-status-pill.is-dismissed {
+    background: rgba(44, 122, 62, 0.12);
+    color: #166534;
+}
+
+.client-report-status-pill.is-blocked {
+    background: rgba(185, 28, 28, 0.1);
+    color: #991b1b;
+}
+
+.client-report-resolution-note {
+    resize: vertical;
+    min-height: 5rem;
+}
+
+.farmer-self-sale-audit {
+    margin: 0.35rem 0 0;
+    font-size: 0.78rem;
+    color: #475569;
+    font-weight: 600;
 }
 
 #coffee-pricing-module .coffee-pricing-unlock-card {
@@ -2264,8 +2759,6 @@ body.beanthentic-dialog-open {
     color: #1f3d2a;
 }
 
-#coffee-pricing-module #coffeePricelistTable th:last-child,
-#coffee-pricing-module #coffeePricelistTable td:last-child,
 #coffee-pricing-module #coffeePricingAppsTable th:last-child,
 #coffee-pricing-module #coffeePricingAppsTable td:last-child {
     width: 10.5rem;

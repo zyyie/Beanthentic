@@ -4,15 +4,14 @@ This guide explains how to train, evaluate, and improve the machine learning com
 
 ---
 
-## 1. What you are training (two models + one rule engine)
+## 1. What you are training (document ensemble + MoP engine)
 
 | Component | File / output | Purpose |
 |-----------|---------------|---------|
-| **Farmer GI readiness** | `machinelearning/gi_model.joblib` | Predicts if a farmer profile looks GI-ready from tabular farm data |
-| **Document Random Forest** | `machinelearning/gi_document_model.joblib` | Classifies document text as Ready / Not Ready (pattern learning) |
+| **Document ensemble** | `machinelearning/gi_document_model.joblib` | Advisory Ready / Not Ready from document text (bagging + boosting soft vote) |
 | **MoP qualitative review** | `machinelearning/gi_reference_basis.py` | **Authoritative** IPOPHL card status on the dashboard (theme coverage) |
 
-**Important for your paper:** On the live IPOPHL dashboard, **Ready / Not Ready** comes from the **MoP qualitative engine**, not from the Random Forest score alone. The RF model is trained and reported separately as a **hybrid / advisory** layer.
+**Important for your paper:** On the live IPOPHL dashboard, **Ready / Not Ready** comes from the **MoP qualitative engine**, not from the ensemble score alone. The document ensemble is a **hybrid / advisory** layer.
 
 ---
 
@@ -50,46 +49,26 @@ In Jupyter: **File → Open** → `machinelearning/notebooks/01_beanthentic_ml_t
 2. Open `machinelearning/notebooks/01_beanthentic_ml_training.ipynb`.
 3. Run **Cell 1** (imports + `PROJECT_ROOT`). All paths depend on this.
 
-### Step 2 — Farmer Random Forest (tabular data)
+### Step 2 — Document ensemble (IPOPHL text)
 
-**Data source:** `machinelearning/uploads/beanthentic_synthetic_dataset_1000 (1).csv`
+**Data source:** official MoP dataset / `machinelearning/training_data/`
 
-1. Run cells in **Section A — Farmer model**.
-2. The notebook will:
-   - Load the CSV
-   - One-hot encode categorical columns
-   - Train/test split (80/20, stratified)
-   - GridSearchCV + 5-fold cross-validation
-   - Plot **confusion matrix** and **feature importance**
-3. **Save for production** (optional, from terminal after verifying metrics):
+1. In the notebook, run **Section A — Document** cells (metrics + confusion matrix).
+2. **Deploy model to the app:**
 
    ```powershell
-   python machinelearning\train_ai_model.py --full-pipeline
+   python machinelearning\train_ai_model.py --train-documents
    ```
 
-4. **Capstone artifacts to screenshot/export:**
+3. **Capstone artifacts to screenshot/export:**
    - Test accuracy, CV mean ± std
    - Confusion matrix figure
-   - `machinelearning/training_results.json`
+   - `machinelearning/document_training_results.json`
 
-### Step 3 — Document Random Forest (IPOPHL text)
+### Step 3 — MoP qualitative engine
 
-**Data source:** `machinelearning/training_data/gi_documents_raw.json`
-
-1. **Rebuild dataset** (if you added new labeled samples):
-
-   ```powershell
-   python scripts\build_document_training_data.py --target 200
-   ```
-
-2. In the notebook, run **Section B — Document model** cells.
-3. Train from the same feature extractor used in production (`GIAnalyzer._extract_features`).
-4. **Deploy model to the app:**
-
-   ```powershell
-   python scripts\build_document_training_data.py --train
-   ```
-
+1. Run **Section B** cells to evaluate MoP Ready / Not Ready on sample or stored uploads.
+2. Remember: MoP status is authoritative on the IPOPHL cards; ensemble is advisory.
    Or:
 
    ```powershell
@@ -155,11 +134,7 @@ Edit or append to `machinelearning/training_data/gi_documents_raw.json`. Each ro
 - Aim for **50–100 real** LGU-reviewed samples if possible (strongest validation).
 - Keep class balance reasonable (`class_weight="balanced"` helps, but real diversity matters more).
 
-### B. Farmer profiles (Random Forest)
-
-Add rows to the CSV or collect real farmer exports from the dashboard DB. Target column: `gi_ready` (0 or 1).
-
-### C. MoP themes (rule engine — highest impact for IPOPHL UI)
+### B. MoP themes (rule engine — highest impact for IPOPHL UI)
 
 Edit `machinelearning/gi_reference_basis.py`:
 
@@ -215,19 +190,14 @@ Use this **iteration loop** in your capstone methodology chapter:
 
 ## 6. Metrics to report in your capstone paper
 
-### Farmer model
+### Document ensemble
 
 - Hold-out **accuracy**
-- **5-fold CV mean ± std**
+- **CV mean ± std**
 - **Confusion matrix** (TN, FP, FN, TP)
 - **Precision / recall / F1** per class
-- Top **feature importance** (e.g. bearing trees, RSBSA)
-
-### Document Random Forest
-
-- Same as above
 - Report **sample size** and **class distribution**
-- State clearly: trained on curated + generated text; validate on **held-out real uploads**
+- State clearly: trained on curated MoP text; validate on **held-out real uploads**
 
 ### MoP qualitative engine (IPOPHL production)
 
@@ -237,9 +207,9 @@ Use this **iteration loop** in your capstone methodology chapter:
 
 ### Honest limitations (panel expects this)
 
-- RF accuracy on synthetic data ≠ legal IPOPHL approval
+- Ensemble accuracy on small samples ≠ legal IPOPHL approval
 - Small or imbalanced real-world sets need ongoing labeling
-- ML is **decision support**; administrators retain final review
+- ML is **decision support**; MoP status is authoritative; administrators retain final review
 
 ---
 
@@ -251,8 +221,9 @@ Use this **iteration loop** in your capstone methodology chapter:
 | `machinelearning/train_ai_model.py` | Production training CLI |
 | `scripts/build_document_training_data.py` | Build document dataset + optional train |
 | `scripts/verify_document_ml.py` | Quick smoke test after deploy |
-| `machinelearning/training_results.json` | Farmer model metrics |
 | `machinelearning/document_training_results.json` | Document model metrics |
+| `machinelearning/gi_document_model.joblib` | Trained document ensemble |
+| `machinelearning/gi_reference_basis.py` | MoP qualitative engine |
 | `machinelearning/gi_reference_basis.py` | MoP qualitative IPOPHL engine |
 | `docs/THESIS_DEFENSE_SCRIPT_ADMIN.md` | Extended ML narrative for defense |
 

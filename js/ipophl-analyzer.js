@@ -10,8 +10,10 @@ class IPOPHLAnalyzer {
         this.currentAnalysis = null;
         this.isAnalyzing = false;
         this.modalIsMinimized = false;
+        this.isMinimizingModal = false;
         this.isResizingModal = false;
         this.modalResizeState = null;
+        this._previewResizeTimer = null;
         /** @type {Record<string, { file: File, key: string }[]>} */
         this.pendingByTask = {};
         this.init();
@@ -29,8 +31,17 @@ class IPOPHLAnalyzer {
             const data = await response.json();
             
             if (data.items) {
-                data.items.forEach(doc => {
-                    // task_id should be the full service name (e.g. phase1-introduction)
+                const latestByKey = new Map();
+                data.items.forEach((doc) => {
+                    const key = `${doc.task_id || ''}::${doc.filename || ''}`;
+                    const prev = latestByKey.get(key);
+                    const ts = String(doc.upload_timestamp || '');
+                    const prevTs = String(prev?.upload_timestamp || '');
+                    if (!prev || ts >= prevTs) {
+                        latestByKey.set(key, doc);
+                    }
+                });
+                latestByKey.forEach((doc) => {
                     const container = document.getElementById(`${doc.task_id}-files`);
                     if (container) {
                         this.renderDocumentCard(container, doc);
@@ -87,15 +98,18 @@ class IPOPHLAnalyzer {
     }
 
     renderDocumentCard(container, doc) {
-        // Prevent duplication: check if file with this name already exists
-        const existingFiles = container.querySelectorAll('.file-name');
-        for (let nameEl of existingFiles) {
-            if (nameEl.textContent === doc.filename) {
-                // If exists, just update the existing card with AI info
-                const card = nameEl.closest('.file-item');
+        // Same filename with a new UUID = replaced upload; drop stale card so analysis matches file.
+        const existingNames = container.querySelectorAll('.file-item:not(.uploading):not(.error) .file-name');
+        for (const nameEl of existingNames) {
+            if (nameEl.textContent !== doc.filename) continue;
+            const card = nameEl.closest('.file-item');
+            const oldUuid = card?.dataset?.fileUuid;
+            if (oldUuid && doc.file_uuid && oldUuid === doc.file_uuid) {
                 this.updateCardWithAI(card, doc);
                 return;
             }
+            if (card) card.remove();
+            break;
         }
 
         const fileExt = doc.filename.split('.').pop().toLowerCase();
@@ -122,10 +136,10 @@ class IPOPHLAnalyzer {
             </div>
             <div class="file-status-actions">
                 <div class="file-actions">
-                    <button type="button" class="file-action-btn ai-analysis" onclick="ipophlAnalyzer.loadAndShowFullAnalysis('${doc.file_uuid}')" title="AI Analysis">
+                    <button type="button" class="file-action-btn ai-analysis" data-ipophl-action="analyze" data-file-uuid="${doc.file_uuid}" title="AI Analysis">
                         <i class="fa-solid fa-brain"></i>
                     </button>
-                    <button type="button" class="file-action-btn delete" onclick="ipophlAnalyzer.deleteFile('${doc.file_uuid}', this)" title="Delete File">
+                    <button type="button" class="file-action-btn delete" data-ipophl-action="delete" data-file-uuid="${doc.file_uuid}" title="Delete File">
                         <i class="fa-solid fa-trash-can"></i>
                     </button>
                 </div>
@@ -192,10 +206,10 @@ class IPOPHLAnalyzer {
         
         statusActionsWrapper.innerHTML = `
             <div class="file-actions">
-                <button type="button" class="file-action-btn ai-analysis" onclick="ipophlAnalyzer.loadAndShowFullAnalysis('${doc.file_uuid}')" title="AI Analysis">
+                <button type="button" class="file-action-btn ai-analysis" data-ipophl-action="analyze" data-file-uuid="${doc.file_uuid}" title="AI Analysis">
                     <i class="fa-solid fa-brain"></i>
                 </button>
-                <button type="button" class="file-action-btn delete" onclick="ipophlAnalyzer.deleteFile('${doc.file_uuid}', this)" title="Delete File">
+                <button type="button" class="file-action-btn delete" data-ipophl-action="delete" data-file-uuid="${doc.file_uuid}" title="Delete File">
                     <i class="fa-solid fa-trash-can"></i>
                 </button>
             </div>
@@ -250,6 +264,7 @@ class IPOPHLAnalyzer {
             document.body.classList.add('modal-open');
             this.modalIsMinimized = false;
             this.syncModalWindowState();
+            requestAnimationFrame(() => this.handlePreviewModalResize());
             
             // Set file name
             const nameEl = document.getElementById('previewFileName');
@@ -264,6 +279,19 @@ class IPOPHLAnalyzer {
     }
 
     attachEventListeners() {
+        document.addEventListener('click', (e) => {
+            const actionBtn = e.target.closest('[data-ipophl-action]');
+            if (!actionBtn) return;
+            const uuid = actionBtn.dataset.fileUuid;
+            const action = actionBtn.dataset.ipophlAction;
+            if (!uuid) return;
+            if (action === 'analyze') {
+                this.loadAndShowFullAnalysis(uuid);
+            } else if (action === 'delete') {
+                this.deleteFile(uuid, actionBtn);
+            }
+        });
+
         const minimizeBtn = document.getElementById('filePreviewMinimizeBtn');
         if (minimizeBtn) {
             minimizeBtn.addEventListener('click', (e) => {
@@ -280,12 +308,12 @@ class IPOPHLAnalyzer {
             });
         }
 
-        const resizeHandle = document.getElementById('filePreviewResizeHandle');
-        if (resizeHandle) {
-            resizeHandle.addEventListener('pointerdown', (e) => {
+        const resizeEdges = document.querySelectorAll('#filePreviewModal .modal-resize-edge');
+        resizeEdges.forEach((edge) => {
+            edge.addEventListener('pointerdown', (e) => {
                 this.startModalResize(e);
             });
-        }
+        });
 
         document.addEventListener('pointermove', (e) => {
             this.handleModalResize(e);
@@ -293,6 +321,11 @@ class IPOPHLAnalyzer {
 
         document.addEventListener('pointerup', () => {
             this.stopModalResize();
+        });
+
+        window.addEventListener('resize', () => {
+            if (this._previewResizeTimer) clearTimeout(this._previewResizeTimer);
+            this._previewResizeTimer = setTimeout(() => this.handlePreviewModalResize(), 120);
         });
 
         // Modal close handlers
@@ -321,63 +354,217 @@ class IPOPHLAnalyzer {
     }
 
     toggleMinimizeFilePreview() {
-        this.modalIsMinimized = !this.modalIsMinimized;
-        this.syncModalWindowState();
+        const modal = document.getElementById('filePreviewModal');
+        if (!modal || this.isMinimizingModal) return;
+
+        if (!this.modalIsMinimized) {
+            this.isMinimizingModal = true;
+            modal.classList.add('is-minimizing');
+            window.setTimeout(() => {
+                this.modalIsMinimized = true;
+                modal.classList.remove('is-minimizing');
+                this.isMinimizingModal = false;
+                this.syncModalWindowState();
+            }, 340);
+            return;
+        }
+        this.restoreFilePreview();
     }
 
     restoreFilePreview() {
+        const modal = document.getElementById('filePreviewModal');
         this.modalIsMinimized = false;
         this.syncModalWindowState();
+        if (!modal) return;
+        modal.classList.add('is-restoring');
+        window.setTimeout(() => {
+            modal.classList.remove('is-restoring');
+            this.handlePreviewModalResize();
+        }, 380);
+    }
+
+    getPreviewModalBounds() {
+        const maxWidth = Math.min(window.innerWidth - 24, 1600);
+        const maxHeight = window.innerHeight - 24;
+        const minWidth = Math.min(720, maxWidth);
+        const minHeight = Math.min(480, maxHeight);
+        return { minWidth, minHeight, maxWidth, maxHeight, margin: 12 };
+    }
+
+    clampPreviewModalGeometry(left, top, width, height) {
+        const { minWidth, minHeight, maxWidth, maxHeight, margin } = this.getPreviewModalBounds();
+        let nextWidth = Math.max(minWidth, Math.min(maxWidth, width));
+        let nextHeight = Math.max(minHeight, Math.min(maxHeight, height));
+        let nextLeft = left;
+        let nextTop = top;
+
+        if (nextLeft + nextWidth > window.innerWidth - margin) {
+            nextLeft = window.innerWidth - margin - nextWidth;
+        }
+        if (nextTop + nextHeight > window.innerHeight - margin) {
+            nextTop = window.innerHeight - margin - nextHeight;
+        }
+        nextLeft = Math.max(margin, nextLeft);
+        nextTop = Math.max(margin, nextTop);
+
+        return {
+            left: nextLeft,
+            top: nextTop,
+            width: nextWidth,
+            height: nextHeight,
+        };
+    }
+
+    applyPreviewModalGeometry(left, top, width, height) {
+        const modal = document.getElementById('filePreviewModal');
+        if (!modal) return;
+        const geometry = this.clampPreviewModalGeometry(left, top, width, height);
+        modal.classList.add('is-geometry-ready');
+        modal.style.setProperty('--file-preview-left', `${geometry.left}px`);
+        modal.style.setProperty('--file-preview-top', `${geometry.top}px`);
+        modal.style.setProperty('--file-preview-width', `${geometry.width}px`);
+        modal.style.setProperty('--file-preview-height', `${geometry.height}px`);
+    }
+
+    handlePreviewModalResize() {
+        const modal = document.getElementById('filePreviewModal');
+        const modalContent = document.querySelector('#filePreviewModal .modal-content.large');
+        if (!modal || !modal.classList.contains('active')) return;
+
+        const { maxWidth, maxHeight } = this.getPreviewModalBounds();
+        const rect = modalContent?.getBoundingClientRect();
+
+        let width = parseFloat(getComputedStyle(modal).getPropertyValue('--file-preview-width'));
+        let height = parseFloat(getComputedStyle(modal).getPropertyValue('--file-preview-height'));
+        if (!Number.isFinite(width)) width = rect?.width || maxWidth;
+        if (!Number.isFinite(height)) height = rect?.height || maxHeight;
+
+        let left = parseFloat(getComputedStyle(modal).getPropertyValue('--file-preview-left'));
+        let top = parseFloat(getComputedStyle(modal).getPropertyValue('--file-preview-top'));
+        if (!Number.isFinite(left)) left = rect?.left ?? (window.innerWidth - width) / 2;
+        if (!Number.isFinite(top)) top = rect?.top ?? (window.innerHeight - height) / 2;
+
+        this.applyPreviewModalGeometry(left, top, width, height);
+        this.fitWordPreviewToContainer();
+    }
+
+    fitWordPreviewToContainer() {
+        const container = document.querySelector('#filePreviewModal .preview-container');
+        const viewport = document.getElementById('wordPreviewViewport');
+        if (!container || !viewport) return;
+        const section = viewport.querySelector('section.docx-beanthentic, section.docx');
+        if (!section) {
+            viewport.style.removeProperty('--word-preview-fit-scale');
+            return;
+        }
+        const available = Math.max(280, container.clientWidth - 24);
+        const pageWidth = section.getBoundingClientRect().width || section.scrollWidth;
+        if (pageWidth > available + 2) {
+            viewport.style.setProperty('--word-preview-fit-scale', String(available / pageWidth));
+        } else {
+            viewport.style.setProperty('--word-preview-fit-scale', '1');
+        }
     }
 
     startModalResize(event) {
-        if (window.innerWidth <= 768) return;
+        const modal = document.getElementById('filePreviewModal');
         const modalContent = document.querySelector('#filePreviewModal .modal-content.large');
-        if (!modalContent) return;
+        const direction = event.currentTarget?.dataset?.resize;
+        if (!modal || !modalContent || !direction) return;
         event.preventDefault();
+        event.stopPropagation();
         this.restoreFilePreview();
+        this.handlePreviewModalResize();
+
+        const rect = modalContent.getBoundingClientRect();
         this.isResizingModal = true;
+        modal.classList.add('is-resizing');
         this.modalResizeState = {
+            direction,
             startX: event.clientX,
             startY: event.clientY,
-            startWidth: modalContent.offsetWidth,
-            startHeight: modalContent.offsetHeight,
+            startLeft: rect.left,
+            startTop: rect.top,
+            startWidth: rect.width,
+            startHeight: rect.height,
+            pointerId: event.pointerId,
         };
+
+        const cursorMap = {
+            n: 'ns-resize',
+            s: 'ns-resize',
+            e: 'ew-resize',
+            w: 'ew-resize',
+            ne: 'nesw-resize',
+            nw: 'nwse-resize',
+            se: 'nwse-resize',
+            sw: 'nesw-resize',
+        };
+        this.modalResizeCursor = cursorMap[direction] || 'default';
+
         try {
-            event.target.setPointerCapture?.(event.pointerId);
+            event.currentTarget.setPointerCapture(event.pointerId);
         } catch (_err) {
             /* ignore */
         }
         document.body.style.userSelect = 'none';
+        document.body.style.cursor = this.modalResizeCursor;
     }
 
     handleModalResize(event) {
         if (!this.isResizingModal || !this.modalResizeState) return;
-        const modal = document.getElementById('filePreviewModal');
-        if (!modal) return;
 
-        const minWidth = 860;
-        const minHeight = 520;
-        const maxWidth = Math.min(window.innerWidth - 32, 1600);
-        const maxHeight = window.innerHeight - 32;
-        const nextWidth = Math.max(
-            minWidth,
-            Math.min(maxWidth, this.modalResizeState.startWidth + (event.clientX - this.modalResizeState.startX))
-        );
-        const nextHeight = Math.max(
-            minHeight,
-            Math.min(maxHeight, this.modalResizeState.startHeight + (event.clientY - this.modalResizeState.startY))
-        );
+        const { direction, startX, startY, startLeft, startTop, startWidth, startHeight } = this.modalResizeState;
+        const dx = event.clientX - startX;
+        const dy = event.clientY - startY;
+        const { minWidth, minHeight } = this.getPreviewModalBounds();
 
-        modal.style.setProperty('--file-preview-width', `${nextWidth}px`);
-        modal.style.setProperty('--file-preview-height', `${nextHeight}px`);
+        let left = startLeft;
+        let top = startTop;
+        let width = startWidth;
+        let height = startHeight;
+
+        if (direction.includes('e')) {
+            width = startWidth + dx;
+        }
+        if (direction.includes('w')) {
+            width = startWidth - dx;
+            left = startLeft + dx;
+        }
+        if (direction.includes('s')) {
+            height = startHeight + dy;
+        }
+        if (direction.includes('n')) {
+            height = startHeight - dy;
+            top = startTop + dy;
+        }
+
+        if (width < minWidth) {
+            if (direction.includes('w')) {
+                left = startLeft + startWidth - minWidth;
+            }
+            width = minWidth;
+        }
+        if (height < minHeight) {
+            if (direction.includes('n')) {
+                top = startTop + startHeight - minHeight;
+            }
+            height = minHeight;
+        }
+
+        this.applyPreviewModalGeometry(left, top, width, height);
     }
 
     stopModalResize() {
         if (!this.isResizingModal) return;
         this.isResizingModal = false;
         this.modalResizeState = null;
+        this.modalResizeCursor = '';
         document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+        const modal = document.getElementById('filePreviewModal');
+        if (modal) modal.classList.remove('is-resizing');
+        this.fitWordPreviewToContainer();
     }
 
     setupFileUploadHandlers() {
@@ -444,6 +631,16 @@ class IPOPHLAnalyzer {
         return response.json();
     }
 
+    removeFileCardByName(container, filename) {
+        if (!container || !filename) return null;
+        const nameEl = Array.from(container.querySelectorAll('.file-item .file-name'))
+            .find((el) => el.textContent === filename);
+        const card = nameEl?.closest('.file-item');
+        const oldUuid = card?.dataset?.fileUuid || null;
+        if (card) card.remove();
+        return oldUuid;
+    }
+
     fileAlreadyInContainer(container, filename) {
         if (!container || !filename) return false;
         return Array.from(
@@ -455,12 +652,13 @@ class IPOPHLAnalyzer {
     async uploadAndAnalyzeFile(file, service, attachedFilesContainer) {
         if (!file || !service || !attachedFilesContainer) return;
 
-        if (this.fileAlreadyInContainer(attachedFilesContainer, file.name)) {
-            this.showToast(`"${file.name}" is already in this list.`, 'error');
-            return;
-        }
+        // Replacing a same-named file should analyze the new bytes, not reuse stale UUID/analysis.
+        this.removeFileCardByName(attachedFilesContainer, file.name);
 
         const [phase] = this.parseServiceName(service);
+        // Clear stale reviewer notes before the new upload finishes.
+        this.resetAnalysisUI();
+        this.showAnalysisLoadingPlaceholder(file.name);
         this.showUploadProgress(attachedFilesContainer, file.name);
 
         const formData = new FormData();
@@ -487,6 +685,10 @@ class IPOPHLAnalyzer {
                 file_uuid: result.file_uuid,
             };
             this.showFullAIAnalysis(fileData);
+            // Force Refresh Analysis after every new upload so the panel never shows stale notes.
+            if (result.file_uuid) {
+                await this.refreshAnalysis();
+            }
 
             const gi = result.gi_publish;
             if (gi && gi.ok) {
@@ -497,7 +699,13 @@ class IPOPHLAnalyzer {
                     'error'
                 );
             } else {
-                this.showToast('Document uploaded and analyzed.', 'success');
+                this.showToast('Document uploaded — analysis refreshed.', 'success');
+            }
+            if (window.dashboardApp?.syncCompleteRegistrationButtonState) {
+                window.dashboardApp.syncCompleteRegistrationButtonState();
+            }
+            if (window.dashboardApp?.updateGiProcessIndicator) {
+                window.dashboardApp.updateGiProcessIndicator();
             }
         } catch (error) {
             console.error('IPOPHL upload/analyze failed:', error);
@@ -505,6 +713,20 @@ class IPOPHLAnalyzer {
             this.showUploadError(attachedFilesContainer, file.name, msg);
             this.showToast(msg, 'error');
         }
+    }
+
+    showAnalysisLoadingPlaceholder(filename) {
+        const statusBadge = document.getElementById('analysisStatusBadge');
+        const resultsEl = document.getElementById('analysisResults');
+        const container = document.getElementById('requirementAnalysisContent');
+        if (statusBadge) statusBadge.textContent = 'Refreshing…';
+        if (resultsEl) resultsEl.classList.add('loading');
+        if (container) {
+            container.innerHTML =
+                `<p class="placeholder">Refreshing analysis for <strong>${this.escapeHtml(filename || 'new upload')}</strong>… previous notes cleared.</p>`;
+        }
+        const nameEl = document.getElementById('previewFileName');
+        if (nameEl && filename) nameEl.textContent = filename;
     }
 
     /** Called from dashboard.js when a phase file is added. */
@@ -691,7 +913,18 @@ class IPOPHLAnalyzer {
                 </div>
             `;
             const del = fileItem.querySelector('.file-action-btn.delete');
-            if (del) del.addEventListener('click', () => fileItem.remove());
+            if (del) {
+                del.addEventListener('click', () => {
+                    const taskId = container?.id?.replace('-files', '') || '';
+                    fileItem.remove();
+                    if (window.dashboardApp?.resetIpophlUploadZone) {
+                        window.dashboardApp.resetIpophlUploadZone(taskId);
+                    } else if (window.dashboardApp?.syncIpophlUploadZoneCompactState) {
+                        window.dashboardApp.syncIpophlUploadZoneCompactState();
+                    }
+                    this.refreshDashboardIndicator();
+                });
+            }
         }
     }
 
@@ -734,14 +967,21 @@ class IPOPHLAnalyzer {
             
             if (result.success) {
                 const fileItem = btn.closest('.file-item');
-                const container = fileItem.parentElement;
-                const taskId = container.id.replace('-files', '');
-                
-                this.updateDashboardState(taskId, { file_uuid: fileUuid }, 'remove');
-                this.refreshDashboardIndicator();
+                const container = fileItem?.parentElement;
+                const taskId = container?.id?.replace('-files', '') || '';
 
-                fileItem.style.opacity = '0';
-                setTimeout(() => fileItem.remove(), 300);
+                this.updateDashboardState(taskId, { file_uuid: fileUuid }, 'remove');
+
+                if (fileItem) {
+                    fileItem.remove();
+                }
+
+                if (window.dashboardApp?.resetIpophlUploadZone) {
+                    window.dashboardApp.resetIpophlUploadZone(taskId);
+                } else if (window.dashboardApp?.syncIpophlUploadZoneCompactState) {
+                    window.dashboardApp.syncIpophlUploadZoneCompactState();
+                }
+                this.refreshDashboardIndicator();
                 const giOk = result.gi_sync && result.gi_sync.ok !== false;
                 this.showToast(
                     giOk
@@ -774,48 +1014,73 @@ class IPOPHLAnalyzer {
     async loadFilePreview(previewUrl) {
         const frame = document.getElementById('filePreviewFrame');
         const wordArea = document.getElementById('wordPreviewArea');
+        const wordViewport = document.getElementById('wordPreviewViewport');
+        const wordStyles = document.getElementById('wordPreviewStyles');
         const loading = document.getElementById('previewLoading');
         const container = document.querySelector('.preview-container');
-        if (!frame || !loading || !container || !wordArea) return;
+        if (!frame || !loading || !container || !wordArea || !wordViewport || !wordStyles) return;
 
-        // Reset states
         loading.classList.remove('hidden');
         frame.style.display = 'none';
         wordArea.style.display = 'none';
-        wordArea.innerHTML = '';
+        wordArea.classList.add('hidden');
+        wordViewport.innerHTML = '';
+        wordStyles.innerHTML = '';
         frame.src = 'about:blank';
 
         const filename = this.currentFile ? this.currentFile.filename.toLowerCase() : '';
-        const isWordDoc = filename.endsWith('.doc') || filename.endsWith('.docx');
+        const isDocx = filename.endsWith('.docx');
+        const isLegacyDoc = filename.endsWith('.doc');
 
-        if (isWordDoc) {
+        if (isDocx || isLegacyDoc) {
             try {
-                // Use mammoth.js for local Word document rendering
-                const response = await fetch(previewUrl, { credentials: 'same-origin' });
-                const arrayBuffer = await response.arrayBuffer();
-                
-                const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
-                
-                loading.classList.add('hidden');
-                wordArea.style.display = 'block';
-                wordArea.innerHTML = `
-                    <div class="rendered-word-content">
-                        ${result.value}
-                    </div>
-                `;
-                
-                if (result.messages.length > 0) {
-                    console.warn('Mammoth messages:', result.messages);
+                if (isLegacyDoc) {
+                    throw new Error('Legacy .doc files must be downloaded or re-saved as .docx for in-browser preview.');
                 }
+                if (typeof docx === 'undefined' || typeof docx.renderAsync !== 'function') {
+                    throw new Error('Document preview library failed to load.');
+                }
+
+                const response = await fetch(previewUrl, { credentials: 'same-origin' });
+                if (!response.ok) {
+                    throw new Error(`Could not load document (${response.status}).`);
+                }
+                const arrayBuffer = await response.arrayBuffer();
+
+                wordArea.style.display = 'block';
+                wordArea.classList.remove('hidden');
+
+                await docx.renderAsync(arrayBuffer, wordViewport, wordStyles, {
+                    className: 'docx-beanthentic',
+                    inWrapper: true,
+                    ignoreWidth: false,
+                    ignoreHeight: false,
+                    ignoreFonts: false,
+                    breakPages: true,
+                    renderHeaders: true,
+                    renderFooters: true,
+                    renderFootnotes: true,
+                    renderEndnotes: true,
+                    useBase64URL: true,
+                });
+                wordStyles.insertAdjacentHTML(
+                    'beforeend',
+                    '<style>.docx-wrapper{background:transparent!important;padding:0!important;margin:0 auto!important;}.docx-wrapper>section.docx-beanthentic,.docx-wrapper>section.docx{margin-bottom:0!important;}</style>'
+                );
+
+                loading.classList.add('hidden');
+                this.fitWordPreviewToContainer();
+                this.applyTransform();
             } catch (error) {
                 console.error('Word rendering failed:', error);
                 loading.classList.add('hidden');
                 wordArea.style.display = 'block';
-                wordArea.innerHTML = `
-                    <div class="preview-error" style="text-align: center; padding: 40px;">
-                        <i class="fa-solid fa-file-circle-exclamation" style="font-size: 3rem; color: #ef4444; margin-bottom: 15px;"></i>
+                wordArea.classList.remove('hidden');
+                wordViewport.innerHTML = `
+                    <div class="preview-error">
+                        <i class="fa-solid fa-file-circle-exclamation" aria-hidden="true"></i>
                         <h4>Preview Failed</h4>
-                        <p style="color: #64748b;">We couldn't render this Word document. Please download it to view.</p>
+                        <p>${this.escapeHtml(error.message || 'We could not render this Word document.')}</p>
                         <button type="button" class="btn btn-primary" onclick="window.ipophlAnalyzer.downloadCurrent()">
                             <i class="fa-solid fa-download"></i> Download Document
                         </button>
@@ -867,10 +1132,16 @@ class IPOPHLAnalyzer {
     }
 
     applyTransform() {
+        const transform = `scale(${this.currentZoom / 100}) rotate(${this.currentRotation}deg)`;
         const frame = document.getElementById('filePreviewFrame');
-        if (frame) {
-            frame.style.transform = `scale(${this.currentZoom / 100}) rotate(${this.currentRotation}deg)`;
+        const wordViewport = document.getElementById('wordPreviewViewport');
+        if (frame && frame.style.display !== 'none') {
+            frame.style.transform = transform;
             frame.style.transformOrigin = 'top center';
+        }
+        if (wordViewport) {
+            wordViewport.style.transform = transform;
+            wordViewport.style.transformOrigin = 'top center';
         }
     }
 
@@ -886,6 +1157,21 @@ class IPOPHLAnalyzer {
     }
 
     printCurrent() {
+        const wordArea = document.getElementById('wordPreviewArea');
+        const wordViewport = document.getElementById('wordPreviewViewport');
+        if (wordArea && wordArea.style.display !== 'none' && wordViewport && wordViewport.innerHTML.trim()) {
+            const printWin = window.open('', '_blank', 'noopener,noreferrer');
+            if (!printWin) return;
+            printWin.document.write(`<!DOCTYPE html><html><head><title>${this.escapeHtml(this.currentFile?.filename || 'Document')}</title>`);
+            printWin.document.write('<style>body{margin:0;padding:0;background:#fff;} .docx-wrapper{padding:0!important;}</style>');
+            printWin.document.write('</head><body>');
+            printWin.document.write(wordViewport.innerHTML);
+            printWin.document.write('</body></html>');
+            printWin.document.close();
+            printWin.focus();
+            printWin.print();
+            return;
+        }
         const frame = document.getElementById('filePreviewFrame');
         if (frame) {
             frame.contentWindow.focus();
@@ -956,6 +1242,51 @@ class IPOPHLAnalyzer {
         return this.escapeHtml(raw);
     }
 
+    /** Escape text, then bold the phrases that matter most for the reviewer. */
+    formatReviewerEmphasis(text, extraFocus = []) {
+        let safe = this.escapeHtml(String(text ?? '').replace(/<[^>]+>/g, ' ').replace(/\s{2,}/g, ' ').trim());
+        if (!safe) return '';
+        const focus = [
+            ...extraFocus,
+            'Not Ready',
+            'Ready',
+            'Kapeng Barako',
+            'Coffea liberica',
+            'Batangas',
+            'Lipa',
+            'Guimaras',
+            'mangoes',
+            'mango',
+            'Tnalak',
+            'product focus',
+            'Trademark',
+            'Copyright',
+            'Industrial Design',
+            'Patent',
+            'Manual of Specifications',
+            'MoP',
+        ]
+            .map((s) => String(s || '').trim())
+            .filter(Boolean)
+            .sort((a, b) => b.length - a.length);
+        const seen = new Set();
+        focus.forEach((phrase) => {
+            const key = phrase.toLowerCase();
+            if (seen.has(key)) return;
+            seen.add(key);
+            const re = new RegExp(
+                `(^|[^A-Za-z0-9_])(${this.escapeRegExp(phrase)})(?![A-Za-z0-9_])`,
+                'gi'
+            );
+            safe = safe.replace(re, (_, pre, m) => `${pre}<strong>${m}</strong>`);
+        });
+        return safe;
+    }
+
+    escapeRegExp(value) {
+        return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
     formatAssistantMarkdown(text) {
         return this.formatPlainText(text);
     }
@@ -1002,6 +1333,10 @@ class IPOPHLAnalyzer {
     getReviewMeta(analysis, assessment) {
         const insights = assessment?.document_insights || {};
         const breakdown = analysis.score_breakdown || {};
+        const productFocus = analysis.product_focus
+            || breakdown.product_focus
+            || insights.product_focus
+            || null;
         const ready = String(analysis.status || '').trim().toLowerCase() === 'ready';
         const wordCount = Number(
             insights.word_count
@@ -1026,7 +1361,8 @@ class IPOPHLAnalyzer {
             || (analysis.task_id || '').replace(/-/g, ' ')
             || 'GI document'
         ).trim();
-        const method = String(analysis.analysis_method || breakdown.analysis_mode || 'MoP review')
+        const method = String(analysis.analysis_method || breakdown.analysis_mode || 'GI document review')
+            .replace(/official[_ ]mop[_ ]ensemble[_ ]hybrid|official[_ ]mop[_ ]qualitative|mop[_ ]reference[_ ]qualitative/gi, 'GI document review')
             .replace(/_/g, ' ');
         return {
             ready,
@@ -1042,127 +1378,279 @@ class IPOPHLAnalyzer {
             missing: (insights.missing_requirements || analysis.missing_requirements || []).slice(0, 8),
             sections: Array.isArray(breakdown.sections) ? breakdown.sections : [],
             reference: insights.reference_source || breakdown.reference_source || '',
+            productFocus,
+            textExcerpt: String(
+                analysis.text_excerpt
+                || breakdown.text_excerpt
+                || insights.text_excerpt
+                || ''
+            ).trim(),
+            contentFingerprint: String(
+                analysis.content_fingerprint
+                || breakdown.content_fingerprint
+                || insights.content_fingerprint
+                || ''
+            ).trim(),
         };
     }
 
     buildShortVerdict(analysis, assessment, meta) {
         const ready = meta.ready;
+        const pf = meta.productFocus || {};
+        const off = (pf.off_product_hits || []).slice(0, 3);
         const pillars = assessment?.pillars || [];
-        const focus = [
+        const pillarFocus = [
             ...pillars.filter((p) => p.status === 'partial').map((p) => p.label),
             ...pillars.filter((p) => p.status === 'not_addressed').map((p) => p.label),
         ].slice(0, 3);
+        const themeFocus = (meta.missing || [])
+            .filter((m) => !/product focus/i.test(m))
+            .slice(0, 3);
+        const doc = this.escapeHtml(meta.docType);
 
         if (ready) {
             return (
-                `This <strong>${this.escapeHtml(meta.docType)}</strong> upload covers the critical ` +
-                `Kapeng Barako MoP themes for its filing zone.` +
-                (focus.length
-                    ? ` Still watch: <strong>${this.escapeHtml(focus.join(', '))}</strong>.`
-                    : ' Companion uploads should still cover any Part I–IV topics not expected in this file alone.')
+                `Nice work — this <strong>${doc}</strong> already covers the critical ` +
+                `<strong>Kapeng Barako</strong> GI requirements for this upload group.` +
+                (pillarFocus.length || themeFocus.length
+                    ? ` Optional polish: <strong>${this.escapeHtml((pillarFocus.length ? pillarFocus : themeFocus).join(', '))}</strong>.`
+                    : ' Keep the companion uploads aligned so the full package stays consistent.')
             );
         }
+
+        if (pf.ok === false || pf.wrong_product || /product focus/i.test((meta.missing || []).join(' '))) {
+            const cue = pf.wrong_product && off.length
+                ? ` It currently reads more like <strong>${this.escapeHtml(off.join(', '))}</strong>.`
+                : '';
+            const focusLine = pf.wrong_product && off.length
+                ? `rewrite so the product, origin, and reputation clearly belong to <strong>Kapeng Barako</strong> from <strong>Batangas</strong>.${cue}`
+                : `upload or rewrite a document that clearly names <strong>Kapeng Barako</strong>, <strong>Liberica</strong>, and <strong>Batangas / Lipa</strong> origin.`;
+            return (
+                `I can't mark this <strong>${doc}</strong> as <strong>Ready</strong> yet.` +
+                ` The priority fix is <strong>Kapeng Barako product focus</strong> — ${focusLine}` +
+                ` Trademark / Copyright details can wait until the product identity is right.`
+            );
+        }
+
+        if (themeFocus.length) {
+            return (
+                `This <strong>${doc}</strong> is still <strong>Not Ready</strong>.` +
+                ` Please build out <strong>${this.escapeHtml(themeFocus.join(', '))}</strong> first` +
+                ` with concrete Kapeng Barako GI content, then send it back for another look.`
+            );
+        }
+
+        if (pillarFocus.length) {
+            return (
+                `This <strong>${doc}</strong> is still <strong>Not Ready</strong>.` +
+                ` From my reading, the weakest spots are <strong>${this.escapeHtml(pillarFocus.join(', '))}</strong>.` +
+                ` Flesh those out with clear, examiner-friendly wording.`
+            );
+        }
+
         return (
-            `This <strong>${this.escapeHtml(meta.docType)}</strong> upload is <strong>Not Ready</strong>. ` +
-            (focus.length
-                ? `Priority gaps: <strong>${this.escapeHtml(focus.join(', '))}</strong>.`
-                : (meta.missing.length
-                    ? `Missing or thin themes: <strong>${this.escapeHtml(meta.missing.slice(0, 3).join(', '))}</strong>.`
-                    : 'Critical MoP themes are still missing or only thinly addressed.'))
+            `This <strong>${doc}</strong> is still <strong>Not Ready</strong>.` +
+            ` Critical <strong>Kapeng Barako</strong> GI requirements are missing or only thinly covered.`
         );
     }
 
-    renderHighlightStrip(meta) {
-        const statusCls = meta.ready ? 'ai-metric--ready' : 'ai-metric--not-ready';
-        const themeText = meta.themesTotal
-            ? `${meta.themesMet} of ${meta.themesTotal}`
-            : '—';
-        const rfText = meta.rfScore != null
-            ? `${meta.rfScore}${meta.rfAgreement == null ? '' : (meta.rfAgreement ? ' · agree' : ' · differ')}`
-            : '—';
-
-        return `<section class="ai-highlight-strip" aria-label="Key review metrics">
-            <div class="ai-metric ${statusCls}">
-                <span class="ai-metric__label">Result</span>
-                <span class="ai-metric__value">${this.escapeHtml(meta.statusLabel)}</span>
-            </div>
-            <div class="ai-metric">
-                <span class="ai-metric__label">Document</span>
-                <span class="ai-metric__value">${this.escapeHtml(meta.docType)}</span>
-            </div>
-            <div class="ai-metric">
-                <span class="ai-metric__label">Words</span>
-                <span class="ai-metric__value">${meta.wordCount.toLocaleString()}</span>
-            </div>
-            <div class="ai-metric">
-                <span class="ai-metric__label">MoP themes</span>
-                <span class="ai-metric__value">${this.escapeHtml(themeText)}</span>
-            </div>
-            <div class="ai-metric">
-                <span class="ai-metric__label">RF check</span>
-                <span class="ai-metric__value">${this.escapeHtml(rfText)}</span>
+    renderFeedbackHero(meta, summaryHtml) {
+        const tone = meta.ready ? 'ready' : 'not-ready';
+        const icon = meta.ready ? 'fa-circle-check' : 'fa-pen-to-square';
+        const eyebrow = meta.ready ? 'Positive feedback' : 'Revision feedback';
+        return `<section class="fb-hero fb-hero--${tone}" aria-label="Overall feedback">
+            <div class="fb-hero__icon" aria-hidden="true"><i class="fa-solid ${icon}"></i></div>
+            <div class="fb-hero__body">
+                <p class="fb-hero__eyebrow">${eyebrow}</p>
+                <h5 class="fb-hero__title">${this.escapeHtml(meta.statusLabel)}</h5>
+                <p class="fb-hero__summary">${summaryHtml}</p>
+                ${meta.reference
+                    ? `<p class="fb-hero__ref"><i class="fa-solid fa-book-open"></i> Checked against ${this.escapeHtml(meta.reference)}</p>`
+                    : ''}
             </div>
         </section>`;
     }
 
+    renderFeedbackMeta(meta) {
+        const themeText = meta.themesTotal
+            ? `${meta.themesMet} of ${meta.themesTotal} themes covered`
+            : 'Theme coverage pending';
+        const reviewChip = `<span class="fb-meta__chip fb-meta__chip--authority"><i class="fa-solid fa-scale-balanced"></i> Review · ${this.escapeHtml(meta.statusLabel)}</span>`;
+        let ensembleChip = '';
+        let mlNote = '';
+        if (meta.rfScore != null) {
+            const agree =
+                meta.rfAgreement == null
+                    ? 'recorded'
+                    : meta.rfAgreement
+                      ? 'agrees'
+                      : 'differs';
+            ensembleChip = `<span class="fb-meta__chip fb-meta__chip--secondary" title="Advisory only — document review decides Ready / Not Ready"><i class="fa-solid fa-robot"></i> Ensemble ${this.escapeHtml(agree)}</span>`;
+            const rfReady = meta.rfScore >= 75;
+            mlNote = `<p class="fb-ml-note">Ensemble confidence ${meta.rfScore}% (${rfReady ? 'Ready' : 'Not Ready'} at 75% threshold) — ${meta.rfAgreement ? 'aligned with' : 'differs from'} document review.</p>`;
+        }
+        return `<section class="fb-meta" aria-label="Feedback context">
+            ${reviewChip}
+            <span class="fb-meta__chip"><i class="fa-solid fa-file"></i> ${this.escapeHtml(meta.docType)}</span>
+            <span class="fb-meta__chip"><i class="fa-solid fa-layer-group"></i> ${this.escapeHtml(themeText)}</span>
+            ${ensembleChip}
+            ${meta.wordCount
+                ? `<span class="fb-meta__chip"><i class="fa-solid fa-align-left"></i> ${meta.wordCount.toLocaleString()} words scanned</span>`
+                : ''}
+            ${meta.contentFingerprint
+                ? `<span class="fb-meta__chip" title="Unique scan ID for this file content"><i class="fa-solid fa-fingerprint"></i> Scan ${this.escapeHtml(meta.contentFingerprint)}</span>`
+                : ''}
+        </section>
+        ${mlNote}
+        ${meta.textExcerpt
+            ? `<details class="fb-scan-excerpt">
+                <summary><i class="fa-solid fa-file-lines"></i> Text scanned from this upload</summary>
+                <p>${this.escapeHtml(meta.textExcerpt)}${meta.textExcerpt.length >= 600 ? '…' : ''}</p>
+               </details>`
+            : ''}`;
+    }
+
+    renderHighlightStrip(meta) {
+        return this.renderFeedbackMeta(meta);
+    }
+
     renderThemeCoverage(sections) {
         if (!sections.length) return '';
-        const chips = sections.map((s) => {
+        const rows = sections.map((s) => {
             const cov = String(s.coverage || (s.found ? 'well_covered' : 'missing'));
             const cls = cov === 'well_covered' || s.found
-                ? 'ai-theme-chip--ok'
-                : (cov === 'partial' ? 'ai-theme-chip--partial' : 'ai-theme-chip--gap');
+                ? 'fb-theme--ok'
+                : (cov === 'partial' ? 'fb-theme--partial' : 'fb-theme--gap');
             const label = cov.replace(/_/g, ' ');
-            return `<li class="ai-theme-chip ${cls}">
-                <span class="ai-theme-chip__name">${this.escapeHtml(s.label || 'Theme')}</span>
-                <span class="ai-theme-chip__state">${this.escapeHtml(label)}</span>
+            const evidence = Array.isArray(s.evidence) ? s.evidence.filter(Boolean).slice(0, 4) : [];
+            const tipParts = [];
+            if (s.expectation) tipParts.push(this.escapeHtml(s.expectation));
+            if (evidence.length) {
+                tipParts.push(`<span class="fb-theme__evidence">Cues found: ${this.escapeHtml(evidence.join(', '))}</span>`);
+            }
+            const tip = tipParts.length
+                ? `<p class="fb-theme__tip">${tipParts.join(' ')}</p>`
+                : '';
+            return `<li class="fb-theme ${cls}">
+                <div class="fb-theme__top">
+                    <span class="fb-theme__name">${this.escapeHtml(s.label || 'Theme')}</span>
+                    <span class="fb-theme__state">${this.escapeHtml(label)}</span>
+                </div>
+                ${tip}
             </li>`;
         }).join('');
-        return `<section class="ai-analysis-block">
-            <h5 class="ai-analysis-block__title">MoP theme coverage</h5>
-            <ul class="ai-theme-chip-list">${chips}</ul>
+        return `<section class="fb-card">
+            <div class="fb-card__head">
+                <h5><i class="fa-solid fa-list-check"></i> Theme coverage</h5>
+                <p>How this upload meets GI filing requirements for its document group</p>
+            </div>
+            <ul class="fb-theme-list">${rows}</ul>
         </section>`;
     }
 
     renderFindingsBlocks(meta) {
         const strengthBlock = meta.strengths.length
-            ? `<div class="ai-findings-col ai-findings-col--ok">
-                <h6><i class="fa-solid fa-circle-check"></i> Strengths</h6>
+            ? `<div class="fb-side fb-side--ok">
+                <h6><i class="fa-solid fa-thumbs-up"></i> What's working</h6>
                 ${this.renderPillarTags(meta.strengths, 'met')}
                </div>`
             : '';
         const gapBlock = meta.missing.length
-            ? `<div class="ai-findings-col ai-findings-col--gap">
-                <h6><i class="fa-solid fa-triangle-exclamation"></i> Gaps to fix</h6>
+            ? `<div class="fb-side fb-side--gap">
+                <h6><i class="fa-solid fa-flag"></i> Needs attention</h6>
                 ${this.renderPillarTags(meta.missing, 'gap')}
                </div>`
             : '';
         if (!strengthBlock && !gapBlock) return '';
-        return `<section class="ai-analysis-block">
-            <h5 class="ai-analysis-block__title">Key findings</h5>
-            <div class="ai-findings-grid">${strengthBlock}${gapBlock}</div>
+        return `<section class="fb-card">
+            <div class="fb-card__head">
+                <h5><i class="fa-solid fa-comments"></i> Quick feedback</h5>
+                <p>Strengths to keep and gaps to fix</p>
+            </div>
+            <div class="fb-side-grid">${strengthBlock}${gapBlock}</div>
         </section>`;
     }
 
-    buildRecommendations(analysis, assessment, gaps) {
+    dedupeRecommendations(recs, meta, summaryHtml = '') {
+        const hero = String(summaryHtml).replace(/<[^>]+>/g, ' ').toLowerCase();
+        const seen = new Set();
+        return recs.filter((item) => {
+            const text = String(item || '').trim();
+            if (!text) return false;
+            const key = text.toLowerCase().slice(0, 48);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            if (/product focus|upload or rewrite|liberica|batangas \/ lipa/i.test(text)
+                && /product focus|kapeng barako|liberica|batangas/i.test(hero)) {
+                return false;
+            }
+            if (meta?.missing?.length) {
+                const overlap = meta.missing.some((m) => {
+                    const label = String(m).toLowerCase();
+                    return label.length > 8 && text.toLowerCase().includes(label.slice(0, 20));
+                });
+                if (overlap && /strengthen|add|fill|expand/i.test(text)) return false;
+            }
+            return true;
+        }).slice(0, 4);
+    }
+
+    dedupeShapHtml(raw) {
+        if (!raw) return '';
+        let html = String(raw).trim();
+        const stripPatterns = [
+            /<p>\s*I reviewed this[\s\S]*?<\/p>/gi,
+            /<p>\s*<strong>What I need from you next:[\s\S]*?<\/p>/gi,
+            /<p>\s*<strong>What already works:[\s\S]*?<\/p>/gi,
+            /<p>\s*<strong>Theme notes[\s\S]*?<\/ul>/gi,
+            /<p>\s*<strong>Ensemble validation[\s\S]*?<\/p>/gi,
+            /<p>\s*<strong>SHAP feature influence[\s\S]*?<\/p>/gi,
+            /<p>\s*<strong>Main issue[\s\S]*?<\/p>/gi,
+            /<p>\s*<strong>Product identity gap\.[\s\S]*?<\/p>/gi,
+            /<p>\s*The (?:MoP )?themes are satisfied[\s\S]*?<\/p>/gi,
+            /<p>\s*The ensemble may reflect[\s\S]*?<\/p>/gi,
+        ];
+        stripPatterns.forEach((re) => {
+            html = html.replace(re, '');
+        });
+        return html.replace(/\s{2,}/g, ' ').trim();
+    }
+
+    buildRecommendations(analysis, assessment, gaps, meta = null, summaryHtml = '') {
+        const pf = analysis.product_focus
+            || analysis.score_breakdown?.product_focus
+            || null;
         if (Array.isArray(assessment?.recommendations) && assessment.recommendations.length) {
             return assessment.recommendations;
         }
+        if (Array.isArray(analysis.improvements) && analysis.improvements.length) {
+            return analysis.improvements;
+        }
         const recs = [];
+        if (pf && pf.ok === false) {
+            const off = (pf.off_product_hits || []).slice(0, 3);
+            recs.push(
+                pf.wrong_product && off.length
+                    ? `Rewrite so this is clearly Kapeng Barako — not ${off.join(', ')}.`
+                    : 'Upload or rewrite a Kapeng Barako GI document with clear Liberica / Batangas identity language.'
+            );
+        }
         (assessment?.pillars || []).forEach((pillar) => {
             if (pillar.gaps?.length) {
-                recs.push(`Improve ${pillar.label}: ${pillar.gaps.slice(0, 5).join(', ')}.`);
+                recs.push(
+                    `On ${pillar.label}, please add: ${pillar.gaps.slice(0, 4).join(', ')}.`
+                );
             }
         });
         if (!recs.length && gaps.length) {
-            recs.push(`Address missing requirements: ${gaps.slice(0, 4).join(', ')}.`);
+            recs.push(`Please fill in: ${gaps.slice(0, 4).join(', ')}.`);
         }
         if (!recs.length) {
-            recs.push('Confirm companion uploads cover any pillar not fully addressed in this file alone.');
-        } else {
-            recs.push('Run **Refresh Analysis** after revisions to verify readiness.');
+            recs.push('Check companion uploads so any theme not covered here still appears in the package.');
+        } else if (!meta?.ready) {
+            recs.push('After you revise, hit Refresh Analysis so I can re-check Ready / Not Ready.');
         }
-        return recs.slice(0, 5);
+        return this.dedupeRecommendations(recs, meta, summaryHtml);
     }
 
     renderChatAnalysis(analysis) {
@@ -1173,50 +1661,86 @@ class IPOPHLAnalyzer {
         const pillars = Array.isArray(assessment?.pillars) ? assessment.pillars : [];
         const gaps = this.collectRequirementGaps(analysis);
         const meta = this.getReviewMeta(analysis, assessment);
-        const recommendations = this.buildRecommendations(analysis, assessment, gaps);
+        const summaryHtml = this.buildShortVerdict(analysis, assessment, meta);
+        const recommendations = this.buildRecommendations(analysis, assessment, gaps, meta, summaryHtml);
 
         this.showChatTyping(false);
 
-        const findings = this.renderFindingsBlocks(meta);
         const themes = this.renderThemeCoverage(meta.sections);
         const pillarBlock = pillars.length
-            ? `<section class="ai-analysis-block">
-                <h5 class="ai-analysis-block__title">IP pillars</h5>
+            ? `<section class="fb-card">
+                <div class="fb-card__head">
+                    <h5><i class="fa-solid fa-scale-balanced"></i> IP pillar feedback</h5>
+                    <p>Trademark, Copyright, Industrial Design, and Patent signals in this file</p>
+                </div>
                 ${this.renderPillarCards(pillars)}
                </section>`
             : '';
 
-        const recBlock = `<section class="ai-analysis-block ai-rec-block">
-            <h5 class="ai-analysis-block__title">What to improve</h5>
-            <ol class="ai-rec-list ai-rec-list--numbered">${recommendations.map((r) =>
-                `<li>${this.formatPlainText(r)}</li>`
-            ).join('')}</ol>
-        </section>`;
+        const recBlock = recommendations.length
+            ? `<section class="fb-card fb-card--actions">
+                <div class="fb-card__head">
+                    <h5><i class="fa-solid fa-list-ol"></i> Action items</h5>
+                    <p>Concrete next steps before re-checking</p>
+                </div>
+                <ol class="fb-actions">${recommendations.map((r, i) =>
+                    `<li><span class="fb-actions__n">${i + 1}</span><span class="fb-actions__text">${this.formatReviewerEmphasis(r, meta.missing)}</span></li>`
+                ).join('')}</ol>
+               </section>`
+            : '';
 
-        const depth = this.renderInDepthReview(analysis);
+        const depth = this.renderInDepthReview(analysis, meta);
 
-        container.innerHTML = `<div class="ai-review-shell">
-            ${this.renderHighlightStrip(meta)}
-            ${findings}
+        container.innerHTML = `<div class="ai-review-shell fb-shell">
+            ${this.renderFeedbackHero(meta, summaryHtml)}
+            ${this.renderFeedbackMeta(meta)}
             ${themes}
-            ${pillarBlock}
             ${recBlock}
+            ${pillarBlock}
             ${depth}
         </div>`;
     }
 
-    renderInDepthReview(analysis) {
+    renderInDepthReview(analysis, meta = null) {
         const raw = String(analysis.shap_analysis || '').trim();
         if (!raw) return '';
-        const cleaned = raw
+        let cleaned = this.dedupeShapHtml(raw)
             .replace(/\b\d{1,3}\s*%/g, '')
             .replace(/readiness score of\s*/gi, '')
-            .replace(/keyword checklist score[^.<]*/gi, 'MoP theme review');
-        return `<details class="ai-analysis-block ai-analysis-block--depth">
-            <summary class="ai-analysis-block__title ai-depth-summary">
-                Full AI narrative <span class="ai-depth-hint">tap to expand</span>
+            .replace(/keyword checklist score[^.<]*/gi, 'GI theme review')
+            .replace(/This review evaluates the uploaded/gi, 'I reviewed this')
+            .replace(/Overall classification:\s*/gi, 'My call: ')
+            .replace(/Product focus check failed:\s*/gi, 'Product identity gap: ')
+            .replace(/What is already working:/gi, 'Strengths to keep:')
+            .replace(/Why it is not yet complete:/gi, 'What I need from you next:')
+            .replace(/Theme-by-theme findings \(MoP basis\):/gi, 'Theme notes:')
+            .replace(/Theme notes \(MoP basis\):/gi, 'Theme notes:')
+            .replace(/The AI analysis only evaluates[^.<]*/gi, 'This review lane is only for Kapeng Barako')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+
+        if (!cleaned || cleaned.replace(/<[^>]+>/g, '').trim().length < 24) return '';
+
+        if (!/<[a-z][\s\S]*>/i.test(cleaned)) {
+            cleaned = cleaned
+                .split(/\n{2,}/)
+                .map((p) => p.trim())
+                .filter(Boolean)
+                .map((p) => `<p>${this.formatReviewerEmphasis(p, meta?.missing || [])}</p>`)
+                .join('');
+        } else if (!/<strong[\s>]/i.test(cleaned)) {
+            cleaned = cleaned.replace(/>([^<]+)</g, (_, text) => {
+                const emphasized = this.formatReviewerEmphasis(text, meta?.missing || []);
+                return `>${emphasized}<`;
+            });
+        }
+
+        return `<details class="fb-card fb-card--depth">
+            <summary class="fb-depth-summary">
+                <span><i class="fa-solid fa-align-left"></i> Additional reviewer notes</span>
+                <span class="fb-depth-hint" aria-hidden="true"></span>
             </summary>
-            <div class="ai-analysis-depth">${cleaned}</div>
+            <div class="ai-analysis-depth fb-depth-body">${cleaned}</div>
         </details>`;
     }
 
@@ -1377,7 +1901,7 @@ class IPOPHLAnalyzer {
         if (!this.currentFile || this.isAnalyzing) return;
         
         this.isAnalyzing = true;
-        const refreshBtn = document.getElementById('refreshBtn');
+        const refreshBtn = document.getElementById('ipophlRefreshBtn');
         const originalContent = refreshBtn.innerHTML;
         
         // Show loading state
@@ -1419,6 +1943,12 @@ class IPOPHLAnalyzer {
                     }
                     this.refreshDashboardIndicator();
                 }
+                if (window.dashboardApp?.syncCompleteRegistrationButtonState) {
+                    window.dashboardApp.syncCompleteRegistrationButtonState();
+                }
+                if (window.dashboardApp?.updateGiProcessIndicator) {
+                    window.dashboardApp.updateGiProcessIndicator();
+                }
                 
                 // Show success message
                 this.showToast('Analysis refreshed successfully', 'success');
@@ -1442,6 +1972,7 @@ class IPOPHLAnalyzer {
         if (modal) {
             modal.classList.remove('active');
             modal.classList.remove('is-minimized');
+            modal.classList.remove('is-geometry-ready');
             modal.setAttribute('hidden', '');
             modal.setAttribute('aria-hidden', 'true');
         }
@@ -1452,6 +1983,15 @@ class IPOPHLAnalyzer {
 
         const frame = document.getElementById('filePreviewFrame');
         if (frame) frame.src = '';
+        const wordViewport = document.getElementById('wordPreviewViewport');
+        if (wordViewport) wordViewport.innerHTML = '';
+        const wordStyles = document.getElementById('wordPreviewStyles');
+        if (wordStyles) wordStyles.innerHTML = '';
+        const wordArea = document.getElementById('wordPreviewArea');
+        if (wordArea) {
+            wordArea.style.display = 'none';
+            wordArea.classList.add('hidden');
+        }
         
         // Reset current file
         this.currentFile = null;

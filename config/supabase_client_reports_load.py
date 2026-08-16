@@ -40,19 +40,37 @@ def fetch_client_reports_via_rest(limit: int = 500, status: str = "", q: str = "
     return rows[:limit]
 
 
-def update_client_report_status_via_rest(report_id: int, status: str) -> dict:
+def update_client_report_status_via_rest(
+    report_id: int, status: str, resolution_note: str = ""
+) -> dict:
     client = get_client()
     status = _normalize_status(status)
-    resp = (
-        client.table("client_misconduct_report")
-        .update({"status": status})
-        .eq("report_id", int(report_id))
-        .execute()
-    )
+    payload: dict = {"status": status}
+    note = str(resolution_note or "").strip()
+    if note:
+        payload["resolution_note"] = note
+    try:
+        resp = (
+            client.table("client_misconduct_report")
+            .update(payload)
+            .eq("report_id", int(report_id))
+            .execute()
+        )
+    except Exception:
+        # Column may not exist yet — fall back to status-only update.
+        resp = (
+            client.table("client_misconduct_report")
+            .update({"status": status})
+            .eq("report_id", int(report_id))
+            .execute()
+        )
     rows = resp.data or []
     if not rows:
         check = client.table("client_misconduct_report").select("*").eq("report_id", int(report_id)).limit(1).execute()
         rows = check.data or []
     if not rows:
         raise LookupError("Report not found")
-    return rows[0]
+    row = dict(rows[0])
+    if note and not row.get("resolution_note"):
+        row["resolution_note"] = note
+    return row

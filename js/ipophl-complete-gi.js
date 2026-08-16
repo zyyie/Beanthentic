@@ -248,6 +248,31 @@
   }
 
   async function publishIpophlToGiUpdates(gmailTab) {
+    if (
+      window.dashboardApp &&
+      typeof window.dashboardApp.areAllRequiredIpophlDocsMopReady === 'function' &&
+      !window.dashboardApp.areAllRequiredIpophlDocsMopReady()
+    ) {
+      closeGmailTab(gmailTab);
+      const missing =
+        (window.dashboardApp.getIpophlCompletionSnapshot?.().missing || [])
+          .map((s) =>
+            window.dashboardApp.getIpophlGroupLabel
+              ? window.dashboardApp.getIpophlGroupLabel(s)
+              : s
+          )
+          .join(', ');
+      notify(
+        missing
+          ? 'Complete Registration is blocked until Ready for: ' + missing + '.'
+          : 'Complete Registration is blocked until all required phase docs are Ready.'
+      );
+      if (window.dashboardApp.syncCompleteRegistrationButtonState) {
+        window.dashboardApp.syncCompleteRegistrationButtonState();
+      }
+      return;
+    }
+
     setButtonCompleted();
 
     const pending =
@@ -376,7 +401,14 @@
       e.preventDefault();
       e.stopImmediatePropagation();
       e.stopPropagation();
-      if (btn.disabled || btn.classList.contains('is-completed')) return;
+      if (btn.disabled || btn.classList.contains('is-completed') || btn.classList.contains('is-blocked-mop')) {
+        if (btn.classList.contains('is-blocked-mop') && window.dashboardApp?.showIpophlNotification) {
+          window.dashboardApp.showIpophlNotification(
+            btn.title || 'Complete Registration is blocked until all required phase docs are Ready.'
+          );
+        }
+        return;
+      }
       const gmailTab = openPendingGmailTab();
       publishIpophlToGiUpdates(gmailTab);
     },

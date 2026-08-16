@@ -68,3 +68,151 @@
   margin: 0 auto;
 }
 
+.farmer-portal-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.farmer-portal-nav__link {
+  text-decoration: none;
+  font-weight: 700;
+  color: var(--accent-ink, #1a2e1a);
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.farmer-portal-nav__link:hover {
+  background: rgba(56, 161, 105, 0.08);
+}
+
+.farmer-portal-nav__link.is-active {
+  border-color: var(--accent-2, #38a169);
+  background: var(--accent-ring, rgba(56, 161, 105, 0.12));
+}
+
+.farmer-home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.farmer-home-card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--accent-ring, rgba(56, 161, 105, 0.2));
+  text-decoration: none;
+  color: inherit;
+  box-shadow: 0 8px 24px rgba(26, 46, 26, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+a.farmer-home-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(26, 46, 26, 0.08);
+}
+
+.farmer-home-card__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-ring, rgba(56, 161, 105, 0.12));
+  color: var(--accent-1-dark, #276749);
+  flex-shrink: 0;
+}
+
+.farmer-home-card h2 {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+}
+
+.farmer-home-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #4a5568;
+}
+
+.farmer-home-price-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.farmer-home-price-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 0.85rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.farmer-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+}
+
+.farmer-confirm[hidden] {
+  display: none !important;
+}
+
+.farmer-confirm__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 30, 20, 0.45);
+}
+
+.farmer-confirm__card {
+  position: relative;
+  z-index: 1;
+  width: min(420px, calc(100vw - 32px));
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+}
+
+.farmer-confirm__card h2 {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+}
+
+.farmer-confirm__card p {
+  margin: 0 0 16px;
+  color: #4a5568;
+}
+
+.farmer-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.farmer-confirm__btn {
+  border-radius: 10px;
+  border: 1px solid #cbd5e0;
+  background: #fff;
+  padding: 8px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.farmer-confirm__btn--danger {
+  background: #c53030;
+  border-color: #c53030;
+  color: #fff;
+}
+
+

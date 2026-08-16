@@ -74,17 +74,38 @@ if ($method === 'PATCH') {
     }
     $reportId = (int)($body['report_id'] ?? 0);
     $status = strtolower(str_replace('_', ' ', trim((string)($body['status'] ?? ''))));
+    $note = trim((string)($body['resolution_note'] ?? $body['note'] ?? ''));
     if ($reportId < 1 || $status === '') {
         json_fail('report_id and status required');
     }
-    $stmt = $pdo->prepare('UPDATE client_misconduct_report SET status = ? WHERE report_id = ?');
-    $stmt->execute([$status, $reportId]);
+    if (in_array($status, ['closed', 'resolved', 'dismissed'], true) && $note === '') {
+        json_fail('A resolution note is required before closing this report.', 400);
+    }
+    // Best-effort optional columns
+    try {
+        if ($driver === 'pgsql') {
+            $pdo->exec('ALTER TABLE client_misconduct_report ADD COLUMN IF NOT EXISTS resolution_note TEXT');
+            $pdo->exec('ALTER TABLE client_misconduct_report ADD COLUMN IF NOT EXISTS customer_transaction_id BIGINT');
+        }
+    } catch (Throwable $e) {
+        // ignore
+    }
+    try {
+        $stmt = $pdo->prepare('UPDATE client_misconduct_report SET status = ?, resolution_note = ? WHERE report_id = ?');
+        $stmt->execute([$status, $note !== '' ? $note : null, $reportId]);
+    } catch (Throwable $e) {
+        $stmt = $pdo->prepare('UPDATE client_misconduct_report SET status = ? WHERE report_id = ?');
+        $stmt->execute([$status, $reportId]);
+    }
     if ($stmt->rowCount() < 1) {
         json_fail('Report not found', 404);
     }
     $stmt = $pdo->prepare('SELECT * FROM client_misconduct_report WHERE report_id = ? LIMIT 1');
     $stmt->execute([$reportId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (is_array($row) && $note !== '' && empty($row['resolution_note'])) {
+        $row['resolution_note'] = $note;
+    }
     json_ok(['item' => $row, 'updated' => 1]);
 }
 

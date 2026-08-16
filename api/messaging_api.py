@@ -138,16 +138,22 @@ def register_messaging_routes(app):
     @app.route("/api/farmer-send-message", methods=["POST"])
     def api_farmer_send_message():
         """Allow farmers to send messages directly to admin via web.py."""
+        if not is_farmer_authenticated():
+            return jsonify({"error": "Unauthorized"}), 401
         try:
             data = request.get_json(silent=True) or request.form or {}
-            sender_phone = str(data.get("sender_phone") or "")
-            sender_name = str(data.get("sender_name") or sender_phone)
+            # Force identity from farmer session — ignore spoofed body fields.
+            sender_phone = get_current_farmer_phone() or ""
+            sender_name = (session.get("farmer_name") or "").strip() or sender_phone
             subject = str(data.get("subject") or "Message from Farmer")
             body = str(data.get("body") or "")
             category = str(data.get("category") or "general")[:30]
-            farmer_id = data.get("farmer_id")
+            farmer_id = session.get("farmer_id")
             farmer_id = int(farmer_id) if farmer_id and str(farmer_id).isdigit() else None
-            
+
+            if not sender_phone:
+                return jsonify({"error": "Unauthorized"}), 401
+
             saved = send_shared_message(
                 role="farmer",
                 phone=sender_phone,
@@ -449,7 +455,7 @@ def register_messaging_routes(app):
     @app.route("/api/messages/<int:message_id>", methods=["GET"])
     def api_messages_detail(message_id):
         """Get a single message and mark it as read."""
-        if not is_authenticated():
+        if not (is_authenticated() or is_farmer_authenticated()):
             return jsonify({"error": "Unauthorized"}), 401
 
         if _use_shared_messages():
@@ -503,7 +509,7 @@ def register_messaging_routes(app):
                 if conn:
                     conn.close()
 
-        user_phone = get_current_user_phone() or ""
+        user_phone = get_current_user_phone() or get_current_farmer_phone() or ""
         msg = Message.query.get(message_id)
         if not msg:
             return jsonify({"error": "Message not found."}), 404
@@ -519,7 +525,7 @@ def register_messaging_routes(app):
     @app.route("/api/messages/<int:message_id>/star", methods=["POST"])
     def api_messages_star(message_id):
         """Toggle star on a message."""
-        if not is_authenticated():
+        if not (is_authenticated() or is_farmer_authenticated()):
             return jsonify({"error": "Unauthorized"}), 401
 
         if _use_shared_messages():
@@ -567,7 +573,7 @@ def register_messaging_routes(app):
     @app.route("/api/messages/<int:message_id>/archive", methods=["POST"])
     def api_messages_archive(message_id):
         """Toggle archive on a message."""
-        if not is_authenticated():
+        if not (is_authenticated() or is_farmer_authenticated()):
             return jsonify({"error": "Unauthorized"}), 401
 
         if _use_shared_messages():
@@ -611,7 +617,7 @@ def register_messaging_routes(app):
     @app.route("/api/messages/<int:message_id>/read", methods=["POST"])
     def api_messages_mark_read(message_id):
         """Mark a message as read."""
-        if not is_authenticated():
+        if not (is_authenticated() or is_farmer_authenticated()):
             return jsonify({"error": "Unauthorized"}), 401
 
         if _use_shared_messages():
@@ -707,7 +713,7 @@ def register_messaging_routes(app):
     @app.route("/api/messages/mark-all-read", methods=["POST"])
     def api_messages_mark_all_read():
         """Mark all inbox messages as read for the current user."""
-        if not is_authenticated():
+        if not (is_authenticated() or is_farmer_authenticated()):
             return jsonify({"error": "Unauthorized"}), 401
 
         if _use_shared_messages():
@@ -744,7 +750,7 @@ def register_messaging_routes(app):
                 if conn:
                     conn.close()
 
-        user_phone = get_current_user_phone() or ""
+        user_phone = get_current_user_phone() or get_current_farmer_phone() or ""
         now = datetime.utcnow()
 
         updated = Message.query.filter(
@@ -759,7 +765,7 @@ def register_messaging_routes(app):
     @app.route("/api/messages/<int:message_id>", methods=["DELETE"])
     def api_messages_delete(message_id):
         """Delete a message permanently."""
-        if not is_authenticated():
+        if not (is_authenticated() or is_farmer_authenticated()):
             return jsonify({"error": "Unauthorized"}), 401
 
         if _use_shared_messages():
@@ -799,7 +805,7 @@ def register_messaging_routes(app):
         if not msg:
             return jsonify({"error": "Message not found."}), 404
 
-        user_phone = get_current_user_phone() or ""
+        user_phone = get_current_user_phone() or get_current_farmer_phone() or ""
         try:
             log_activity(user_phone, "MESSAGE_DELETED", f"Deleted message: {msg.subject[:60]}", request.remote_addr)
         except Exception:
@@ -813,7 +819,7 @@ def register_messaging_routes(app):
     @app.route("/api/messages/unread-count", methods=["GET"])
     def api_messages_unread_count():
         """Get unread message count for badge display."""
-        if not is_authenticated():
+        if not (is_authenticated() or is_farmer_authenticated()):
             return jsonify({"error": "Unauthorized"}), 401
 
         if app_db_params() or app_server_base():
@@ -829,7 +835,7 @@ def register_messaging_routes(app):
                 )
                 return jsonify(load_error_payload("MESSAGES_LOAD_FAILED", msg)), 503
 
-        user_phone = get_current_user_phone() or ""
+        user_phone = get_current_user_phone() or get_current_farmer_phone() or ""
         count = Message.query.filter(
             (Message.recipient_phone == user_phone) | (Message.recipient_phone == ""),
             Message.is_read == False,

@@ -18,13 +18,59 @@ from config.pricing_store import (
     upsert_pricelist,
 )
 from config.security import safe_error_message
+from config.self_sale_audit import get_self_sale_unlock_audit, record_self_sale_unlock
 from config.supabase_client import get_client, is_configured
-from config.utils import is_authenticated
+from config.utils import get_current_admin_account, get_current_user_phone, is_authenticated, log_activity
 from config.validation import validate_positive_int
 
 
 def _pricing_unavailable():
     return jsonify({"ok": False, "error": "PRICING_NOT_CONFIGURED", "detail": "Supabase is not configured."}), 503
+
+
+def _admin_unlock_actor() -> tuple[str, str]:
+    account = get_current_admin_account() or {}
+    phone = str(
+        account.get("display_phone")
+        or account.get("storage_phone")
+        or get_current_user_phone()
+        or ""
+    ).strip()
+    name = str(account.get("full_name") or "").strip()
+    if not name:
+        name = phone or "Admin"
+    return name, phone
+
+
+def _record_unlock_audit(farmer_id: int, *, enabled: bool) -> dict:
+    name, phone = _admin_unlock_actor()
+    if enabled:
+        entry = record_self_sale_unlock(
+            farmer_id,
+            unlocked_by=name,
+            unlocked_by_phone=phone,
+            enabled=True,
+        )
+        log_activity(
+            phone or name,
+            "SELF_SALE_UNLOCKED",
+            f"Farmer #{farmer_id} Records unlocked by {name} (pricelist approved)",
+            request.remote_addr,
+        )
+        return entry
+    entry = record_self_sale_unlock(
+        farmer_id,
+        unlocked_by=name,
+        unlocked_by_phone=phone,
+        enabled=False,
+    )
+    log_activity(
+        phone or name,
+        "SELF_SALE_DISABLED",
+        f"Farmer #{farmer_id} self-sale disabled by {name}",
+        request.remote_addr,
+    )
+    return entry
 
 
 def _ensure_schema_once():
@@ -105,6 +151,7 @@ def register_pricing_routes(app):
         enabled = bool(data.get("enabled"))
         try:
             set_farmer_self_sale(farmer_id, enabled)
+            audit = _record_unlock_audit(farmer_id, enabled=enabled)
             return jsonify({
                 "ok": True,
                 "farmer_id": farmer_id,
@@ -113,9 +160,19 @@ def register_pricing_routes(app):
                 "pricelist_status": "approved" if enabled else None,
                 "records_module_enabled": bool(enabled),
                 "records_unlocked": bool(enabled),
+                "unlock_audit": audit,
+                "unlocked_by": audit.get("unlocked_by"),
+                "unlocked_at": audit.get("unlocked_at"),
             })
         except Exception as exc:
             return jsonify({"ok": False, "error": safe_error_message(exc, public="Could not update self-sale status.")}), 500
+
+    @app.route("/api/farmer-self-sale-audit/<int:farmer_id>", methods=["GET"])
+    def api_farmer_self_sale_audit(farmer_id: int):
+        if not is_authenticated():
+            return jsonify({"error": "Unauthorized"}), 401
+        audit = get_self_sale_unlock_audit(farmer_id) or {}
+        return jsonify({"ok": True, "farmer_id": farmer_id, "unlock_audit": audit})
 
     @app.route("/api/farmer-price-applications", methods=["GET"])
     def api_farmer_price_applications():
@@ -160,7 +217,12 @@ def register_pricing_routes(app):
             )
             if not saved:
                 return jsonify({"ok": False, "error": "Application not found."}), 404
-            return jsonify({"ok": True, "item": saved})
+            audit = None
+            if str(saved.get("status") or "").lower() == "approved":
+                fid = int(saved.get("farmer_id") or 0)
+                if fid > 0:
+                    audit = _record_unlock_audit(fid, enabled=True)
+            return jsonify({"ok": True, "item": saved, "unlock_audit": audit})
         except ValueError as exc:
             return jsonify({"ok": False, "error": str(exc)}), 400
         except Exception as exc:
@@ -168,6 +230,7 @@ def register_pricing_routes(app):
 
     @app.route("/api/app/coffee-pricelist", methods=["GET", "OPTIONS"])
     def api_app_coffee_pricelist():
+        # Shared official price source for Admin, Farmer portal, Mobile App, and Client Web.
         if request.method == "OPTIONS":
             return make_response("", 204)
         if not is_configured():
@@ -228,6 +291,17 @@ def register_pricing_routes(app):
         records_unlocked = bool(enabled) or (
             status_l == "active" and (not sell_path or pricelist_status in {None, "", "approved"})
         )
+        unlock_audit = get_self_sale_unlock_audit(farmer_id) or {}
+        unlock_message = ""
+        if isinstance(unlock_audit, dict) and unlock_audit:
+            by = unlock_audit.get("unlocked_by") or unlock_audit.get("unlocked_by_phone") or ""
+            at = unlock_audit.get("unlocked_at") or ""
+            if by and at:
+                unlock_message = f"Unlocked by {by} on {at}."
+            elif by:
+                unlock_message = f"Unlocked by {by}."
+            elif at:
+                unlock_message = f"Unlocked at {at}."
         return jsonify({
             "ok": True,
             "farmer_id": farmer_id,
@@ -237,6 +311,8 @@ def register_pricing_routes(app):
             "pricelist_status": pricelist_status,
             "records_module_enabled": records_unlocked,
             "records_unlocked": records_unlocked,
+            "unlock_audit": unlock_audit,
+            "unlock_message": unlock_message,
         })
 
     @app.route("/api/app/farmer-price-application", methods=["POST", "OPTIONS"])

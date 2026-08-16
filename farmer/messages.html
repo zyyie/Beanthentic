@@ -6,11 +6,13 @@
     <title>Beanthentic | Farmer Messages</title>
 
     <link rel="stylesheet" href="../css/base.css" />
+    <link rel="stylesheet" href="../css/motion.css" />
     <link rel="stylesheet" href="../css/layout.css" />
     <link rel="stylesheet" href="../css/components.css" />
     <link rel="stylesheet" href="../css/responsive.css" />
     <link rel="stylesheet" href="../css/messaging-module.css" />
     <link rel="stylesheet" href="../css/farmer-messaging.css" />
+    <link rel="stylesheet" href="../css/site-polish.css" />
 
     <link
       rel="stylesheet"
@@ -32,7 +34,11 @@
           </div>
         </div>
       </div>
-      <a class="farmer-messaging-header__logout" href="{{ url_for('farmer_logout') }}">Logout</a>
+      <nav class="farmer-portal-nav" aria-label="Farmer portal">
+        <a class="farmer-portal-nav__link" href="{{ url_for('farmer_home') }}">Home</a>
+        <a class="farmer-portal-nav__link is-active" href="{{ url_for('farmer_messages') }}">Messages</a>
+        <a class="farmer-messaging-header__logout" href="{{ url_for('farmer_logout') }}">Logout</a>
+      </nav>
     </header>
 
     <main class="farmer-messaging-main">
@@ -171,6 +177,18 @@
               </button>
             </div>
           </form>
+        </div>
+      </div>
+
+      <div class="farmer-confirm" id="farmerConfirmModal" hidden aria-hidden="true">
+        <div class="farmer-confirm__backdrop" tabindex="-1"></div>
+        <div class="farmer-confirm__card" role="alertdialog" aria-modal="true" aria-labelledby="farmerConfirmTitle">
+          <h2 id="farmerConfirmTitle">Delete Message</h2>
+          <p id="farmerConfirmMessage">Are you sure you want to delete this message permanently?</p>
+          <div class="farmer-confirm__actions">
+            <button type="button" class="farmer-confirm__btn" id="farmerConfirmCancel">Cancel</button>
+            <button type="button" class="farmer-confirm__btn farmer-confirm__btn--danger" id="farmerConfirmOk">Delete</button>
+          </div>
         </div>
       </div>
     </main>

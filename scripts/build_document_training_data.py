@@ -177,6 +177,27 @@ def _append_row(
     })
 
 
+def _guimaras_mango_body(task_id: str) -> str:
+    return f"""
+Republic of the Philippines — Geographical Indication Application
+Product: Guimaras Mangoes (Carabao mango variety)
+Territory: Guimaras Island, Western Visayas
+
+This filing documents the reputation, history, and quality of Guimaras mangoes.
+The fruit is known for its sweetness and export recognition. Production areas include
+Jordan, Nueva Valencia, and Buenavista. This is not a Kapeng Barako coffee filing.
+Upload zone tag: {task_id}.
+""".strip()
+
+
+def _tnalak_body() -> str:
+    return """
+Geographical Indication — T'nalak woven textile of Lake Sebu, South Cotabato.
+Cultural heritage, T'boli community, traditional abaca weaving patterns.
+Not related to coffee, Liberica, or Batangas Kapeng Barako.
+""".strip()
+
+
 def generate_extended_samples(analyzer: GIAnalyzer) -> list[dict]:
     """Additional variants to reach ~200 total training documents."""
     rows: list[dict] = []
@@ -209,6 +230,27 @@ def generate_extended_samples(analyzer: GIAnalyzer) -> list[dict]:
             score=15,
             source="hard_negative",
             notes=f"Non-Barako coffee brochure variant {i + 1}",
+        )
+
+    for task_id in analyzer.task_checklists.keys():
+        _append_row(
+            rows,
+            text=_guimaras_mango_body(task_id),
+            label="Not Ready",
+            score=0,
+            source="wrong_product_mango",
+            task_id=task_id,
+            notes=f"Guimaras mango GI — wrong product for {task_id}",
+        )
+
+    for i in range(3):
+        _append_row(
+            rows,
+            text=_tnalak_body() + f"\nVariant {i + 1}.",
+            label="Not Ready",
+            score=0,
+            source="wrong_product_tnalak",
+            notes=f"T'nalak textile GI variant {i + 1}",
         )
 
     extra_negatives = [
@@ -428,6 +470,24 @@ def build_dataset(target: int = 200) -> list[dict]:
             f"{official['training_rows']} training rows"
         )
         if rows:
+            analyzer = GIAnalyzer(str(ML_DIR))
+            # Merge Ready + Not Ready variants (not only hard negatives) for class balance.
+            extras = generate_extended_samples(analyzer)
+            extras.extend(generate_task_samples(analyzer))
+            extras.extend(HARD_NEGATIVES)
+            extras.extend(ingest_local_uploads(analyzer))
+            rows = dedupe_by_text(rows + extras)
+            print(f"Merged {len(extras)} extended samples (total before pad: {len(rows)})")
+            rows = _pad_to_target(rows, analyzer, max(target, len(rows)))
+            rows = dedupe_by_text(rows)
+            if len(rows) > target:
+                # Prefer keeping Ready examples when trimming to target.
+                ready_rows = [r for r in rows if r.get("label") == "Ready"]
+                not_ready_rows = [r for r in rows if r.get("label") != "Ready"]
+                keep_ready = min(len(ready_rows), max(40, target // 3))
+                keep_not_ready = max(0, target - keep_ready)
+                rows = ready_rows[:keep_ready] + not_ready_rows[:keep_not_ready]
+                rows = dedupe_by_text(rows)[:target]
             DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
             with open(DATA_PATH, "w", encoding="utf-8") as f:
                 json.dump(rows, f, indent=2, ensure_ascii=False)

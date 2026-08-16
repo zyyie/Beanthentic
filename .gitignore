@@ -33,7 +33,11 @@ data/password_reset_tokens.json
 data/otp_codes.json
 data/admin_notifications_feed.json
 data/profile_photos/
+data/admin_sqlalchemy.db
+data/self_sale_unlock_audit.json
 instance/
+.env
+.env.local
 
 # Jupyter / temp artifacts
 .ipynb_checkpoints/

@@ -1,0 +1,373 @@
+/* Beanthentic — shared motion system */
+
+/* ── Keyframes ─────────────────────────────────────────────── */
+
+@keyframes btFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes btFadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes btFadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes btScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes btSlideInTop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 12px));
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes btSlideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(calc(100% + 16px));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes btSlideOutTop {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 8px));
+  }
+}
+
+@keyframes btSlideOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(calc(100% + 16px));
+  }
+}
+
+@keyframes btModuleEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes btBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes btDialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes btRipple {
+  to {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+/* ── Dashboard module transitions ──────────────────────────── */
+
+.module:not(.hidden),
+.module.is-entering {
+  animation: btModuleEnter var(--motion-duration-normal) var(--motion-ease-emphasized) both;
+}
+
+.module-content {
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+/* ── Navigation & layout ───────────────────────────────────── */
+
+.side-panel {
+  transition:
+    transform var(--motion-duration-slow) var(--motion-ease-emphasized),
+    width var(--motion-duration-slow) var(--motion-ease-emphasized) !important;
+}
+
+.main-content {
+  transition: margin-left var(--motion-duration-slow) var(--motion-ease-emphasized) !important;
+}
+
+.nav-link {
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-standard),
+    color var(--motion-duration-fast) var(--motion-ease-standard),
+    transform var(--motion-duration-fast) var(--motion-ease-emphasized) !important;
+}
+
+.nav-link:hover {
+  transform: translateX(2px);
+}
+
+.nav-link.active,
+.side-nav .nav-link[aria-current="page"] {
+  transition:
+    background-color var(--motion-duration-normal) var(--motion-ease-standard),
+    color var(--motion-duration-normal) var(--motion-ease-standard),
+    box-shadow var(--motion-duration-normal) var(--motion-ease-standard) !important;
+}
+
+.nav-indicator {
+  transition: height var(--motion-duration-fast) var(--motion-ease-emphasized) !important;
+}
+
+/* ── Buttons & interactive controls ────────────────────────── */
+
+.btn-primary,
+.btn-secondary,
+.icon-action-btn,
+.header-icon-actions .icon-action-btn {
+  transition:
+    transform var(--motion-duration-fast) var(--motion-ease-emphasized),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-standard),
+    background-color var(--motion-duration-fast) var(--motion-ease-standard),
+    color var(--motion-duration-fast) var(--motion-ease-standard),
+    border-color var(--motion-duration-fast) var(--motion-ease-standard),
+    opacity var(--motion-duration-fast) var(--motion-ease-standard) !important;
+}
+
+.icon-action-btn:hover,
+.btn-primary:hover {
+  transform: scale(1.06);
+}
+
+.icon-action-btn:active,
+.btn-primary:active {
+  transform: scale(0.97);
+  transition-duration: var(--motion-duration-instant) !important;
+}
+
+/* Ripple effect (ui.js) */
+.btn-primary {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary .ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  transform: scale(0);
+  animation: btRipple 600ms var(--motion-ease-decelerate);
+  pointer-events: none;
+}
+
+/* ── Toasts / notifications ────────────────────────────────── */
+
+.notification {
+  cursor: pointer;
+  animation: btSlideInTop var(--motion-duration-normal) var(--motion-ease-emphasized) both;
+  will-change: transform, opacity;
+}
+
+.notification.notification--right {
+  animation: btSlideInRight var(--motion-duration-normal) var(--motion-ease-emphasized) both;
+}
+
+.notification.is-dismissed {
+  animation: btSlideOutTop var(--motion-duration-fast) var(--motion-ease-accelerate) forwards;
+  pointer-events: none;
+}
+
+.notification.notification--right.is-dismissed {
+  animation: btSlideOutRight var(--motion-duration-fast) var(--motion-ease-accelerate) forwards;
+}
+
+/* Legacy ui.js show class */
+.notification.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Confirm dialogs ───────────────────────────────────────── */
+
+.confirm-dialog:not([hidden]) {
+  animation: btFadeIn var(--motion-duration-fast) var(--motion-ease-standard) both;
+}
+
+.confirm-dialog:not([hidden]) .confirm-dialog__backdrop {
+  animation: btBackdropIn var(--motion-duration-normal) var(--motion-ease-decelerate) both;
+}
+
+.confirm-dialog:not([hidden]) .confirm-dialog__card {
+  animation: btDialogIn var(--motion-duration-normal) var(--motion-ease-emphasized) both;
+}
+
+/* ── IPOPHL & module modals ────────────────────────────────── */
+
+.modal.active {
+  animation: btFadeIn var(--motion-duration-fast) var(--motion-ease-standard) both;
+}
+
+.modal.active > .modal-content,
+.modal.active .modal-content {
+  animation: btDialogIn var(--motion-duration-normal) var(--motion-ease-emphasized) both;
+}
+
+#filePreviewModal.is-minimizing .modal-content.large {
+  transition:
+    transform var(--motion-duration-normal) var(--motion-ease-accelerate),
+    opacity var(--motion-duration-normal) var(--motion-ease-accelerate) !important;
+}
+
+#filePreviewModal.is-restoring .modal-content.large {
+  animation: btScaleIn var(--motion-duration-normal) var(--motion-ease-spring) forwards !important;
+}
+
+#filePreviewModal.is-minimized .modal-minimized-bar {
+  animation: btFadeInUp var(--motion-duration-normal) var(--motion-ease-spring) both !important;
+}
+
+.txn-receipt-card,
+.pricing-edit-modal__card,
+.modalScaleUp-target {
+  animation: btDialogIn var(--motion-duration-normal) var(--motion-ease-emphasized) both;
+}
+
+/* ── Cards & stat widgets ──────────────────────────────────── */
+
+.stat-card,
+.widget-card,
+.overview-stat-card,
+.farmer-card,
+.settings-card {
+  transition:
+    transform var(--motion-duration-fast) var(--motion-ease-emphasized),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-standard),
+    border-color var(--motion-duration-fast) var(--motion-ease-standard) !important;
+}
+
+.stat-card:hover,
+.widget-card:hover,
+.overview-stat-card:hover,
+.farmer-card:hover {
+  transform: translateY(-2px);
+}
+
+/* ── Landing / auth entrance animations ────────────────────── */
+
+.hero-card,
+.about-card {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity var(--motion-duration-slow) var(--motion-ease-emphasized),
+    transform var(--motion-duration-slow) var(--motion-ease-emphasized);
+}
+
+.hero-card.animate-in,
+.about-card.animate-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hero-slider-track {
+  transition: transform var(--motion-duration-slower) var(--motion-ease-emphasized) !important;
+}
+
+.hero-slider-dot {
+  transition:
+    width var(--motion-duration-normal) var(--motion-ease-emphasized),
+    background var(--motion-duration-normal) var(--motion-ease-standard),
+    border-color var(--motion-duration-fast) var(--motion-ease-standard) !important;
+}
+
+/* ── Form focus states ─────────────────────────────────────── */
+
+input,
+select,
+textarea,
+.input {
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-ease-standard),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-standard),
+    background-color var(--motion-duration-fast) var(--motion-ease-standard) !important;
+}
+
+/* ── Reduced motion ────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .module:not(.hidden) {
+    animation: none;
+  }
+
+  .hero-card,
+  .about-card {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .nav-link:hover {
+    transform: none;
+  }
+
+  .stat-card:hover,
+  .widget-card:hover,
+  .overview-stat-card:hover,
+  .farmer-card:hover {
+    transform: none;
+  }
+}

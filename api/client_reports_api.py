@@ -8,7 +8,7 @@ import json
 import os
 from pathlib import Path
 
-from flask import jsonify, request
+from flask import jsonify, make_response, request
 from pymysql.cursors import DictCursor
 
 from config.app_connection import (
@@ -25,7 +25,17 @@ from config.mysql_app_bridge import connect_app_db
 import beanthentic_env
 from config.utils import is_authenticated
 
-ALLOWED_STATUSES = {"under review", "blocked", "resolved", "dismissed", "open", "under_review"}
+ALLOWED_STATUSES = {
+    "under review",
+    "blocked",
+    "resolved",
+    "dismissed",
+    "open",
+    "under_review",
+    "closed",
+}
+
+STATUSES_REQUIRING_RESOLUTION_NOTE = frozenset({"closed", "resolved", "dismissed"})
 
 
 def _read_connection_settings() -> dict:
@@ -67,12 +77,42 @@ def _normalize_status(status: str) -> str:
     s = (status or "under review").strip().lower().replace("_", " ")
     if s == "open":
         return "under review"
+    if s in {"close", "closed", "done"}:
+        return "closed"
     return s
+
+
+def _extract_transaction_id(r: dict) -> int | None:
+    for key in ("customer_transaction_id", "transaction_id", "related_transaction_id"):
+        raw = r.get(key)
+        if raw is None or raw == "":
+            continue
+        try:
+            tid = int(raw)
+            if tid > 0:
+                return tid
+        except (TypeError, ValueError):
+            continue
+    chat = r.get("chat_json")
+    if isinstance(chat, dict):
+        return _extract_transaction_id(chat)
+    if isinstance(chat, str) and chat.strip():
+        try:
+            parsed = json.loads(chat)
+            if isinstance(parsed, dict):
+                return _extract_transaction_id(parsed)
+        except Exception:
+            pass
+    return None
 
 
 def _row_to_item(r: dict) -> dict:
     rid = int(r.get("report_id") or r.get("id") or 0)
     at = r.get("created_at")
+    farmer_id = int(r["farmer_id"]) if r.get("farmer_id") else None
+    farmer_no = r.get("farmer_no")
+    if farmer_no is None and farmer_id:
+        farmer_no = farmer_id
     return {
         "id": rid,
         "report_id": rid,
@@ -82,11 +122,36 @@ def _row_to_item(r: dict) -> dict:
         "reason_category": str(r.get("reason_category") or "").strip(),
         "reason_detail": str(r.get("reason_detail") or "").strip(),
         "allegation": str(r.get("allegation") or "").strip(),
-        "farmer_id": int(r["farmer_id"]) if r.get("farmer_id") else None,
-        "farmer_no": r.get("farmer_no"),
+        "farmer_id": farmer_id,
+        "farmer_no": farmer_no,
         "farmer_name": str(r.get("farmer_name") or "").strip() or "—",
         "status": _normalize_status(str(r.get("status") or "")),
+        "resolution_note": str(r.get("resolution_note") or "").strip(),
+        "customer_transaction_id": _extract_transaction_id(r),
     }
+
+
+def _ensure_report_extra_columns(conn) -> None:
+    """Add resolution_note / customer_transaction_id when missing."""
+    is_pg = beanthentic_env.is_postgresql()
+    alters = []
+    if is_pg:
+        alters = [
+            "ALTER TABLE client_misconduct_report ADD COLUMN IF NOT EXISTS resolution_note TEXT",
+            "ALTER TABLE client_misconduct_report ADD COLUMN IF NOT EXISTS customer_transaction_id BIGINT",
+        ]
+    else:
+        # MySQL lacks IF NOT EXISTS for columns — ignore duplicate errors.
+        alters = [
+            "ALTER TABLE client_misconduct_report ADD COLUMN resolution_note TEXT NULL",
+            "ALTER TABLE client_misconduct_report ADD COLUMN customer_transaction_id BIGINT UNSIGNED NULL",
+        ]
+    with conn.cursor() as cur:
+        for sql in alters:
+            try:
+                cur.execute(sql)
+            except Exception:
+                pass
 
 
 def _ensure_table(conn) -> None:
@@ -117,6 +182,7 @@ def _ensure_table(conn) -> None:
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_cmr_created ON client_misconduct_report (created_at)
             """)
+        _ensure_report_extra_columns(conn)
     else:
         with conn.cursor() as cur:
             cur.execute(
@@ -139,6 +205,7 @@ def _ensure_table(conn) -> None:
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                 """
             )
+        _ensure_report_extra_columns(conn)
 
 
 def _load_from_mysql(limit: int, status: str, q: str) -> list[dict]:
@@ -211,10 +278,13 @@ def load_admin_client_reports(limit: int = 500, status: str = "", q: str = "") -
     )
 
 
-def _update_report_via_http(report_id: int, status: str) -> dict:
+def _update_report_via_http(report_id: int, status: str, resolution_note: str = "") -> dict:
+    payload = {"report_id": report_id, "status": status}
+    if resolution_note:
+        payload["resolution_note"] = resolution_note
     data = app_http_patch_json(
         "/api/admin_client_reports.php",
-        {"report_id": report_id, "status": status},
+        payload,
     )
     if data.get("ok") is False:
         raise RuntimeError(str(data.get("detail") or data.get("error") or "HTTP update failed"))
@@ -224,17 +294,20 @@ def _update_report_via_http(report_id: int, status: str) -> dict:
     raise LookupError("Report not found")
 
 
-def update_report_status(report_id: int, status: str) -> dict:
+def update_report_status(report_id: int, status: str, resolution_note: str = "") -> dict:
     if report_id < 1:
         raise ValueError("Invalid report id")
     status = _normalize_status(status)
     if status not in ALLOWED_STATUSES:
         raise ValueError("Invalid status")
+    note = str(resolution_note or "").strip()
+    if status in STATUSES_REQUIRING_RESOLUTION_NOTE and not note:
+        raise ValueError("A resolution note is required before closing this report.")
 
     if beanthentic_env.uses_supabase_anon():
         from config.supabase_client_reports_load import update_client_report_status_via_rest
 
-        row = update_client_report_status_via_rest(report_id, status)
+        row = update_client_report_status_via_rest(report_id, status, resolution_note=note)
         return _row_to_item(row)
 
     def _mysql_update() -> dict:
@@ -249,10 +322,16 @@ def update_report_status(report_id: int, status: str) -> dict:
         try:
             _ensure_table(conn)
             with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE client_misconduct_report SET status = %s WHERE report_id = %s",
-                    (status, int(report_id)),
-                )
+                try:
+                    cur.execute(
+                        "UPDATE client_misconduct_report SET status = %s, resolution_note = %s WHERE report_id = %s",
+                        (status, note or None, int(report_id)),
+                    )
+                except Exception:
+                    cur.execute(
+                        "UPDATE client_misconduct_report SET status = %s WHERE report_id = %s",
+                        (status, int(report_id)),
+                    )
                 if cur.rowcount <= 0:
                     raise LookupError("Report not found")
                 cur.execute(
@@ -262,7 +341,10 @@ def update_report_status(report_id: int, status: str) -> dict:
                 row = cur.fetchone()
             if not row:
                 raise LookupError("Report not found")
-            return _row_to_item(row)
+            item = _row_to_item(row)
+            if note and not item.get("resolution_note"):
+                item["resolution_note"] = note
+            return item
         finally:
             conn.close()
 
@@ -272,7 +354,7 @@ def update_report_status(report_id: int, status: str) -> dict:
 
     if prefer_app_http_bridge() and app_server_base():
         try:
-            return _update_report_via_http(report_id, status)
+            return _update_report_via_http(report_id, status, note)
         except LookupError:
             raise
         except Exception:
@@ -294,7 +376,7 @@ def update_report_status(report_id: int, status: str) -> dict:
         except Exception as mysql_err:
             if app_server_base():
                 try:
-                    return _update_report_via_http(report_id, status)
+                    return _update_report_via_http(report_id, status, note)
                 except LookupError:
                     raise
                 except Exception as http_err:
@@ -310,7 +392,7 @@ def update_report_status(report_id: int, status: str) -> dict:
             ) from mysql_err
 
     if app_server_base():
-        return _update_report_via_http(report_id, status)
+        return _update_report_via_http(report_id, status, note)
     raise RuntimeError("app_db_host or app_server_base required in settings.json")
 
 
@@ -336,10 +418,11 @@ def register_client_reports_routes(app) -> None:
             return jsonify({"error": "Unauthorized"}), 401
         payload = request.get_json(silent=True) or {}
         status = str(payload.get("status") or "").strip()
+        note = str(payload.get("resolution_note") or payload.get("note") or "").strip()
         if not status:
             return jsonify({"error": "status is required"}), 400
         try:
-            item = update_report_status(report_id, status)
+            item = update_report_status(report_id, status, resolution_note=note)
             return jsonify({"success": True, "item": item})
         except LookupError:
             return jsonify({"error": "Not found"}), 404
@@ -347,3 +430,82 @@ def register_client_reports_routes(app) -> None:
             return jsonify({"error": str(e)}), 400
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/app/misconduct-report-status", methods=["GET", "OPTIONS"])
+    def api_app_misconduct_report_status():
+        """Client Web status lookup by report_id and/or reporter_email / reporter_phone."""
+        if request.method == "OPTIONS":
+            return make_response("", 204)
+
+        report_id_raw = str(request.args.get("report_id") or "").strip()
+        reporter_email = str(request.args.get("reporter_email") or "").strip().lower()
+        reporter_phone = str(
+            request.args.get("reporter_phone") or request.args.get("reporter_contact") or ""
+        ).strip()
+
+        report_id = 0
+        if report_id_raw:
+            try:
+                report_id = int(report_id_raw)
+            except (TypeError, ValueError):
+                return jsonify({"ok": False, "error": "Invalid report_id"}), 400
+
+        if report_id < 1 and not reporter_email and not reporter_phone:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Provide report_id and/or reporter_email / reporter_phone",
+                }
+            ), 400
+
+        try:
+            items, source = load_admin_client_reports(limit=500, status="", q="")
+        except Exception as e:
+            payload = load_error_payload("CLIENT_REPORTS_LOAD_FAILED", str(e))
+            return jsonify(payload), 503
+
+        def _phone_tail(val: str) -> str:
+            import re
+
+            d = re.sub(r"\D", "", str(val or ""))
+            if d.startswith("0"):
+                d = d[1:]
+            if d.startswith("63"):
+                d = d[2:]
+            return d[-10:] if len(d) >= 10 else d
+
+        want_phone = _phone_tail(reporter_phone) if reporter_phone else ""
+        matches = []
+        for item in items:
+            if report_id > 0 and int(item.get("report_id") or item.get("id") or 0) != report_id:
+                continue
+            contact = str(item.get("reporter_contact") or "").strip()
+            contact_l = contact.lower()
+            if reporter_email and reporter_email not in contact_l:
+                continue
+            if want_phone and _phone_tail(contact) != want_phone:
+                continue
+            matches.append(
+                {
+                    "report_id": item.get("report_id") or item.get("id"),
+                    "status": item.get("status"),
+                    "resolution_note": item.get("resolution_note") or "",
+                    "created_at": item.get("created_at"),
+                    "reason_category": item.get("reason_category") or "",
+                }
+            )
+
+        if report_id > 0 and not matches:
+            return jsonify({"ok": False, "error": "Report not found", "items": []}), 404
+
+        primary = matches[0] if matches else None
+        return jsonify(
+            {
+                "ok": True,
+                "source": source,
+                "item": primary,
+                "items": matches,
+                "status": (primary or {}).get("status"),
+                "resolution_note": (primary or {}).get("resolution_note") or "",
+            }
+        )

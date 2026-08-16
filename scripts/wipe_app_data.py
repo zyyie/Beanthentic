@@ -5,7 +5,6 @@ Keeps:
   - data/users.json (admin accounts)
   - settings / .env
   - ML models and official training baselines
-  - Farmer training CSV in machinelearning/uploads/
 
 Usage (from project root):
   python scripts/wipe_app_data.py --yes
@@ -23,9 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 ML_UPLOADS = ROOT / "machinelearning" / "uploads"
 GI_UPLOADS = ROOT / "uploads" / "gi_contributions"
-KEEP_ML_NAMES = {
-    "beanthentic_synthetic_dataset_1000 (1).csv",
-}
+KEEP_ML_NAMES = set()
 
 
 def _write_json(path: Path, payload: object) -> None:

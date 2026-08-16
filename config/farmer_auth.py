@@ -4,7 +4,7 @@ Farmer portal: verify phones and update passwords in Beanthentic-App MySQL.
 
 from __future__ import annotations
 
-from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from config.app_connection import app_db_params
 from config.mysql_app_bridge import connect_app_db
@@ -148,6 +148,42 @@ def update_farmer_password(user_id: int, new_password: str) -> tuple[bool, str |
     if user_id <= 0:
         return False, "Invalid farmer account."
 
+    pwd_hash = generate_password_hash(new_password)
+
+    if beanthentic_env.uses_supabase_anon():
+        try:
+            from config.supabase_client import get_client
+
+            client = get_client()
+            # Prefer password_hash; fall back to password if that is what select uses.
+            for col in ("password_hash", "password"):
+                try:
+                    resp = (
+                        client.table("users")
+                        .update({col: pwd_hash})
+                        .eq("user_id", user_id)
+                        .execute()
+                    )
+                    rows = resp.data if isinstance(getattr(resp, "data", None), list) else []
+                    if rows:
+                        return True, None
+                    # Some PostgREST setups return empty data on update; verify by re-read.
+                    check = (
+                        client.table("users")
+                        .select(col)
+                        .eq("user_id", user_id)
+                        .limit(1)
+                        .execute()
+                        .data
+                        or []
+                    )
+                    if check and str(check[0].get(col) or "") == pwd_hash:
+                        return True, None
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
     if beanthentic_env.is_postgresql():
         conn = connect_app_db({})
     else:
@@ -156,7 +192,6 @@ def update_farmer_password(user_id: int, new_password: str) -> tuple[bool, str |
             return False, "Database is not configured."
         conn = connect_app_db(params)
 
-    pwd_hash = generate_password_hash(new_password)
     try:
         col = _find_password_column(conn)
         if not col:
@@ -176,3 +211,139 @@ def update_farmer_password(user_id: int, new_password: str) -> tuple[bool, str |
     finally:
         if conn:
             conn.close()
+
+
+def _password_hash_for_user(user_id: int) -> str | None:
+    if user_id <= 0:
+        return None
+    if beanthentic_env.uses_supabase_anon():
+        try:
+            from config.supabase_client import get_client
+
+            rows = (
+                get_client()
+                .table("users")
+                .select("password_hash,password")
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+            if not rows:
+                return None
+            return str(rows[0].get("password_hash") or rows[0].get("password") or "").strip() or None
+        except Exception:
+            pass
+
+    if beanthentic_env.is_postgresql():
+        conn = connect_app_db({})
+    else:
+        params = app_db_params()
+        if not params:
+            return None
+        conn = connect_app_db(params)
+    try:
+        col = _find_password_column(conn)
+        if not col:
+            return None
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT `{col}` AS pwd FROM users WHERE user_id = %s LIMIT 1", (user_id,))
+            row = cur.fetchone()
+        if not row:
+            return None
+        return str(row.get("pwd") or "").strip() or None
+    except Exception:
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+
+def _farmer_display_name(farmer: dict) -> str:
+    fid = int(farmer.get("farmer_id") or 0)
+    digits = str(farmer.get("digits10") or "")
+    fallback = f"Farmer +63{digits}" if digits else "Farmer"
+
+    if beanthentic_env.uses_supabase_anon() and fid:
+        try:
+            from config.supabase_client import get_client
+
+            rows = (
+                get_client()
+                .table("personal_information")
+                .select("first_name,last_name")
+                .eq("farmer_id", fid)
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+            if rows:
+                name = f"{rows[0].get('first_name') or ''} {rows[0].get('last_name') or ''}".strip()
+                if name:
+                    return name
+        except Exception:
+            pass
+        return fallback
+
+    if not fid:
+        return fallback
+    if beanthentic_env.is_postgresql():
+        conn = connect_app_db({})
+    else:
+        params = app_db_params()
+        if not params:
+            return fallback
+        conn = connect_app_db(params)
+    try:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(
+                    "SELECT first_name, last_name FROM personal_information WHERE farmer_id = %s LIMIT 1",
+                    (fid,),
+                )
+                row = cur.fetchone()
+                if row:
+                    name = f"{row.get('first_name') or ''} {row.get('last_name') or ''}".strip()
+                    if name:
+                        return name
+            except Exception:
+                try:
+                    cur.execute(
+                        "SELECT first_name, last_name FROM personal_info WHERE farmer_id = %s LIMIT 1",
+                        (fid,),
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        name = f"{row.get('first_name') or ''} {row.get('last_name') or ''}".strip()
+                        if name:
+                            return name
+                except Exception:
+                    pass
+        return fallback
+    except Exception:
+        return fallback
+    finally:
+        if conn:
+            conn.close()
+
+
+def authenticate_farmer(phone: str, password: str) -> tuple[dict | None, str | None]:
+    """Verify registered farmer phone + password. Name comes from the farmer record."""
+    farmer, err = lookup_farmer_by_phone(phone)
+    if not farmer:
+        return None, err or "Phone number is not registered."
+    if not str(password or "").strip():
+        return None, "Enter your password."
+    stored = _password_hash_for_user(int(farmer.get("user_id") or 0))
+    if not stored:
+        return None, "No password is set yet. Use Forgot password to create one."
+    try:
+        ok = check_password_hash(stored, password)
+    except Exception:
+        ok = False
+    if not ok:
+        return None, "Incorrect phone number or password."
+    farmer["display_name"] = _farmer_display_name(farmer)
+    return farmer, None

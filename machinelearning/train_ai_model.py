@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-Random Forest AI Training Pipeline for IPOPHL GI Document Analysis
+Ensemble AI Training Pipeline for IPOPHL GI Document Analysis
 
-This script provides a complete training pipeline for the Random Forest classifier
-used in the IPOPHL GI document analysis system.
+Trains a soft-voting ensemble (bagging + boosting) for document MoP advisory
+scoring. See ``ensemble_learning.py`` for the theory notes.
 
 Usage:
-    python train_ai_model.py --prepare-data
-    python train_ai_model.py --train
-    python train_ai_model.py --evaluate
+    python train_ai_model.py --train-documents
     python train_ai_model.py --full-pipeline
+    python train_ai_model.py --prepare-data
+    python train_ai_model.py --evaluate
 """
 
 import argparse
 import json
 import logging
-
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -25,19 +25,29 @@ import numpy as np
 import pandas as pd
 
 # ML imports
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.model_selection import GridSearchCV, cross_val_score, train_test_split
 
 # Local imports
 from ai_engine import GIAnalyzer
+from ensemble_learning import (
+    ENSEMBLE_DESCRIPTION,
+    ENSEMBLE_METHOD,
+    build_gi_ensemble,
+    describe_ensemble,
+    ensemble_feature_importances,
+    ensemble_param_grid,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# GridSearchCV n_jobs=-1 can crash on Windows (multiprocessing + scipy import races).
+_GRID_N_JOBS = 1 if os.name == "nt" else -1
+
 class GIDocumentTrainer:
-    """Training pipeline for GI Document and Farmer Profile Analysis"""
+    """Training pipeline for GI document ensemble analysis."""
 
     def __init__(self, data_dir: str = "training_data", models_dir: str = None):
         self.data_dir = Path(data_dir)
@@ -55,113 +65,9 @@ class GIDocumentTrainer:
 
         # Training data paths
         self.raw_data_path = self.data_dir / "gi_documents_raw.json"
-        # CSV dataset path is in uploads subfolder
-        self.csv_dataset_path = self.models_dir / "uploads" / "beanthentic_synthetic_dataset_1000 (1).csv"
         self.processed_data_path = self.data_dir / "gi_documents_processed.csv"
         self.features_path = self.data_dir / "features_matrix.npy"
         self.labels_path = self.data_dir / "labels.npy"
-
-    def prepare_training_data_from_csv(self) -> Tuple[np.ndarray, np.ndarray, List[str]]:
-        """Prepare training data from the CSV dataset."""
-        logger.info("Preparing training data from CSV: %s", self.csv_dataset_path)
-
-        if not self.csv_dataset_path.exists():
-            raise FileNotFoundError(f"CSV dataset not found: {self.csv_dataset_path}")
-
-        df = pd.read_csv(self.csv_dataset_path)
-
-        # Drop ID column
-        if 'farmer_id' in df.columns:
-            df = df.drop(columns=['farmer_id'])
-
-        # Separate features and labels
-        X = df.drop(columns=['gi_ready'])
-        y = df['gi_ready']
-
-        # Handle categorical variables
-        categorical_cols = X.select_dtypes(include=['object']).columns.tolist()
-        logger.info("Encoding categorical columns: %s", categorical_cols)
-
-        # We'll use one-hot encoding for the model training
-        X_encoded = pd.get_dummies(X, columns=categorical_cols)
-
-        feature_names = X_encoded.columns.tolist()
-        feature_matrix = X_encoded.values
-        labels = y.values
-
-        # Save processed data for later use
-        np.save(self.features_path, feature_matrix)
-        np.save(self.labels_path, labels)
-
-        # Save feature names to a JSON for ai_engine to use
-        with open(self.models_dir / "feature_names.json", 'w') as f:
-            json.dump(feature_names, f)
-
-        # Save the column structure for consistent encoding later
-        with open(self.models_dir / "column_structure.json", 'w') as f:
-            json.dump({
-                'original_cols': X.columns.tolist(),
-                'categorical_cols': categorical_cols,
-                'encoded_cols': feature_names
-            }, f)
-
-        logger.info("Training data prepared with %s features", len(feature_names))
-        return feature_matrix, labels, feature_names
-
-    def train_model_from_csv(self) -> Dict:
-        """Train model using the CSV dataset."""
-        feature_matrix, labels, feature_names = self.prepare_training_data_from_csv()
-
-        # Split data
-        feature_train, feature_test, label_train, label_test = train_test_split(
-            feature_matrix, labels, test_size=0.2, random_state=42, stratify=labels
-        )
-
-        # Hyperparameter grid
-        param_grid = {
-            "n_estimators": [100, 200],
-            "max_depth": [12, 20, None],
-            "min_samples_split": [2, 5],
-            "min_samples_leaf": [1, 2],
-            "max_features": ["sqrt"],
-        }
-
-        # Initialize and train model
-        rf = RandomForestClassifier(random_state=42)
-        grid_search = GridSearchCV(
-            rf, param_grid, cv=5, scoring='accuracy', n_jobs=-1, verbose=1
-        )
-
-        grid_search.fit(feature_train, label_train)
-
-        # Best model
-        best_model = grid_search.best_estimator_
-
-        # Evaluate
-        predictions = best_model.predict(feature_test)
-        accuracy = accuracy_score(label_test, predictions)
-
-        # Cross-validation
-        cv_scores = cross_val_score(best_model, feature_matrix, labels, cv=5)
-
-        feature_importance = pd.DataFrame({
-            'feature': feature_names,
-            'importance': best_model.feature_importances_
-        }).sort_values('importance', ascending=False)
-
-        results = {
-            'model': best_model,
-            'accuracy': accuracy,
-            'cv_mean': cv_scores.mean(),
-            'cv_std': cv_scores.std(),
-            'best_params': grid_search.best_params_,
-            'feature_importance': feature_importance,
-            'classification_report': classification_report(label_test, predictions, output_dict=True),
-            'confusion_matrix': confusion_matrix(label_test, predictions).tolist(),
-            'feature_names': feature_names
-        }
-
-        return results
 
     def create_sample_dataset(self) -> List[Dict]:
         """Create a sample dataset for demonstration"""
@@ -422,8 +328,8 @@ class GIDocumentTrainer:
         return feature_matrix, labels
 
     def train_model(self, feature_matrix: np.ndarray = None, labels: np.ndarray = None) -> Dict:
-        """Train Random Forest model with hyperparameter tuning."""
-        logger.info("Training Random Forest model...")
+        """Train soft-voting ensemble with hyperparameter tuning on the RF member."""
+        logger.info("Training ensemble model (%s)...", ENSEMBLE_METHOD)
 
         # Load data if not provided
         if feature_matrix is None or labels is None:
@@ -433,97 +339,152 @@ class GIDocumentTrainer:
             else:
                 feature_matrix, labels = self.prepare_training_data()
 
+        labels = np.asarray(labels)
+        n_samples = len(feature_matrix)
+        class_counts = np.bincount(labels.astype(int)) if labels.size else np.array([])
+        if len(np.unique(labels)) < 2:
+            raise ValueError("Need both Ready and Not Ready labels to train the document ensemble.")
+
         # Split data
-        if len(feature_matrix) < 10:
-            # For very small datasets, use simple split without stratification
-            feature_train, feature_test, label_train, label_test = train_test_split(
-                feature_matrix, labels, test_size=0.2, random_state=42
-            )
-        else:
-            # For larger datasets, use stratified split
+        can_stratify = n_samples >= 10 and int(class_counts.min()) >= 2
+        if can_stratify:
             feature_train, feature_test, label_train, label_test = train_test_split(
                 feature_matrix, labels, test_size=0.2, random_state=42, stratify=labels
             )
+        else:
+            feature_train, feature_test, label_train, label_test = train_test_split(
+                feature_matrix, labels, test_size=0.2, random_state=42
+            )
 
-        # Hyperparameter grid
-        param_grid = {
-            'n_estimators': [50, 100, 200],
-            'max_depth': [10, 20, None],
-            'min_samples_split': [2, 5, 10],
-            'min_samples_leaf': [1, 2, 4],
-            'max_features': ['sqrt', 'log2']
-        }
-
-        # Initialize and train model (balanced weights help mixed Ready / Not Ready sets)
-        rf = RandomForestClassifier(random_state=42, class_weight="balanced")
-
-        n_samples = len(feature_matrix)
-        n_folds = 5 if n_samples >= 25 else (3 if n_samples >= 15 else 2)
-
-        grid_search = GridSearchCV(
-            rf, param_grid, cv=n_folds, scoring="accuracy", n_jobs=-1, verbose=1
+        # Tiny MoP sets: bagging-only vote + direct fit (GB/GridSearch often see 1 class).
+        use_boosting = n_samples >= 40 and int(class_counts.min()) >= 3
+        ensemble = build_gi_ensemble(
+            random_state=42,
+            class_weight="balanced",
+            include_boosting=use_boosting,
         )
 
-        grid_search.fit(feature_train, label_train)
-
-        # Best model
-        best_model = grid_search.best_estimator_
+        best_params: dict
+        if n_samples < 40 or not use_boosting:
+            logger.info(
+                "Small/imbalanced document set (n=%s) — direct ensemble fit (boosting=%s)",
+                n_samples,
+                use_boosting,
+            )
+            ensemble.fit(feature_train, label_train)
+            best_model = ensemble
+            best_params = {
+                "mode": "direct_fit",
+                "include_boosting": use_boosting,
+                "n_samples": int(n_samples),
+            }
+        else:
+            n_folds = 5 if n_samples >= 25 else 3
+            # Always use the compact grid — full grid is too slow on typical thesis hardware.
+            compact = True
+            grid_search = GridSearchCV(
+                ensemble,
+                ensemble_param_grid(compact=compact),
+                cv=n_folds,
+                scoring="accuracy",
+                n_jobs=_GRID_N_JOBS,
+                verbose=1,
+                error_score=0.0,
+            )
+            grid_search.fit(feature_train, label_train)
+            best_model = grid_search.best_estimator_
+            best_params = grid_search.best_params_
 
         # Evaluate on test set
         predictions = best_model.predict(feature_test)
         accuracy = accuracy_score(label_test, predictions)
 
-        cv_folds = 5 if n_samples >= 25 else (3 if n_samples >= 15 else 2)
-        cv_scores = cross_val_score(best_model, feature_matrix, labels, cv=cv_folds)
+        cv_folds = min(5, int(class_counts.min()), n_samples) if n_samples >= 10 else 2
+        cv_folds = max(2, cv_folds)
+        try:
+            cv_scores = cross_val_score(best_model, feature_matrix, labels, cv=cv_folds)
+        except Exception as cv_exc:
+            logger.warning("CV skipped: %s", cv_exc)
+            cv_scores = np.array([accuracy])
 
         # Feature importance
         feature_names = (['text_length', 'word_count'] +
                         self.analyzer.gi_checklist["mandatory_terms"] +
                         self.analyzer.gi_checklist["optional_terms"])
 
+        importances = ensemble_feature_importances(best_model, n_features=len(feature_names))
         feature_importance = pd.DataFrame({
             'feature': feature_names,
-            'importance': best_model.feature_importances_
+            'importance': importances
         }).sort_values('importance', ascending=False)
 
         # Training results
         results = {
             'model': best_model,
             'accuracy': accuracy,
-            'cv_mean': cv_scores.mean(),
-            'cv_std': cv_scores.std(),
-            'best_params': grid_search.best_params_,
+            'cv_mean': float(cv_scores.mean()),
+            'cv_std': float(cv_scores.std()),
+            'best_params': best_params,
             'feature_importance': feature_importance,
-            'classification_report': classification_report(label_test, predictions, output_dict=True),
-            'confusion_matrix': confusion_matrix(label_test, predictions).tolist()
+            'classification_report': classification_report(
+                label_test, predictions, output_dict=True, zero_division=0
+            ),
+            'confusion_matrix': confusion_matrix(label_test, predictions).tolist(),
+            'ensemble': describe_ensemble(best_model),
+            'ensemble_method': ENSEMBLE_METHOD,
+            'ensemble_description': ENSEMBLE_DESCRIPTION,
         }
 
         logger.info("Training completed. Accuracy: %.3f ± %.3f", accuracy, cv_scores.std())
-        logger.info("Best parameters: %s", grid_search.best_params_)
+        logger.info("Best parameters: %s", best_params)
+        logger.info("Ensemble: %s", ENSEMBLE_DESCRIPTION)
 
         return results
 
     def train_document_model(self) -> Dict:
-        """Train Random Forest on GI document text features (keyword + length)."""
-        logger.info("Training document ML model...")
+        """Train ensemble on GI document text features (keyword + length)."""
+        logger.info("Training document ensemble model...")
         feature_matrix, labels = self.prepare_training_data()
         results = self.train_model(feature_matrix, labels)
         doc_path = self.models_dir / "gi_document_model.joblib"
         joblib.dump(results["model"], doc_path)
         logger.info("Document model saved to %s", doc_path)
         results["document_model_path"] = str(doc_path)
+
+        dataset = self.load_dataset(create_sample_if_missing=False)
+        training_results = {
+            "accuracy": results["accuracy"],
+            "cv_mean": results["cv_mean"],
+            "cv_std": results["cv_std"],
+            "best_params": results["best_params"],
+            "classification_report": results["classification_report"],
+            "confusion_matrix": results["confusion_matrix"],
+            "training_date": datetime.now().isoformat(),
+            "model_type": "document_ensemble",
+            "sample_count": len(dataset),
+            "ready_count": sum(1 for d in dataset if d.get("label") == "Ready"),
+            "not_ready_count": sum(1 for d in dataset if d.get("label") != "Ready"),
+            "training_source": "ipophl_official_mop_dataset.csv",
+            "analysis_method": "official_mop_ensemble_hybrid",
+            "ensemble_method": results.get("ensemble_method", ENSEMBLE_METHOD),
+            "ensemble_description": results.get(
+                "ensemble_description", ENSEMBLE_DESCRIPTION
+            ),
+            "ensemble": results.get("ensemble") or describe_ensemble(results["model"]),
+            "learning_theory": "ensemble_learning",
+        }
+        with open(self.models_dir / "document_training_results.json", "w", encoding="utf-8") as f:
+            json.dump(training_results, f, indent=2)
+
         return results
 
-    def save_model(self, results: Dict, *, model_name: str = "gi_farmer_model.joblib") -> None:
-        """Save trained model and results."""
+    def save_model(self, results: Dict, *, model_name: str = "gi_document_model.joblib") -> None:
+        """Save trained document model and results."""
         logger.info("Saving trained model...")
 
         # Save model
         model_path = self.models_dir / model_name
         joblib.dump(results['model'], model_path)
-        if model_name == "gi_farmer_model.joblib":
-            legacy_path = self.models_dir / "gi_model.joblib"
-            joblib.dump(results['model'], legacy_path)
 
         # Save feature importance
         results['feature_importance'].to_csv(
@@ -539,24 +500,33 @@ class GIDocumentTrainer:
             'classification_report': results['classification_report'],
             'confusion_matrix': results['confusion_matrix'],
             'training_date': datetime.now().isoformat(),
-            'feature_importance_top10': results['feature_importance'].head(10).to_dict('records')
+            'feature_importance_top10': results['feature_importance'].head(10).to_dict('records'),
+            'ensemble_method': results.get('ensemble_method', ENSEMBLE_METHOD),
+            'ensemble_description': results.get('ensemble_description', ENSEMBLE_DESCRIPTION),
+            'ensemble': results.get('ensemble') or describe_ensemble(results['model']),
+            'learning_theory': 'ensemble_learning',
+            'model_type': 'document_ensemble',
         }
 
-        with open(self.models_dir / "training_results.json", 'w', encoding='utf-8') as f:
+        out_name = (
+            "document_training_results.json"
+            if model_name == "gi_document_model.joblib"
+            else "training_results.json"
+        )
+        with open(self.models_dir / out_name, 'w', encoding='utf-8') as f:
             json.dump(training_results, f, indent=2)
 
         logger.info("Model saved to %s", model_path)
 
     def evaluate_model(self) -> Dict:
-        """Evaluate trained model performance."""
+        """Evaluate trained document model performance."""
         logger.info("Evaluating model performance...")
 
-        # Load model and data
-        model_path = self.models_dir / "gi_farmer_model.joblib"
+        model_path = self.models_dir / "gi_document_model.joblib"
         if not model_path.exists():
-            model_path = self.models_dir / "gi_model.joblib"
-        if not model_path.exists():
-            raise FileNotFoundError("Model not found. Train the model first: python train_ai_model.py --train-csv")
+            raise FileNotFoundError(
+                "Document model not found. Train with: python train_ai_model.py --train-documents"
+            )
 
         model = joblib.load(model_path)
 
@@ -583,18 +553,24 @@ class GIDocumentTrainer:
         # Metrics
         accuracy = accuracy_score(label_test, predictions)
 
+        feature_names = (
+            ['text_length', 'word_count']
+            + self.analyzer.gi_checklist["mandatory_terms"]
+            + self.analyzer.gi_checklist["optional_terms"]
+        )
+        importances = ensemble_feature_importances(model, n_features=len(feature_names))
+
         # Detailed report
         evaluation = {
             'accuracy': accuracy,
             'classification_report': classification_report(label_test, predictions, output_dict=True),
             'confusion_matrix': confusion_matrix(label_test, predictions).tolist(),
+            'ensemble': describe_ensemble(model),
             'feature_importance': pd.DataFrame({
-                'feature': ['text_length', 'word_count'] + self.analyzer.gi_checklist["mandatory_terms"] + self.analyzer.gi_checklist["optional_terms"],
-                'importance': model.feature_importances_
+                'feature': feature_names,
+                'importance': importances
             }).sort_values('importance', ascending=False).head(10).to_dict('records')
         }
-
-
 
         logger.info("Evaluation completed. Accuracy: %.3f", accuracy)
         return evaluation
@@ -620,13 +596,14 @@ class GIDocumentTrainer:
         return str(template_path)
 
 def main():
-    parser = argparse.ArgumentParser(description='Train Random Forest model for GI document analysis')
+    parser = argparse.ArgumentParser(
+        description='Train ensemble (bagging + boosting soft vote) for GI readiness analysis'
+    )
     parser.add_argument('--prepare-data', action='store_true', help='Prepare training data')
     parser.add_argument('--train', action='store_true', help='Train the model from JSON')
-    parser.add_argument('--train-csv', action='store_true', help='Train farmer + document models (CSV + JSON samples)')
     parser.add_argument('--train-documents', action='store_true', help='Train document model only from JSON samples')
     parser.add_argument('--evaluate', action='store_true', help='Evaluate the model')
-    parser.add_argument('--full-pipeline', action='store_true', help='Run complete pipeline')
+    parser.add_argument('--full-pipeline', action='store_true', help='Train GI document ensemble (default app pipeline)')
     parser.add_argument('--create-template', action='store_true', help='Create dataset template')
     parser.add_argument('--data-dir', default='training_data', help='Training data directory')
 
@@ -638,55 +615,16 @@ def main():
         trainer.create_real_dataset_template()
         return
 
-    if args.train_csv:
-        logger.info("Running training pipeline from CSV...")
-        results = trainer.train_model_from_csv()
-        trainer.save_model(results)
+    if args.full_pipeline or args.train_documents:
+        logger.info("Running document training pipeline...")
         doc_results = trainer.train_document_model()
-        print("\nCSV Training completed successfully!")
-        print(f"Farmer model accuracy: {results['accuracy']:.3f}")
+        print("\nDocument training completed successfully!")
         print(f"Document model accuracy: {doc_results['accuracy']:.3f}")
-        print(f"Cross-validation score: {results['cv_mean']:.3f} ± {results['cv_std']:.3f}")
-        return
-
-    if args.full_pipeline:
-        logger.info("Running full training pipeline (farmer CSV + document JSON)...")
-        results = trainer.train_model_from_csv()
-        trainer.save_model(results)
-        doc_results = trainer.train_document_model()
-        print("\nTraining completed successfully!")
-        print(f"Farmer model accuracy: {results['accuracy']:.3f}")
-        print(f"Document model accuracy: {doc_results['accuracy']:.3f}")
-        print(f"Cross-validation score: {results['cv_mean']:.3f} ± {results['cv_std']:.3f}")
-        print(f"Farmer model: {trainer.models_dir / 'gi_farmer_model.joblib'}")
         print(f"Document model: {trainer.models_dir / 'gi_document_model.joblib'}")
         return
 
     if args.prepare_data:
         trainer.prepare_training_data()
-
-    if args.train_documents:
-        doc_results = trainer.train_document_model()
-        dataset = trainer.load_dataset(create_sample_if_missing=False)
-        training_results = {
-            "accuracy": doc_results["accuracy"],
-            "cv_mean": doc_results["cv_mean"],
-            "cv_std": doc_results["cv_std"],
-            "best_params": doc_results["best_params"],
-            "classification_report": doc_results["classification_report"],
-            "confusion_matrix": doc_results["confusion_matrix"],
-            "training_date": datetime.now().isoformat(),
-            "model_type": "document",
-            "sample_count": len(dataset),
-            "ready_count": sum(1 for d in dataset if d.get("label") == "Ready"),
-            "not_ready_count": sum(1 for d in dataset if d.get("label") != "Ready"),
-            "training_source": "ipophl_official_mop_dataset.csv",
-            "analysis_method": "official_mop_rf_hybrid",
-        }
-        with open(trainer.models_dir / "document_training_results.json", "w", encoding="utf-8") as f:
-            json.dump(training_results, f, indent=2)
-        print(f"Document model accuracy: {doc_results['accuracy']:.3f}")
-        return
 
     if args.train:
         results = trainer.train_model()

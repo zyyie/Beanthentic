@@ -75,6 +75,33 @@ def _is_db_error(exc: BaseException) -> bool:
     )
 
 
+def _supersede_prior_uploads(*, file_uuid: str, task_id: str, original_filename: str) -> None:
+    """Remove older records with the same task + filename so analysis matches latest upload."""
+    from config.ipophl_store import list_documents
+
+    task_id = normalize_ipophl_task_id(task_id)
+    norm_name = secure_filename((original_filename or "").strip()) or (original_filename or "").strip()
+    if not task_id or not norm_name:
+        return
+
+    for record in list_documents(task_id=task_id, limit=100):
+        old_uuid = str(record.get("file_uuid") or "").strip()
+        if not old_uuid or old_uuid == file_uuid:
+            continue
+        old_name = secure_filename(
+            str(record.get("original_filename") or record.get("filename") or "").strip()
+        )
+        if old_name != norm_name:
+            continue
+        old_path = str(record.get("file_path") or "").strip()
+        if old_path and os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except OSError:
+                pass
+        _delete_document_record(old_uuid)
+
+
 def _ingest_ipophl_upload(file, *, task_id: str, ipophl_phase: str | None = None) -> str:
     """
     Save one IPOPHL file to disk + JSON (same as /api/ipo-analyze).
@@ -164,6 +191,11 @@ def _ingest_ipophl_upload(file, *, task_id: str, ipophl_phase: str | None = None
     doc_analysis.ip_pillar_assessment = ipa if isinstance(ipa, dict) else None
 
     _persist_document(doc_analysis, is_new=existing_record is None)
+    _supersede_prior_uploads(
+        file_uuid=file_uuid,
+        task_id=task_id,
+        original_filename=stored_display_name,
+    )
     return file_uuid
 
 

@@ -154,10 +154,10 @@ pip install -r config/requirements.txt
 
 If analysis always shows **0%** and `analysis_method` is `rule_based`, the Python environment is missing ML libraries (`scikit-learn`, `python-docx`, etc.). Install the requirements above and restart the Flask app.
 
-Train or refresh models (farmer CSV + document samples):
+Train or refresh the document ensemble:
 ```bash
 cd machinelearning
-python train_ai_model.py --full-pipeline
+python train_ai_model.py --train-documents
 ```
 
 ### 2. Install Tesseract OCR (for scanned PDFs)
@@ -316,8 +316,7 @@ model = RandomForestClassifier(n_estimators=100, random_state=42)
 model.fit(X_train_vec, y_train)
 
 # Save model
-joblib.dump(model, 'uploads/gi_model.joblib')
-joblib.dump(vectorizer, 'uploads/vectorizer.joblib')
+joblib.dump(model, 'gi_document_model.joblib')
 ```
 
 **Adding New GI Terms:**
@@ -432,8 +431,8 @@ Beanthentic/
 ├── machinelearning/           # AI and ML components
 │   ├── ai_engine.py          # Core AI analysis engine
 │   ├── train_ai_model.py     # ML training pipeline
-│   ├── gi_model.joblib       # Trained Random Forest model
-│   ├── training_results.json # Training metrics
+│   ├── gi_document_model.joblib  # Trained document ensemble
+│   ├── document_training_results.json # Training metrics
 │   └── feature_importance.csv # Feature rankings
 ├── models.py                 # Database models
 ├── web.py                    # Flask application and API routes

@@ -19,6 +19,66 @@ _NOTIF_SOURCE_TIMEOUT_SEC = 3
 _FEED_MAX_ITEMS = 200
 _FEED_LOCK = threading.Lock()
 _FEED_PATH = Path(__file__).resolve().parent.parent / "data" / "admin_notifications_feed.json"
+_STATE_ROW_ID = "default"
+
+
+def _supabase_state_ready() -> bool:
+    try:
+        import beanthentic_env
+        from config.supabase_client import is_configured
+
+        return bool(beanthentic_env.uses_supabase_anon() and is_configured())
+    except Exception:
+        return False
+
+
+def _load_remote_notification_state() -> dict | None:
+    if not _supabase_state_ready():
+        return None
+    try:
+        from config.supabase_client import get_client
+
+        rows = (
+            get_client()
+            .table("admin_notification_state")
+            .select("read_ids,dismissed_ids")
+            .eq("id", _STATE_ROW_ID)
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
+        if not rows:
+            return None
+        row = rows[0] or {}
+        read_ids = row.get("read_ids") if isinstance(row.get("read_ids"), list) else []
+        dismissed = row.get("dismissed_ids") if isinstance(row.get("dismissed_ids"), list) else []
+        return {
+            "read_ids": [str(x) for x in read_ids if x],
+            "dismissed_ids": [str(x) for x in dismissed if x],
+        }
+    except Exception:
+        return None
+
+
+def _save_remote_notification_state(read_ids: list[str], dismissed_ids: list[str]) -> None:
+    if not _supabase_state_ready():
+        return
+    try:
+        from config.supabase_client import get_client
+
+        get_client().table("admin_notification_state").upsert(
+            {
+                "id": _STATE_ROW_ID,
+                "read_ids": list(read_ids or []),
+                "dismissed_ids": list(dismissed_ids or []),
+                "updated_at": datetime.now().isoformat(),
+            },
+            on_conflict="id",
+        ).execute()
+    except Exception:
+        pass
+
 
 from config.models import ActivityLogEntry, DocumentAnalysis
 from config.utils import get_current_user_phone, load_settings
@@ -47,19 +107,32 @@ def _parse_ts(val: Any) -> datetime | None:
 
 def _load_feed_store() -> dict:
     if not _FEED_PATH.exists():
-        return {"items": [], "dismissed_ids": []}
-    try:
-        data = json.loads(_FEED_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {"items": [], "dismissed_ids": []}
-    if not isinstance(data, dict):
-        return {"items": [], "dismissed_ids": []}
-    items = data.get("items") if isinstance(data.get("items"), list) else []
-    dismissed = data.get("dismissed_ids") if isinstance(data.get("dismissed_ids"), list) else []
-    return {
-        "items": [i for i in items if isinstance(i, dict) and i.get("id")],
-        "dismissed_ids": [str(x) for x in dismissed if x],
-    }
+        store = {"items": [], "dismissed_ids": [], "read_ids": []}
+    else:
+        try:
+            data = json.loads(_FEED_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        if not isinstance(data, dict):
+            store = {"items": [], "dismissed_ids": [], "read_ids": []}
+        else:
+            items = data.get("items") if isinstance(data.get("items"), list) else []
+            dismissed = data.get("dismissed_ids") if isinstance(data.get("dismissed_ids"), list) else []
+            read_ids = data.get("read_ids") if isinstance(data.get("read_ids"), list) else []
+            store = {
+                "items": [i for i in items if isinstance(i, dict) and i.get("id")],
+                "dismissed_ids": [str(x) for x in dismissed if x],
+                "read_ids": [str(x) for x in read_ids if x],
+            }
+
+    remote = _load_remote_notification_state()
+    if remote:
+        # Union remote + local so either store can catch up after offline edits.
+        store["read_ids"] = sorted(set(store.get("read_ids") or []) | set(remote.get("read_ids") or []))
+        store["dismissed_ids"] = sorted(
+            set(store.get("dismissed_ids") or []) | set(remote.get("dismissed_ids") or [])
+        )
+    return store
 
 
 def _save_feed_store(store: dict) -> None:
@@ -67,11 +140,13 @@ def _save_feed_store(store: dict) -> None:
     payload = {
         "items": store.get("items") or [],
         "dismissed_ids": store.get("dismissed_ids") or [],
+        "read_ids": store.get("read_ids") or [],
         "updated_at": datetime.now().isoformat(),
     }
     tmp = _FEED_PATH.with_suffix(".tmp")
     tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     tmp.replace(_FEED_PATH)
+    _save_remote_notification_state(payload["read_ids"], payload["dismissed_ids"])
 
 
 def _merge_live_into_store(live_items: list[dict]) -> list[dict]:
@@ -102,13 +177,46 @@ def _merge_live_into_store(live_items: list[dict]) -> list[dict]:
 
         unique.sort(key=sort_key, reverse=True)
         unique = unique[:_FEED_MAX_ITEMS]
+        read_ids = set(store.get("read_ids") or [])
+        for item in unique:
+            nid = str(item.get("id") or "")
+            item["read"] = bool(item.get("read")) or nid in read_ids
         store["items"] = unique
         store["dismissed_ids"] = sorted(dismissed)
+        store["read_ids"] = sorted(read_ids)
         try:
             _save_feed_store(store)
         except OSError:
             pass
         return unique
+
+
+def mark_admin_notifications_read(notification_ids: list[str] | None = None, *, all_items: bool = False) -> bool:
+    """Persist read state on the durable feed (survives device/browser changes)."""
+    with _FEED_LOCK:
+        store = _load_feed_store()
+        read_ids = set(store.get("read_ids") or [])
+        if all_items:
+            for item in store.get("items") or []:
+                nid = str(item.get("id") or "")
+                if nid:
+                    read_ids.add(nid)
+                    item["read"] = True
+        else:
+            wanted = {str(x).strip() for x in (notification_ids or []) if str(x).strip()}
+            if not wanted:
+                return False
+            for item in store.get("items") or []:
+                nid = str(item.get("id") or "")
+                if nid in wanted:
+                    item["read"] = True
+                    read_ids.add(nid)
+        store["read_ids"] = sorted(read_ids)
+        try:
+            _save_feed_store(store)
+        except OSError:
+            return False
+        return True
 
 
 def dismiss_admin_notification(notification_id: str) -> bool:

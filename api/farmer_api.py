@@ -1622,6 +1622,20 @@ def _app_fetch_farmer_rows(limit: int = 2000) -> list[dict]:
         ),
         _optional_select_expr(
             conn,
+            table_name="farm_information",
+            table_alias="fi",
+            alias="latitude",
+            candidates=("latitude", "lat", "gps_lat", "gps_latitude", "farm_lat", "farm_latitude"),
+        ),
+        _optional_select_expr(
+            conn,
+            table_name="farm_information",
+            table_alias="fi",
+            alias="longitude",
+            candidates=("longitude", "lng", "lon", "gps_lng", "gps_longitude", "farm_lng", "farm_longitude"),
+        ),
+        _optional_select_expr(
+            conn,
             table_name="production_information",
             table_alias="prod",
             alias="consolidation_preference",
@@ -1732,7 +1746,34 @@ def _app_fetch_farmer_rows(limit: int = 2000) -> list[dict]:
         with conn.cursor() as cur:
             cur.execute(sql, (limit,))
             rows = cur.fetchall() or []
-            return list(rows)
+            out = []
+            for row in rows:
+                if not isinstance(row, dict):
+                    out.append(row)
+                    continue
+                r = dict(row)
+                lat = r.get("latitude")
+                lng = r.get("longitude")
+                try:
+                    lat_f = float(lat) if lat is not None and lat != "" else None
+                except (TypeError, ValueError):
+                    lat_f = None
+                try:
+                    lng_f = float(lng) if lng is not None and lng != "" else None
+                except (TypeError, ValueError):
+                    lng_f = None
+                if lat_f is not None:
+                    r["latitude"] = lat_f
+                    r["lat"] = lat_f
+                    r["gps_lat"] = lat_f
+                    r["farm_lat"] = lat_f
+                if lng_f is not None:
+                    r["longitude"] = lng_f
+                    r["lng"] = lng_f
+                    r["gps_lng"] = lng_f
+                    r["farm_lng"] = lng_f
+                out.append(r)
+            return out
     finally:
         conn.close()
 

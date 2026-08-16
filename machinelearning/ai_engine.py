@@ -6,6 +6,7 @@ IPOPHL Geographical Indication registration documents using both
 rule-based and machine learning approaches.
 """
 
+import hashlib
 import logging
 import re
 import sys
@@ -182,12 +183,7 @@ class GIAnalyzer:
             }
         }
 
-        # Farmer tabular model (GI readiness from farm profile fields)
-        self.farmer_model = None
-        self.column_structure = None
-        self.farmer_feature_names = None
-
-        # Document analysis uses rules unless a separate document model is added
+        # Document analysis: MoP qualitative review + optional document ensemble
         self.document_model = None
         self.document_feature_names = None
         self.explainer = None
@@ -409,32 +405,8 @@ class GIAnalyzer:
         elif ML_AVAILABLE:
             self._initialize_models()
 
-    def _model_paths(self) -> list[Path]:
-        names = ("gi_farmer_model.joblib", "gi_model.joblib")
-        paths = [self.ml_dir / n for n in names]
-        paths.extend(self.uploads_dir / n for n in names)
-        return paths
-
     def _initialize_models(self):
-        """Load farmer GI readiness model and optional document model."""
-        structure_path = self.ml_dir / "column_structure.json"
-        feature_names_path = self.ml_dir / "feature_names.json"
-
-        farmer_model_path = next((p for p in self._model_paths() if p.exists()), None)
-        if farmer_model_path:
-            try:
-                self.farmer_model = joblib.load(farmer_model_path)
-                logging.info("Loaded farmer ML model from %s", farmer_model_path.name)
-                if structure_path.exists():
-                    with open(structure_path, encoding="utf-8") as f:
-                        self.column_structure = json.load(f)
-                if feature_names_path.exists():
-                    with open(feature_names_path, encoding="utf-8") as f:
-                        self.farmer_feature_names = json.load(f)
-            except Exception as e:
-                logging.warning("Failed to load farmer ML model: %s", e)
-                self.farmer_model = None
-
+        """Load GI document ensemble model (MoP advisory)."""
         doc_path = self.ml_dir / "gi_document_model.joblib"
         if doc_path.exists():
             try:
@@ -445,6 +417,7 @@ class GIAnalyzer:
                     + self.gi_checklist["optional_terms"]
                 )
                 # SHAP explainer is created lazily on first explanation (slow to build)
+                logging.info("Loaded document ML model from %s", doc_path.name)
             except Exception as e:
                 logging.warning("Failed to load document ML model: %s", e)
                 self.document_model = None
@@ -586,17 +559,9 @@ class GIAnalyzer:
         return task_id
 
     def ml_status(self) -> Dict:
-        """Return whether trained models are available."""
-        farmer_meta = {}
+        """Return whether the GI document model is available."""
         document_meta = {}
-        farmer_path = self.ml_dir / "training_results.json"
         document_path = self.ml_dir / "document_training_results.json"
-        if farmer_path.exists():
-            try:
-                with open(farmer_path, encoding="utf-8") as f:
-                    farmer_meta = json.load(f)
-            except Exception:
-                farmer_meta = {}
         if document_path.exists():
             try:
                 with open(document_path, encoding="utf-8") as f:
@@ -604,24 +569,29 @@ class GIAnalyzer:
             except Exception:
                 document_meta = {}
         return {
-            "farmer_model_loaded": self.farmer_model is not None,
             "document_model_loaded": self.document_model is not None,
             "document_analysis_default": (
-                "official_mop_rf_hybrid" if self.document_model else "official_mop_qualitative"
+                "official_mop_ensemble_hybrid" if self.document_model else "official_mop_qualitative"
             ),
-            "farmer_training": farmer_meta,
+            "focus": "gi_document",
             "document_training": document_meta,
-            "training": document_meta or farmer_meta,
+            "training": document_meta,
         }
 
     def _get_explainer(self):
-        """Lazy-load SHAP TreeExplainer for document model."""
+        """Lazy-load SHAP TreeExplainer for the bagging (RF) member of the ensemble."""
         if self.explainer is not None:
             return self.explainer
         if not ML_AVAILABLE or self.document_model is None:
             return None
         try:
-            self.explainer = shap.TreeExplainer(self.document_model)
+            try:
+                from machinelearning.ensemble_learning import tree_estimator_for_shap
+            except ImportError:
+                from ensemble_learning import tree_estimator_for_shap  # type: ignore
+
+            tree_model = tree_estimator_for_shap(self.document_model)
+            self.explainer = shap.TreeExplainer(tree_model)
         except Exception as shap_err:
             logging.warning("SHAP explainer unavailable: %s", shap_err)
             self.explainer = None
@@ -663,7 +633,7 @@ class GIAnalyzer:
         if rf_score is not None and abs(int(rf_score) - rule_score) >= 15:
             if int(rf_score) > rule_score:
                 irregularities.append(
-                    f"The Random Forest model rated this document at <strong>{rf_score}%</strong>, "
+                    f"The ensemble model rated this document at <strong>{rf_score}%</strong>, "
                     f"which is <strong>{int(rf_score) - rule_score} points higher</strong> than the "
                     f"task keyword score ({rule_score}%). This suggests general GI vocabulary in the "
                     f"text may be inflating the statistical model even though required terms for this "
@@ -671,7 +641,7 @@ class GIAnalyzer:
                 )
             else:
                 irregularities.append(
-                    f"The Random Forest model rated this document at <strong>{rf_score}%</strong>, "
+                    f"The ensemble model rated this document at <strong>{rf_score}%</strong>, "
                     f"which is <strong>{rule_score - int(rf_score)} points lower</strong> than the "
                     f"keyword score ({rule_score}%). The model may under-weight domain terms that "
                     f"are present but phrased differently from training samples."
@@ -726,7 +696,7 @@ class GIAnalyzer:
         self, features: List
     ) -> tuple[List[str], List[str], List[dict]]:
         """Return (positive_terms, negative_terms, full_impact_rows) from TreeExplainer."""
-        feature_names = self.document_feature_names or self.farmer_feature_names
+        feature_names = self.document_feature_names or []
         explainer = self._get_explainer()
         if not explainer or not feature_names:
             return [], [], []
@@ -762,7 +732,7 @@ class GIAnalyzer:
         mop_status: str,
         task_id: str | None = None,
     ) -> str:
-        """Append RF probability + SHAP term impacts for capstone validation (advisory)."""
+        """Append ensemble probability + SHAP term impacts for capstone validation (advisory)."""
         doc_type = task_id.replace("-", " ").title() if task_id else "Document"
         rf_ready = int(rf_score) >= 75
         mop_ready = str(mop_status).lower() == "ready"
@@ -770,17 +740,19 @@ class GIAnalyzer:
 
         shap_pos, shap_neg, impacts = self._extract_shap_feature_impacts(features)
         agreement = (
-            "<strong>aligned</strong> — MoP review and Random Forest agree."
+            "<strong>aligned</strong> — MoP review and the ensemble agree."
             if agrees
             else "<strong>divergent</strong> — treat MoP Ready/Not Ready as final; "
-            "review RF signals below."
+            "review ensemble signals below."
         )
 
         parts = [
-            f"<p><strong>Random Forest validation ({doc_type}):</strong> "
-            f"model confidence <strong>{int(rf_score)}%</strong> "
+            f"<p><strong>Ensemble validation ({doc_type}):</strong> "
+            f"soft-voting confidence <strong>{int(rf_score)}%</strong> "
             f"({'Ready' if rf_ready else 'Not Ready'} at 75% threshold). "
-            f"MoP classification: <strong>{mop_status}</strong> — {agreement}</p>"
+            f"MoP classification: <strong>{mop_status}</strong> — {agreement} "
+            f"Base learners: Random Forest + Extra Trees (bagging) and Gradient Boosting "
+            f"(boosting).</p>"
         ]
 
         if impacts:
@@ -788,7 +760,7 @@ class GIAnalyzer:
                 f"{row['name']} ({row['impact']:+.3f})" for row in impacts[:6]
             )
             parts.append(
-                f"<p><strong>SHAP feature influence (top terms):</strong> {rows}. "
+                f"<p><strong>SHAP feature influence (RF bagging member):</strong> {rows}. "
                 "Positive values push toward Ready; negative values push toward Not Ready.</p>"
             )
         elif shap_pos or shap_neg:
@@ -804,13 +776,13 @@ class GIAnalyzer:
         if not agrees:
             if mop_ready and not rf_ready:
                 parts.append(
-                    "<p>The MoP themes are satisfied, but the statistical model is cautious — "
+                    "<p>The MoP themes are satisfied, but the statistical ensemble is cautious — "
                     "consider adding more explicit Kapeng Barako / Lipa terminology to strengthen "
                     "ML agreement.</p>"
                 )
             else:
                 parts.append(
-                    "<p>The Random Forest may reflect GI vocabulary in the text, but MoP critical "
+                    "<p>The ensemble may reflect GI vocabulary in the text, but MoP critical "
                     "themes are still missing or the document targets the wrong product — follow "
                     "the gap analysis above.</p>"
                 )
@@ -863,96 +835,21 @@ class GIAnalyzer:
             normalized["shap_analysis"] = self._align_shap_readiness_text(shap, score)
         return normalized
 
-    def _encode_farmer_profile(self, profile_data: Dict):
-        """Return feature matrix aligned to training columns."""
-        if not self.column_structure:
-            raise ValueError("Column structure not loaded. Train the model first.")
+    def _normalize_extracted_text(self, text: str) -> str:
+        """Clean OCR/PDF noise and collapse whitespace for reliable term matching."""
+        cleaned = (text or "").replace("\r\n", "\n").replace("\r", "\n")
+        cleaned = re.sub(r"[ \t\f\v]+", " ", cleaned)
+        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+        return cleaned.strip()
 
-        df = pd.DataFrame([profile_data])
-        for col in self.column_structure["original_cols"]:
-            if col not in df.columns:
-                if col in ("elevation_masl", "soil_pH", "annual_rainfall_mm", "mean_temperature_C", "annual_yield_kg", "moisture_content_pct", "defect_count_per_300g", "years_in_farming", "bearing_trees", "non_bearing_trees"):
-                    df[col] = 0
-                else:
-                    df[col] = "Unknown"
-
-        df_encoded = pd.get_dummies(df, columns=self.column_structure["categorical_cols"])
-        for col in self.column_structure["encoded_cols"]:
-            if col not in df_encoded.columns:
-                df_encoded[col] = 0
-        return df_encoded[self.column_structure["encoded_cols"]]
-
-    def analyze_farmer_profile(self, profile_data: Dict) -> Dict:
-        """Analyze a farmer's GI readiness based on profile / tabular data."""
-        if self.farmer_model is None or self.column_structure is None:
-            return {
-                "success": False,
-                "error": "Farmer ML model not trained. Run: python train_ai_model.py --train-csv",
-            }
-
-        try:
-            df_final = self._encode_farmer_profile(profile_data)
-            probability = self.farmer_model.predict_proba(df_final.values)[0]
-            ready_prob = float(probability[1]) if len(probability) > 1 else float(probability[0])
-            readiness_score = int(round(ready_prob * 100))
-            status = "Ready" if readiness_score >= 75 else "Not Ready"
-            predicted_class = int(self.farmer_model.predict(df_final.values)[0])
-
-            detected_features = [
-                col for col, val in profile_data.items()
-                if val == "Yes" or (isinstance(val, (int, float)) and val > 0)
-            ]
-
-            return {
-                "success": True,
-                "readiness_score": readiness_score,
-                "status": status,
-                "gi_ready": bool(predicted_class),
-                "probability_ready": round(ready_prob, 4),
-                "detected_features": detected_features,
-                "analysis_method": "ml_farmer",
-            }
-        except Exception as e:
-            logging.error("Farmer profile analysis failed: %s", e)
-            return {"success": False, "error": str(e)}
-
-    def predict_farmers_batch(self, rows: List[Dict]) -> Dict:
-        """Predict GI readiness for many farmer records."""
-        try:
-            from machinelearning.farmer_features import farmer_row_to_ml_features
-        except ImportError:
-            from farmer_features import farmer_row_to_ml_features
-
-        if self.farmer_model is None:
-            return {
-                "success": False,
-                "error": "Farmer ML model not trained. Run: python train_ai_model.py --train-csv",
-                "predictions": [],
-            }
-
-        predictions = []
-        for idx, row in enumerate(rows):
-            features = farmer_row_to_ml_features(row if isinstance(row, dict) else {})
-            result = self.analyze_farmer_profile(features)
-            predictions.append(
-                {
-                    "index": idx,
-                    "farmer_id": row.get("farmer_id") or row.get("NO.") if isinstance(row, dict) else idx,
-                    "readiness_score": result.get("readiness_score", 0),
-                    "status": result.get("status", "Not Ready"),
-                    "gi_ready": result.get("gi_ready", False),
-                    "success": result.get("success", False),
-                }
-            )
-
-        eligible = sum(1 for p in predictions if p.get("gi_ready"))
+    def _analysis_scan_meta(self, text: str) -> Dict:
+        words = re.findall(r"[A-Za-z0-9']+", text or "")
+        excerpt = (text or "").strip()[:600]
+        digest = hashlib.sha256((text or "").encode("utf-8", errors="ignore")).hexdigest()
         return {
-            "success": True,
-            "analysis_method": "ml_farmer",
-            "total": len(predictions),
-            "eligible": eligible,
-            "not_eligible": len(predictions) - eligible,
-            "predictions": predictions,
+            "word_count": len(words),
+            "text_excerpt": excerpt,
+            "content_fingerprint": digest[:16],
         }
 
     def extract_text_from_file(self, file_path: str) -> str:
@@ -962,45 +859,64 @@ class GIAnalyzer:
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
 
+        suffix = file_path.suffix.lower()
         text = ""
 
-        if file_path.suffix.lower() == '.pdf':
+        if suffix == '.pdf':
             text = self._extract_from_pdf(file_path)
-        elif file_path.suffix.lower() in ['.doc', '.docx']:
+        elif suffix in ['.doc', '.docx']:
+            if suffix == '.doc':
+                raise ValueError(
+                    "Legacy .doc files are not supported for text scanning. "
+                    "Re-save as .docx or export to PDF, then upload again."
+                )
             text = self._extract_from_docx(file_path)
-        elif file_path.suffix.lower() in ['.txt', '.md']:
+        elif suffix in ['.txt', '.md']:
             text = file_path.read_text(encoding='utf-8', errors='ignore')
         else:
             raise ValueError(f"Unsupported file type: {file_path.suffix}")
 
-        return text
+        return self._normalize_extracted_text(text)
 
     def _extract_from_pdf(self, file_path: Path) -> str:
-        """Extract text from PDF, with OCR fallback"""
+        """Extract text from PDF, with OCR fallback for scanned pages."""
         if not PDF_AVAILABLE:
             raise ImportError("PyMuPDF is required for PDF processing")
 
-        text = ""
+        chunks: list[str] = []
         try:
             doc = fitz.open(file_path)
             for page in doc:
-                page_text = page.get_text()
-                text += page_text + "\n"
+                page_text = page.get_text("text", sort=True) or page.get_text() or ""
+                page_text = page_text.strip()
+                if len(page_text) < 40 and OCR_AVAILABLE:
+                    page_text = self._ocr_pdf_page(page) or page_text
+                if page_text:
+                    chunks.append(page_text)
             doc.close()
-
-            # Check if extracted text is meaningful
-            if len(text.strip()) < 50:  # Likely scanned PDF
-                if OCR_AVAILABLE:
-                    text = self._ocr_pdf(file_path)
-                else:
-                    logging.warning("PDF appears scanned but OCR not available")
-
         except Exception as e:
             logging.error(f"Error extracting from PDF: {e}")
             if OCR_AVAILABLE:
-                text = self._ocr_pdf(file_path)
+                return self._ocr_pdf(file_path)
 
+        text = "\n\n".join(chunks)
+        if len(text.strip()) < 80 and OCR_AVAILABLE:
+            ocr_text = self._ocr_pdf(file_path)
+            if len(ocr_text.strip()) > len(text.strip()):
+                text = ocr_text
         return text
+
+    def _ocr_pdf_page(self, page) -> str:
+        if not OCR_AVAILABLE:
+            return ""
+        try:
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+            img_data = pix.tobytes("png")
+            img = Image.open(io.BytesIO(img_data))
+            return pytesseract.image_to_string(img)
+        except Exception as e:
+            logging.error(f"OCR page error: {e}")
+            return ""
 
     def _ocr_pdf(self, file_path: Path) -> str:
         """OCR extraction from PDF pages"""
@@ -1024,49 +940,96 @@ class GIAnalyzer:
         return text
 
     def _extract_from_docx(self, file_path: Path) -> str:
-        """Extract text from Word document"""
+        """Extract text from Word document including tables, headers, and footers."""
         if not DOCX_AVAILABLE:
             raise ImportError("python-docx is required for Word document processing")
 
-        text = ""
+        parts: list[str] = []
         try:
             doc = docx.Document(file_path)
             for paragraph in doc.paragraphs:
-                text += paragraph.text + "\n"
+                line = paragraph.text.strip()
+                if line:
+                    parts.append(line)
 
-            # Extract text from tables
             for table in doc.tables:
                 for row in table.rows:
-                    for cell in row.cells:
-                        text += cell.text + " "
-                    text += "\n"
+                    row_cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                    if row_cells:
+                        parts.append(" | ".join(row_cells))
+
+            for section in doc.sections:
+                for container in (section.header, section.footer):
+                    if container is None:
+                        continue
+                    for paragraph in container.paragraphs:
+                        line = paragraph.text.strip()
+                        if line:
+                            parts.append(line)
+                    for table in container.tables:
+                        for row in table.rows:
+                            row_cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                            if row_cells:
+                                parts.append(" | ".join(row_cells))
         except Exception as e:
             logging.error(f"Error extracting from DOCX: {e}")
+            raise ValueError(f"Could not read DOCX content: {e}") from e
 
-        return text
+        return "\n".join(parts)
+
+    def _attach_scan_meta(self, payload: Dict, text: str) -> Dict:
+        meta = self._analysis_scan_meta(text)
+        enriched = dict(payload or {})
+        enriched["text_excerpt"] = meta["text_excerpt"]
+        enriched["content_fingerprint"] = meta["content_fingerprint"]
+        enriched["word_count"] = meta["word_count"]
+        breakdown = enriched.get("score_breakdown")
+        if isinstance(breakdown, dict):
+            merged_breakdown = dict(breakdown)
+            merged_breakdown.update(meta)
+            enriched["score_breakdown"] = merged_breakdown
+        insights = enriched.get("ip_pillar_assessment")
+        if isinstance(insights, dict):
+            doc_insights = dict(insights.get("document_insights") or {})
+            doc_insights.setdefault("word_count", meta["word_count"])
+            doc_insights["text_excerpt"] = meta["text_excerpt"]
+            doc_insights["content_fingerprint"] = meta["content_fingerprint"]
+            insights = dict(insights)
+            insights["document_insights"] = doc_insights
+            enriched["ip_pillar_assessment"] = insights
+        return enriched
 
     def analyze_document(self, file_path: str, task_id: str = None) -> Dict:
         """Main analysis function with task-specific context"""
         file_path_obj = Path(file_path)
-        
-        # If it's a CSV file, process as farmer profile instead of document
-        if file_path_obj.suffix.lower() == '.csv':
-            try:
-                import pandas as pd
-                df = pd.read_csv(file_path)
-                # Take the first row as a sample for analysis
-                if not df.empty:
-                    profile_data = df.iloc[0].to_dict()
-                    return self.analyze_farmer_profile(profile_data)
-                else:
-                    return {"success": False, "error": "Empty CSV file"}
-            except Exception as e:
-                logging.error(f"CSV analysis failed: {e}")
-                return {"success": False, "error": f"CSV analysis failed: {str(e)}"}
+
+        if file_path_obj.suffix.lower() == ".csv":
+            return {
+                "success": False,
+                "error": "CSV farmer-profile analysis was removed. Upload a GI document (PDF/DOCX/TXT) for MoP analysis.",
+            }
 
         try:
             # Extract text
             text = self.extract_text_from_file(file_path)
+            scan_meta = self._analysis_scan_meta(text)
+            if scan_meta["word_count"] < 40:
+                return {
+                    "success": False,
+                    "error": (
+                        "Could not extract enough readable text from this file. "
+                        "Try a text-based PDF or DOCX, or re-scan the document with higher quality."
+                    ),
+                    "readiness_score": 0,
+                    "status": "Not Ready",
+                    "detected_features": [],
+                    "missing_requirements": ["Readable document text"],
+                    "text_length": len(text or ""),
+                    "text_excerpt": scan_meta.get("text_excerpt") or "",
+                    "content_fingerprint": scan_meta.get("content_fingerprint") or "",
+                    "word_count": scan_meta.get("word_count") or 0,
+                }
+
             task_id = self._resolve_task_id_from_text(text, task_id)
 
             # Default IPOPHL pipeline: official MoP qualitative review + RF/SHAP validation
@@ -1089,12 +1052,12 @@ class GIAnalyzer:
                 )
                 if task_id:
                     merged["task_id"] = task_id
-                return merged
+                return self._attach_scan_meta(merged, text)
             payload = self.normalize_analysis_payload(rule_result)
             payload["analysis_method"] = "official_mop_qualitative"
             if task_id:
                 payload["task_id"] = task_id
-            return payload
+            return self._attach_scan_meta(payload, text)
 
         except Exception as e:
             logging.error(f"Analysis error: {e}")
@@ -1163,7 +1126,7 @@ class GIAnalyzer:
             "analysis_mode": "mop_reference_qualitative",
             "reference_source": review.get("reference_source"),
             "final_score": readiness_score,
-            "formula": "Qualitative MoP theme coverage (no keyword percentage)",
+            "formula": "Qualitative GI theme coverage (no keyword percentage)",
             "sections": sections,
             "sections_found": sum(1 for s in sections if s.get("found")),
             "sections_total": len(sections),
@@ -1274,12 +1237,6 @@ class GIAnalyzer:
 
         rf_agreement = None
         if rf_score is not None and text:
-            features = self._extract_features(text)
-            appendix = self._build_rf_shap_appendix(
-                features, int(rf_score), status, task_id
-            )
-            if appendix and "Random Forest validation" not in shap:
-                shap = shap + appendix
             rf_ready = int(rf_score) >= 75
             mop_ready = str(status).lower() == "ready"
             rf_agreement = rf_ready == mop_ready
@@ -1291,7 +1248,7 @@ class GIAnalyzer:
             "detected_features": detected,
             "missing_requirements": missing,
             "text_length": rule_result.get("text_length") or ml_result.get("text_length") or 0,
-            "analysis_method": "official_mop_rf_hybrid",
+            "analysis_method": "official_mop_ensemble_hybrid",
             "shap_analysis": shap,
             "ml_score": ml_score,
             "rule_score": rule_score,
@@ -1303,6 +1260,7 @@ class GIAnalyzer:
                     "rf_score": rf_score,
                     "rf_agreement": rf_agreement,
                     "training_source": "ipophl_official_mop_dataset.csv",
+                    "ensemble_method": "soft_voting_bagging_boosting",
                 },
             },
             "keyword_score": None,
@@ -1323,13 +1281,12 @@ class GIAnalyzer:
         )
         p2 = (
             f"<p>Themes still needing work: {', '.join(missing) if missing else 'none'}. "
-            f"Revise against PART 1 Justification, PART 2 Technical Part, and "
-            f"CONTROL & TRACEABILITY & LABELLING, then re-analyze.</p>"
+            f"Revise against the Kapeng Barako GI filing requirements, then re-analyze.</p>"
         )
         return p1 + p2
 
     def _ml_analysis(self, text: str, checklist: Dict = None, task_id: str = None) -> Dict:
-        """ML layer: task keyword score + Random Forest advisory probability."""
+        """ML layer: task keyword score + ensemble advisory probability."""
         if checklist is None:
             checklist = self.gi_checklist
 
