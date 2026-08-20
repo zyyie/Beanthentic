@@ -949,6 +949,11 @@ def _map_app_row_to_dashboard(
 
     row_out = _json_safe_row_values(row)
     photo_ref = _json_safe_photo_ref(row.get("profile_photo_data") or row.get("profile_photo"))
+    municipality = str(row.get("municipality") or row.get("MUNICIPALITY") or "Lipa City").strip() or "Lipa City"
+    province = str(row.get("province") or row.get("PROVINCE") or "Batangas").strip() or "Batangas"
+    house_no = str(row.get("house_no") or row.get("HOUSE NO.") or "").strip()
+    street = str(row.get("street") or row.get("STREET") or "").strip()
+
     mapped = {
         **row_out,
         "NO.": fid,
@@ -975,6 +980,14 @@ def _map_app_row_to_dashboard(
         "created_at": _json_safe_value(row.get("registered_at") or row.get("created_at")),
         "ADDRESS (BARANGAY)": (row.get("barangay") or "").strip() or "—",
         "barangay": (row.get("barangay") or "").strip(),
+        "HOUSE NO.": house_no,
+        "house_no": house_no,
+        "STREET": street,
+        "street": street,
+        "MUNICIPALITY": municipality,
+        "municipality": municipality,
+        "PROVINCE": province,
+        "province": province,
         "BIRTHDAY": _fmt_birthday(row.get("birthday")),
         "birthday": _fmt_birthday(row.get("birthday")),
         "FA OFFICER / MEMBER": federation,

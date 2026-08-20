@@ -1,1 +1,169 @@
-{}
+{
+  "f8c0ac1d-a15c-435f-ac87-741d13993bdc": {
+    "file_uuid": "f8c0ac1d-a15c-435f-ac87-741d13993bdc",
+    "original_filename": "TNALAK_TAU_SEBU.pdf",
+    "file_path": "machinelearning/uploads/f8c0ac1d-a15c-435f-ac87-741d13993bdc.pdf",
+    "file_type": ".pdf",
+    "file_size": 4526025,
+    "ai_score": 0,
+    "ai_status": "Not Ready",
+    "detected_features": [
+      "blocked: wrong product (tnalak, t'nalak, t'boli)",
+      "reputation"
+    ],
+    "missing_requirements": [
+      "Kapeng Barako product focus"
+    ],
+    "analysis_method": "official_mop_ensemble_hybrid",
+    "text_length": 52131,
+    "shap_analysis": "<p><strong>Verdict:</strong> This <strong>Phase1 Introduction</strong> is <strong>Not Ready for this upload zone</strong> against IPOPHL GI seal filing requirements for Batangas Kapeng Barako (8175 words reviewed).</p><p><strong>Coverage snapshot:</strong> 0 themes well covered, 1 partial, 0 missing.</p><p><strong>Product identity:</strong> I read this as a filing about tnalak, t'nalak, t'boli, not about Kapeng Barako (Coffea liberica from Batangas). Please rewrite so the product, place, and reputation are clearly Kapeng Barako before this upload can be marked Ready. Competing cues detected: <strong>tnalak, t'nalak, t'boli</strong>. Rewrite so the document is clearly about Kapeng Barako (Coffea liberica), not another crop.</p><p><strong>Theme notes:</strong></p><ul><li><strong>Introduction, reputation & origin</strong> \u2014 partial (blocked: wrong product (tnalak, t'nalak, t'boli), reputation, geographical indication). Expected: Explain why Batangas / Lipa Kapeng Barako deserves GI protection: product identity (Coffea liberica / Barako), geographic origin, and reputa\u2026</li></ul>",
+    "score_breakdown": {
+      "analysis_mode": "mop_reference_qualitative",
+      "reference_source": "IPOPHL GI seal filing requirements for Batangas Kapeng Barako",
+      "final_score": 0,
+      "formula": "Qualitative GI theme coverage (no keyword percentage)",
+      "sections": [
+        {
+          "id": "reputation_origin",
+          "label": "Introduction, reputation & origin",
+          "found": false,
+          "coverage": "partial",
+          "part": "Justification & reputation",
+          "expectation": "Explain why Batangas / Lipa Kapeng Barako deserves GI protection: product identity (Coffea liberica / Barako), geographic origin, and reputation among producers and consumers.",
+          "evidence": [
+            "blocked: wrong product (tnalak, t'nalak, t'boli)",
+            "reputation",
+            "geographical indication",
+            "geographical origin",
+            "distinctive",
+            "tradition"
+          ]
+        }
+      ],
+      "sections_found": 0,
+      "sections_total": 1,
+      "improvements": [
+        "Rewrite the document so it is clearly about Kapeng Barako \u2014 not another product (tnalak, t'nalak, t'boli).",
+        "Expand \u00abIntroduction, reputation & origin\u00bb: Explain why Batangas / Lipa Kapeng Barako deserves GI protection: product identity (Coffea liberica / Barako), geogra\u2026"
+      ],
+      "product_focus": {
+        "ok": false,
+        "has_identity": false,
+        "has_primary": false,
+        "wrong_product": true,
+        "missing_identity": true,
+        "identity_hits": [],
+        "primary_hits": [],
+        "off_product_hits": [
+          "tnalak",
+          "t'nalak",
+          "t'boli"
+        ],
+        "reason": "I read this as a filing about tnalak, t'nalak, t'boli, not about Kapeng Barako (Coffea liberica from Batangas). Please rewrite so the product, place, and reputation are clearly Kapeng Barako before this upload can be marked Ready.",
+        "label": "Kapeng Barako product focus"
+      },
+      "terms": [
+        {
+          "term": "Introduction, reputation & origin",
+          "found": true,
+          "coverage": "partial"
+        }
+      ],
+      "rf_validation": {
+        "rf_score": 52,
+        "rf_agreement": true,
+        "training_source": "ipophl_official_mop_dataset.csv",
+        "ensemble_method": "soft_voting_bagging_boosting"
+      },
+      "word_count": 8175,
+      "text_excerpt": "Intellectual Property Center, 28 Upper McKinley Rd.\n McKinley Hill Town Center, Fort Bonifacio, Taguig City 1634, Philippines\n Tel. No. 238-6300 Website: http://www.ipophil.gov.ph e-mail: mail@ipophil.gov.ph\n Publication Date : 03 February 2026\n\n1 ALLOWED GEOGRAPHICAL INDICATION PUBLISHED FOR THIRD-PARTY OBSERVATION ...................... 2\n\n 1.1 Allowed Geographical Indication\u2026\u2026\u2026.\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026..\u2026\u2026\u2026\u2026\u2026\u2026\u20262\n\n2 CODE OF PRACTICE\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026..\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u20265\n\n3 CERTIFICATION FROM THE CONCERNED GOVERNMENT AGENCY OR EQUIVALENT INDEPENDENT\n BODY\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026..\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026",
+      "content_fingerprint": "80978d4a1de3e1e2"
+    },
+    "ip_pillar_assessment": {
+      "pillars": [
+        {
+          "id": "trademark",
+          "label": "Trademark",
+          "scope": "Geographical indications, signs, labels, product names, branding, filing with the Bureau of Trademarks, publication, opposition, and GI registration.",
+          "status": "partial",
+          "met": [
+            "blocked: wrong product (tnalak, t'nalak, t'boli)",
+            "reputation"
+          ],
+          "gaps": [
+            "Kapeng Barako product focus",
+            "Introduction, reputation & origin"
+          ],
+          "signal_detected": true,
+          "evidence": [
+            "\u2026of the textile in the final product must be \"Tnalak Tau Sebu\" to carry the Quality, words \"Made with Tnalak Tau Sebu\". Characteristics, or Reputation No usage contrary to cultural rules is allowed such as foot wears or rags or carpets or other similar uses. Link to the Territory: The\u2026",
+            "\u2026ilippines Tel. No. 238-6300 Website: http://www.ipophil.gov.ph e-mail: mail@ipophil.gov.ph Publication Date : 03 February 2026 1 ALLOWED GEOGRAPHICAL INDICATION PUBLISHED FOR THIRD-PARTY OBSERVATION ...................... 2 1.1 Allowed Geographical Indication\u2026\u2026\u2026.\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026..\u2026\u2026\u2026\u2026\u2026\u2026\u20262 2 C\u2026"
+          ],
+          "narrative": "Trademark \u2014 Partially addressed. The document references Trademark-related content, but the evidence is not yet complete enough for this filing stage. Items already present: blocked: wrong product (tnalak, t'nalak, t'boli), reputation. The submission includes related wording such as: \u2026of the textile in the final product must be \"Tnalak Tau Sebu\" to carry the Quality, words \"Made with Tnalak Tau Sebu\". Characteristics, or Reputation No usage contrary to cultural rules is allowed such as foot wears or rags or carpets or other similar uses. Link to the Territory: The\u2026 However, the following checklist items still need explicit coverage: Kapeng Barako product focus, Introduction, reputation & origin. IPOPHL formality and substantive examination typically require these to be stated clearly, not merely implied. To strengthen the Trademark pillar, expand sections that document geographical indications, signs, labels, product names, branding, filing with the bureau of trademarks, publication, opposition, and gi registration using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        },
+        {
+          "id": "copyright",
+          "label": "Copyright",
+          "scope": "Original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation.",
+          "status": "partial",
+          "met": [],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [
+            "\u2026s Tel. No. 238-6300 Website: http://www.ipophil.gov.ph e-mail: mail@ipophil.gov.ph Publication Date : 03 February 2026 CODE OF PRACTICE Manual of Specifications TNALAK TAU SEBU LAKE SEBU, SOUTH COTABATO, PHILIPPINES Table of Contents Part 1: Justification for the request for the protection as\u2026",
+            "\u2026N PUBLISHED FOR THIRD-PARTY OBSERVATION ...................... 2 1.1 Allowed Geographical Indication\u2026\u2026\u2026.\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026..\u2026\u2026\u2026\u2026\u2026\u2026\u20262 2 CODE OF PRACTICE\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026..\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u20265 3 CERTIFICATION FROM THE CONCERNED GOVERNMENT AGENCY OR EQUIVALENT INDEPENDENT BODY\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026"
+          ],
+          "narrative": "Copyright \u2014 Partially addressed. The document references Copyright-related content, but the evidence is not yet complete enough for this filing stage. The submission includes related wording such as: \u2026s Tel. No. 238-6300 Website: http://www.ipophil.gov.ph e-mail: mail@ipophil.gov.ph Publication Date : 03 February 2026 CODE OF PRACTICE Manual of Specifications TNALAK TAU SEBU LAKE SEBU, SOUTH COTABATO, PHILIPPINES Table of Contents Part 1: Justification for the request for the protection as\u2026 To strengthen the Copyright pillar, expand sections that document original literary and artistic works: manuals, specifications, codes of practice, descriptive text, consultation records, letters, and authored documentation using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        },
+        {
+          "id": "industrial_design",
+          "label": "Industrial Design",
+          "scope": "Ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers.",
+          "status": "partial",
+          "met": [],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [],
+          "narrative": "Industrial Design \u2014 Partially addressed. The document references Industrial Design-related content, but the evidence is not yet complete enough for this filing stage. To strengthen the Industrial Design pillar, expand sections that document ornamental or aesthetic appearance of products and packaging: label layout, product imagery, visual presentation, and design of goods or containers using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        },
+        {
+          "id": "patent",
+          "label": "Patent",
+          "scope": "Technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing.",
+          "status": "partial",
+          "met": [],
+          "gaps": [],
+          "signal_detected": true,
+          "evidence": [],
+          "narrative": "Patent \u2014 Partially addressed. The document references Patent-related content, but the evidence is not yet complete enough for this filing stage. To strengthen the Patent pillar, expand sections that document technical processes, methods, and inventive steps: production, processing, quality-control systems, and novel apparatus or methods described in the filing using consistent Kapeng Barako terminology and task-specific IPOPHL language."
+        }
+      ],
+      "ready_pillars": 0,
+      "partial_pillars": 4,
+      "gap_pillars": 0,
+      "pillar_total": 4,
+      "executive_summary": "Verdict:  This  Phase1 Introduction  is  Not Ready for this upload zone  against IPOPHL GI seal filing requirements for Batangas Kapeng Barako (8175 words reviewed).",
+      "recommendations": [
+        "Rewrite the document so it is clearly about Kapeng Barako \u2014 not another product (tnalak, t'nalak, t'boli).",
+        "Expand \u00abIntroduction, reputation & origin\u00bb: Explain why Batangas / Lipa Kapeng Barako deserves GI protection: product identity (Coffea liberica / Barako), geogra\u2026"
+      ],
+      "document_insights": {
+        "document_type": "Phase1 Introduction",
+        "word_count": 8175,
+        "checklist_met": 0,
+        "checklist_total": 1,
+        "detected_features": [],
+        "missing_requirements": [
+          "Kapeng Barako product focus"
+        ],
+        "reference_source": "IPOPHL GI seal filing requirements for Batangas Kapeng Barako",
+        "text_excerpt": "Intellectual Property Center, 28 Upper McKinley Rd.\n McKinley Hill Town Center, Fort Bonifacio, Taguig City 1634, Philippines\n Tel. No. 238-6300 Website: http://www.ipophil.gov.ph e-mail: mail@ipophil.gov.ph\n Publication Date : 03 February 2026\n\n1 ALLOWED GEOGRAPHICAL INDICATION PUBLISHED FOR THIRD-PARTY OBSERVATION ...................... 2\n\n 1.1 Allowed Geographical Indication\u2026\u2026\u2026.\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026..\u2026\u2026\u2026\u2026\u2026\u2026\u20262\n\n2 CODE OF PRACTICE\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026..\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u20265\n\n3 CERTIFICATION FROM THE CONCERNED GOVERNMENT AGENCY OR EQUIVALENT INDEPENDENT\n BODY\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026..\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026",
+        "content_fingerprint": "80978d4a1de3e1e2"
+      }
+    },
+    "upload_timestamp": "",
+    "analysis_timestamp": "2026-08-20T04:56:04.321549",
+    "ipophl_phase": "phase1",
+    "task_id": "phase1-introduction"
+  }
+}

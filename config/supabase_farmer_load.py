@@ -145,6 +145,10 @@ def _merge_farmer_row(
         "contact_number": pi.get("contact_number"),
         "birthday": pi.get("birthday") or farmer.get("birthday"),
         "barangay": pi.get("barangay") or fi.get("barangay") or farmer.get("address_barangay"),
+        "house_no": pi.get("house_no") or fi.get("house_no"),
+        "street": pi.get("street") or fi.get("street"),
+        "municipality": pi.get("municipality") or fi.get("municipality") or "Lipa City",
+        "province": pi.get("province") or fi.get("province") or "Batangas",
         "ownership_status": fi.get("ownership_status"),
         "farm_size_ha": fi.get("farm_size_ha") or fi.get("total_area_planted_ha"),
         "coffee_varieties": (

@@ -16,6 +16,7 @@ import argparse
 import json
 import logging
 import os
+import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -23,6 +24,7 @@ from typing import Dict, List, Tuple
 import joblib
 import numpy as np
 import pandas as pd
+from sklearn.exceptions import InconsistentVersionWarning
 
 # ML imports
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
@@ -528,7 +530,14 @@ class GIDocumentTrainer:
                 "Document model not found. Train with: python train_ai_model.py --train-documents"
             )
 
-        model = joblib.load(model_path)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            model = joblib.load(model_path)
+        if any(issubclass(w.category, InconsistentVersionWarning) for w in caught):
+            logger.warning(
+                "Detected sklearn version mismatch for %s; retraining is recommended before evaluation.",
+                model_path,
+            )
 
         # Load test data
         if self.features_path.exists() and self.labels_path.exists():

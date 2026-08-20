@@ -12,8 +12,11 @@ import re
 import sys
 import uuid
 import json
+import warnings
 from pathlib import Path
 from typing import Dict, List, Tuple
+
+from sklearn.exceptions import InconsistentVersionWarning
 
 # Support imports whether loaded as `machinelearning.ai_engine` or `ai_engine`
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -405,22 +408,55 @@ class GIAnalyzer:
         elif ML_AVAILABLE:
             self._initialize_models()
 
+    def _load_document_model(self, doc_path: Path):
+        """Load the saved GI model while tolerating scikit-learn version mismatches."""
+        if not doc_path.exists():
+            return None
+
+        with warnings.catch_warnings(record=True) as caught_warnings:
+            warnings.simplefilter("always")
+            try:
+                model = joblib.load(doc_path)
+            except Exception as exc:
+                logging.warning("Failed to load document ML model: %s", exc)
+                return None
+
+        if any(issubclass(w.category, InconsistentVersionWarning) for w in caught_warnings):
+            logging.warning(
+                "Detected stale GI document model from a newer sklearn version at %s. "
+                "The artifact will be rebuilt with the current environment.",
+                doc_path,
+            )
+            try:
+                doc_path.unlink()
+            except OSError:
+                pass
+            return None
+
+        return model
+
     def _initialize_models(self):
         """Load GI document ensemble model (MoP advisory)."""
         doc_path = self.ml_dir / "gi_document_model.joblib"
         if doc_path.exists():
             try:
-                self.document_model = joblib.load(doc_path)
+                self.document_model = self._load_document_model(doc_path)
                 self.document_feature_names = (
                     ["text_length", "word_count"]
                     + self.gi_checklist["mandatory_terms"]
                     + self.gi_checklist["optional_terms"]
                 )
-                # SHAP explainer is created lazily on first explanation (slow to build)
-                logging.info("Loaded document ML model from %s", doc_path.name)
+                if self.document_model is not None:
+                    # SHAP explainer is created lazily on first explanation (slow to build)
+                    logging.info("Loaded document ML model from %s", doc_path.name)
+                else:
+                    self.document_feature_names = []
             except Exception as e:
-                logging.warning("Failed to load document ML model: %s", e)
+                logging.warning("Failed to initialize document ML model: %s", e)
                 self.document_model = None
+        else:
+            self.document_model = None
+            self.document_feature_names = []
 
     def _ensure_official_mop_baseline(self) -> None:
         """Ensure official Part 1 / Part 2 / Control MoP CSV + training JSON exist."""
@@ -445,11 +481,16 @@ class GIAnalyzer:
             logging.warning("Could not build official MoP baseline dataset: %s", exc)
 
     def _ensure_document_model(self) -> None:
-        """Train document classifier from official MoP files if missing."""
+        """Train document classifier from official MoP files if missing or stale."""
         self._ensure_official_mop_baseline()
         doc_path = self.ml_dir / "gi_document_model.joblib"
-        if doc_path.exists() or self.document_model is not None:
+        if self.document_model is not None and doc_path.exists():
             return
+        if doc_path.exists() and self.document_model is None:
+            try:
+                doc_path.unlink()
+            except OSError:
+                pass
         try:
             import subprocess
             import sys

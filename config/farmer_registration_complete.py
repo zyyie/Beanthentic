@@ -71,10 +71,50 @@ def is_farmer_registration_complete(row: dict) -> bool:
     if looks_like_phone(full):
         return False
 
-    barangay = _field(row, "barangay", "ADDRESS (BARANGAY)", "address_barangay")
+    barangay = _field(
+        row,
+        "barangay",
+        "ADDRESS (BARANGAY)",
+        "address_barangay",
+        "BARANGAY",
+        "municipality",
+        "MUNICIPALITY",
+        "province",
+        "PROVINCE",
+        "house_no",
+        "HOUSE NO.",
+        "street",
+        "STREET",
+    )
+
+    row_address = _field(
+        row,
+        "barangay",
+        "ADDRESS (BARANGAY)",
+        "address_barangay",
+        "BARANGAY",
+        "municipality",
+        "MUNICIPALITY",
+        "province",
+        "PROVINCE",
+        "house_no",
+        "HOUSE NO.",
+        "street",
+        "STREET",
+    )
+
+    # Accept modern app addresses as a valid completion signal even when the old
+    # legacy fields are not present in the merged farmer row.
+    has_address = bool(row_address)
+
     farm_ha = row.get("farm_size_ha")
     if farm_ha is None:
-        for key in ("TOTAL AREA PLANTED (HA.)", "Total Area Planted (HA.)", "total_area_ha"):
+        for key in (
+            "TOTAL AREA PLANTED (HA.)",
+            "Total Area Planted (HA.)",
+            "total_area_ha",
+            "farm_area_ha",
+        ):
             if row.get(key) is not None:
                 farm_ha = row.get(key)
                 break
@@ -85,7 +125,7 @@ def is_farmer_registration_complete(row: dict) -> bool:
 
     trees = row.get("TOTAL TREES")
     if trees is None:
-        for key in ("total_trees", "total_bearing_trees", "TOTAL BEARING"):
+        for key in ("total_trees", "total_bearing_trees", "TOTAL BEARING", "bearing_trees"):
             if row.get(key) is not None:
                 trees = row.get(key)
                 break
@@ -94,4 +134,4 @@ def is_farmer_registration_complete(row: dict) -> bool:
     except (TypeError, ValueError):
         has_trees = False
 
-    return bool(barangay or has_farm_area or has_trees)
+    return bool(has_address or barangay or has_farm_area or has_trees)

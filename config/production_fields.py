@@ -69,6 +69,28 @@ for _v in VARIETIES:
 
 PRODUCTION_DETAIL_JSON_COLUMN = "production_detail"
 
+CURRENT_APP_SCHEMA_COLUMNS: dict[str, list[tuple[str, str, str]]] = {
+    "farm_information": [
+        ("province", "VARCHAR(80) DEFAULT 'Batangas'", "VARCHAR(80) DEFAULT 'Batangas'"),
+        ("municipality", "VARCHAR(80) DEFAULT 'Lipa City'", "VARCHAR(80) DEFAULT 'Lipa City'"),
+        ("house_no", "VARCHAR(120) DEFAULT NULL", "VARCHAR(120) DEFAULT NULL"),
+        ("street", "VARCHAR(160) DEFAULT NULL", "VARCHAR(160) DEFAULT NULL"),
+        ("farm_latitude", "NUMERIC(10,8) DEFAULT NULL", "DECIMAL(10,8) DEFAULT NULL"),
+        ("farm_longitude", "NUMERIC(10,8) DEFAULT NULL", "DECIMAL(10,8) DEFAULT NULL"),
+        ("farm_location_notes", "TEXT DEFAULT NULL", "TEXT DEFAULT NULL"),
+        ("terms_accepted", "BOOLEAN NOT NULL DEFAULT FALSE", "TINYINT(1) NOT NULL DEFAULT 0"),
+        ("terms_accepted_at", "TIMESTAMPTZ NULL", "DATETIME NULL"),
+        ("coffee_varieties", "TEXT DEFAULT NULL", "TEXT DEFAULT NULL"),
+        ("coffee_distribution", "VARCHAR(40) DEFAULT NULL", "VARCHAR(40) DEFAULT NULL"),
+    ],
+    "personal_information": [
+        ("province", "VARCHAR(80) DEFAULT 'Batangas'", "VARCHAR(80) DEFAULT 'Batangas'"),
+        ("municipality", "VARCHAR(80) DEFAULT 'Lipa City'", "VARCHAR(80) DEFAULT 'Lipa City'"),
+        ("house_no", "VARCHAR(120) DEFAULT NULL", "VARCHAR(120) DEFAULT NULL"),
+        ("street", "VARCHAR(160) DEFAULT NULL", "VARCHAR(160) DEFAULT NULL"),
+    ],
+}
+
 PRODUCTION_DETAIL_SELECT_SQL = ", ".join(
     [f"prod.{name}" for name, _, _ in PRODUCTION_DETAIL_COLUMNS]
     + [f"prod.{PRODUCTION_DETAIL_JSON_COLUMN}"]
@@ -166,6 +188,41 @@ def ensure_production_detail_columns(conn) -> list[str]:
         cur.close()
     except Exception:
         pass
+    return added
+
+
+def ensure_current_app_schema_columns(conn) -> list[str]:
+    """Add current app registration / address fields required by the dashboard forms."""
+    import beanthentic_env
+
+    postgres = beanthentic_env.is_postgresql()
+    added: list[str] = []
+    cur = conn.cursor()
+    try:
+        for table_name, columns in CURRENT_APP_SCHEMA_COLUMNS.items():
+            if not _table_exists(cur, table_name, postgres=postgres):
+                continue
+            for col_name, pg_ddl, mysql_ddl in columns:
+                if _column_exists(cur, table_name, col_name, postgres=postgres):
+                    continue
+                ddl = pg_ddl if postgres else mysql_ddl
+                try:
+                    cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {ddl}")
+                    added.append(f"{table_name}.{col_name}")
+                except Exception:
+                    pass
+        try:
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
     return added
 
 

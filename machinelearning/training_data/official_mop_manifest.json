@@ -1,56 +1,56 @@
 {
-  "built_at": "2026-08-15T13:11:43.134052+00:00",
+  "built_at": "2026-08-20T06:57:10.185697+00:00",
   "official_file_count": 7,
   "training_row_count": 19,
-  "csv_path": "machinelearning\\training_data\\ipophl_official_mop_dataset.csv",
-  "json_path": "machinelearning\\training_data\\gi_documents_raw.json",
+  "csv_path": "machinelearning/training_data/ipophl_official_mop_dataset.csv",
+  "json_path": "machinelearning/training_data/gi_documents_raw.json",
   "files": [
     {
       "sample_id": "n1",
       "task_id": "phase1-introduction",
-      "path": "reference\\mop\\PART 1 - Justification for the Request for Protection-20260724T153341Z-1-001\\PART 1 - Justification for the Request for Protection\\Introduction & Reputation.docx",
+      "path": "reference/mop/PART 1 - Justification for the Request for Protection-20260724T153341Z-1-001/PART 1 - Justification for the Request for Protection/Introduction & Reputation.docx",
       "status": "Ready",
       "word_count": 1114
     },
     {
       "sample_id": "n2",
       "task_id": "phase1-history",
-      "path": "reference\\mop\\PART 1 - Justification for the Request for Protection-20260724T153341Z-1-001\\PART 1 - Justification for the Request for Protection\\History of Kapeng Barako.docx",
+      "path": "reference/mop/PART 1 - Justification for the Request for Protection-20260724T153341Z-1-001/PART 1 - Justification for the Request for Protection/History of Kapeng Barako.docx",
       "status": "Ready",
       "word_count": 3921
     },
     {
       "sample_id": "n3",
       "task_id": "phase1-physical-link",
-      "path": "reference\\mop\\PART 1 - Justification for the Request for Protection-20260724T153341Z-1-001\\PART 1 - Justification for the Request for Protection\\Physical link to the territory.docx",
+      "path": "reference/mop/PART 1 - Justification for the Request for Protection-20260724T153341Z-1-001/PART 1 - Justification for the Request for Protection/Physical link to the territory.docx",
       "status": "Ready",
       "word_count": 2403
     },
     {
       "sample_id": "n4",
       "task_id": "phase2-general",
-      "path": "reference\\mop\\PART 2 - Technical Part-20260724T153344Z-1-001\\PART 2 - Technical Part\\TECHNICAL - General Description.docx",
+      "path": "reference/mop/PART 2 - Technical Part-20260724T153344Z-1-001/PART 2 - Technical Part/TECHNICAL - General Description.docx",
       "status": "Ready",
       "word_count": 608
     },
     {
       "sample_id": "n5",
       "task_id": "phase2-specific",
-      "path": "reference\\mop\\PART 2 - Technical Part-20260724T153344Z-1-001\\PART 2 - Technical Part\\TECHNICAL - Specific Description of the Production.docx",
+      "path": "reference/mop/PART 2 - Technical Part-20260724T153344Z-1-001/PART 2 - Technical Part/TECHNICAL - Specific Description of the Production.docx",
       "status": "Not Ready",
       "word_count": 52
     },
     {
       "sample_id": "n6",
       "task_id": "phase2-production",
-      "path": "reference\\mop\\PART 2 - Technical Part-20260724T153344Z-1-001\\PART 2 - Technical Part\\TECHNICAL - The Production Process.docx",
+      "path": "reference/mop/PART 2 - Technical Part-20260724T153344Z-1-001/PART 2 - Technical Part/TECHNICAL - The Production Process.docx",
       "status": "Not Ready",
       "word_count": 2817
     },
     {
       "sample_id": "n7",
       "task_id": "phase3-control",
-      "path": "reference\\mop\\CONTROL & TRACEABILITY & LABELLING.docx",
+      "path": "reference/mop/CONTROL & TRACEABILITY & LABELLING.docx",
       "status": "Not Ready",
       "word_count": 73
     }

@@ -266,7 +266,7 @@ def _ensure_production_detail_columns() -> None:
     """Add harvest / GCB / roasted detail columns on production_information."""
     try:
         from config.mysql_app_bridge import connect_app_db
-        from config.production_fields import ensure_production_detail_columns
+        from config.production_fields import ensure_current_app_schema_columns, ensure_production_detail_columns
         from config.supabase_production_sync import (
             backfill_production_classifications_from_detail,
             backfill_production_detail_from_legacy,
@@ -278,6 +278,9 @@ def _ensure_production_detail_columns() -> None:
             added = ensure_production_detail_columns(conn)
             if added:
                 print(f"[Beanthentic] production_information: added {len(added)} column(s)")
+            registration_added = ensure_current_app_schema_columns(conn)
+            if registration_added:
+                print(f"[Beanthentic] current app schema: added {len(registration_added)} column(s)")
             updated = backfill_production_detail_from_legacy(conn)
             if updated:
                 print(f"[Beanthentic] production_information: backfilled {updated} row(s) from legacy qty")
