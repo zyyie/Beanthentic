@@ -2952,10 +2952,10 @@ class DashboardApp {
 
     if (statusEl) {
       statusEl.textContent = enabled
-        ? 'Self-sale enabled — Records unlocked. Price applications are managed in Coffee Pricing.'
+        ? 'Self-sale enabled — Records unlocked.'
         : access.reason === 'pricelist'
-          ? 'Self-sale is off — Records frozen. Enable self-sale from Coffee Pricing → Records Unlock Queue, or approve a price application.'
-          : 'Self-sale is disabled for this farmer.';
+          ? 'Self-sale off — Records frozen.'
+          : 'Self-sale disabled.';
       statusEl.classList.toggle('is-enabled', enabled);
       statusEl.classList.toggle('is-locked', !enabled && access.reason === 'pricelist');
     }

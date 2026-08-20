@@ -569,7 +569,8 @@ def get_farmer_self_sale(farmer_id: int) -> bool:
     rows = resp.data or []
     if not rows:
         return False
-    return bool(rows[0].get("self_sale_enabled"))
+    value = rows[0].get("self_sale_enabled")
+    return value in (True, 1, "1", "true", "True", "TRUE", "yes", "Yes", "YES")
 
 
 _SELL_PATH_PREFS = frozenset({"sell_produce", "drop_off_and_sell"})
@@ -615,7 +616,7 @@ def sync_registration_price_applications(*, farmer_id: int | None = None) -> int
         try:
             class_rows = (
                 client.table("production_bean_classifications")
-                .select("variety, bean_type, classification, quantity, price, sell_qty")
+                .select("*")
                 .eq("production_info_id", prod_id)
                 .execute()
                 .data
@@ -652,14 +653,30 @@ def sync_registration_price_applications(*, farmer_id: int | None = None) -> int
             variety = str(row.get("variety") or "").strip().lower()
             bean_type = str(row.get("bean_type") or "").strip().lower()
             classification = _normalize_classification(row.get("classification"))
-            sell_qty = float(row.get("sell_qty") or 0)
-            qty = sell_qty if sell_qty > 0 else float(row.get("quantity") or 0)
+            sell_qty_raw = next(
+                (row.get(key) for key in ("sell_qty", "sell_qty_kg", "sell_kg", "sell") if row.get(key) not in (None, "")),
+                None,
+            )
+            quantity_raw = next(
+                (row.get(key) for key in ("quantity", "quantity_kg", "qty_kg", "amount_kg") if row.get(key) not in (None, "")),
+                None,
+            )
+            sell_qty = float(sell_qty_raw or 0)
+            qty = sell_qty if sell_qty > 0 else float(quantity_raw or 0)
             if pref == "drop_off_and_sell" and sell_qty <= 0:
                 continue
-            if qty <= 0 or row.get("price") is None:
+            requested_raw = next(
+                (
+                    row.get(key)
+                    for key in ("price", "price_per_kg", "requested_price", "requested_price_per_kg", "ask_price_per_kg")
+                    if row.get(key) not in (None, "")
+                ),
+                None,
+            )
+            if qty <= 0 or requested_raw is None:
                 continue
             try:
-                requested = float(row.get("price"))
+                requested = float(requested_raw)
             except (TypeError, ValueError):
                 continue
             if requested <= 0 or variety not in VALID_VARIETIES:
@@ -744,9 +761,11 @@ def submit_price_application(data: dict) -> dict:
         raise ValueError("quantity_kg must be greater than zero.")
 
     requested = _pick(data, "requested_price_per_kg", "requested_price", "price_per_kg", "ask_price_per_kg")
-    requested_price = float(requested) if requested is not None and str(requested).strip() != "" else None
-    if requested_price is not None and requested_price <= 0:
-        raise ValueError("requested_price_per_kg must be greater than zero when provided.")
+    if requested is None or str(requested).strip() == "":
+        raise ValueError("requested_price_per_kg is required for a price application.")
+    requested_price = float(requested)
+    if requested_price <= 0:
+        raise ValueError("requested_price_per_kg must be greater than zero.")
 
     reference = _lookup_reference_price(variety, bean_type, classification)
     sale_channel = str(_pick(data, "sale_channel", "channel") or "self_sale").strip().lower() or "self_sale"

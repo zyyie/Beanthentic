@@ -131,6 +131,9 @@ def _merge_farmer_row(
     tc = trees or {}
     prod = production or {}
     u = user or {}
+    self_sale_enabled = farmer.get("self_sale_enabled") in (
+        True, 1, "1", "true", "True", "TRUE", "yes", "Yes", "YES"
+    )
 
     row: dict = {
         "farmer_id": farmer.get("farmer_id"),
@@ -215,7 +218,9 @@ def _merge_farmer_row(
         "warning_count": farmer.get("warning_count"),
         "last_warning_at": farmer.get("last_warning_at"),
         "last_warning_reason": farmer.get("last_warning_reason"),
-        "self_sale_enabled": farmer.get("self_sale_enabled"),
+        "self_sale_enabled": self_sale_enabled,
+        "records_module_enabled": self_sale_enabled,
+        "records_unlocked": self_sale_enabled,
         "profile_photo_data": farmer.get("profile_photo"),
         "profile_photo": farmer.get("profile_photo"),
     }

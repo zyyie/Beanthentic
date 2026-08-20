@@ -953,6 +953,7 @@ def _map_app_row_to_dashboard(
     province = str(row.get("province") or row.get("PROVINCE") or "Batangas").strip() or "Batangas"
     house_no = str(row.get("house_no") or row.get("HOUSE NO.") or "").strip()
     street = str(row.get("street") or row.get("STREET") or "").strip()
+    self_sale_enabled = row.get("self_sale_enabled") in (True, 1, "1", "true", "True", "TRUE", "yes", "Yes", "YES")
 
     mapped = {
         **row_out,
@@ -960,7 +961,9 @@ def _map_app_row_to_dashboard(
         "farmer_id": fid,
         "user_id": int(row.get("user_id") or 0) or None,
         "is_blocked": active_susp,
-        "self_sale_enabled": bool(row.get("self_sale_enabled")),
+        "self_sale_enabled": self_sale_enabled,
+        "records_module_enabled": self_sale_enabled,
+        "records_unlocked": self_sale_enabled,
         "consolidation_preference": str(row.get("consolidation_preference") or "").strip() or None,
         "pricelist_status": str(row.get("pricelist_status") or "").strip().lower() or None,
         "suspended_until": suspended_until_ms,

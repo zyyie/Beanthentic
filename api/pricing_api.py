@@ -24,6 +24,10 @@ from config.utils import get_current_admin_account, get_current_user_phone, is_a
 from config.validation import validate_positive_int
 
 
+def _as_bool(value) -> bool:
+    return value in (True, 1, "1", "true", "True", "TRUE", "yes", "Yes", "YES")
+
+
 def _pricing_unavailable():
     return jsonify({"ok": False, "error": "PRICING_NOT_CONFIGURED", "detail": "Supabase is not configured."}), 503
 
@@ -148,7 +152,7 @@ def register_pricing_routes(app):
         ok_fid, fid_err, farmer_id = validate_positive_int(data.get("farmer_id"), field="farmer_id", minimum=1)
         if not ok_fid:
             return jsonify({"ok": False, "error": fid_err}), 400
-        enabled = bool(data.get("enabled"))
+        enabled = _as_bool(data.get("enabled"))
         try:
             set_farmer_self_sale(farmer_id, enabled)
             audit = _record_unlock_audit(farmer_id, enabled=enabled)
@@ -268,7 +272,7 @@ def register_pricing_routes(app):
             )
             if fr.data:
                 farmer_status = str((fr.data[0] or {}).get("status") or "pending")
-                enabled = bool((fr.data[0] or {}).get("self_sale_enabled"))
+                enabled = _as_bool((fr.data[0] or {}).get("self_sale_enabled"))
             prod = (
                 get_client()
                 .table("production_information")

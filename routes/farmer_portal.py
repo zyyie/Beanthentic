@@ -59,7 +59,10 @@ def _portal_status_payload(farmer_id: int | None, phone: str) -> dict:
                     )
                     if fr.data:
                         farmer_status = str((fr.data[0] or {}).get("status") or "pending")
-                        self_sale_enabled = bool((fr.data[0] or {}).get("self_sale_enabled"))
+                        value = (fr.data[0] or {}).get("self_sale_enabled")
+                        self_sale_enabled = value in (
+                            True, 1, "1", "true", "True", "TRUE", "yes", "Yes", "YES"
+                        )
                     prod = (
                         get_client()
                         .table("production_information")
